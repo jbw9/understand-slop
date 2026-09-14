@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useSpring, useTransform } from "motion/react";
 import { cn } from "@/lib/utils";
-import { AnatomyView } from "@/components/anatomy";
+import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { E0, E1, L0, L1, type Edge, type Node } from "@/lib/data";
+import { E0, E1, L0, L1, LINKS, type Edge, type Node } from "@/lib/data";
 
 /**
  * The whole screen. A pan/zoom surface holding the diagram — no chrome, no
@@ -26,15 +26,57 @@ const MAX_SCALE = 3.2;
 const READ_MIN = 0.75;
 const READ_MAX = 1.05;
 
-/** Column/row geometry of the world, in un-scaled px. */
-const COL_W = 460;
-const ROW_H = 190;
 const CARD_W = 380;
-const OVERVIEW = { scale: 0.8, x: 120, y: 90 };
+const OVERVIEW = { scale: 0.8, x: 80, y: 60 };
+
+/**
+ * Hand-placed layout, read left-to-right as a request flows through the system:
+ * the client enters, the API fans out to the domains that do the work, and
+ * those land on the stores that persist it.
+ *
+ * Deliberately NOT a uniform grid. An even col*W, row*H lattice reads as a
+ * spreadsheet — every card the same size at the same pitch says nothing about
+ * what matters or what depends on what. Real architecture diagrams vary tier
+ * width, stagger cards off each other's baseline, and give the busy tiers more
+ * room. The irregularity is the information.
+ */
+const PLACE: Record<string, { x: number; y: number; w?: number }> = {
+  // entry
+  client: { x: 0, y: 300 },
+  // the gate everything passes through — wider, vertically centred on the fan
+  api: { x: 470, y: 210, w: 300 },
+  auth: { x: 470, y: 430, w: 300 },
+  // the domains that do the work, fanned out
+  billing: { x: 880, y: 40 },
+  projects: { x: 880, y: 250 },
+  jobs: { x: 880, y: 470 },
+  // where it all lands
+  db: { x: 1350, y: 150 },
+  storage: { x: 1350, y: 400 },
+  // the hole, deliberately off to the side and away from the flow
+  obs: { x: 1350, y: 620, w: 300 },
+};
 
 function worldPos(node: Node) {
-  return { x: node.col * COL_W, y: node.row * ROW_H };
+  return PLACE[node.id] ?? { x: 0, y: 0 };
 }
+
+function cardWidth(node: Node) {
+  return PLACE[node.id]?.w ?? CARD_W;
+}
+
+/**
+ * Explicit size for the world box.
+ *
+ * Every node inside it is absolutely positioned, so without this the element
+ * collapses to 0x0 — and WireLayer, which measures its bounding rect to size
+ * the SVG, renders a 0x0 canvas that clips every wire away. The paths are
+ * computed correctly either way; they simply have nowhere to land.
+ */
+const WORLD = {
+  w: Math.max(...L0.map((n) => worldPos(n).x + cardWidth(n))) + 200,
+  h: Math.max(...L0.map((n) => worldPos(n).y)) + 900,
+};
 
 export function Canvas() {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -66,7 +108,44 @@ export function Canvas() {
     [focus],
   );
 
+  /* ── tracing a row-level chain ────────────────────────────── */
+
+  const [traced, setTraced] = useState<string | null>(null);
+
+  /**
+   * Walk LINKS outward from the clicked row. Following the chain transitively
+   * is what produces the cascade a developer expects — click a foreign key and
+   * you see the column it references *and* what reads that column, not just one
+   * hop. Depth-capped so a cycle in the fixture can't hang the walk.
+   */
+  const lit = useMemo(() => {
+    if (!traced) return new Set<string>();
+    const seen = new Set<string>([traced]);
+    let frontier = [traced];
+    for (let hop = 0; hop < 6 && frontier.length; hop++) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        for (const l of LINKS) {
+          if (l.from === id && !seen.has(l.to)) { seen.add(l.to); next.push(l.to); }
+          if (l.to === id && !seen.has(l.from)) { seen.add(l.from); next.push(l.from); }
+        }
+      }
+      frontier = next;
+    }
+    return seen;
+  }, [traced]);
+
   const wires = useMemo<Wire[]>(() => {
+    // While tracing, row wires REPLACE card wires. Two wire systems on screen
+    // at once is exactly the clutter that made the card-only version unreadable.
+    if (traced) {
+      return LINKS.filter((l) => lit.has(l.from) && lit.has(l.to)).map((l) => ({
+        from: l.from,
+        to: l.to,
+        kind: wireKind(l.state, l.alarm),
+        depth: l.from === traced || l.to === traced ? 0 : 1,
+      }));
+    }
     const edges: Edge[] = [...E0];
     for (const id of openIds) edges.push(...(E1[id] ?? []));
     const mapped = edges.map((e) => ({
@@ -81,7 +160,17 @@ export function Canvas() {
     // that actually touch what is in scope.
     const inScope = new Set<string>([focus, ...(L1[focus] ?? []).map((n) => n.id)]);
     return mapped.filter((w) => inScope.has(w.from) && inScope.has(w.to));
-  }, [openIds, focus]);
+  }, [openIds, focus, traced, lit]);
+
+  const rowCtx = useMemo<RowCtx>(
+    () => ({
+      anchor,
+      lit,
+      tracing: Boolean(traced),
+      onTrace: (id) => setTraced((cur) => (cur === id ? null : id)),
+    }),
+    [anchor, lit, traced],
+  );
 
   /* ── drilling ─────────────────────────────────────────────── */
 
@@ -116,7 +205,7 @@ export function Canvas() {
       // it arrives. Height only shifts the centre now — it no longer drives
       // scale, so a tall stack pans rather than zooming out.
       const h = Math.min(84 + members * 62, 460);
-      frame({ x: p.x, y: p.y, w: CARD_W, h });
+      frame({ x: p.x, y: p.y, w: cardWidth(node), h });
       setFocus(node.id);
       setDepth(members > 0 ? 1 : 0);
     },
@@ -208,15 +297,17 @@ export function Canvas() {
       const cy = r.top + r.height / 2;
       if (e.key === "=" || e.key === "+") zoomAt(cx, cy, 1.25);
       else if (e.key === "-" || e.key === "_") zoomAt(cx, cy, 0.8);
-      else if (e.key === "0") drillOut();
+      else if (e.key === "0") { setTraced(null); drillOut(); }
       else if (e.key === "Escape") {
-        if (depth === 2) setDepth(1);
+        // Unwind one layer at a time: trace, then detail, then focus.
+        if (traced) setTraced(null);
+        else if (depth === 2) setDepth(1);
         else drillOut();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [zoomAt, drillOut, depth]);
+  }, [zoomAt, drillOut, depth, traced]);
 
   return (
     <motion.div
@@ -234,7 +325,7 @@ export function Canvas() {
       <motion.div
         ref={worldRef}
         className="absolute left-0 top-0 origin-top-left"
-        style={{ transform }}
+        style={{ transform, width: WORLD.w, height: WORLD.h }}
       >
         {/* Inside the transformed world, so the wires scale with the nodes
             rather than being measured in screen px and drifting. */}
@@ -259,13 +350,14 @@ export function Canvas() {
           return (
             <motion.div
               key={node.id}
-              className="absolute flex w-[380px] flex-col gap-2"
+              className="absolute flex flex-col gap-2"
               // Kept mounted while out of scope: the anchor stays registered
               // and nothing reflows, so coming back is a pure fade. Pointer
               // events go away so an invisible card can't be clicked.
               style={{
                 left: p.x,
                 top: p.y,
+                width: cardWidth(node),
                 pointerEvents: outOfScope ? "none" : "auto",
               }}
               animate={{
@@ -311,6 +403,7 @@ export function Canvas() {
                           ref={anchor(child.id)}
                           compact
                           detail={depth >= 2}
+                          ctx={rowCtx}
                           onClick={() => setDepth(depth >= 2 ? 1 : 2)}
                         />
                       </motion.div>
@@ -333,6 +426,7 @@ function NodeCard({
   inert,
   selected,
   detail,
+  ctx,
   onClick,
 }: {
   node: Node;
@@ -342,14 +436,32 @@ function NodeCard({
   inert?: boolean;
   selected?: boolean;
   detail?: boolean;
+  /** Row anchoring and trace state, threaded down to the anatomy rows. */
+  ctx?: RowCtx;
   onClick?: () => void;
 }) {
-  const Tag = onClick ? "button" : "div";
+  // Always a div, never a button. Anatomy rows are themselves buttons, and the
+  // HTML parser refuses to nest interactive elements — it reparents the inner
+  // ones out of the card, which detaches every wire anchor inside it. The card
+  // takes its click via role/keyboard instead.
   return (
-    <Tag
+    <div
       ref={ref as never}
       data-node
       onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       className={cn(
         "w-full rounded-[14px] border bg-pure-white px-4 text-left transition-[border-color,opacity,box-shadow] duration-200",
         compact ? "py-2" : "py-3.5",
@@ -397,9 +509,9 @@ function NodeCard({
                   {node.detail}
                 </p>
               ) : null}
-              {node.anatomy ? (
+              {node.anatomy && ctx ? (
                 <div className={cn(node.detail && "mt-2.5")}>
-                  <AnatomyView blocks={node.anatomy} />
+                  <AnatomyView owner={node.id} blocks={node.anatomy} ctx={ctx} />
                 </div>
               ) : null}
               {/* Provenance, always. A claim with no location is the failure
@@ -413,6 +525,6 @@ function NodeCard({
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </Tag>
+    </div>
   );
 }

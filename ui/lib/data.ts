@@ -663,3 +663,64 @@ export const OPEN = [
     node: "obs",
   },
 ];
+
+/* ── row-level links ──────────────────────────────────────────
+   The edges developers actually want to trace. Endpoints are ROWS, not cards:
+   a foreign key points at the exact column it references, a route points at
+   the step that serves it. Card-to-card edges ("Billing relates to Database")
+   are nearly contentless; these are the ones that answer a question.
+
+   Row id = `${capabilityId}:${rowKey}` — see rowId() below. */
+
+export interface Link {
+  from: string;
+  to: string;
+  state: State;
+  alarm?: boolean;
+  label?: string;
+}
+
+/** Stable id for an anatomy row, so a wire can anchor to it. */
+export function rowId(owner: string, key: string | number) {
+  return `${owner}:${key}`;
+}
+
+export const LINKS: Link[] = [
+  // Foreign keys — the classic thing you trace through a schema.
+  { from: rowId("bill-subs", "org_id"), to: rowId("db-orgs", "id"), state: "derived", label: "FK" },
+  { from: rowId("db-projects", "org_id"), to: rowId("db-orgs", "id"), state: "derived", label: "FK" },
+  { from: rowId("db-projects", "created_by"), to: rowId("db-users", "id"), state: "derived", label: "FK" },
+  { from: rowId("db-orgs", "user_id"), to: rowId("db-users", "id"), state: "derived", label: "FK" },
+  { from: rowId("db-orgs", "org_id"), to: rowId("db-orgs", "id"), state: "derived", label: "FK" },
+  { from: rowId("db-orgs", "invited_by"), to: rowId("db-users", "id"), state: "derived", label: "FK" },
+
+  // Write paths — which step writes which column.
+  { from: rowId("bill-checkout", 4), to: rowId("bill-subs", "stripe_subscription_id"), state: "derived", label: "writes" },
+  { from: rowId("bill-hooks", "checkout.session.completed"), to: rowId("bill-subs", "status"), state: "derived", label: "writes" },
+  { from: rowId("bill-hooks", "customer.subscription.updated"), to: rowId("bill-subs", "seats"), state: "derived", label: "writes" },
+  { from: rowId("bill-hooks", "customer.subscription.updated"), to: rowId("bill-subs", "current_period_end"), state: "derived", label: "writes" },
+  { from: rowId("bill-hooks", "customer.subscription.deleted"), to: rowId("bill-subs", "canceled_at"), state: "derived", label: "writes" },
+
+  // Reads — an auth claim read out of a column.
+  { from: rowId("auth-session", "Claims"), to: rowId("db-orgs", "role"), state: "derived", label: "reads" },
+  { from: rowId("auth-signin", 2), to: rowId("db-users", "email"), state: "derived", label: "looks up" },
+  { from: rowId("auth-signin", 4), to: rowId("auth-session", "Transport"), state: "derived", label: "sets" },
+
+  // Routes into the write path.
+  { from: rowId("api-projects", "POST /api/projects"), to: rowId("proj-crud", 1), state: "derived", label: "handled by" },
+  { from: rowId("proj-crud", 3), to: rowId("db-projects", "org_id"), state: "derived", label: "writes" },
+  { from: rowId("proj-crud", 4), to: rowId("jobs-queue", "reindexProject"), state: "derived", label: "enqueues" },
+  { from: rowId("api-projects", "POST /api/projects/[id]/files"), to: rowId("proj-uploads", 2), state: "derived", label: "handled by" },
+  { from: rowId("proj-uploads", 4), to: rowId("db-projects", "settings"), state: "partial", label: "unconfirmed uploads orphan" },
+
+  // The alarming one: the webhook route is swept in by the middleware glob.
+  { from: rowId("api-webhooks", "POST /api/webhooks/stripe"), to: rowId("bill-hooks", "Rate limited"), state: "partial", alarm: true, label: "rate limited by IP" },
+
+  // Storage keys derive from the org and project ids.
+  { from: rowId("st-s3", "Key layout"), to: rowId("db-projects", "id"), state: "inferred", label: "key contains" },
+];
+
+/** Every link touching a row, in both directions. */
+export function linksFor(id: string) {
+  return LINKS.filter((l) => l.from === id || l.to === id);
+}

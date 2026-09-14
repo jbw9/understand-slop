@@ -243,13 +243,23 @@ export function WireLayer({
             key={kind}
             id={`arrow-${kind}`}
             viewBox="0 0 10 10"
-            refX="9"
+            refX="8.5"
             refY="5"
-            markerWidth="5"
-            markerHeight="5"
+            // Small and stroked, not a filled wedge. A big solid triangle at
+            // the card edge reads as an arrow bolted onto the wire; a light
+            // chevron reads as the thread simply arriving.
+            markerWidth="4"
+            markerHeight="4"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill={STROKE[kind]} />
+            <path
+              d="M 2.5 2 L 8 5 L 2.5 8"
+              fill="none"
+              stroke={STROKE[kind]}
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </marker>
         ))}
       </defs>
@@ -263,12 +273,14 @@ export function WireLayer({
               d={p.d}
               fill="none"
               stroke={STROKE[p.kind]}
-              strokeWidth={p.depth === 0 ? 2 : 1.5}
+              strokeWidth={p.depth === 0 ? 1.5 : 1.15}
               strokeLinecap="round"
               strokeDasharray={DASHED[p.kind]}
               markerEnd={`url(#arrow-${p.kind})`}
             />
-            <circle cx={p.x1} cy={p.y1} r={2.5} fill={STROKE[p.kind]} />
+            {/* Origin dot — the wire's other terminal. Small enough to read as
+                a node on the thread rather than a bullet. */}
+            <circle cx={p.x1} cy={p.y1} r={2} fill={STROKE[p.kind]} />
           </g>
         );
       })}

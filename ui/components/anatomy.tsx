@@ -111,9 +111,10 @@ function Block({
                 {c.note ? (
                   <span
                     className={cn(
-                      "truncate text-right text-[10px] leading-snug",
+                      "min-w-0 flex-1 truncate text-right text-[10px] leading-snug",
                       c.state === "derived" ? "text-faint" : "text-amber-ink",
                     )}
+                    title={c.note}
                   >
                     {c.note}
                   </span>
@@ -276,9 +277,11 @@ function Block({
             >
               {p.label}
             </span>
+            {/* Left-aligned: right-aligning a long value in a narrow column
+                produces a ragged staircase of 3-4 wrapped lines. */}
             <span
               className={cn(
-                "min-w-0 flex-1 text-right text-[10px] leading-snug",
+                "min-w-0 flex-1 text-left text-[10px] leading-snug",
                 p.state === "derived" ? "text-muted-slate" : "text-amber-ink",
               )}
             >

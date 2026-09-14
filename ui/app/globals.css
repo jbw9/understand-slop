@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── surfaces ─────────────────────────────────────────────
+     Warm cream ground with a container ramp, so panels sit on
+     paper rather than on flat white. */
+  --color-warm-cream: #fafaf8;
+  --color-pure-white: #ffffff;
+  --color-surface: #f9f9f7;
+  --color-surface-container-low: #f4f4f2;
+  --color-surface-container: #eeeeec;
+  --color-surface-dim: #dadad8;
+
+  /* ── ink ───────────────────────────────────────────────── */
+  --color-ink: #1a1a2e;
+  --color-on-surface: #1a1c1b;
+  --color-on-surface-variant: #404945;
+  --color-muted-slate: #6b7280;
+  --color-faint: #9aa0a6;
+
+  /* ── green family — derived, compiler-resolved ─────────── */
+  --color-deep-green: #1f5c4d;
+  --color-brand: #004437;
+  --color-forest-green: #2e7d32;
+  --color-mint-success: #e8f5e9;
+  --color-mint-line: #cfe6d4;
+
+  /* ── amber family — partial, found but incomplete ──────── */
+  --color-amber-ink: #8a6416;
+  --color-amber-surface: #fdf6e3;
+  --color-amber-line: #e2c77e;
+
+  /* ── clay family — the one alarming finding ────────────── */
+  --color-clay-ink: #8e3320;
+  --color-clay-surface: #fbede9;
+  --color-clay-line: #e0b3a5;
+
+  /* ── lines ─────────────────────────────────────────────── */
+  --color-border-gray: #e7e5e0;
+  --color-border-strong: #d6d3cc;
+  --color-wire: #b9b6ae;
+
+  /* ── shape ─────────────────────────────────────────────── */
+  --radius-panel: 20px;
+  --radius-row: 12px;
+  --radius-chip: 999px;
+
+  /* ── elevation ─────────────────────────────────────────── */
+  --shadow-panel: 0 1px 2px rgba(26, 26, 46, 0.04);
+  --shadow-lift: 0 10px 34px -6px rgba(26, 26, 46, 0.1);
+
+  /* ── type ──────────────────────────────────────────────── */
+  --text-display: 30px;
+  --text-display--line-height: 1.18;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 600;
+
+  --text-title: 20px;
+  --text-title--line-height: 1.3;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 600;
+
+  --text-label: 11px;
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.08em;
+  --text-label--font-weight: 600;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border-gray);
+  }
+  html {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-warm-cream);
+    color: var(--color-ink);
+  }
+  /* Numbers in chips and counts must not jitter as they change. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Dot grid for the canvas ground — paper texture, not a grid
+     you are meant to align to. */
+  .dotfield {
+    background-image: radial-gradient(
+      var(--color-surface-dim) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+    background-position: -1px -1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

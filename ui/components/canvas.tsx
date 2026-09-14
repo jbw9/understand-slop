@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { AnimatePresence, motion, useSpring, useTransform } from "motion/react";
 import { cn } from "@/lib/utils";
+import { AnatomyView } from "@/components/anatomy";
 import { StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { E0, E1, L0, L1, type Edge, type Node } from "@/lib/data";
@@ -20,6 +21,10 @@ import { E0, E1, L0, L1, type Edge, type Node } from "@/lib/data";
 
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 3.2;
+
+/** Comfortable reading band. Drilling nudges into this and no further. */
+const READ_MIN = 0.75;
+const READ_MAX = 1.05;
 
 /** Column/row geometry of the world, in un-scaled px. */
 const COL_W = 460;
@@ -80,19 +85,21 @@ export function Canvas() {
 
   /* ── drilling ─────────────────────────────────────────────── */
 
-  /** Animate the view so a world-space box sits centred in the viewport. */
+  /**
+   * Centre a world-space box in the viewport.
+   *
+   * Deliberately does NOT scale to fit. Drilling in is a FILTER — the other
+   * domains fade out, which is what makes the focused one readable. Zooming
+   * hard on top of that is redundant magnification that throws away the
+   * surrounding context for no gain. Scale is only nudged into a comfortable
+   * reading band, and left alone if it is already there.
+   */
   const frame = useCallback(
-    (box: { x: number; y: number; w: number; h: number }, pad = 120) => {
+    (box: { x: number; y: number; w: number; h: number }) => {
       const vp = viewportRef.current;
       if (!vp) return;
       const r = vp.getBoundingClientRect();
-      const s = Math.min(
-        MAX_SCALE,
-        Math.max(
-          MIN_SCALE,
-          Math.min((r.width - pad * 2) / box.w, (r.height - pad * 2) / box.h),
-        ),
-      );
+      const s = Math.min(READ_MAX, Math.max(READ_MIN, ss.get()));
       ss.set(s);
       sx.set(r.width / 2 - (box.x + box.w / 2) * s);
       sy.set(r.height / 2 - (box.y + box.h / 2) * s);
@@ -104,10 +111,12 @@ export function Canvas() {
     (node: Node) => {
       const p = worldPos(node);
       const members = L1[node.id]?.length ?? 0;
-      // Frame the subsystem plus the column of members about to appear, so the
+      // Centre on the domain plus the capabilities about to appear, so the
       // camera lands where the content will be rather than shifting again once
-      // it arrives.
-      frame({ x: p.x, y: p.y, w: CARD_W, h: 84 + members * 54 });
+      // it arrives. Height only shifts the centre now — it no longer drives
+      // scale, so a tall stack pans rather than zooming out.
+      const h = Math.min(84 + members * 62, 460);
+      frame({ x: p.x, y: p.y, w: CARD_W, h });
       setFocus(node.id);
       setDepth(members > 0 ? 1 : 0);
     },
@@ -374,7 +383,7 @@ function NodeCard({
         {node.sub}
       </p>
       <AnimatePresence initial={false}>
-        {detail && node.detail ? (
+        {detail && (node.detail || node.anatomy) ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -382,9 +391,25 @@ function NodeCard({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <p className="mt-1.5 border-t border-border-gray pt-1.5 text-[10.5px] leading-relaxed text-on-surface-variant">
-              {node.detail}
-            </p>
+            <div className="mt-2 border-t border-border-gray pt-2">
+              {node.detail ? (
+                <p className="text-[10.5px] leading-relaxed text-on-surface-variant">
+                  {node.detail}
+                </p>
+              ) : null}
+              {node.anatomy ? (
+                <div className={cn(node.detail && "mt-2.5")}>
+                  <AnatomyView blocks={node.anatomy} />
+                </div>
+              ) : null}
+              {/* Provenance, always. A claim with no location is the failure
+                  mode this tool exists to avoid. */}
+              {node.evidence ? (
+                <p className="mt-2 font-mono text-[9.5px] text-faint">
+                  {node.evidence}
+                </p>
+              ) : null}
+            </div>
           </motion.div>
         ) : null}
       </AnimatePresence>

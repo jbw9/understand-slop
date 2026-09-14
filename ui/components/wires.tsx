@@ -35,6 +35,13 @@ export interface Wire {
   kind: WireKind;
   /** 0 = touches the focused node directly; deeper = further out. */
   depth: number;
+  /**
+   * Foreign key. Drawn as an ER relationship instead of a flow arrow:
+   * orthogonal elbows routed through the gutter between cards, with crow's
+   * foot terminals — a bar for "exactly one" at the referenced key, three
+   * splayed lines for "many" at the referencing column.
+   */
+  relation?: boolean;
 }
 
 interface Path {
@@ -43,6 +50,13 @@ interface Path {
   depth: number;
   x1: number;
   y1: number;
+  /** ER terminals, when this path is a foreign key. */
+  er?: {
+    /** "many" end — sits on the referencing column. */
+    many: { x: number; y: number; dir: 1 | -1 };
+    /** "one" end — sits on the referenced key. */
+    one: { x: number; y: number; dir: 1 | -1 };
+  };
 }
 
 /**
@@ -163,6 +177,99 @@ export function WireLayer({
       const bx = (B.left + B.right) / 2;
       const by = (B.top + B.bottom) / 2;
 
+      // Foreign keys draw as ER relationships: orthogonal elbows through the
+      // gutter, never diagonals across a card. Three segments — out sideways
+      // from the column, vertically along the gutter, in sideways to the key.
+      if (wire.relation) {
+        // Route around the CARDS, not the rows. A midpoint between two column
+        // rows usually lands inside one of the cards, which is how the lines
+        // ended up cutting straight through the tables.
+        const cardOf = (el: HTMLElement) =>
+          (el.closest("[data-node]") as HTMLElement | null) ?? el;
+        const rca = cardOf(a).getBoundingClientRect();
+        const rcb = cardOf(b).getBoundingClientRect();
+        const CA = {
+          left: (rca.left - base.left) / k,
+          right: (rca.right - base.left) / k,
+          bottom: (rca.bottom - base.top) / k,
+        };
+        const CB = {
+          left: (rcb.left - base.left) / k,
+          right: (rcb.right - base.left) / k,
+          bottom: (rcb.bottom - base.top) / k,
+        };
+
+        const sameCard = Math.abs(CA.left - CB.left) < 1;
+        const rightward = CB.left >= CA.right || (!sameCard && bx >= ax);
+
+        // Exit the card's own edge, not the row's, so the stub always clears
+        // the box it came from.
+        const sx = sameCard
+          ? CA.left
+          : rightward
+            ? CA.right
+            : CA.left;
+        const ex = sameCard ? CB.left : rightward ? CB.left : CB.right;
+        const dirOut: 1 | -1 = sameCard ? -1 : rightward ? 1 : -1;
+
+        const r = 7; // elbow radius, so corners read as drawn not aliased
+        const gutter = sameCard ? 0 : Math.abs(ex - sx);
+
+        // Does any OTHER card sit horizontally between these two? If so the
+        // "gutter" between them is not empty space — it is somebody else's
+        // card, and running the vertical leg there draws straight through it.
+        let dd: string;
+
+        // Capability cards sit side by side in one row, so ANY cross-card link
+        // runs level with the cards between its endpoints. Three attempts at
+        // predicting which ones collide all missed a case; the lane below the
+        // cards is unconditionally clear, so cross-card links always take it.
+        if (!sameCard) {
+          // Cards are adjacent or separated by another card — there is no
+          // gutter to run down. Detour beneath both cards instead of cutting
+          // through whatever sits between them.
+          const lane = Math.max(CA.bottom, CB.bottom) + 20;
+          const outX = sx + dirOut * 16;
+          const inX = ex - dirOut * 16;
+          dd =
+            `M ${sx} ${ay} H ${outX - dirOut * r}` +
+            ` Q ${outX} ${ay} ${outX} ${ay + r}` +
+            ` V ${lane - r}` +
+            ` Q ${outX} ${lane} ${outX + dirOut * r} ${lane}` +
+            ` H ${inX - dirOut * r}` +
+            ` Q ${inX} ${lane} ${inX} ${lane - r}` +
+            ` V ${by + r}` +
+            ` Q ${inX} ${by} ${inX - dirOut * r} ${by}` +
+            ` H ${ex}`;
+        } else {
+          // Two tables in one card: bow out into the left margin rather than
+          // crossing the rows between them. Otherwise run the real gutter.
+          const mid = sameCard ? CA.left - 22 : (sx + ex) / 2;
+          const sweepDown = by > ay;
+          const vSign = sweepDown ? 1 : -1;
+          const canRound = Math.abs(by - ay) > r * 2 + 2;
+          dd = canRound
+            ? `M ${sx} ${ay} H ${mid - dirOut * r}` +
+              ` Q ${mid} ${ay} ${mid} ${ay + vSign * r}` +
+              ` V ${by - vSign * r}` +
+              ` Q ${mid} ${by} ${mid + dirOut * r} ${by}` +
+              ` H ${ex}`
+            : `M ${sx} ${ay} H ${mid} V ${by} H ${ex}`;
+        }
+        next.push({
+          d: dd,
+          kind: wire.kind,
+          depth: wire.depth,
+          x1: sx,
+          y1: ay,
+          er: {
+            many: { x: sx, y: ay, dir: dirOut },
+            one: { x: ex, y: by, dir: (rightward ? -1 : 1) as 1 | -1 },
+          },
+        });
+        continue;
+      }
+
       // Leave and enter through whichever pair of edges the nodes actually
       // face, so a wire never crosses the box it starts from.
       const horizontal = Math.abs(bx - ax) >= Math.abs(by - ay);
@@ -267,6 +374,27 @@ export function WireLayer({
         // Fade with distance from the focused node, so its direct edges stay
         // the loudest thing on the canvas.
         const opacity = Math.max(0.2, 0.92 - p.depth * 0.24);
+        if (p.er) {
+          // ER relationship: crow's foot at the referencing column, single bar
+          // at the referenced key. Cardinality IS the information here, so the
+          // terminals carry it rather than a generic arrowhead.
+          const { many, one } = p.er;
+          const s = STROKE[p.kind];
+          const w = p.depth === 0 ? 1.3 : 1.1;
+          return (
+            <g key={i} opacity={opacity} stroke={s} strokeWidth={w} fill="none" strokeLinecap="round">
+              <path d={p.d} strokeDasharray={DASHED[p.kind]} />
+              {/* many: three splayed lines opening away from the column */}
+              <path
+                d={`M ${many.x + many.dir * 9} ${many.y - 4.5} L ${many.x} ${many.y}` +
+                   ` M ${many.x + many.dir * 9} ${many.y} L ${many.x} ${many.y}` +
+                   ` M ${many.x + many.dir * 9} ${many.y + 4.5} L ${many.x} ${many.y}`}
+              />
+              {/* one: a single bar across the line */}
+              <path d={`M ${one.x + one.dir * 7} ${one.y - 4.5} L ${one.x + one.dir * 7} ${one.y + 4.5}`} />
+            </g>
+          );
+        }
         return (
           <g key={i} opacity={opacity}>
             <path

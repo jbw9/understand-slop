@@ -42,19 +42,20 @@ const OVERVIEW = { scale: 0.8, x: 80, y: 60 };
  */
 const PLACE: Record<string, { x: number; y: number; w?: number }> = {
   // entry
-  client: { x: 0, y: 300 },
-  // the gate everything passes through — wider, vertically centred on the fan
-  api: { x: 470, y: 210, w: 300 },
-  auth: { x: 470, y: 430, w: 300 },
+  client: { x: 0, y: 250 },
+  // the gate everything passes through — narrower, straddling the fan
+  api: { x: 460, y: 150, w: 310 },
+  auth: { x: 460, y: 370, w: 310 },
   // the domains that do the work, fanned out
-  billing: { x: 880, y: 40 },
+  billing: { x: 880, y: 20 },
   projects: { x: 880, y: 250 },
-  jobs: { x: 880, y: 470 },
+  jobs: { x: 880, y: 480 },
   // where it all lands
-  db: { x: 1350, y: 150 },
-  storage: { x: 1350, y: 400 },
-  // the hole, deliberately off to the side and away from the flow
-  obs: { x: 1350, y: 620, w: 300 },
+  db: { x: 1330, y: 135 },
+  storage: { x: 1330, y: 365 },
+  // The hole sits in the tier it would instrument, not exiled far below —
+  // stranded with no neighbour it read as forgotten rather than deliberate.
+  obs: { x: 1330, y: 575, w: 310 },
 };
 
 function worldPos(node: Node) {
@@ -73,9 +74,11 @@ function cardWidth(node: Node) {
  * the SVG, renders a 0x0 canvas that clips every wire away. The paths are
  * computed correctly either way; they simply have nowhere to land.
  */
+// Padding is generous enough for an expanded domain's capabilities to have
+// somewhere to go, but not the blind +900 that left a third of the canvas dead.
 const WORLD = {
-  w: Math.max(...L0.map((n) => worldPos(n).x + cardWidth(n))) + 200,
-  h: Math.max(...L0.map((n) => worldPos(n).y)) + 900,
+  w: Math.max(...L0.map((n) => worldPos(n).x + cardWidth(n))) + 160,
+  h: Math.max(...L0.map((n) => worldPos(n).y)) + 420,
 };
 
 export function Canvas() {
@@ -357,6 +360,9 @@ export function Canvas() {
               style={{
                 left: p.x,
                 top: p.y,
+                // The domain card keeps its tier width whether open or not.
+                // Letting it stretch to its children made a one-line title card
+                // span 1100px, which read as a banner rather than a node.
                 width: cardWidth(node),
                 pointerEvents: outOfScope ? "none" : "auto",
               }}
@@ -377,7 +383,14 @@ export function Canvas() {
               <AnimatePresence>
                 {open && members.length > 0 ? (
                   <motion.div
-                    className="flex flex-col gap-1.5 pl-6"
+                    // Capabilities lay out in columns, not one stack. A single
+                    // 380px column runs off the bottom of the viewport and
+                    // wastes the whole width of the canvas; side-by-side keeps
+                    // a domain readable in one screenful.
+                    // Capabilities sit side by side in real columns. A single
+                    // stack runs off the bottom of the viewport and wastes the
+                    // whole width of the canvas.
+                    className="flex items-start gap-4 pl-6"
                     initial="out"
                     animate="in"
                     exit="out"
@@ -398,14 +411,18 @@ export function Canvas() {
                         }}
                         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                       >
-                        <NodeCard
-                          node={child}
-                          ref={anchor(child.id)}
-                          compact
-                          detail={depth >= 2}
-                          ctx={rowCtx}
-                          onClick={() => setDepth(depth >= 2 ? 1 : 2)}
-                        />
+                        {/* Anatomy opens with the drill, not on a second
+                            hidden click. Showing three bare title cards in an
+                            empty screen buries the only content that matters. */}
+                        <div className="w-[340px]">
+                          <NodeCard
+                            node={child}
+                            ref={anchor(child.id)}
+                            compact
+                            detail
+                            ctx={rowCtx}
+                          />
+                        </div>
                       </motion.div>
                     ))}
                   </motion.div>

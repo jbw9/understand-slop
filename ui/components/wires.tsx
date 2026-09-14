@@ -107,12 +107,20 @@ export function WireLayer({
   nodes,
   wires,
   version,
+  scale = 1,
   reflowKey,
 }: {
   canvasRef: RefObject<HTMLDivElement | null>;
   nodes: RefObject<Map<string, HTMLElement>>;
   wires: Wire[];
   version: number;
+  /**
+   * Scale of the transformed world this layer is mounted inside.
+   * getBoundingClientRect reports post-transform screen pixels, so every
+   * measured delta is divided by this to get back to world coordinates —
+   * otherwise the wires would be scaled twice and drift off the nodes.
+   */
+  scale?: number;
   /** Any value that changes when the layout shifts — forces a re-measure. */
   reflowKey?: string | null;
 }) {
@@ -123,7 +131,8 @@ export function WireLayer({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const base = canvas.getBoundingClientRect();
-    setSize({ w: base.width, h: base.height });
+    const k = scale || 1;
+    setSize({ w: base.width / k, h: base.height / k });
 
     const next: Path[] = [];
     for (const wire of wires) {
@@ -133,20 +142,26 @@ export function WireLayer({
       const ra = a.getBoundingClientRect();
       const rb = b.getBoundingClientRect();
 
-      // Cull anything with an endpoint outside the canvas rather than clamping
-      // it to the edge. A clamped wire is a lie — it points at a place the
-      // node isn't. Culling shows only the connections you can actually follow.
-      const off = (r: DOMRect) =>
-        r.bottom < base.top + 8 ||
-        r.top > base.bottom - 8 ||
-        r.right < base.left + 8 ||
-        r.left > base.right - 8;
-      if (off(ra) || off(rb)) continue;
+      // World-space edges of each node. No culling here: the layer lives inside
+      // the panned/zoomed world, so "outside the canvas" no longer means
+      // offscreen — the viewport clips what the eye can't reach.
+      const A = {
+        left: (ra.left - base.left) / k,
+        right: (ra.right - base.left) / k,
+        top: (ra.top - base.top) / k,
+        bottom: (ra.bottom - base.top) / k,
+      };
+      const B = {
+        left: (rb.left - base.left) / k,
+        right: (rb.right - base.left) / k,
+        top: (rb.top - base.top) / k,
+        bottom: (rb.bottom - base.top) / k,
+      };
 
-      const ax = ra.left + ra.width / 2 - base.left;
-      const ay = ra.top + ra.height / 2 - base.top;
-      const bx = rb.left + rb.width / 2 - base.left;
-      const by = rb.top + rb.height / 2 - base.top;
+      const ax = (A.left + A.right) / 2;
+      const ay = (A.top + A.bottom) / 2;
+      const bx = (B.left + B.right) / 2;
+      const by = (B.top + B.bottom) / 2;
 
       // Leave and enter through whichever pair of edges the nodes actually
       // face, so a wire never crosses the box it starts from.
@@ -156,9 +171,9 @@ export function WireLayer({
 
       if (horizontal) {
         const rightward = bx > ax;
-        x1 = (rightward ? ra.right : ra.left) - base.left;
+        x1 = rightward ? A.right : A.left;
         y1 = ay;
-        x2 = (rightward ? rb.left : rb.right) - base.left;
+        x2 = rightward ? B.left : B.right;
         y2 = by;
         const pull = Math.min(Math.max(Math.abs(x2 - x1) * 0.45, 34), 150);
         const dir = rightward ? 1 : -1;
@@ -167,9 +182,9 @@ export function WireLayer({
       } else {
         const downward = by > ay;
         x1 = ax;
-        y1 = (downward ? ra.bottom : ra.top) - base.top;
+        y1 = downward ? A.bottom : A.top;
         x2 = bx;
-        y2 = (downward ? rb.top : rb.bottom) - base.top;
+        y2 = downward ? B.top : B.bottom;
         const pull = Math.min(Math.max(Math.abs(y2 - y1) * 0.45, 28), 120);
         const dir = downward ? 1 : -1;
         const tip = y2 - dir * 3;
@@ -179,7 +194,7 @@ export function WireLayer({
       next.push({ d, kind: wire.kind, depth: wire.depth, x1, y1 });
     }
     setPaths(next);
-  }, [canvasRef, nodes, wires]);
+  }, [canvasRef, nodes, wires, scale]);
 
   // Synchronous and pre-paint, so wires never render a frame behind the nodes.
   useLayoutEffect(() => {

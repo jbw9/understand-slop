@@ -34,6 +34,8 @@ export interface Node {
   alarm?: boolean;
   /** A hole in the analysis, drawn as a hole rather than hidden. */
   ghost?: boolean;
+  /** One line revealed on the card at the deepest zoom level. */
+  detail?: string;
   /** Grid column/row within its level's layout. */
   col: number;
   row: number;
@@ -92,31 +94,31 @@ export const E0: Edge[] = [
 
 export const L1: Record<string, Node[]> = {
   core: [
-    { id: "limiter", title: "RateLimiter.consume", sub: "limiter.ts:74", state: "derived", col: 1, row: 0 },
-    { id: "identity", title: "identify", sub: "identity.ts:23", state: "derived", col: 1, row: 1 },
-    { id: "policies", title: "policyFor", sub: "policies.ts:51 · 4 of 11 keys", state: "partial", col: 1, row: 2 },
-    { id: "rredis", title: "rateRedis", sub: "redis.ts:12", state: "derived", col: 1, row: 3 },
-    { id: "lua", title: "slidingWindow()", sub: "untyped past package boundary", state: "partial", ghost: true, col: 2, row: 3 },
+    { id: "limiter", title: "RateLimiter.consume", sub: "limiter.ts:74", state: "derived", col: 1, row: 0, detail: "7 call sites, all compiler-resolved. None in the webhook route — that one is limited only by the middleware." },
+    { id: "identity", title: "identify", sub: "identity.ts:23", state: "derived", col: 1, row: 1, detail: "Adds a DB round trip to every unauthenticated request carrying x-api-key." },
+    { id: "policies", title: "policyFor", sub: "policies.ts:51 · 4 of 11 keys", state: "partial", col: 1, row: 2, detail: "Key is a template literal of two runtime values, so 4 of 11 policies have no resolvable read." },
+    { id: "rredis", title: "rateRedis", sub: "redis.ts:12", state: "derived", col: 1, row: 3, detail: "A second Redis connection. No recorded rationale for not reusing the session pool." },
+    { id: "lua", title: "slidingWindow()", sub: "untyped past package boundary", state: "partial", ghost: true, col: 2, row: 3, detail: "Built at runtime by defineCommand; resolves to any. Return shape unverified." },
   ],
   routes: [
-    { id: "mw", title: "middleware", sub: "middleware.ts:44", state: "partial", alarm: true, col: 1, row: 0 },
-    { id: "checkout", title: "POST /billing/checkout", sub: "route.ts:22", state: "derived", col: 1, row: 1 },
-    { id: "magic", title: "POST /auth/magic-link", sub: "route.ts:17", state: "derived", col: 1, row: 2 },
-    { id: "projects", title: "GET · POST /projects", sub: "route.ts:19, :48", state: "derived", col: 1, row: 3 },
-    { id: "del", title: "DELETE /projects/[id]", sub: "route.ts:88 · bypass", state: "partial", col: 1, row: 4 },
+    { id: "mw", title: "middleware", sub: "middleware.ts:44", state: "partial", alarm: true, col: 1, row: 0, detail: "Matcher '/api/:path*' sweeps in the Stripe webhook. No call edge proves it — Next registers middleware itself." },
+    { id: "checkout", title: "POST /billing/checkout", sub: "route.ts:22", state: "derived", col: 1, row: 1, detail: "Limited inline and by the middleware, so it decrements two counters per request." },
+    { id: "magic", title: "POST /auth/magic-link", sub: "route.ts:17", state: "derived", col: 1, row: 2, detail: "consume() at :17, then Resend at :34." },
+    { id: "projects", title: "GET · POST /projects", sub: "route.ts:19, :48", state: "derived", col: 1, row: 3, detail: "Rewriting :19 orphaned withThrottle — still exported, now written and read by nothing." },
+    { id: "del", title: "DELETE /projects/[id]", sub: "route.ts:88 · bypass", state: "partial", col: 1, row: 4, detail: "Returns before the limiter on an internal token header. No comment, no test." },
   ],
   stores: [
-    { id: "redis", title: "Redis", sub: "rate:{scope}:{identity}", state: "derived", col: 1, row: 0 },
-    { id: "pg", title: "Postgres", sub: "organizations", state: "derived", col: 1, row: 1 },
-    { id: "queue", title: "BullMQ", sub: "jobs · retry path", state: "partial", col: 1, row: 2 },
+    { id: "redis", title: "Redis", sub: "rate:{scope}:{identity}", state: "derived", col: 1, row: 0, detail: "One round trip per request: ZREMRANGEBYSCORE + ZADD + ZCARD + PEXPIRE via EVALSHA." },
+    { id: "pg", title: "Postgres", sub: "organizations", state: "derived", col: 1, row: 1, detail: "New SELECT on every x-api-key request. These previously touched no DB before routing." },
+    { id: "queue", title: "BullMQ", sub: "jobs · retry path", state: "partial", col: 1, row: 2, detail: "Retry path reachable only through the dynamic handler lookup at handlers.ts:77." },
   ],
   ext: [
-    { id: "stripe", title: "api.stripe.com", sub: "checkout.sessions.create", state: "derived", col: 1, row: 0 },
-    { id: "resend", title: "api.resend.com", sub: "emails.send", state: "derived", col: 1, row: 1 },
+    { id: "stripe", title: "api.stripe.com", sub: "checkout.sessions.create", state: "derived", col: 1, row: 0, detail: "POST /v1/checkout/sessions, downstream of a route that is now rate limited." },
+    { id: "resend", title: "api.resend.com", sub: "emails.send", state: "derived", col: 1, row: 1, detail: "POST /emails from the magic-link handler at :34." },
   ],
   entry: [
-    { id: "mwfile", title: "src/middleware.ts", sub: "+47 −9", state: "derived", col: 1, row: 0 },
-    { id: "envfile", title: "src/env.ts", sub: "+6", state: "derived", col: 1, row: 1 },
+    { id: "mwfile", title: "src/middleware.ts", sub: "+47 −9", state: "derived", col: 1, row: 0, detail: "Constructs the limiter at :31, calls it at :44. The matcher at :71 decides what it fronts." },
+    { id: "envfile", title: "src/env.ts", sub: "+6", state: "derived", col: 1, row: 1, detail: "Adds RATE_LIMIT_REDIS_URL to the server env schema. Purely additive." },
   ],
   hole: [],
 };

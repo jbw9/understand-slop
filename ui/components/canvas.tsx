@@ -147,22 +147,44 @@ export function Canvas() {
         to: l.to,
         kind: wireKind(l.state, l.alarm),
         depth: l.from === traced || l.to === traced ? 0 : 1,
+        relation: l.label === "FK",
       }));
     }
     const edges: Edge[] = [...E0];
     for (const id of openIds) edges.push(...(E1[id] ?? []));
-    const mapped = edges.map((e) => ({
+    const mapped: Wire[] = edges.map((e) => ({
       from: e.from,
       to: e.to,
       kind: wireKind(e.state, e.alarm),
       depth: 0,
     }));
     if (!focus) return mapped;
+
+    // Foreign keys show as soon as a domain is open — an ER map you have to
+    // hunt for by clicking rows is not a map. Only FKs whose BOTH ends are
+    // inside this domain's open capabilities, so nothing dangles off-screen.
+    const capIds = new Set((L1[focus] ?? []).map((n) => n.id));
+    const owner = (rowKey: string) => rowKey.slice(0, rowKey.indexOf(":"));
+    const fks: Wire[] = LINKS.filter(
+      (l) =>
+        l.label === "FK" &&
+        capIds.has(owner(l.from)) &&
+        capIds.has(owner(l.to)),
+    ).map((l) => ({
+      from: l.from,
+      to: l.to,
+      kind: wireKind(l.state, l.alarm),
+      depth: 0,
+      relation: true,
+    }));
     // Out-of-scope nodes stay mounted (so their anchors survive), which means
     // their wires would still be drawn across empty space. Keep only edges
     // that actually touch what is in scope.
     const inScope = new Set<string>([focus, ...(L1[focus] ?? []).map((n) => n.id)]);
-    return mapped.filter((w) => inScope.has(w.from) && inScope.has(w.to));
+    return [
+      ...mapped.filter((w) => inScope.has(w.from) && inScope.has(w.to)),
+      ...fks,
+    ];
   }, [openIds, focus, traced, lit]);
 
   const rowCtx = useMemo<RowCtx>(

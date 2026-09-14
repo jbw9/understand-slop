@@ -1,46 +1,75 @@
 /**
  * Fixture for the prototype. No repository is analysed — this is the shape a
- * real `understand-slop diff` run would emit, captured from one realistic
- * scenario: an agent was asked to "add rate limiting to the API routes" and
- * touched 11 files.
+ * real `understand-slop map` run would emit for a mid-size SaaS codebase.
  *
- * Every fact carries a state. `derived` is resolved by the TypeScript compiler,
- * `partial` was found but the analysis knows it is incomplete (and says why),
- * `inferred` is not derivable from code at all.
+ * The map is organised by CONCEPT, not by file. Someone new to a codebase asks
+ * "how does billing work" and "what's in the database", not "what's in
+ * identity.ts". Files appear only at the bottom, as the evidence for a claim.
+ *
+ * Every fact carries a state. `derived` is resolved by the TypeScript compiler
+ * or read straight out of a migration; `partial` was found but the analysis
+ * knows it is incomplete (and says why); `inferred` is a guess from naming or
+ * layout and is never presented as fact.
  */
 
 export type State = "derived" | "partial" | "inferred";
 
-export type Level = 0 | 1 | 2;
+/* ── anatomy: level 2 renders in the SHAPE of the thing ───────
+   A database capability shows columns. An API capability shows routes. A
+   pipeline shows ordered steps. One prose paragraph for all three would throw
+   away the structure that makes each legible. */
 
-export interface Detail {
-  title: string;
-  loc?: string;
+export interface Column {
+  name: string;
+  type: string;
+  key?: "PK" | "FK" | "UQ";
+  nullable?: boolean;
   state: State;
-  alarm?: boolean;
-  /** Lead paragraph — the finding, in plain English. */
-  lead: string;
-  /** Why the analysis could not finish, when state is not `derived`. */
-  caveat?: string;
-  facts?: { label: string; value: string }[];
-  code?: { path: string; line: number; body: string };
+  note?: string;
 }
+
+export interface Route {
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  path: string;
+  auth: string;
+  state: State;
+  note?: string;
+}
+
+export interface Step {
+  n: number;
+  title: string;
+  detail: string;
+  state: State;
+}
+
+export interface Pair {
+  label: string;
+  value: string;
+  state: State;
+}
+
+export type Anatomy =
+  | { kind: "schema"; table: string; rows: Column[]; rel?: string[] }
+  | { kind: "routes"; rows: Route[] }
+  | { kind: "flow"; rows: Step[] }
+  | { kind: "facts"; rows: Pair[] };
 
 export interface Node {
   id: string;
   title: string;
+  /** One line, plain English. What this IS — never a file path. */
   sub: string;
   state: State;
   alarm?: boolean;
-  /** A hole in the analysis, drawn as a hole rather than hidden. */
   ghost?: boolean;
-  /** One line revealed on the card at the deepest zoom level. */
-  detail?: string;
-  /** Grid column/row within its level's layout. */
   col: number;
   row: number;
-  span?: number;
-  children?: string[];
+  /** Sentence shown when the node is focused, before you go deeper. */
+  detail?: string;
+  /** Where the claim came from. Always a real location. */
+  evidence?: string;
+  anatomy?: Anatomy[];
 }
 
 export interface Edge {
@@ -52,400 +81,585 @@ export interface Edge {
 }
 
 export const RUN = {
-  command: "understand-slop diff HEAD~1",
-  commit: "8f3a1c9",
-  prompt: "add rate limiting to the API routes",
-  model: "claude-sonnet-4-5",
-  files: 11,
-  added: 387,
-  removed: 24,
-  elapsed: "1.8s",
+  command: "understand-slop map .",
+  repo: "acme/platform",
+  commit: "4d91e07",
+  files: 612,
+  elapsed: "6.4s",
 };
 
-export const VERDICT = {
-  lead: "A Redis-backed sliding-window limiter was wired into 6 of 9 route handlers and the global middleware",
-  hot: "which means the Stripe webhook is now rate limited too",
-  state: "inferred" as State,
-};
-
-export const RADIUS = { direct: 11, transitive: 43, unresolved: 5 };
-
-/* ── level 0 — subsystems ─────────────────────────────────── */
+/* ── level 0 — the domains ────────────────────────────────── */
 
 export const L0: Node[] = [
-  { id: "entry", title: "Entry", sub: "2 files · middleware, env", state: "derived", col: 0, row: 1, children: ["mwfile", "envfile"] },
-  { id: "core", title: "Rate limiting core", sub: "4 new files", state: "inferred", col: 1, row: 0, children: ["limiter", "identity", "policies", "rredis", "lua"] },
-  { id: "routes", title: "Route handlers", sub: "6 modified", state: "inferred", col: 1, row: 2, children: ["mw", "checkout", "magic", "projects", "del"] },
-  { id: "stores", title: "Data stores", sub: "3 reached", state: "derived", col: 2, row: 0, children: ["redis", "pg", "queue"] },
-  { id: "ext", title: "External", sub: "2 third-party APIs", state: "derived", col: 2, row: 2, children: ["stripe", "resend"] },
-  { id: "hole", title: "2 handlers unresolved", sub: "dynamic dispatch", state: "partial", ghost: true, col: 2, row: 3 },
+  {
+    id: "client",
+    title: "Web client",
+    sub: "What users see and click",
+    state: "derived",
+    col: 0,
+    row: 0,
+    detail:
+      "Next.js App Router. 34 pages, of which 11 are behind auth and 4 are admin-only.",
+    evidence: "app/**/page.tsx",
+  },
+  {
+    id: "auth",
+    title: "Auth & identity",
+    sub: "Who you are, what you may do",
+    state: "derived",
+    col: 0,
+    row: 1,
+    detail:
+      "Email magic links and Google OAuth. Sessions are JWTs in an httpOnly cookie, checked by middleware on every /app and /api request.",
+    evidence: "src/lib/auth/*.ts",
+  },
+  {
+    id: "api",
+    title: "API surface",
+    sub: "How the client talks to the server",
+    state: "derived",
+    col: 1,
+    row: 0,
+    detail:
+      "41 route handlers under /api. All but 3 require a session; those 3 are webhooks authenticated by signature instead.",
+    evidence: "src/app/api/**/route.ts",
+  },
+  {
+    id: "billing",
+    title: "Billing",
+    sub: "Plans, payment, and what a plan unlocks",
+    state: "derived",
+    col: 1,
+    row: 1,
+    detail:
+      "Stripe Checkout for purchase, webhooks for state. An org's plan gates seat count and project limits.",
+    evidence: "src/server/billing/*.ts",
+  },
+  {
+    id: "projects",
+    title: "Projects",
+    sub: "The thing customers actually make",
+    state: "derived",
+    col: 2,
+    row: 0,
+    detail:
+      "The core domain object. A project belongs to one org, holds uploaded files, and is edited by members with a role.",
+    evidence: "src/server/projects/*.ts",
+  },
+  {
+    id: "db",
+    title: "Database",
+    sub: "Postgres — 14 tables",
+    state: "derived",
+    col: 2,
+    row: 1,
+    detail:
+      "Postgres via Drizzle. 14 tables, 9 with an org_id for tenant isolation. Migrations are checked in and sequential.",
+    evidence: "drizzle/schema.ts, drizzle/migrations/",
+  },
+  {
+    id: "jobs",
+    title: "Background work",
+    sub: "What happens after the response",
+    state: "partial",
+    col: 3,
+    row: 0,
+    detail:
+      "BullMQ on Redis. 9 job types, of which 7 resolve statically; 2 are registered at module load and cannot be traced from the queue.",
+    evidence: "src/server/jobs/handlers.ts:77",
+  },
+  {
+    id: "storage",
+    title: "File storage",
+    sub: "Uploads and generated assets",
+    state: "derived",
+    col: 3,
+    row: 1,
+    detail:
+      "S3 behind presigned URLs. The browser uploads directly; the server only ever sees the key.",
+    evidence: "src/server/storage/s3.ts",
+  },
+  {
+    id: "obs",
+    title: "Observability",
+    sub: "Not found in this repo",
+    state: "inferred",
+    ghost: true,
+    col: 4,
+    row: 1,
+    detail:
+      "No tracing, metrics, or structured logging library is imported anywhere. Either it lives in infrastructure outside this repo, or it does not exist.",
+    evidence: "no match for otel|datadog|sentry in package.json",
+  },
 ];
 
 export const E0: Edge[] = [
-  { from: "entry", to: "core", state: "derived", label: "constructs" },
-  { from: "entry", to: "routes", state: "partial", alarm: true, label: "matcher glob" },
-  { from: "routes", to: "core", state: "derived", label: "consume()" },
-  { from: "core", to: "stores", state: "derived", label: "reads / writes" },
-  { from: "routes", to: "ext", state: "derived", label: "calls out" },
-  { from: "routes", to: "hole", state: "partial", label: "job.type" },
+  { from: "client", to: "api", state: "derived", label: "fetch" },
+  { from: "client", to: "auth", state: "derived", label: "session" },
+  { from: "api", to: "auth", state: "derived", label: "guards" },
+  { from: "api", to: "billing", state: "derived" },
+  { from: "api", to: "projects", state: "derived" },
+  { from: "billing", to: "db", state: "derived" },
+  { from: "projects", to: "db", state: "derived" },
+  { from: "auth", to: "db", state: "derived" },
+  { from: "projects", to: "jobs", state: "derived", label: "enqueue" },
+  { from: "projects", to: "storage", state: "derived" },
+  { from: "jobs", to: "db", state: "partial", label: "2 handlers unresolved" },
+  { from: "jobs", to: "storage", state: "derived" },
 ];
 
-/* ── level 1 — inside each subsystem ──────────────────────── */
+/* ── level 1 — capabilities inside each domain ────────────── */
 
 export const L1: Record<string, Node[]> = {
-  core: [
-    { id: "limiter", title: "RateLimiter.consume", sub: "limiter.ts:74", state: "derived", col: 1, row: 0, detail: "7 call sites, all compiler-resolved. None in the webhook route — that one is limited only by the middleware." },
-    { id: "identity", title: "identify", sub: "identity.ts:23", state: "derived", col: 1, row: 1, detail: "Adds a DB round trip to every unauthenticated request carrying x-api-key." },
-    { id: "policies", title: "policyFor", sub: "policies.ts:51 · 4 of 11 keys", state: "partial", col: 1, row: 2, detail: "Key is a template literal of two runtime values, so 4 of 11 policies have no resolvable read." },
-    { id: "rredis", title: "rateRedis", sub: "redis.ts:12", state: "derived", col: 1, row: 3, detail: "A second Redis connection. No recorded rationale for not reusing the session pool." },
-    { id: "lua", title: "slidingWindow()", sub: "untyped past package boundary", state: "partial", ghost: true, col: 2, row: 3, detail: "Built at runtime by defineCommand; resolves to any. Return shape unverified." },
+  auth: [
+    {
+      id: "auth-signin",
+      title: "Sign in",
+      sub: "Magic link · Google OAuth",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "src/app/api/auth/magic-link/route.ts",
+      anatomy: [
+        {
+          kind: "flow",
+          rows: [
+            { n: 1, title: "POST /api/auth/magic-link", detail: "Email submitted. Rate limited to 5 per hour per address.", state: "derived" },
+            { n: 2, title: "Token minted and stored", detail: "32-byte random token, SHA-256 hashed into auth_tokens, 15 minute expiry.", state: "derived" },
+            { n: 3, title: "Email sent via Resend", detail: "Link points at /auth/verify?token=…", state: "derived" },
+            { n: 4, title: "GET /auth/verify", detail: "Token looked up by hash, marked used, session JWT set as httpOnly cookie.", state: "derived" },
+            { n: 5, title: "Redirect to /app", detail: "Or to the ?next= param if it is a same-origin path.", state: "derived" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "auth-session",
+      title: "Sessions",
+      sub: "JWT cookie, 30 day sliding expiry",
+      state: "derived",
+      col: 0,
+      row: 1,
+      evidence: "src/lib/auth/session.ts:22",
+      anatomy: [
+        {
+          kind: "facts",
+          rows: [
+            { label: "Transport", value: "httpOnly, Secure, SameSite=Lax cookie", state: "derived" },
+            { label: "Algorithm", value: "HS256, secret from AUTH_SECRET", state: "derived" },
+            { label: "Lifetime", value: "30 days, refreshed on each request", state: "derived" },
+            { label: "Claims", value: "sub, org_id, role, iat, exp", state: "derived" },
+            { label: "Revocation", value: "None — a stolen token is valid until expiry", state: "derived" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "auth-rbac",
+      title: "Permissions",
+      sub: "3 roles · checked in 28 places",
+      state: "partial",
+      col: 0,
+      row: 2,
+      detail:
+        "owner / admin / member, checked by a requireRole helper. 4 handlers query the org directly instead of using it.",
+      evidence: "src/lib/auth/rbac.ts:31",
+      anatomy: [
+        {
+          kind: "facts",
+          rows: [
+            { label: "owner", value: "Billing, delete org, transfer ownership", state: "derived" },
+            { label: "admin", value: "Invite and remove members, all project actions", state: "derived" },
+            { label: "member", value: "Read and write projects they are on", state: "derived" },
+            { label: "Bypasses requireRole", value: "4 handlers — inconsistent, not necessarily wrong", state: "partial" },
+          ],
+        },
+      ],
+    },
   ],
-  routes: [
-    { id: "mw", title: "middleware", sub: "middleware.ts:44", state: "partial", alarm: true, col: 1, row: 0, detail: "Matcher '/api/:path*' sweeps in the Stripe webhook. No call edge proves it — Next registers middleware itself." },
-    { id: "checkout", title: "POST /billing/checkout", sub: "route.ts:22", state: "derived", col: 1, row: 1, detail: "Limited inline and by the middleware, so it decrements two counters per request." },
-    { id: "magic", title: "POST /auth/magic-link", sub: "route.ts:17", state: "derived", col: 1, row: 2, detail: "consume() at :17, then Resend at :34." },
-    { id: "projects", title: "GET · POST /projects", sub: "route.ts:19, :48", state: "derived", col: 1, row: 3, detail: "Rewriting :19 orphaned withThrottle — still exported, now written and read by nothing." },
-    { id: "del", title: "DELETE /projects/[id]", sub: "route.ts:88 · bypass", state: "partial", col: 1, row: 4, detail: "Returns before the limiter on an internal token header. No comment, no test." },
+  billing: [
+    {
+      id: "bill-checkout",
+      title: "Checkout",
+      sub: "Stripe hosted, 3 plans",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "src/app/api/billing/checkout/route.ts:22",
+      anatomy: [
+        {
+          kind: "flow",
+          rows: [
+            { n: 1, title: "POST /api/billing/checkout", detail: "Body names a price ID. Caller must be org owner.", state: "derived" },
+            { n: 2, title: "Session created at Stripe", detail: "checkout.sessions.create with client_reference_id = org_id.", state: "derived" },
+            { n: 3, title: "Browser redirected to Stripe", detail: "Card details never touch this server.", state: "derived" },
+            { n: 4, title: "Webhook confirms", detail: "checkout.session.completed writes the subscription row.", state: "derived" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "bill-subs",
+      title: "Subscriptions",
+      sub: "Plan state and entitlements",
+      state: "derived",
+      col: 0,
+      row: 1,
+      evidence: "drizzle/schema.ts:140",
+      anatomy: [
+        {
+          kind: "schema",
+          table: "subscriptions",
+          rows: [
+            { name: "id", type: "uuid", key: "PK", state: "derived" },
+            { name: "org_id", type: "uuid", key: "FK", state: "derived", note: "→ organizations.id, unique" },
+            { name: "stripe_subscription_id", type: "text", key: "UQ", state: "derived" },
+            { name: "status", type: "enum", state: "derived", note: "active · past_due · canceled · trialing" },
+            { name: "plan", type: "enum", state: "derived", note: "free · team · enterprise" },
+            { name: "seats", type: "integer", state: "derived" },
+            { name: "current_period_end", type: "timestamptz", state: "derived" },
+            { name: "canceled_at", type: "timestamptz", nullable: true, state: "derived" },
+          ],
+          rel: [
+            "One row per org (org_id is unique) — an org cannot hold two plans.",
+            "Read on every request through the entitlements cache, not joined per query.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "bill-hooks",
+      title: "Stripe webhooks",
+      sub: "6 events handled",
+      state: "partial",
+      alarm: true,
+      col: 0,
+      row: 2,
+      detail:
+        "The handler is behind the global rate limiter. Stripe retries from a rotating IP pool, so a burst can be 429'd — and Stripe counts a 429 as a failed delivery.",
+      evidence: "src/middleware.ts:71",
+      anatomy: [
+        {
+          kind: "facts",
+          rows: [
+            { label: "checkout.session.completed", value: "Creates the subscription row", state: "derived" },
+            { label: "customer.subscription.updated", value: "Updates status, seats, period end", state: "derived" },
+            { label: "customer.subscription.deleted", value: "Marks canceled, downgrades to free", state: "derived" },
+            { label: "invoice.payment_failed", value: "Sets past_due, enqueues dunning email", state: "derived" },
+            { label: "Signature check", value: "stripe.webhooks.constructEvent — correct", state: "derived" },
+            { label: "Rate limited", value: "Yes, by IP — no call edge proves it, matched from the middleware glob", state: "partial" },
+          ],
+        },
+      ],
+    },
   ],
-  stores: [
-    { id: "redis", title: "Redis", sub: "rate:{scope}:{identity}", state: "derived", col: 1, row: 0, detail: "One round trip per request: ZREMRANGEBYSCORE + ZADD + ZCARD + PEXPIRE via EVALSHA." },
-    { id: "pg", title: "Postgres", sub: "organizations", state: "derived", col: 1, row: 1, detail: "New SELECT on every x-api-key request. These previously touched no DB before routing." },
-    { id: "queue", title: "BullMQ", sub: "jobs · retry path", state: "partial", col: 1, row: 2, detail: "Retry path reachable only through the dynamic handler lookup at handlers.ts:77." },
+  db: [
+    {
+      id: "db-orgs",
+      title: "Organizations & members",
+      sub: "Tenancy lives here",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "drizzle/schema.ts:31",
+      anatomy: [
+        {
+          kind: "schema",
+          table: "organizations",
+          rows: [
+            { name: "id", type: "uuid", key: "PK", state: "derived" },
+            { name: "name", type: "text", state: "derived" },
+            { name: "slug", type: "text", key: "UQ", state: "derived" },
+            { name: "api_key_hash", type: "text", nullable: true, state: "derived", note: "SHA-256, looked up on every x-api-key request" },
+            { name: "created_at", type: "timestamptz", state: "derived" },
+          ],
+        },
+        {
+          kind: "schema",
+          table: "memberships",
+          rows: [
+            { name: "user_id", type: "uuid", key: "PK", state: "derived", note: "composite with org_id" },
+            { name: "org_id", type: "uuid", key: "PK", state: "derived" },
+            { name: "role", type: "enum", state: "derived", note: "owner · admin · member" },
+            { name: "invited_by", type: "uuid", nullable: true, key: "FK", state: "derived" },
+          ],
+          rel: [
+            "Join table: a user can belong to many orgs with a different role in each.",
+            "9 of 14 tables carry org_id. Isolation is enforced in application code, not by row-level security.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "db-projects",
+      title: "Projects & files",
+      sub: "The core domain tables",
+      state: "derived",
+      col: 0,
+      row: 1,
+      evidence: "drizzle/schema.ts:78",
+      anatomy: [
+        {
+          kind: "schema",
+          table: "projects",
+          rows: [
+            { name: "id", type: "uuid", key: "PK", state: "derived" },
+            { name: "org_id", type: "uuid", key: "FK", state: "derived", note: "→ organizations.id" },
+            { name: "name", type: "text", state: "derived" },
+            { name: "status", type: "enum", state: "derived", note: "draft · active · archived" },
+            { name: "created_by", type: "uuid", key: "FK", state: "derived" },
+            { name: "settings", type: "jsonb", state: "partial", note: "No schema on this column — shape is whatever was written" },
+            { name: "deleted_at", type: "timestamptz", nullable: true, state: "derived", note: "Soft delete; 3 queries forget to filter it" },
+          ],
+          rel: [
+            "project_files holds one row per upload, pointing at an S3 key.",
+            "Soft-deleted projects are still returned by 3 queries that omit the deleted_at filter.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "db-users",
+      title: "Users & tokens",
+      sub: "Accounts and auth material",
+      state: "derived",
+      col: 0,
+      row: 2,
+      evidence: "drizzle/schema.ts:12",
+      anatomy: [
+        {
+          kind: "schema",
+          table: "users",
+          rows: [
+            { name: "id", type: "uuid", key: "PK", state: "derived" },
+            { name: "email", type: "citext", key: "UQ", state: "derived" },
+            { name: "name", type: "text", nullable: true, state: "derived" },
+            { name: "avatar_url", type: "text", nullable: true, state: "derived" },
+            { name: "last_seen_at", type: "timestamptz", nullable: true, state: "derived" },
+          ],
+          rel: [
+            "No password column — authentication is magic link or OAuth only.",
+            "auth_tokens holds single-use magic link hashes with a 15 minute expiry.",
+          ],
+        },
+      ],
+    },
   ],
-  ext: [
-    { id: "stripe", title: "api.stripe.com", sub: "checkout.sessions.create", state: "derived", col: 1, row: 0, detail: "POST /v1/checkout/sessions, downstream of a route that is now rate limited." },
-    { id: "resend", title: "api.resend.com", sub: "emails.send", state: "derived", col: 1, row: 1, detail: "POST /emails from the magic-link handler at :34." },
+  api: [
+    {
+      id: "api-projects",
+      title: "Project endpoints",
+      sub: "18 routes",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "src/app/api/projects/",
+      anatomy: [
+        {
+          kind: "routes",
+          rows: [
+            { method: "GET", path: "/api/projects", auth: "session", state: "derived", note: "Scoped to the caller's org" },
+            { method: "POST", path: "/api/projects", auth: "session + admin", state: "derived" },
+            { method: "GET", path: "/api/projects/[id]", auth: "session + membership", state: "derived" },
+            { method: "PATCH", path: "/api/projects/[id]", auth: "session + admin", state: "derived" },
+            { method: "DELETE", path: "/api/projects/[id]", auth: "session + owner", state: "partial", note: "Bypassed when x-internal-token matches — no comment, no test" },
+            { method: "POST", path: "/api/projects/[id]/files", auth: "session", state: "derived", note: "Returns a presigned S3 PUT" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "api-webhooks",
+      title: "Inbound webhooks",
+      sub: "3 routes · signature auth",
+      state: "partial",
+      alarm: true,
+      col: 0,
+      row: 1,
+      detail: "These are the only routes without a session. They authenticate by signature — and they sit behind the IP rate limiter.",
+      evidence: "src/app/api/webhooks/",
+      anatomy: [
+        {
+          kind: "routes",
+          rows: [
+            { method: "POST", path: "/api/webhooks/stripe", auth: "Stripe signature", state: "partial", note: "Rate limited by IP — Stripe retries from rotating IPs" },
+            { method: "POST", path: "/api/webhooks/resend", auth: "Svix signature", state: "derived", note: "Delivery and bounce events" },
+            { method: "POST", path: "/api/webhooks/github", auth: "HMAC sha256", state: "derived" },
+          ],
+        },
+      ],
+    },
   ],
-  entry: [
-    { id: "mwfile", title: "src/middleware.ts", sub: "+47 −9", state: "derived", col: 1, row: 0, detail: "Constructs the limiter at :31, calls it at :44. The matcher at :71 decides what it fronts." },
-    { id: "envfile", title: "src/env.ts", sub: "+6", state: "derived", col: 1, row: 1, detail: "Adds RATE_LIMIT_REDIS_URL to the server env schema. Purely additive." },
+  jobs: [
+    {
+      id: "jobs-queue",
+      title: "Queue & dispatch",
+      sub: "BullMQ · 9 types, 7 resolved",
+      state: "partial",
+      col: 0,
+      row: 0,
+      detail:
+        "JOB_HANDLERS is indexed by a runtime job.type string, so the reachable set is not statically closed.",
+      evidence: "src/server/jobs/handlers.ts:77",
+      anatomy: [
+        {
+          kind: "facts",
+          rows: [
+            { label: "sendWelcomeEmail", value: "Resolved", state: "derived" },
+            { label: "syncStripeCustomer", value: "Resolved", state: "derived" },
+            { label: "reconcileInvoices", value: "Resolved", state: "derived" },
+            { label: "expireTrials", value: "Resolved", state: "derived" },
+            { label: "generateThumbnail", value: "Resolved", state: "derived" },
+            { label: "reindexProject", value: "Resolved", state: "derived" },
+            { label: "sendDunningEmail", value: "Resolved", state: "derived" },
+            { label: "2 more", value: "Registered at module load by register-billing.ts:14 — names are a guess", state: "inferred" },
+          ],
+        },
+      ],
+    },
   ],
-  hole: [],
+  projects: [
+    {
+      id: "proj-crud",
+      title: "Create & edit",
+      sub: "The main write path",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "src/server/projects/service.ts",
+      anatomy: [
+        {
+          kind: "flow",
+          rows: [
+            { n: 1, title: "Validate with zod", detail: "Rejects before touching the database.", state: "derived" },
+            { n: 2, title: "Check entitlement", detail: "Project count against the org's plan limit.", state: "derived" },
+            { n: 3, title: "Insert row", detail: "org_id taken from the session, never from the body.", state: "derived" },
+            { n: 4, title: "Enqueue reindex", detail: "Fire-and-forget; failure is logged, not surfaced.", state: "partial" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "proj-uploads",
+      title: "File uploads",
+      sub: "Direct to S3",
+      state: "derived",
+      col: 0,
+      row: 1,
+      evidence: "src/server/storage/s3.ts:44",
+      anatomy: [
+        {
+          kind: "flow",
+          rows: [
+            { n: 1, title: "Client asks for a URL", detail: "POST /api/projects/[id]/files with filename and content type.", state: "derived" },
+            { n: 2, title: "Server presigns a PUT", detail: "5 minute expiry, key is org/{org_id}/project/{id}/{uuid}.", state: "derived" },
+            { n: 3, title: "Browser PUTs to S3", detail: "Bytes never pass through the app server.", state: "derived" },
+            { n: 4, title: "Client confirms", detail: "Row written to project_files. An upload that is never confirmed leaves an orphan object.", state: "partial" },
+          ],
+        },
+      ],
+    },
+  ],
+  client: [
+    {
+      id: "cl-app",
+      title: "App shell",
+      sub: "11 authed pages",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "src/app/(app)/",
+      anatomy: [
+        {
+          kind: "facts",
+          rows: [
+            { label: "/app", value: "Project list", state: "derived" },
+            { label: "/app/projects/[id]", value: "Project detail and editor", state: "derived" },
+            { label: "/app/settings/members", value: "Invite and role management", state: "derived" },
+            { label: "/app/settings/billing", value: "Plan and invoices", state: "derived" },
+            { label: "Data fetching", value: "Server Components; 4 client components use SWR", state: "derived" },
+          ],
+        },
+      ],
+    },
+  ],
+  storage: [
+    {
+      id: "st-s3",
+      title: "S3 bucket",
+      sub: "Presigned access only",
+      state: "derived",
+      col: 0,
+      row: 0,
+      evidence: "src/server/storage/s3.ts",
+      anatomy: [
+        {
+          kind: "facts",
+          rows: [
+            { label: "Bucket", value: "acme-platform-uploads", state: "derived" },
+            { label: "Key layout", value: "org/{org_id}/project/{project_id}/{uuid}", state: "derived" },
+            { label: "Public access", value: "Blocked — every read is presigned, 60s expiry", state: "derived" },
+            { label: "Lifecycle rule", value: "None found in this repo", state: "inferred" },
+            { label: "Orphans", value: "Unconfirmed uploads are never cleaned up", state: "partial" },
+          ],
+        },
+      ],
+    },
+  ],
+  obs: [],
 };
 
 export const E1: Record<string, Edge[]> = {
-  core: [
-    { from: "core", to: "limiter", state: "derived" },
-    { from: "core", to: "identity", state: "derived" },
-    { from: "core", to: "policies", state: "partial" },
-    { from: "core", to: "rredis", state: "derived" },
-    { from: "rredis", to: "lua", state: "partial", label: "defineCommand" },
+  auth: [
+    { from: "auth-signin", to: "auth-session", state: "derived", label: "issues" },
+    { from: "auth-session", to: "auth-rbac", state: "derived", label: "claims" },
   ],
-  routes: [
-    { from: "routes", to: "mw", state: "partial", alarm: true },
-    { from: "routes", to: "checkout", state: "derived" },
-    { from: "routes", to: "magic", state: "derived" },
-    { from: "routes", to: "projects", state: "derived" },
-    { from: "routes", to: "del", state: "partial" },
+  billing: [
+    { from: "bill-checkout", to: "bill-hooks", state: "derived", label: "confirms via" },
+    { from: "bill-hooks", to: "bill-subs", state: "derived", label: "writes" },
   ],
-  stores: [
-    { from: "stores", to: "redis", state: "derived" },
-    { from: "stores", to: "pg", state: "derived" },
-    { from: "stores", to: "queue", state: "partial" },
+  db: [
+    { from: "db-orgs", to: "db-projects", state: "derived", label: "org_id" },
+    { from: "db-orgs", to: "db-users", state: "derived", label: "memberships" },
   ],
-  ext: [
-    { from: "ext", to: "stripe", state: "derived" },
-    { from: "ext", to: "resend", state: "derived" },
-  ],
-  entry: [
-    { from: "entry", to: "mwfile", state: "derived" },
-    { from: "entry", to: "envfile", state: "derived" },
-  ],
-  hole: [],
+  api: [{ from: "api-projects", to: "api-webhooks", state: "inferred" }],
+  jobs: [],
+  projects: [{ from: "proj-crud", to: "proj-uploads", state: "derived" }],
+  client: [],
+  storage: [],
+  obs: [],
 };
 
-/* ── level 2 — the detail behind any node ─────────────────── */
-
-export const DETAIL: Record<string, Detail> = {
-  entry: {
-    title: "Entry",
-    loc: "2 files",
-    state: "derived",
-    lead: "Where requests arrive before any route handler runs. The middleware was modified to construct the limiter and call it globally.",
-    facts: [
-      { label: "src/middleware.ts", value: "+47 −9" },
-      { label: "src/env.ts", value: "+6" },
-    ],
-  },
-  core: {
-    title: "Rate limiting core",
-    loc: "4 new files · grouping is inferred",
-    state: "inferred",
-    lead: "Four new files in one new directory, mutually importing, with no other importers before this change.",
-    caveat:
-      "This grouping is a guess, not structure. It was inferred from directory layout and import density — nothing here is load-bearing, and you can disagree with it.",
-    facts: [
-      { label: "limiter.ts", value: "+118" },
-      { label: "policies.ts", value: "+64" },
-      { label: "identity.ts", value: "+41" },
-      { label: "redis.ts", value: "+29" },
-    ],
-  },
-  routes: {
-    title: "Route handlers",
-    loc: "6 modified files · grouping is inferred",
-    state: "inferred",
-    lead: "Each diff is the same three-line shape: import, consume, 429 early return. Six of these also sit behind the global middleware, so they decrement two separate counters per request and can 429 at half the intended rate.",
-    caveat:
-      "Grouped by diff shape and directory, not by a structural fact the compiler can confirm.",
-  },
-  stores: {
-    title: "Data stores",
-    loc: "3 reached",
-    state: "derived",
-    lead: "Side effects the new code performs. The Redis connection is new — separate from the existing sessionRedis pool at src/lib/redis.ts:9.",
-  },
-  ext: {
-    title: "External",
-    loc: "2 third-party APIs",
-    state: "derived",
-    lead: "Outbound calls downstream of the limited routes. Both are now behind a rate limit that did not previously exist.",
-  },
-  hole: {
-    title: "2 handlers unresolved",
-    loc: "src/server/jobs/handlers.ts:77",
-    state: "partial",
-    lead: "Seven of nine handler entries resolve from the JOB_HANDLERS object literal. Two more are installed at module load by register-billing.ts:14.",
-    caveat:
-      "JOB_HANDLERS is indexed by a runtime job.type string, so the set of reachable functions is not statically closed. By name match the missing two look like handleDunningRetry and handleSubscriptionSweep — that is a guess, not a resolved edge.",
-    facts: [
-      { label: "resolved", value: "7 of 9" },
-      { label: "sendWelcomeEmail", value: "derived" },
-      { label: "syncStripeCustomer", value: "derived" },
-      { label: "reconcileInvoices", value: "derived" },
-      { label: "expireTrials", value: "derived" },
-    ],
-    code: {
-      path: "src/server/jobs/handlers.ts",
-      line: 77,
-      body: `const handler = JOB_HANDLERS[job.type as JobType];
-if (!handler) throw new UnknownJobError(job.type);
-return handler(job.payload, { limiter });`,
-    },
-  },
-  mw: {
-    title: "middleware",
-    loc: "src/middleware.ts:44",
-    state: "partial",
-    alarm: true,
-    lead: "The Stripe webhook route is now rate limited by IP. Stripe retries from a rotating egress pool, so a burst of deliveries from one Stripe IP will receive 429 — and Stripe treats that as a delivery failure.",
-    caveat:
-      "No call edge proves this. Next.js registers the middleware itself, so there is no call site in the repo; this was matched by expanding the glob at middleware.ts:71 against the route tree.",
-    facts: [
-      { label: "routes fronted", value: "9" },
-      { label: "also limited inline", value: "6" },
-      { label: "proven by call edge", value: "none" },
-    ],
-    code: {
-      path: "src/middleware.ts",
-      line: 71,
-      body: `export const config = {
-  matcher: ['/api/:path*'],
-};`,
-    },
-  },
-  limiter: {
-    title: "RateLimiter.consume",
-    loc: "src/lib/rate-limit/limiter.ts:74",
-    state: "derived",
-    lead: "Seven call sites, all resolved by the compiler. No call site exists in the webhook route — it is limited only by the middleware.",
-    facts: [
-      { label: "middleware.ts", value: ":44" },
-      { label: "projects/route.ts", value: ":19, :48" },
-      { label: "projects/[id]/route.ts", value: ":61" },
-      { label: "billing/checkout/route.ts", value: ":22" },
-      { label: "auth/magic-link/route.ts", value: ":17" },
-      { label: "limiter.test.ts", value: ":31" },
-    ],
-    code: {
-      path: "src/app/api/billing/checkout/route.ts",
-      line: 22,
-      body: `const { allowed, retryAfter } = await limiter.consume(identity, 'billing:checkout');
-if (!allowed) {
-  return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-}`,
-    },
-  },
-  identity: {
-    title: "identify",
-    loc: "src/lib/rate-limit/identity.ts:23",
-    state: "derived",
-    lead: "Runs a database query on every unauthenticated API request that carries an x-api-key header. This is a new round trip on the hot path.",
-    code: {
-      path: "src/lib/rate-limit/identity.ts",
-      line: 23,
-      body: `const row = await db.oneOrNone(
-  'SELECT id, plan FROM organizations WHERE api_key_hash = $1',
-  [hash(key)],
-);`,
-    },
-  },
-  policies: {
-    title: "policyFor",
-    loc: "src/lib/rate-limit/policies.ts:51",
-    state: "partial",
-    lead: "Resolves a rate policy for a scope and tier, falling back to the POLICIES table on a cache miss.",
-    caveat:
-      "POLICIES is read with a template-literal key built from two runtime values, so 4 of 11 declared policy keys have no statically resolvable read. Those four may be dead configuration, or reachable only in production tiers — the analysis cannot tell you which.",
-    code: {
-      path: "src/lib/rate-limit/policies.ts",
-      line: 44,
-      body: `const policy = POLICIES[\`\${scope}:\${tier}\`];`,
-    },
-  },
-  rredis: {
-    title: "rateRedis",
-    loc: "src/lib/rate-limit/redis.ts:12",
-    state: "derived",
-    lead: "A second Redis connection, separate from the existing sessionRedis pool at src/lib/redis.ts:9.",
-    caveat:
-      "Nothing in the change explains why a separate connection was opened rather than reusing the pool. No recorded rationale found — ask whoever ran the agent.",
-    code: {
-      path: "src/lib/rate-limit/redis.ts",
-      line: 12,
-      body: `export const rateRedis = new Redis(serverEnv.RATE_LIMIT_REDIS_URL);`,
-    },
-  },
-  lua: {
-    title: "slidingWindow()",
-    loc: "src/lib/rate-limit/redis.ts:21",
-    state: "partial",
-    lead: "Generated at runtime by ioredis defineCommand.",
-    caveat:
-      "There is no declaration in @types/ioredis, so the call resolves to any. The return shape is unverified past the package boundary — every field read off this result is unchecked.",
-    code: {
-      path: "src/lib/rate-limit/redis.ts",
-      line: 21,
-      body: `rateRedis.defineCommand('slidingWindow', {
-  numberOfKeys: 1,
-  lua: SLIDING_WINDOW_LUA,
-});`,
-    },
-  },
-  del: {
-    title: "DELETE /projects/[id]",
-    loc: "src/app/api/projects/[id]/route.ts:88",
-    state: "partial",
-    lead: "This handler returns before reaching the limiter when an internal token header matches.",
-    caveat:
-      "An intentional-looking bypass with no comment and no test. Whether it is deliberate is not recorded anywhere in the repo.",
-    code: {
-      path: "src/app/api/projects/[id]/route.ts",
-      line: 88,
-      body: `if (req.headers.get('x-internal-token') === serverEnv.INTERNAL_TOKEN) {
-  return handleDelete(params.id);
-}`,
-    },
-  },
-  checkout: {
-    title: "POST /billing/checkout",
-    loc: "src/app/api/billing/checkout/route.ts:22",
-    state: "derived",
-    lead: "Calls consume() inline, then creates a Stripe checkout session. Also behind the global middleware, so this route decrements two counters per request.",
-    code: {
-      path: "src/app/api/billing/checkout/route.ts",
-      line: 22,
-      body: `const { allowed, retryAfter } = await limiter.consume(identity, 'billing:checkout');
-if (!allowed) {
-  return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-}`,
-    },
-  },
-  magic: {
-    title: "POST /auth/magic-link",
-    loc: "src/app/api/auth/magic-link/route.ts:17",
-    state: "derived",
-    lead: "Calls consume() at :17, then sends an email through Resend at :34.",
-  },
-  projects: {
-    title: "GET · POST /projects",
-    loc: "src/app/api/projects/route.ts:19, :48",
-    state: "derived",
-    lead: "Rewriting line 19 removed the last caller of withThrottle. It is still exported and still imported by src/lib/http/index.ts:4, so the bundler will not drop it — and its Redis keys throttle:ip:* are now written by nothing and read by nothing.",
-    code: {
-      path: "src/lib/http/throttle.ts",
-      line: 18,
-      body: `export async function withThrottle<T>(ip: string, fn: () => Promise<T>): Promise<T> {
-  const n = await sessionRedis.incr(\`throttle:ip:\${ip}\`);`,
-    },
-  },
-  redis: {
-    title: "Redis",
-    loc: "rate:{scope}:{identity}",
-    state: "derived",
-    lead: "One round trip per request: ZREMRANGEBYSCORE + ZADD + ZCARD + PEXPIRE, executed as a single Lua script via EVALSHA.",
-  },
-  pg: {
-    title: "Postgres",
-    loc: "organizations",
-    state: "derived",
-    lead: "New SELECT on every API request carrying an x-api-key header. Previously these requests touched no database before routing.",
-  },
-  queue: {
-    title: "BullMQ",
-    loc: "src/server/jobs/handlers.ts:82",
-    state: "partial",
-    lead: "Queue.add on the retry path when a handler throws RateLimitedError.",
-    caveat:
-      "That path is reachable only through the dynamic handler lookup at line 77, so whether the two unattributed handlers can throw it is unresolved.",
-  },
-  stripe: {
-    title: "api.stripe.com",
-    loc: "billing/checkout/route.ts:38",
-    state: "derived",
-    lead: "POST https://api.stripe.com/v1/checkout/sessions via stripe.checkout.sessions.create.",
-  },
-  resend: {
-    title: "api.resend.com",
-    loc: "auth/magic-link/route.ts:34",
-    state: "derived",
-    lead: "POST https://api.resend.com/emails via resend.emails.send.",
-  },
-  mwfile: {
-    title: "src/middleware.ts",
-    loc: "+47 −9",
-    state: "derived",
-    lead: "Constructs the limiter at :31 and calls it globally at :44. The matcher at :71 determines which routes it fronts.",
-  },
-  envfile: {
-    title: "src/env.ts",
-    loc: "+6",
-    state: "derived",
-    lead: "Adds RATE_LIMIT_REDIS_URL to the server env schema. Purely additive.",
-  },
-};
-
-/* ── the unresolved list, surfaced as a first-class panel ──── */
-
-export const UNRESOLVED = [
-  {
-    kind: "framework callback",
-    at: "src/middleware.ts:71",
-    text: "Next.js invokes middleware itself from the config.matcher glob. There is no call site in the repo, so which routes the limiter actually fronts cannot be derived.",
-    node: "mw",
-  },
+/** Questions the analysis could not answer. Surfaced, never hidden. */
+export const OPEN = [
   {
     kind: "dynamic dispatch",
     at: "src/server/jobs/handlers.ts:77",
-    text: "JOB_HANDLERS is indexed by a runtime job.type string. Two entries are installed at module load, so the reachable set is not statically closed.",
-    node: "hole",
+    text: "Two job types are registered at module load, so the set of reachable handlers is not statically closed.",
+    node: "jobs",
   },
   {
-    kind: "computed access",
-    at: "src/lib/rate-limit/policies.ts:44",
-    text: "POLICIES is read with a template-literal key built from two runtime values. 4 of 11 declared keys have no resolvable read.",
-    node: "policies",
+    kind: "framework callback",
+    at: "src/middleware.ts:71",
+    text: "The matcher glob '/api/:path*' sweeps in the Stripe webhook. Next registers middleware itself, so no call edge proves which routes are fronted.",
+    node: "billing",
   },
   {
-    kind: "computed access",
-    at: "src/app/api/projects/[id]/route.ts:88",
-    text: "DELETE returns before reaching the limiter when an internal token header matches — a bypass with no comment and no test.",
-    node: "del",
+    kind: "untyped column",
+    at: "drizzle/schema.ts:96",
+    text: "projects.settings is jsonb with no schema. Its shape is whatever has been written to it.",
+    node: "db",
   },
   {
-    kind: "external",
-    at: "src/lib/rate-limit/redis.ts:21",
-    text: "slidingWindow() is generated at runtime by ioredis defineCommand and resolves to any. The return shape is unverified.",
-    node: "lua",
+    kind: "no rationale",
+    at: "src/lib/auth/rbac.ts:31",
+    text: "4 handlers query the org directly instead of calling requireRole. Whether that is deliberate is not recorded anywhere.",
+    node: "auth",
+  },
+  {
+    kind: "absent",
+    at: "package.json",
+    text: "No observability library is imported. Either it lives outside this repo or it does not exist.",
+    node: "obs",
   },
 ];

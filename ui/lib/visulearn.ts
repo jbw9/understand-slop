@@ -717,13 +717,16 @@ export const L0: Node[] = [
         evidence: "src/lib/dynamodb.ts:26",
         anatomy: [
           {
-            kind: "facts",
+            // Tables render as tables. Restating three names and what each
+            // holds was five rows of prose describing a schema — the one shape
+            // this tool already draws well.
+            kind: "chips",
+            caption: "tables · env-var overridable",
             rows: [
-              { label: "visulearn-conversations", value: "Conversation metadata, authenticated and anonymous", state: "derived" },
-              { label: "visulearn-messages", value: "Message bodies, including generated animation code", state: "derived" },
-              { label: "visulearn-animation-cache", value: "Embeddings and cached animations, 30 day TTL", state: "derived" },
-              { label: "Table names", value: "All four are env-var overridable, with these as defaults", state: "derived" },
-              { label: "Key schema", value: "Not defined anywhere in this repo — see 'Where the tables came from'", state: "inferred" },
+              { label: "conversations", note: "Metadata, authenticated and anonymous", state: "derived" },
+              { label: "messages", note: "Bodies, including generated animation code", state: "derived" },
+              { label: "animation-cache", note: "Embeddings and cached animations · 30d TTL", state: "derived" },
+              { label: "key schema — not in this repo", state: "inferred" },
             ],
           },
         ],

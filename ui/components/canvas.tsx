@@ -23,6 +23,9 @@ import type { Edge, Node } from "@/lib/data";
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 3.2;
 
+/** Breathing room above a top-anchored card, so it doesn't touch the edge. */
+const TOP_GUTTER = 72;
+
 /** The one spring every deliberate camera move rides on. */
 const GLIDE = { type: "spring", stiffness: 210, damping: 32, mass: 0.9 } as const;
 
@@ -208,12 +211,22 @@ export function Canvas() {
   const sy = useMotionValue(OVERVIEW.y);
   const ss = useMotionValue(OVERVIEW.scale);
 
+  /** Camera animations currently running, so a new move can cancel them. */
+  const flight = useRef<{ stop: () => void }[]>([]);
+
   /** Ease the camera to a target. Cancels whatever move was in flight. */
   const glideTo = useCallback(
     (x: number, y: number, s: number) => {
-      animate(sx, x, GLIDE);
-      animate(sy, y, GLIDE);
-      animate(ss, s, GLIDE);
+      // Cancel whatever move was still running. Two camera animations on one
+      // value do NOT resolve to the later target — the first one keeps
+      // driving and the second is lost, which is what pinned the vertical
+      // offset at a stale value through ten attempts at fixing the deep drill.
+      for (const c of flight.current) c.stop();
+      flight.current = [
+        animate(sx, x, GLIDE),
+        animate(sy, y, GLIDE),
+        animate(ss, s, GLIDE),
+      ];
     },
     [sx, sy, ss],
   );
@@ -332,16 +345,27 @@ export function Canvas() {
    * reading band, and left alone if it is already there.
    */
   const frame = useCallback(
-    (box: { x: number; y: number; w: number; h: number }) => {
+    (
+      box: { x: number; y: number; w: number; h: number },
+      anchor: "centre" | "top" = "centre",
+    ) => {
       const vp = viewportRef.current;
       if (!vp) return;
       const r = vp.getBoundingClientRect();
       const s = Math.min(READ_MAX, Math.max(READ_MIN, ss.get()));
-      glideTo(
-        r.width / 2 - (box.x + box.w / 2) * s,
-        r.height / 2 - (box.y + box.h / 2) * s,
-        s,
-      );
+      // Vertical anchoring is a CHOICE, not always centring.
+      //
+      // Centring is right for the overview, where the board is wider than it
+      // is tall. It is wrong for an opened subtree, which runs 950-1450px
+      // against an ~860px viewport: centring a box taller than the screen puts
+      // its top AND bottom off the edges. Three separate attempts at fixing
+      // the deep drill changed the box being passed here; none of them could
+      // have worked, because this line always centred whatever it was given.
+      const y =
+        anchor === "top"
+          ? TOP_GUTTER - box.y * s
+          : r.height / 2 - (box.y + box.h / 2) * s;
+      glideTo(r.width / 2 - (box.x + box.w / 2) * s, y, s);
     },
     [ss, glideTo],
   );
@@ -442,26 +466,20 @@ export function Canvas() {
     // under it, so its rect IS the thing to frame. One measurement, no guesses.
     const col = opened.parentElement ?? opened;
     const cb = col.getBoundingClientRect();
-    const vp = viewportRef.current?.getBoundingClientRect();
-    const colH = cb.height / s;
-    // Anchor the TOP, don't centre.
-    //
-    // An opened subtree runs 950-1450px tall against an 860px viewport, so
-    // centring it puts the bottom half off the screen every time — which is
-    // what left levels 3 and 4 below the fold through three different
-    // attempts at this. Fitting instead would need ~0.6 scale, under the
-    // READ_MIN floor, so the content would be there and unreadable.
-    //
-    // You read a subtree downward from the card you just opened. Framing a
-    // viewport-tall box at its top puts that card near the top of the screen
-    // with its content below it, and the rest is a scroll away.
-    const visibleH = vp ? vp.height / s : colH;
-    frame({
-      x: (cb.left - wb.left) / s,
-      y: (cb.top - wb.top) / s,
-      w: cb.width / s,
-      h: Math.min(colH, visibleH),
-    });
+    // You read a subtree DOWNWARD from the card you just opened, so that card
+    // belongs near the top of the screen with its content below it — not at
+    // the midpoint of a column that overflows both edges. Fitting the whole
+    // column instead would need ~0.6 scale, below the READ_MIN floor, so it
+    // would be on screen and unreadable.
+    frame(
+      {
+        x: (cb.left - wb.left) / s,
+        y: (cb.top - wb.top) / s,
+        w: cb.width / s,
+        h: cb.height / s,
+      },
+      "top",
+    );
     // Only when the PATH changes: re-running on every frame identity change
     // would fight the user's own panning.
     // eslint-disable-next-line react-hooks/exhaustive-deps

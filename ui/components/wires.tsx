@@ -425,8 +425,14 @@ export function WireLayer({
         const enterX = (B.left + B.right) / 2;
         // Leave the source from whichever vertical edge faces the target, drop
         // to the lane, run along it, and descend once into the target.
-        const startY = A.bottom <= laneY ? A.bottom : A.top;
-        const dropX = ax;
+        // A writer sitting ABOVE the lane drops out of its bottom edge. One
+        // level with the target — admin shares the store's row — has no room
+        // to drop, so it leaves from its own top edge and runs up, which drew
+        // a stub poking out of the card. Those join the lane from the side
+        // instead, at their nearest vertical edge.
+        const above = A.bottom <= laneY;
+        const startY = above ? A.bottom : A.top;
+        const dropX = above ? ax : A.left <= B.right ? A.left : A.right;
         const busR = 7;
         const alongRight = enterX >= dropX ? 1 : -1;
         const canRound = Math.abs(enterX - dropX) > busR * 2 + 2 && Math.abs(laneY - startY) > busR * 2 + 2;

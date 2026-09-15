@@ -404,19 +404,23 @@ function Block({
           </div>
           {/* Legend, not a table: label and size on one line each. */}
           <ul className="mt-2 flex flex-col gap-1">
-            {block.rows.map((p) => {
+            {block.rows.map((p, at) => {
               const id = rowId(owner, p.label);
               const isLit = ctx.lit.has(id);
               return (
                 <li key={p.label} className="flex items-center gap-2">
                   <span
+                    // Same tone rule as the bar segment above, index included.
+                    // A swatch is only a key if it is the colour it explains.
                     className={cn(
                       "size-[7px] shrink-0 rounded-[2px]",
                       isLit
                         ? "bg-deep-green"
                         : p.tone === "vary"
                           ? "bg-amber-line"
-                          : "bg-mint-line",
+                          : at % 2 === 0
+                            ? "bg-deep-green/55"
+                            : "bg-mint-line",
                     )}
                   />
                   <span

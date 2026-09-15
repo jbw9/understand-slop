@@ -36,7 +36,8 @@ export const RUN = {
    L0 holds the roots. Everything deeper hangs off `children`, so there is no
    level cap anywhere in the data — only branches that happened to stop. */
 
-export const L0: Node[] = [
+/** The tree as authored. `L0` below is this, plus a node per deep row. */
+const AUTHORED: Node[] = [
   {
     id: "asking",
     title: "Asking a question",
@@ -57,19 +58,163 @@ export const L0: Node[] = [
         col: 0,
         row: 0,
         evidence: "src/app/api/chat/route.ts:41",
-        // Stops here. Each row is one branch of a single if/else — going
-        // deeper would show four near-identical push() calls, which is the
-        // same fact a fifth time.
+        // An earlier pass stopped this card here, reasoning that buildContent
+        // is one if/else and drilling in would show four near-identical push()
+        // calls. That was right about buildContent and wrong about the
+        // question: "what happens when I send an image" is not a question
+        // about buildContent. The real path crosses a client-side gate, a wire
+        // type, the dispatch, and storage — four files, of which the card
+        // named one. Each row now opens its own path.
         anatomy: [
           {
             kind: "map",
             caption: "attachment → how it reaches the model",
             rows: [
-              { from: "image", to: "base64 image block", state: "derived" },
-              { from: "pdf", to: "native document block", state: "derived" },
-              { from: ".docx", to: "text via mammoth", state: "derived" },
-              { from: "text", to: "decoded, inlined", state: "derived" },
-              { from: "url", to: "fetched server-side · falls back to training data", state: "partial" },
+              {
+                from: "image",
+                to: "base64 image block",
+                state: "derived",
+                under: [
+                  {
+                    kind: "flow",
+                    rows: [
+                      {
+                        n: 1,
+                        title: "Still a file on your disk",
+                        detail: "Nothing has been sent. The browser checks the OS-reported type against five allowed image formats and the size against 10MB, and refuses here — so a file that is going to be rejected is rejected before it is ever read.",
+                        state: "derived",
+                      },
+                      {
+                        n: 2,
+                        title: "Now text, roughly a third bigger",
+                        detail: "FileReader re-encodes the bytes as base64 — an image becomes a very long string of letters. That is the form it travels and is stored in for the rest of its life; it is never a file again.",
+                        state: "derived",
+                      },
+                      {
+                        n: 3,
+                        title: "One item in a list, beside your words",
+                        detail: "Your message stops being a string and becomes a list of blocks. Each attachment is one block, your typed text is another, and the text is appended last — so the model reads the picture before the question about it.",
+                        state: "derived",
+                      },
+                      {
+                        n: 4,
+                        title: "Read by the model as part of the question",
+                        detail: "The block carries the original format tag so the model knows how to decode it. Nothing describes or summarises the image first — the model sees the picture itself.",
+                        state: "derived",
+                      },
+                      {
+                        n: 5,
+                        title: "Kept forever inside the message row",
+                        detail: "The whole base64 string is written into the conversation row in DynamoDB rather than to file storage, so the picture and the sentence live in the same record.",
+                        state: "partial",
+                      },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/components/ChatInput.tsx",
+                    start: 158,
+                    // Re-indented to the card's width. The 340px column scrolls
+                    // horizontally rather than wrapping, and a quote you have to
+                    // drag sideways to finish is one nobody reads.
+                    code: "const base64 = e.target?.result as string;\nconst base64Data = base64.split(',')[1];",
+                    why: "readAsDataURL returns `data:<mime>;base64,<payload>` and the API wants only the payload, so the prefix is cut by splitting on the first comma. It reads as a throwaway line and is the one place the client and the Bedrock content-block format actually meet — `source.data` is exactly this string.",
+                  },
+                ],
+              },
+              {
+                from: "pdf",
+                to: "native document block",
+                state: "derived",
+                under: [
+                  {
+                    kind: "facts",
+                    rows: [
+                      { label: "Branch", value: "fileType 'document' + mimeType === 'application/pdf'", state: "derived" },
+                      { label: "Block", value: "type 'document' · base64 · media_type application/pdf", state: "derived" },
+                      { label: "title", value: "The original filename, passed to the model", state: "derived" },
+                      { label: "Not extracted", value: "No text parsing — the model reads the PDF itself", state: "derived" },
+                    ],
+                  },
+                ],
+              },
+              {
+                from: ".docx",
+                to: "text via mammoth",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "src/app/api/chat/route.ts",
+                    start: 59,
+                    code: "        // Extract text from Word doc using mammoth\n        try {\n          const buffer = Buffer.from(attachment.data, 'base64');\n          const { value: docText } = await mammoth.extractRawText({ buffer });\n          contentBlocks.push({\n            type: 'text',\n            text: `[Content from Word document \"${attachment.name}\":\\n${docText.trim()}\\n]`,\n          });\n        } catch {\n          contentBlocks.push({\n            type: 'text',\n            text: `[Could not extract text from \"${attachment.name}\"]`,\n          });\n        }",
+                    why: "Word is the only attachment the server parses rather than forwards — mammoth pulls raw text and it is wrapped in a bracketed label so the model can tell document content from the user's own words. The catch is the honest part: extraction failure becomes a sentence saying so, sent to the model as if it were the document. The learner is never told; they get an answer about a file nothing could read.",
+                  },
+                ],
+              },
+              {
+                from: "text",
+                to: "decoded, inlined",
+                state: "derived",
+                under: [
+                  {
+                    kind: "flow",
+                    rows: [
+                      { n: 1, title: "Base64 → utf-8", detail: "Buffer.from(data, 'base64').toString('utf-8'). The browser encoded it; the server immediately undoes that.", state: "derived" },
+                      { n: 2, title: "Wrapped and labelled", detail: "[Content from text file \"name\": … ] — same bracket convention as the Word branch.", state: "derived" },
+                      { n: 3, title: "No size guard on this side", detail: "The 10MB cap lives in the browser only. A direct POST inlines the whole file into the prompt.", state: "partial" },
+                    ],
+                  },
+                ],
+              },
+              {
+                from: "anything else",
+                to: "silently dropped",
+                state: "partial",
+                under: [
+                  {
+                    kind: "source",
+                    file: "src/app/api/chat/route.ts",
+                    start: 50,
+                    code: "    if (attachment.fileType === 'document') {\n      if (attachment.mimeType === 'application/pdf') {\n        …\n      } else if (WORD_MIME_TYPES.has(attachment.mimeType)) {\n        …\n      } else if (attachment.mimeType === 'text/plain') {\n        …\n      }\n    } else {",
+                    why: "Three inner branches and no else. A document whose MIME matches none of them pushes no block at all — the attachment reaches the server, is counted, and vanishes before the model sees anything. Today the two lists agree, so it never fires: the client accepts exactly pdf, two Word types and text/plain. It is one entry in ACCEPTED_DOCUMENT_TYPES away from a file that uploads cleanly, shows a chip in the composer, and is not there.",
+                  },
+                  {
+                    kind: "map",
+                    caption: "the two lists that have to stay in step",
+                    rows: [
+                      { from: "client", to: "ACCEPTED_DOCUMENT_TYPES — 4 entries · ChatInput.tsx:22", state: "derived" },
+                      { from: "server", to: "3 branches — pdf · WORD_MIME_TYPES · text/plain", state: "derived" },
+                      { from: "linked by", to: "nothing — no shared constant, no test", state: "partial" },
+                    ],
+                  },
+                ],
+              },
+              {
+                from: "url",
+                to: "fetched server-side · falls back to training data",
+                state: "partial",
+                under: [
+                  {
+                    kind: "flow",
+                    rows: [
+                      { n: 1, title: "Found by regex, not by the composer", detail: "A URL is never attached — it is matched out of the message text with /https?:\\/\\/[^\\s<>\"{}|\\\\^`[\\]]+/g. Pasting a link into a sentence is the whole interaction.", state: "derived" },
+                      { n: 2, title: "First two only", detail: "detectedUrls.slice(0, 2). A message with five links silently fetches two.", state: "partial" },
+                      { n: 3, title: "Fetched with a 5s timeout", detail: "AbortSignal.timeout(5000), under a spoofed Mozilla User-Agent. Each URL is awaited in series, so two slow hosts cost 10s before the model is called.", state: "derived" },
+                      { n: 4, title: "HTML stripped by six regexes", detail: "script and style blocks dropped, then all tags, then entities, then whitespace collapsed — no parser involved.", state: "partial" },
+                      { n: 5, title: "Truncated to 8,000 chars", detail: "Appended to the message as [Web page content from <url>: …]. Anything past 8k is gone with no marker.", state: "derived" },
+                      { n: 6, title: "Any failure is invisible", detail: "Timeout, 403, or a JS-rendered page all hit an empty catch. The model answers from training data and nothing says the page was never read.", state: "partial" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/app/api/chat/route.ts",
+                    start: 190,
+                    code: "      } catch {\n        // Fetch failed (timeout, blocked, JS-rendered) — Claude falls back to training data\n      }",
+                    why: "The comment states the design and the design is the risk. A silent fallback means a learner who pastes a link gets a confident answer about what the model already believed was at that URL, which for a page behind auth or rendered client-side is the common case. This is the same failure shape as the subject classifier's catch and the animation cache's — three places where an outage and a normal result are indistinguishable downstream.",
+                  },
+                ],
+              },
             ],
           },
         ],
@@ -1159,6 +1304,76 @@ export const E0: Edge[] = [
 /* ── tree helpers ─────────────────────────────────────────────
    The canvas walks by path, so these are the only two ways it needs to look
    a node up. Neither assumes a depth. */
+
+/* ── rows that go deeper ──────────────────────────────────────
+   A row carrying `under` becomes a REAL child node, spliced in beside whatever
+   children its owner already had.
+
+   The alternative — a bespoke "detail card" with its own state, its own
+   position and its own wire — was built first and was wrong. It gave the
+   product two ways to go deeper: cards drilled, rows did something else that
+   looked similar and behaved differently. Everything the drill already does
+   (camera, Escape, drillOut, the depth rule, out-of-scope fading) had to be
+   re-implemented or went missing. As a node, a row inherits all of it and the
+   special case disappears.
+
+   The synthesized id is `rowId(owner, key)` — the SAME id the row's anchor
+   registers under. That is deliberate: the wire layer resolves an endpoint by
+   walking up to the nearest [data-node], so the row and the card it opens
+   share an identity and connect without a special-cased wire. */
+
+/** The rows of one anatomy block that carry `under`, as {key, label, blocks}. */
+function deepRows(blocks: Anatomy[]) {
+  const out: { key: string; label: string; under: Anatomy[] }[] = [];
+  for (const b of blocks) {
+    if (b.kind === "map") {
+      for (const r of b.rows) {
+        if (r.under) out.push({ key: r.from, label: r.from, under: r.under });
+      }
+    } else if (b.kind === "flow") {
+      for (const r of b.rows) {
+        if (r.under) out.push({ key: String(r.n), label: r.title, under: r.under });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Walk the tree and give every `under`-carrying row a child node.
+ *
+ * Runs once at module load over the authored tree, so `nodeAt`, `levelAt`,
+ * `allNodes` and the canvas all see one uniform structure and none of them
+ * needs to know a row was involved.
+ */
+function withRowChildren(nodes: Node[]): Node[] {
+  return nodes.map((n) => {
+    const authored = n.children ? withRowChildren(n.children) : [];
+    const fromRows = n.anatomy
+      ? deepRows(n.anatomy).map((r, i): Node => ({
+          id: rowId(n.id, r.key),
+          title: r.label,
+          // What this level answers, not a restatement of the row.
+          sub: "what happens to it",
+          state: "derived",
+          col: 0,
+          row: authored.length + i,
+          anatomy: r.under,
+          evidence: n.evidence,
+          // Only the one you clicked is ever rendered. See Node.fromRow.
+          fromRow: true,
+        }))
+      : [];
+    const children = [...authored, ...fromRows];
+    return children.length ? { ...n, children } : { ...n, children: undefined };
+  });
+}
+
+/**
+ * The tree everything else reads: authored nodes, plus one node for every row
+ * that carries `under`. Built once, so no consumer knows a row was involved.
+ */
+export const L0: Node[] = withRowChildren(AUTHORED);
 
 /** Resolve a path of ids to the node it names. */
 export function nodeAt(path: string[]): Node | null {

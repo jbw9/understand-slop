@@ -41,6 +41,8 @@ export interface Step {
   title: string;
   detail: string;
   state: State;
+  /** What happens inside this step. Same contract as `Mapping.under`. */
+  under?: Anatomy[];
 }
 
 export interface Pair {
@@ -106,6 +108,22 @@ export interface Mapping {
   from: string;
   to: string;
   state: State;
+  /**
+   * What actually happens between `from` and `to`. An arrow is a summary of a
+   * path, and for some rows the path is the question — "image → base64 image
+   * block" is four stages in three files drawn as one hop.
+   *
+   * Deliberately `Anatomy[]` and not `Node[]`. A node owns a grid position, a
+   * camera frame and a wire anchor; a row that opened one would push the
+   * deepest level past the viewport, which is the failure D8 records after
+   * twelve attempts. This expands in place instead — the camera never moves,
+   * so no framing maths is involved at all.
+   *
+   * A row with no `under` is a row whose arrow really is the whole fact. Most
+   * rows are that, and adding this everywhere would restate the summary one
+   * click down, which is the clutter this tool exists to avoid.
+   */
+  under?: Anatomy[];
 }
 
 export type Anatomy =
@@ -149,6 +167,16 @@ export interface Node {
   children?: Node[];
   /** Edges among this node's own children, drawn when it is the open node. */
   edges?: Edge[];
+  /**
+   * Synthesized from a row that carried `under`, rather than authored.
+   *
+   * The distinction is what a level MEANS. Authored children are siblings you
+   * are meant to see together — "Subject and mode" next to "What you can send"
+   * is a comparison. Row children are answers to six different questions, and
+   * you asked one: rendering the other five is the wall of context this tool
+   * exists to remove. `Branch` shows only the row child on the open path.
+   */
+  fromRow?: boolean;
 }
 
 export interface Edge {

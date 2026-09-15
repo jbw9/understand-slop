@@ -196,7 +196,7 @@ export const L0: Node[] = [
               {
                 kind: "source",
                 file: "src/app/api/chat/route.ts",
-                start: 216,
+                start: 217,
                 code: "    if (resolvedSubject && mode !== 'test' && SUBJECT_PROMPTS[resolvedSubject]) {\n      subjectModePrompt += SUBJECT_PROMPTS[resolvedSubject];\n    }",
                 why: "A computer-science question in auto or visualize mode gets no subject guidance at all — the `&&` chain simply falls through. In test mode the same question does get CS guidance, because that comes from SUBJECT_TEST_HINTS, which does have a cs key. Same subject, opposite treatment, decided by mode.",
               },
@@ -257,7 +257,7 @@ export const L0: Node[] = [
               {
                 kind: "source",
                 file: "src/app/api/chat/route.ts",
-                start: 239,
+                start: 245,
                 code: "      if (questionCount >= 3) {\n        dynamicContext += `\\n\\n**IMPORTANT CONTEXT: You have already asked ${questionCount} clarifying questions in this conversation. DO NOT ask any more questions.**`;",
                 why: "This is the entire reason the prompt is split into three cached blocks. The sentence changes on almost every turn, and if it lived inside block 1 or 2 the whole cached prefix would be invalidated each time — so ~102KB would be re-sent to buy one sentence of state.",
               },
@@ -592,7 +592,7 @@ export const L0: Node[] = [
               {
                 kind: "source",
                 file: "src/lib/system-prompt.ts",
-                start: 46,
+                start: 47,
                 code: "CRITICAL: Always use the `animation` fence tag. Never use `html` or `javascript`. The frontend uses this tag to detect animation blocks.",
                 why: "The parser downstream keys on this exact fence. It is the contract between the prompt and stream-parser.ts, written in prose in one file and as a regex in another, with nothing linking them — rename the fence in one place and the product stops rendering animations.",
               },
@@ -622,7 +622,7 @@ export const L0: Node[] = [
               {
                 kind: "source",
                 file: "src/lib/system-prompt.ts",
-                start: 5077,
+                start: 5079,
                 code: "**IMPORTANT OVERRIDE: The rule above that says \"Every response MUST contain animation code\" applies to FIRST messages only.**",
                 why: "Auto mode is two prompts, not one. The first message is forced to animate; the follow-up explicitly revokes that rule so a one-word clarification does not trigger a full animation rebuild. This is why the same mode behaves differently on turn 1 and turn 2.",
               },
@@ -926,7 +926,7 @@ export const L0: Node[] = [
               {
                 kind: "source",
                 file: "src/app/api/generate-pdf/route.ts",
-                start: 78,
+                start: 84,
                 code: "      if (ch === '\"') { inString = !inString; cleaned += ch; continue; }\n      if (inString && ch === '\\n') { cleaned += '\\\\n'; continue; }",
                 why: "A blanket replace would corrupt the JSON's own structural newlines between keys. Tracking in-string state means only prose inside a value is escaped. The prompt asks for this in capitals — 'never press Enter inside a JSON string' — and the parser still needs the fallback, which is the honest signal about how reliable that instruction is.",
               },

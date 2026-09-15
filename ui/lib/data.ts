@@ -390,13 +390,44 @@ export const L1: Record<string, Node[]> = {
         },
       ],
     },
+    // Users sits next to Organizations because three of the five foreign keys
+    // run between those two tables (user_id, invited_by, created_by). Ordering
+    // them apart forced every one of those wires to traverse the whole diagram
+    // and cut through whatever card sat in the middle — a layout problem that
+    // no amount of elbow routing can solve.
+    {
+      id: "db-users",
+      title: "Users & tokens",
+      sub: "Accounts and auth material",
+      state: "derived",
+      col: 0,
+      row: 1,
+      evidence: "drizzle/schema.ts:12",
+      anatomy: [
+        {
+          kind: "schema",
+          table: "users",
+          rows: [
+            { name: "id", type: "uuid", key: "PK", state: "derived" },
+            { name: "email", type: "citext", key: "UQ", state: "derived" },
+            { name: "name", type: "text", nullable: true, state: "derived" },
+            { name: "avatar_url", type: "text", nullable: true, state: "derived" },
+            { name: "last_seen_at", type: "timestamptz", nullable: true, state: "derived" },
+          ],
+          rel: [
+            "No password column — authentication is magic link or OAuth only.",
+            "auth_tokens holds single-use magic link hashes with a 15 minute expiry.",
+          ],
+        },
+      ],
+    },
     {
       id: "db-projects",
       title: "Projects & files",
       sub: "The core domain tables",
       state: "derived",
       col: 0,
-      row: 1,
+      row: 2,
       evidence: "drizzle/schema.ts:78",
       anatomy: [
         {
@@ -414,32 +445,6 @@ export const L1: Record<string, Node[]> = {
           rel: [
             "project_files holds one row per upload, pointing at an S3 key.",
             "Soft-deleted projects are still returned by 3 queries that omit the deleted_at filter.",
-          ],
-        },
-      ],
-    },
-    {
-      id: "db-users",
-      title: "Users & tokens",
-      sub: "Accounts and auth material",
-      state: "derived",
-      col: 0,
-      row: 2,
-      evidence: "drizzle/schema.ts:12",
-      anatomy: [
-        {
-          kind: "schema",
-          table: "users",
-          rows: [
-            { name: "id", type: "uuid", key: "PK", state: "derived" },
-            { name: "email", type: "citext", key: "UQ", state: "derived" },
-            { name: "name", type: "text", nullable: true, state: "derived" },
-            { name: "avatar_url", type: "text", nullable: true, state: "derived" },
-            { name: "last_seen_at", type: "timestamptz", nullable: true, state: "derived" },
-          ],
-          rel: [
-            "No password column — authentication is magic link or OAuth only.",
-            "auth_tokens holds single-use magic link hashes with a 15 minute expiry.",
           ],
         },
       ],
@@ -618,10 +623,12 @@ export const E1: Record<string, Edge[]> = {
     { from: "bill-checkout", to: "bill-hooks", state: "derived", label: "confirms via" },
     { from: "bill-hooks", to: "bill-subs", state: "derived", label: "writes" },
   ],
-  db: [
-    { from: "db-orgs", to: "db-projects", state: "derived", label: "org_id" },
-    { from: "db-orgs", to: "db-users", state: "derived", label: "memberships" },
-  ],
+  // Intentionally empty. Every edge worth drawing between these three cards is
+  // a foreign key, and the FK wires say it precisely — they land on the exact
+  // column. A card-level "db-orgs → db-projects (org_id)" alongside a row-level
+  // "projects.org_id → organizations.id" is the same fact drawn twice, once
+  // vaguely, and the vague copy is the one that cuts across the middle card.
+  db: [],
   api: [{ from: "api-projects", to: "api-webhooks", state: "inferred" }],
   jobs: [],
   projects: [{ from: "proj-crud", to: "proj-uploads", state: "derived" }],

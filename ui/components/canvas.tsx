@@ -30,6 +30,19 @@ const CARD_W = 380;
 const OVERVIEW = { scale: 0.8, x: 80, y: 60 };
 
 /**
+ * Open-domain metrics. The camera has to frame content that does not exist yet
+ * at the moment of the click, so these mirror the capability row's real layout
+ * — `w-[340px]` children, `gap-14` (56px), `pl-6` (24px) — and are used both to
+ * size the world box and to aim the drill.
+ */
+const CHILD_W = 340;
+const CHILD_GAP = 56;
+const CHILD_PL = 24;
+const CARD_H = 57;
+/** Tallest expanded capability card, measured from the rendered DB domain. */
+const OPEN_CHILD_H = 410;
+
+/**
  * Hand-placed layout, read left-to-right as a request flows through the system:
  * the client enters, the API fans out to the domains that do the work, and
  * those land on the stores that persist it.
@@ -76,9 +89,17 @@ function cardWidth(node: Node) {
  */
 // Padding is generous enough for an expanded domain's capabilities to have
 // somewhere to go, but not the blind +900 that left a third of the canvas dead.
+// The width term carries the widest open domain, whose capability row unfolds
+// to the right of its title card. Sizing to the domain cards alone clipped the
+// SVG and took the rightmost relationship wires with it.
+const WIDEST_OPEN = Math.max(
+  ...Object.values(L1).map((m) =>
+    m.length ? CHILD_PL + m.length * CHILD_W + (m.length - 1) * CHILD_GAP : 0,
+  ),
+);
 const WORLD = {
-  w: Math.max(...L0.map((n) => worldPos(n).x + cardWidth(n))) + 160,
-  h: Math.max(...L0.map((n) => worldPos(n).y)) + 420,
+  w: Math.max(...L0.map((n) => worldPos(n).x)) + WIDEST_OPEN + 160,
+  h: Math.max(...L0.map((n) => worldPos(n).y)) + CARD_H + OPEN_CHILD_H + 160,
 };
 
 export function Canvas() {
@@ -225,12 +246,17 @@ export function Canvas() {
     (node: Node) => {
       const p = worldPos(node);
       const members = L1[node.id]?.length ?? 0;
-      // Centre on the domain plus the capabilities about to appear, so the
-      // camera lands where the content will be rather than shifting again once
-      // it arrives. Height only shifts the centre now — it no longer drives
-      // scale, so a tall stack pans rather than zooming out.
-      const h = Math.min(84 + members * 62, 460);
-      frame({ x: p.x, y: p.y, w: cardWidth(node), h });
+      // Frame the domain AND the capabilities it is about to spawn. Centring on
+      // the title card alone parked the camera on a 304px box while ~1200px of
+      // content unfolded to its right, which is what pushed the whole diagram
+      // into the lower-right corner with half the screen left empty.
+      const w = members
+        ? CHILD_PL + members * CHILD_W + (members - 1) * CHILD_GAP
+        : cardWidth(node);
+      // Real opened height, not a per-member estimate: an expanded schema card
+      // runs ~410px, so the old 84 + n*62 centred well above the content.
+      const h = members ? CARD_H + CHILD_GAP + OPEN_CHILD_H : CARD_H;
+      frame({ x: p.x, y: p.y, w, h });
       setFocus(node.id);
       setDepth(members > 0 ? 1 : 0);
     },
@@ -412,7 +438,11 @@ export function Canvas() {
                     // Capabilities sit side by side in real columns. A single
                     // stack runs off the bottom of the viewport and wastes the
                     // whole width of the canvas.
-                    className="flex items-start gap-4 pl-6"
+                    // The gutter is where the FK wires run. At gap-4 three
+                    // relationships shared one lane and stacked into a bundle;
+                    // this gives each its own vertical track while still
+                    // fitting three cards across a laptop screen.
+                    className="flex items-start gap-14 pl-6"
                     initial="out"
                     animate="in"
                     exit="out"

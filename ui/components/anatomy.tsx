@@ -25,6 +25,13 @@ export interface RowCtx {
   /** True while any trace is active, so unlit rows can recede. */
   tracing: boolean;
   onTrace: (id: string) => void;
+  /**
+   * The row on the open path, if the level below came from a row. Lights the
+   * row you drilled through, the same way a card stays selected.
+   */
+  open: string | null;
+  /** Drill into the level this row owns. Same gesture as opening a card. */
+  onOpenRow: (id: string) => void;
 }
 
 export function AnatomyView({
@@ -42,6 +49,38 @@ export function AnatomyView({
         <Block key={i} owner={owner} block={block} ctx={ctx} />
       ))}
     </div>
+  );
+}
+
+/**
+ * Points right, and turns green when this row's card is open.
+ *
+ * It does NOT rotate to point down any more. Down means "expands below me",
+ * which is what this used to do and is exactly the thing that crushed 700px of
+ * flow into a 340px column. The card opens to the RIGHT, so the mark keeps
+ * pointing that way and only changes colour.
+ */
+function Caret({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="9"
+      height="9"
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
+      className={cn(
+        "shrink-0 transition-colors duration-200",
+        open ? "text-deep-green" : "text-faint",
+      )}
+    >
+      <path
+        d="M4.5 2.5L8 6l-3.5 3.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -309,41 +348,69 @@ function Block({
         {block.rows.map((m) => {
           const id = rowId(owner, m.from);
           const isLit = ctx.lit.has(id);
+          const isOpen = ctx.open === id;
           return (
-            <button
-              key={m.from}
-              ref={ctx.anchor(id)}
-              data-row
-              onClick={() => ctx.onTrace(id)}
-              className={rowClass(
-                id,
-                ctx,
-                "flex w-full items-center gap-2 border-b border-border-gray px-3 py-1.5 last:border-b-0",
-              )}
-            >
-              <span
-                className={cn(
-                  "shrink-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
-                  isLit
-                    ? "bg-deep-green text-pure-white"
-                    : "bg-surface-container text-on-surface",
+            <div key={m.from} className="border-b border-border-gray last:border-b-0">
+              <button
+                ref={ctx.anchor(id)}
+                data-row
+                // A row that has somewhere to go opens it; one that does not
+                // keeps tracing. The same click does the thing the row can
+                // actually do, so there is no dead affordance either way.
+                // Stop the click here when the row owns a level.
+                //
+                // The card wrapping these rows is itself clickable, and a real
+                // pointer click bubbles: row opens the level, card handler then
+                // fires on the SAME click and collapses it again. Measured
+                // order was ROW click → CARD click, which is why calling the
+                // handler directly worked and every genuine click did nothing.
+                onClick={(e) => {
+                  if (!m.under) return ctx.onTrace(id);
+                  e.stopPropagation();
+                  ctx.onOpenRow(id);
+                }}
+                className={rowClass(
+                  id,
+                  ctx,
+                  "flex w-full items-start gap-2 px-3 py-1.5",
                 )}
               >
-                {m.from}
-              </span>
-              {/* The arrow carries the relationship, so the text doesn't
-                  have to say "becomes". */}
-              <span className="shrink-0 font-mono text-[11px] text-faint">→</span>
-              <span
-                className={cn(
-                  "min-w-0 flex-1 text-left font-mono text-[9.5px] leading-snug",
-                  m.state === "derived" ? "text-muted-slate" : "text-amber-ink",
-                )}
-              >
-                {m.to}
-              </span>
-              <StateChip state={m.state} />
-            </button>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
+                    isLit || isOpen
+                      ? "bg-deep-green text-pure-white"
+                      : "bg-surface-container text-on-surface",
+                  )}
+                >
+                  {m.from}
+                </span>
+                {/* The arrow carries the relationship, so the text doesn't
+                    have to say "becomes". */}
+                <span className="shrink-0 font-mono text-[11px] leading-[1.5] text-faint">→</span>
+                {/* Chip sits INSIDE the flowing column, not beside it. As a
+                    sibling of the text it was `shrink-0` against a `flex-1`
+                    that could shrink to nothing, so a long `to` string was
+                    squeezed into a five-line ribbon while the chip kept its
+                    full width. Inline, the chip wraps with the words. */}
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 text-left font-mono text-[9.5px] leading-snug",
+                    m.state === "derived" ? "text-muted-slate" : "text-amber-ink",
+                  )}
+                >
+                  {m.to}
+                  {m.state !== "derived" ? (
+                    <StateChip state={m.state} className="ml-1.5 align-[1px]" />
+                  ) : null}
+                </span>
+                {m.under ? (
+                  <span className="mt-[3px]">
+                    <Caret open={isOpen} />
+                  </span>
+                ) : null}
+              </button>
+            </div>
           );
         })}
       </div>
@@ -532,7 +599,12 @@ function Block({
               <button
                 ref={ctx.anchor(id)}
                 data-row
-                onClick={() => ctx.onTrace(id)}
+                // See the map row above: the click must not reach the card.
+                onClick={(e) => {
+                  if (!s.under) return ctx.onTrace(id);
+                  e.stopPropagation();
+                  ctx.onOpenRow(id);
+                }}
                 className={rowClass(
                   id,
                   ctx,
@@ -546,12 +618,17 @@ function Block({
                   <span
                     className={cn(
                       "text-[11px] font-semibold leading-tight",
-                      isLit ? "text-deep-green" : "text-ink",
+                      isLit || ctx.open === id ? "text-deep-green" : "text-ink",
                     )}
                   >
                     {s.title}
                   </span>
                   <StateChip state={s.state} />
+                  {s.under ? (
+                    <span className="ml-auto">
+                      <Caret open={ctx.open === id} />
+                    </span>
+                  ) : null}
                 </span>
                 <span className="mt-0.5 block text-[10px] leading-relaxed text-on-surface-variant">
                   {s.detail}

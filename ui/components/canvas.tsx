@@ -49,6 +49,7 @@ const OVERVIEW = { scale: 1, x: 80, y: 60 };
  * size the world box and to aim the drill.
  */
 const CHILD_W = 340;
+
 /**
  * The gutter is a wire corridor, not a margin. Six foreign keys run between
  * these cards and three of them shared one 45px channel, which is what turned
@@ -245,6 +246,11 @@ export function Canvas() {
 
   const [traced, setTraced] = useState<string | null>(null);
 
+  // The deepest path segment, which is a row id when the level below came from
+  // a row. Rows and cards are both just nodes now, so there is no second piece
+  // of state to keep in step with the path — the path IS the state.
+  const rowOpen = path[path.length - 1] ?? "";
+
   /**
    * Walk LINKS outward from the clicked row. Following the chain transitively
    * is what produces the cascade a developer expects — click a foreign key and
@@ -323,16 +329,6 @@ export function Canvas() {
     ];
   }, [path, depth, traced, lit]);
 
-  const rowCtx = useMemo<RowCtx>(
-    () => ({
-      anchor,
-      lit,
-      tracing: Boolean(traced),
-      onTrace: (id) => setTraced((cur) => (cur === id ? null : id)),
-    }),
-    [anchor, lit, traced],
-  );
-
   /* ── drilling ─────────────────────────────────────────────── */
 
   /**
@@ -378,7 +374,12 @@ export function Canvas() {
   const drillInto = useCallback(
     (node: Node, parentPath: string[]) => {
       const members = node.children?.length ?? 0;
-      if (members === 0) return;
+      // Nothing to show means nothing to open — but "nothing" is no children
+      // AND no anatomy. A node synthesized from a row carries its content in
+      // `anatomy` and has no children at all, so a children-only guard made
+      // every row click a no-op: the click fired, this returned, and the path
+      // never moved. That is the bug you see as "I clicked and nothing opened".
+      if (members === 0 && !node.anatomy?.length) return;
       const next = [...parentPath, node.id];
       setPath(next);
 
@@ -397,13 +398,67 @@ export function Canvas() {
       // Frame the card AND the level it is about to spawn. Centring on the
       // title card alone parked the camera on a 304px box while ~1200px of
       // content unfolded to its right.
-      const w = CHILD_PL + members * CHILD_W + (members - 1) * CHILD_GAP;
+      // Clamped at one column: a node opened from a row has no children, and
+      // the fan-out formula with members=0 yields -116px — a negative box the
+      // camera would aim at the wrong place entirely.
+      const w =
+        CHILD_PL + Math.max(1, members) * CHILD_W + Math.max(0, members - 1) * CHILD_GAP;
       // Real opened height, not a per-member estimate: an expanded schema card
       // runs ~410px, so a 84 + n*62 guess centred well above the content.
       const h = CARD_H + CHILD_GAP + OPEN_CHILD_H;
       frame({ x: p.x, y: p.y, w, h });
     },
     [frame],
+  );
+
+  /**
+   * Open the level a row owns.
+   *
+   * A row with `under` was given a real child node at data-build time, under
+   * the row's own id — so this is an ordinary drill, and everything that
+   * follows from that (camera, Escape, drillOut, out-of-scope fading, the
+   * depth rule) is inherited rather than re-implemented. The earlier version
+   * of this was a bespoke floating card with its own state and its own wire,
+   * which is why it behaved like a different product every time you used it.
+   */
+  const onOpenRow = useCallback(
+    (id: string) => {
+      // The row id names its OWNER: `ask-input:image` hangs off `ask-input`.
+      // That owner is usually a card in the level on screen, not the deepest
+      // node on the path — clicking a row on "What you can send" happens while
+      // the path is still just ["asking"]. Appending the row id to `path`
+      // therefore looked up ["asking","ask-input:image"], which does not
+      // exist, so nodeAt returned null and the click did nothing at all.
+      // Truncate at the owner, then append — never just append.
+      //
+      // Switching between sibling rows is the case that makes this necessary.
+      // With `image` open the path is [asking, ask-input, ask-input:image], so
+      // the owner is NOT the last segment; appending produced
+      // [..., ask-input:image, ask-input, ask-input:pdf] and nodeAt resolved
+      // nothing, which is why a second row only opened after clicking out
+      // first. Cutting the path back to the owner makes the first open and the
+      // switch the same operation.
+      const owner = id.slice(0, id.indexOf(":"));
+      const ownerAt = path.indexOf(owner);
+      const at = ownerAt === -1 ? [...path, owner] : path.slice(0, ownerAt + 1);
+      const node = nodeAt([...at, id]);
+      if (node) drillInto(node, at);
+    },
+    [path, drillInto],
+  );
+
+  const rowCtx = useMemo<RowCtx>(
+    () => ({
+      anchor,
+      lit,
+      tracing: Boolean(traced),
+      onTrace: (rid) => setTraced((cur) => (cur === rid ? null : rid)),
+      // The row you drilled through stays lit, the way an opened card stays
+      // selected — so the level on screen says which row it came from.
+      open: rowOpen,
+      onOpenRow,
+    }),
+    [anchor, lit, traced, rowOpen, onOpenRow],
   );
 
   /**
@@ -450,7 +505,12 @@ export function Canvas() {
     if (!world || !opened) return;
     const node = nodeAt(path);
     const members = node?.children?.length ?? 0;
-    if (members === 0) return;
+    // Same rule as drillInto's guard, and missed here the first time: a node
+    // opened from a row holds its content in `anatomy` and has no children at
+    // all. Bailing on children alone meant the camera never followed a row
+    // drill — the level opened at y:578 running to y:1304 against a 900px
+    // viewport, so the answer you asked for rendered below the fold.
+    if (members === 0 && !node?.anatomy?.length) return;
     const s = ss.get() || 1;
     const wb = world.getBoundingClientRect();
     // Frame the whole SUBTREE, measured — not a box computed from constants.
@@ -665,6 +725,7 @@ export function Canvas() {
             </motion.div>
           );
         })}
+
       </motion.div>
     </motion.div>
   );
@@ -699,9 +760,25 @@ function Branch({
   onClose: () => void;
 }) {
   const here = [...at, node.id];
-  const members = node.children ?? [];
   // Am I on the open path at all?
   const onPath = here.every((id, i) => path[i] === id);
+  // The child of mine that the path continues into, if any.
+  const openChildId = onPath ? path[here.length] : undefined;
+
+  /* Row children are shown ONE at a time; authored children are shown together.
+     The two kinds of level mean different things. Authored siblings — "What you
+     can send" beside "Subject and mode" — are a set you are meant to compare,
+     so all of them appear. Row children are answers to six separate questions
+     ("what happens to an image", "…to a PDF"), and you asked one. Rendering the
+     other five is exactly the wall of context this tool exists to delete: one
+     click produced six cards, the sixth sliced off the edge of the screen.
+
+     So a row child appears only when the path names it. */
+  const members = (node.children ?? []).filter(
+    (c) => !c.fromRow || c.id === openChildId,
+  );
+  /** The level below me came from one of my own rows, not from authored children. */
+  const rowOpened = members.some((c) => c.fromRow && c.id === openChildId);
   // The path has reached me, so my children are the level on screen.
   //
   // `>=`, not `>`. At equality I am the node that was just clicked and my
@@ -725,10 +802,19 @@ function Branch({
         // Anatomy shows on the node you have actually opened to, and on the
         // cards of the level you are looking at — not on every ancestor, which
         // would stack four expanded cards down the screen at once.
-        detail={!root && !showChildren}
+        //
+        // A card whose open child came from one of its own rows keeps showing
+        // its anatomy: those rows ARE the menu you chose from, and hiding them
+        // would mean backing out a level just to read the next one. The row you
+        // picked stays lit, so the list doubles as your position marker.
+        detail={!root && (!showChildren || rowOpened)}
         ctx={rowCtx}
+        // Openable is judged on the AUTHORED children, not the filtered ones.
+        // `members` hides unopened row children, so a card whose only children
+        // came from its rows would look childless and lose its click handler —
+        // you could open it and then not close it again.
         onClick={
-          members.length > 0
+          (node.children?.length ?? 0) > 0
             ? () => (showChildren ? onClose() : onOpen(node, at))
             : undefined
         }

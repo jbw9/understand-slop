@@ -235,3 +235,63 @@ overflows the viewport wants its own scroll container, or levels past 2 want to
 replace the view rather than nest inside it. Both are larger than a camera
 tweak and neither should be attempted without deciding what drilling four deep
 is supposed to feel like.
+
+---
+
+## D9 — A row with depth becomes a node, and only the one you clicked opens
+
+**Chose:** every row carrying `under` becomes a real child `Node`
+(`withRowChildren`), marked `fromRow`, and `Branch` renders a row child ONLY
+when the path names it.
+**Beat:** inline expansion under the row (built first), a free-standing detail
+card beside the level (built second), and rendering all row children as a
+normal level (built third).
+
+Three rejected designs, each a variation on the same mistake: a second way to go
+deeper running alongside the drill the product already had. Cards drilled; rows
+did something that looked similar and behaved differently, so camera framing,
+Escape, `drillOut`, out-of-scope fading and wires all had to be re-implemented
+or went missing.
+
+The measured failure of the side-card version: clicking `image` put the row at
+**x = −432**, off the left edge, while its card sat at x=467 — the camera framed
+the card alone, so the question left the screen exactly when the answer arrived.
+The card also opened at x=964, past `ask-mode` (504–844), so its connector wire
+crossed an unrelated card.
+
+**The `fromRow` filter is the part that matters.** As plain children, six deep
+rows produced six sibling cards on one click, the sixth sliced off the screen
+edge. That is the wall of context this tool exists to delete: you asked what
+happens to an image and got PDFs, Word docs, plain text and URLs as well.
+Authored siblings are a set you are meant to compare ("What you can send" beside
+"Subject and mode"); row children are answers to six separate questions. Same
+data structure, different meaning, so `Branch` filters on `fromRow`.
+
+The owner card keeps rendering its anatomy while a row child is open
+(`detail={!root && (!showChildren || rowOpened)}`), so the row list stays on
+screen as the menu you chose from, with the chosen row lit.
+
+**Four bugs found only by driving the running app**, every one of which made the
+click a silent no-op:
+1. `drillInto` guarded on `node.children?.length === 0`. A row node holds its
+   content in `anatomy` and has no children, so every row click returned before
+   `setPath`.
+2. The deep-level framing effect had the SAME children-only guard, missed on the
+   first pass — so even once the path moved, the camera did not, and the level
+   opened at y:578 running to y:1304 against a 900px viewport.
+3. `onOpenRow` built the path as `[...path, id]`, but a row's owner is a card in
+   the level on screen, not the deepest path segment — so it looked up
+   `["asking","ask-input:image"]`, which does not exist, and `nodeAt` returned
+   null.
+4. The row click bubbled to the card's own handler. Instrumented order was
+   `ROW click → CARD click`: the row opened the level and the card collapsed it
+   on the same event. This is why calling the handler directly worked and every
+   genuine pointer click did nothing — a difference no amount of reading the
+   source would have shown.
+
+**Cost accepted:** the camera frames the opened level, which pushes the owner
+card partly above the viewport (measured y:−279). You can see the row list by
+panning up, but it is not in view at rest.
+**Breaks at scale:** `deepRows` only understands `map` and `flow` blocks. A deep
+row inside `schema`, `bars`, `chips` or `routes` is silently ignored — it renders
+a caret and opens nothing, which is the worst failure mode available.

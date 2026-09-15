@@ -77,21 +77,190 @@ export const L0: Node[] = [
       {
         id: "ask-mode",
         title: "Subject and mode",
-        sub: "3 modes · 6 subjects + a catch-all",
+        sub: "3 modes → 4 prompt paths · 11 subjects",
         state: "derived",
         col: 0,
         row: 1,
         detail:
-          "A learner can pin the subject, or leave it to a classifier call. Mode changes which system prompt is used.",
-        evidence: "src/lib/subject-router.ts:26, src/types/index.ts",
+          "Two independent choices that together select which prompt text gets appended. Mode is picked by the learner; subject is either pinned or classified by a separate model call.",
+        evidence: "src/lib/subject-router.ts:26, src/app/api/chat/route.ts:210",
         anatomy: [
           {
-            kind: "chips",
-            caption: "modes",
+            kind: "map",
+            caption: "mode → what gets appended as block 2",
             rows: [
-              { label: "auto", note: "Model decides whether to animate", state: "derived" },
-              { label: "visualize", note: "Always animates", state: "derived" },
-              { label: "test", note: "Quiz question, graded client-side", state: "derived" },
+              { from: "auto · 1st", to: "SUBJECT_PROMPTS[s] + AUTO_MODE_FIRST_MESSAGE_PROMPT", state: "derived" },
+              { from: "auto · later", to: "SUBJECT_PROMPTS[s] + AUTO_MODE_FOLLOW_UP_PROMPT", state: "derived" },
+              { from: "visualize", to: "SUBJECT_PROMPTS[s] + VISUALIZE_MODE_PROMPT", state: "derived" },
+              { from: "test", to: "TEST_MODE_PROMPT + SUBJECT_TEST_HINTS[s] — no subject prompt", state: "derived" },
+            ],
+          },
+        ],
+        children: [
+          {
+            id: "ask-classify",
+            title: "How the subject is decided",
+            sub: "One Haiku call · 11 labels · never throws",
+            state: "derived",
+            col: 0,
+            row: 0,
+            detail:
+              "If the learner pins a subject chip it is used directly, after being checked against VALID_SUBJECTS so a client cannot inject an arbitrary string. Otherwise one cheap model call classifies the first message.",
+            evidence: "src/lib/subject-router.ts:36",
+            anatomy: [
+              {
+                kind: "flow",
+                rows: [
+                  { n: 1, title: "Env var checked first", detail: "No BEDROCK_CLASSIFIER_MODEL_ID → returns 'general' without calling anything.", state: "derived" },
+                  { n: 2, title: "Message truncated to 500 chars", detail: "Only the opening of the first message is classified; the rest is never sent.", state: "derived" },
+                  { n: 3, title: "Haiku, max 10 output tokens", detail: "The reply is one word, so the budget is one word. ~150ms.", state: "derived" },
+                  { n: 4, title: "3s AbortController", detail: "A slow classifier is abandoned rather than delaying the answer.", state: "derived" },
+                  { n: 5, title: "Reply checked against VALID_SUBJECTS", detail: "An unrecognised word is discarded, not passed through.", state: "derived" },
+                  { n: 6, title: "Every failure path → 'general'", detail: "catch {} with no rethrow. A misclassification and an outage look identical downstream.", state: "partial" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/lib/subject-router.ts",
+                start: 56,
+                code: "  } catch {\n    return 'general';\n  } finally {\n    clearTimeout(timeout);\n  }",
+                why: "This is why the subject can silently be wrong. A timeout, a throttle, a bad model id and a genuinely general question all produce the same 'general', and nothing records which one happened. The learner sees a slightly worse answer and no error.",
+              },
+            ],
+          },
+          {
+            id: "ask-disambig",
+            title: "Why this subject, not that one",
+            sub: "4 rules written into the classifier prompt",
+            state: "derived",
+            col: 0,
+            row: 1,
+            detail:
+              "The subjects overlap, so the prompt spends most of its length drawing borders between the pairs that collide rather than defining each subject.",
+            evidence: "src/lib/subject-router.ts:17",
+            anatomy: [
+              {
+                kind: "map",
+                caption: "the boundary, verbatim from the prompt",
+                rows: [
+                  { from: "a cell", to: "biology", state: "derived" },
+                  { from: "a molecule", to: "chemistry", state: "derived" },
+                  { from: "recording a transaction", to: "accounting", state: "derived" },
+                  { from: "market forces and theory", to: "economics", state: "derived" },
+                  { from: "running an organization", to: "business", state: "derived" },
+                  { from: "how language works", to: "language", state: "derived" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/lib/subject-router.ts",
+                start: 20,
+                code: "- Biology is living systems; chemistry is molecules and reactions (a cell = biology; a molecule = chemistry)",
+                why: "Written as an instruction to the model, which means the taxonomy exists only in prose. Nothing verifies that a message about mitochondria lands on biology — there is no test, and the only feedback is the answer being subtly off-domain.",
+              },
+            ],
+          },
+          {
+            id: "ask-cs-gap",
+            title: "The subject with no prompt",
+            sub: "8 subject prompts · 9 test hints · 11 subjects",
+            state: "partial",
+            col: 0,
+            row: 2,
+            detail:
+              "SUBJECT_PROMPTS is a Partial<Record>, and three of the eleven classifiable subjects have no entry. The lookup is a guarded `if`, so a missing subject is not an error — block 2 simply carries less.",
+            evidence: "src/lib/system-prompt.ts:5018",
+            anatomy: [
+              {
+                kind: "chips",
+                caption: "has a subject prompt",
+                rows: [
+                  { label: "math", note: "5.0KB", state: "derived" },
+                  { label: "physics", note: "8.6KB", state: "derived" },
+                  { label: "chemistry", note: "19.5KB", state: "derived" },
+                  { label: "biology", note: "14.3KB", state: "derived" },
+                  { label: "language", note: "11.9KB", state: "derived" },
+                  { label: "business", note: "12.7KB", state: "derived" },
+                  { label: "accounting", note: "16.2KB", state: "derived" },
+                  { label: "economics", note: "17.4KB", state: "derived" },
+                ],
+              },
+              {
+                kind: "chips",
+                caption: "classifiable, but no subject prompt",
+                rows: [
+                  { label: "cs", note: "test hint only", state: "partial" },
+                  { label: "general", note: "nothing", state: "partial" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/app/api/chat/route.ts",
+                start: 216,
+                code: "    if (resolvedSubject && mode !== 'test' && SUBJECT_PROMPTS[resolvedSubject]) {\n      subjectModePrompt += SUBJECT_PROMPTS[resolvedSubject];\n    }",
+                why: "A computer-science question in auto or visualize mode gets no subject guidance at all — the `&&` chain simply falls through. In test mode the same question does get CS guidance, because that comes from SUBJECT_TEST_HINTS, which does have a cs key. Same subject, opposite treatment, decided by mode.",
+              },
+            ],
+          },
+          {
+            id: "ask-questions",
+            title: "When it asks instead of answering",
+            sub: "Ambiguous → options block, not a guess",
+            state: "derived",
+            col: 0,
+            row: 3,
+            detail:
+              "The rule is written into the base prompt as four triggers and four exclusions, with three worked examples. It is prose instruction only — nothing validates that the model obeys it.",
+            evidence: "src/lib/system-prompt.ts:55",
+            anatomy: [
+              {
+                kind: "map",
+                caption: "ask · the prompt's own examples",
+                rows: [
+                  { from: "\"explain sorting\"", to: "bubble / merge / quick / compare all three", state: "derived" },
+                  { from: "\"visualize recursion\"", to: "factorial / fibonacci / binary search", state: "derived" },
+                  { from: "\"show me data structures\"", to: "array / tree / graph", state: "derived" },
+                ],
+              },
+              {
+                kind: "map",
+                caption: "don't ask",
+                rows: [
+                  { from: "already specific", to: "\"show me bubble sort\" → just build it", state: "derived" },
+                  { from: "context makes it clear", to: "earlier turns already narrowed it", state: "derived" },
+                  { from: "an obvious best choice exists", to: "pick it", state: "derived" },
+                  { from: "user stated a preference", to: "honour it", state: "derived" },
+                ],
+              },
+            ],
+          },
+          {
+            id: "ask-budget",
+            title: "The three-question budget",
+            sub: "Counted from stored messages, injected as a sentence",
+            state: "derived",
+            col: 0,
+            row: 4,
+            detail:
+              "The cap is not enforced by rejecting anything. It is counted server-side each turn and stated to the model in block 3, which is the reason block 3 exists at all.",
+            evidence: "src/app/api/chat/route.ts:239",
+            anatomy: [
+              {
+                kind: "flow",
+                rows: [
+                  { n: 1, title: "Counted, not tracked", detail: "history.filter(m => m.questionData !== undefined).length — derived from stored messages each turn, so there is no counter to drift.", state: "derived" },
+                  { n: 2, title: "0 asked → nothing injected", detail: "The prompt's own 'max 3' line is the only limit in play.", state: "derived" },
+                  { n: 3, title: "1–2 asked → allowance stated", detail: "\"You can ask up to N more if needed.\"", state: "derived" },
+                  { n: 4, title: "3+ asked → hard stop", detail: "\"DO NOT ask any more questions. Proceed directly with creating a visualization.\"", state: "derived" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/app/api/chat/route.ts",
+                start: 239,
+                code: "      if (questionCount >= 3) {\n        dynamicContext += `\\n\\n**IMPORTANT CONTEXT: You have already asked ${questionCount} clarifying questions in this conversation. DO NOT ask any more questions.**`;",
+                why: "This is the entire reason the prompt is split into three cached blocks. The sentence changes on almost every turn, and if it lived inside block 1 or 2 the whole cached prefix would be invalidated each time — so ~102KB would be re-sent to buy one sentence of state.",
+              },
             ],
           },
         ],
@@ -274,11 +443,13 @@ export const L0: Node[] = [
                 anatomy: [
                   {
                     kind: "parts",
-                    total: "~174KB per request",
+                    // Largest real request: chemistry in test mode. Measured from
+                    // the constants, not from the route's comment, which is wrong.
+                    total: "~125KB · chemistry + test, the heaviest combination",
                     rows: [
-                      { label: "Block 1 · base", weight: 149, display: "~149KB · cached", tone: "hold", state: "derived" },
-                      { label: "Block 2 · subject+mode", weight: 25, display: "20-30KB · cached", tone: "hold", state: "derived" },
-                      { label: "Block 3 · per-message", weight: 2, display: "tiny · uncached", tone: "vary", state: "derived" },
+                      { label: "Block 1 · base", weight: 102450, display: "102KB · cached", tone: "hold", state: "derived" },
+                      { label: "Block 2 · subject+mode", weight: 22609, display: "5–23KB · cached", tone: "hold", state: "derived" },
+                      { label: "Block 3 · per-message", weight: 400, display: "a sentence · uncached", tone: "vary", state: "derived" },
                     ],
                   },
                   {
@@ -288,7 +459,7 @@ export const L0: Node[] = [
                     code: `    // Block 3 (uncached): Dynamic per-message context — tiny, changes every turn.
     // Kept outside cached blocks so it doesn't invalidate the 149KB+ cache.
     let dynamicContext = '';`,
-                    why: "The whole three-block split exists for this line. Question count and difficulty change on nearly every turn; if they lived inside the cached blocks, a 149KB prompt would be re-sent each time. Isolating them keeps the expensive cache entry valid.",
+                    why: "The whole three-block split exists for this line. Question count and difficulty change on nearly every turn; if they lived inside the cached blocks, the entire ~102KB prefix would be re-sent each time to buy one sentence of state. Note the comment's own figure: the base literal measures 102,450 bytes, so the 149KB it claims here — and in three other places in this file — is not a number anything in the repository produces.",
                   },
                 ],
               },
@@ -360,7 +531,7 @@ export const L0: Node[] = [
       {
         id: "gen-prompt",
         title: "The system prompt",
-        sub: "5,098 lines · one file",
+        sub: "5,098 lines · 234KB file · one export per mode",
         state: "partial",
         col: 0,
         row: 2,
@@ -369,12 +540,92 @@ export const L0: Node[] = [
         evidence: "src/lib/system-prompt.ts",
         anatomy: [
           {
-            kind: "facts",
+            kind: "parts",
+            // Charts the 15 named prompt literals, measured one by one. Not the
+            // file on disk, which is ~25KB larger once imports, comments and the
+            // declarations themselves are counted — none of that is ever sent.
+            // SUBJECT_TEST_HINTS is deliberately absent: it lives inside an
+            // object literal rather than its own const, so it is not measured
+            // the same way and would not reconcile against this total.
+            //
+            // The three slices sum to 213,273 of 214,546. The missing 1,273 is
+            // HAIKU_EXPLANATION_PROMPT and ANIMATION_ONLY_SUFFIX. No fourth
+            // slice for them: at 0.6% the 6% floor would draw them ten times
+            // their real size, which is worse than leaving them named here.
+            total: "210KB across 15 named prompt literals",
             rows: [
-              { label: "Size", value: "5,098 lines, ~149KB", state: "derived" },
-              { label: "Exports", value: "Base prompt, per-subject prompts, per-mode prompts, test hints", state: "derived" },
-              { label: "Cached as", value: "Block 1 of 3, identical for every request", state: "derived" },
-              { label: "Test coverage", value: "No test file in the repo references it", state: "inferred" },
+              { label: "SYSTEM_PROMPT · block 1", weight: 102450, display: "102KB · every request", tone: "hold", state: "derived" },
+              { label: "8 subject prompts · block 2", weight: 105637, display: "106KB · one is chosen", tone: "hold", state: "derived" },
+              { label: "4 mode prompts · block 2", weight: 5186, display: "5KB · one is chosen", tone: "vary", state: "derived" },
+            ],
+          },
+          {
+            kind: "source",
+            file: "src/app/api/chat/route.ts",
+            start: 161,
+            code: "    // Block 1: SYSTEM_PROMPT (149KB, cached, same for ALL requests)\n    // Block 2: Subject + mode prompt (20-30KB, cached per subject+mode combo)",
+            why: "Measured, the base literal is 102,450 bytes, not 149KB — the comment appears four times in this file and is wrong in all four. The 234KB figure people reach for is the file on disk, which also counts the subject prompts that are block 2, plus ~17KB of imports and comments that are never sent anywhere. Block 2's '20-30KB' flattens a 4x spread: chemistry is 19.5KB, math is 5.0KB.",
+          },
+        ],
+        children: [
+          {
+            id: "gen-prompt-what",
+            title: "What is in the base block",
+            sub: "2,349 lines sent with every single request",
+            state: "derived",
+            col: 0,
+            row: 0,
+            detail:
+              "Block 1 is one template literal. It is identical for every user, every subject and every mode, which is what makes it worth caching — and what makes it the single largest fixed cost per request.",
+            evidence: "src/lib/system-prompt.ts:3",
+            anatomy: [
+              {
+                kind: "map",
+                caption: "the sections that take up the space",
+                rows: [
+                  { from: "response format", to: "explanation text + ```animation fenced block", state: "derived" },
+                  { from: "asking clarifying questions", to: "when to, when not to, 3 worked examples", state: "derived" },
+                  { from: "animation templates", to: "step players, canvas loops, physics scaffolds", state: "derived" },
+                  { from: "quiz format", to: "```options JSON, grading, questionId rules", state: "derived" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/lib/system-prompt.ts",
+                start: 46,
+                code: "CRITICAL: Always use the `animation` fence tag. Never use `html` or `javascript`. The frontend uses this tag to detect animation blocks.",
+                why: "The parser downstream keys on this exact fence. It is the contract between the prompt and stream-parser.ts, written in prose in one file and as a regex in another, with nothing linking them — rename the fence in one place and the product stops rendering animations.",
+              },
+            ],
+          },
+          {
+            id: "gen-prompt-modes",
+            title: "The mode prompts are tiny",
+            sub: "218 bytes to 3KB · the subject prompt is the weight",
+            state: "derived",
+            col: 0,
+            row: 1,
+            detail:
+              "Block 2 is assembled from a subject prompt plus a mode prompt. The mode half is almost nothing; nearly all of block 2's size is the subject.",
+            evidence: "src/lib/system-prompt.ts:2354",
+            anatomy: [
+              {
+                kind: "bars",
+                unit: "bytes",
+                rows: [
+                  { label: "TEST_MODE_PROMPT", value: 3088, display: "3,088 B", state: "derived", note: "quiz JSON, grading, difficulty" },
+                  { label: "AUTO_MODE_FOLLOW_UP", value: 1451, display: "1,451 B", state: "derived", note: "refine / text / new / ask" },
+                  { label: "AUTO_MODE_FIRST_MESSAGE", value: 429, display: "429 B", state: "derived" },
+                  { label: "VISUALIZE_MODE_PROMPT", value: 218, display: "218 B", state: "derived" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/lib/system-prompt.ts",
+                start: 5077,
+                code: "**IMPORTANT OVERRIDE: The rule above that says \"Every response MUST contain animation code\" applies to FIRST messages only.**",
+                why: "Auto mode is two prompts, not one. The first message is forced to animate; the follow-up explicitly revokes that rule so a one-word clarification does not trigger a full animation rebuild. This is why the same mode behaves differently on turn 1 and turn 2.",
+              },
             ],
           },
         ],
@@ -600,22 +851,123 @@ export const L0: Node[] = [
       {
         id: "share-pdf",
         title: "PDF worksheets",
-        sub: "Model-authored, headless Chrome rendered",
+        sub: "JSON from the model → HTML → headless Chrome",
         state: "partial",
         col: 0,
         row: 1,
         detail:
-          "A second generation path with its own prompt, schema and quota — the model returns structured JSON which is rendered to HTML and printed.",
+          "A second generation path with its own prompt, schema and quota. The model never writes the document — it writes JSON, which is validated and then rendered.",
         evidence: "src/app/api/generate-pdf/route.ts",
         anatomy: [
           {
-            kind: "facts",
+            kind: "flow",
             rows: [
-              { label: "Model output", value: "JSON validated with zod against a worksheet schema", state: "derived" },
-              { label: "Malformed JSON", value: "Newlines inside strings are repaired character-by-character, then retried once", state: "partial" },
-              { label: "Rendering", value: "puppeteer-core prints the HTML to PDF", state: "derived" },
-              { label: "Upload limit", value: "~6MB decoded, enforced to prevent large-payload abuse", state: "derived" },
-              { label: "Timeout", value: "maxDuration 60s — generation alone can take ~20s", state: "derived" },
+              { n: 1, title: "Prompt built per subject and doc type", detail: "buildPdfSystemPrompt() picks guidance from two lookup tables and inlines the JSON schema as prose.", state: "derived" },
+              { n: 2, title: "invokeModelJson, maxTokens 8000", detail: "A single call. An attached PDF is passed as document data.", state: "derived" },
+              { n: 3, title: "Markdown fences stripped", detail: "Leading ```json and trailing ``` are removed before parsing.", state: "derived" },
+              { n: 4, title: "Character-walk repair", detail: "Literal newlines and tabs inside JSON strings are escaped, tracking in-string state so only string contents are touched.", state: "derived" },
+              { n: 5, title: "JSON.parse, then Zod", detail: "PdfDocSchema.safeParse. A failure at either step retries once with a stricter instruction.", state: "derived" },
+              { n: 6, title: "Best-effort coercion", detail: "On the second failure, four fields are salvaged with defaults rather than erroring out.", state: "partial" },
+              { n: 7, title: "puppeteer-core prints", detail: "setContent, waitUntil load, 20s timeout.", state: "derived" },
+            ],
+          },
+        ],
+        children: [
+          {
+            id: "pdf-prompt",
+            title: "What the model is told",
+            sub: "2 lookup tables + the schema as prose",
+            state: "derived",
+            col: 0,
+            row: 0,
+            detail:
+              "The PDF prompt is assembled, not stored. Subject guidance and document-type instructions are selected from two records, then the JSON schema is written into the prompt as text.",
+            evidence: "src/lib/pdf-prompts.ts:34",
+            anatomy: [
+              {
+                kind: "map",
+                caption: "subject → notation rule",
+                rows: [
+                  { from: "math", to: "LaTeX for everything · pmatrix for matrices", state: "derived" },
+                  { from: "chemistry", to: "LaTeX equations · \\text{} for element symbols", state: "derived" },
+                  { from: "cs", to: "pseudocode as plain text, never LaTeX", state: "derived" },
+                  { from: "accounting", to: "journal entries as described tables · avoid LaTeX", state: "derived" },
+                  { from: "biology", to: "no LaTeX unless genetics or biochemistry", state: "derived" },
+                ],
+              },
+              {
+                kind: "map",
+                caption: "docType → structure",
+                rows: [
+                  { from: "notes", to: "content, keyPoints, solution_text — questions forbidden", state: "derived" },
+                  { from: "worksheet", to: "questions with workSpaceLines 4–12 · always generate solutions", state: "derived" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/lib/pdf-prompts.ts",
+                start: 20,
+                code: "For EVERY question, always generate BOTH the question AND a complete solution. The rendering system will decide whether to display the solutions — your job is always to include them.",
+                why: "The answer key is not a second generation pass. Solutions are always produced and the renderer chooses whether to print them, so toggling 'include answers' costs nothing extra and cannot disagree with the questions.",
+              },
+            ],
+          },
+          {
+            id: "pdf-repair",
+            title: "Why the JSON needs repairing",
+            sub: "Prose in strings · 2 attempts · then salvage",
+            state: "partial",
+            col: 0,
+            row: 1,
+            detail:
+              "The model is asked for single-line JSON strings and does not reliably produce them, so the route repairs the output before parsing rather than rejecting it.",
+            evidence: "src/app/api/generate-pdf/route.ts:74",
+            anatomy: [
+              {
+                kind: "source",
+                file: "src/app/api/generate-pdf/route.ts",
+                start: 78,
+                code: "      if (ch === '\"') { inString = !inString; cleaned += ch; continue; }\n      if (inString && ch === '\\n') { cleaned += '\\\\n'; continue; }",
+                why: "A blanket replace would corrupt the JSON's own structural newlines between keys. Tracking in-string state means only prose inside a value is escaped. The prompt asks for this in capitals — 'never press Enter inside a JSON string' — and the parser still needs the fallback, which is the honest signal about how reliable that instruction is.",
+              },
+              {
+                kind: "flow",
+                rows: [
+                  { n: 1, title: "Attempt 1 fails to parse", detail: "The original user message is re-sent with an appended instruction: start with { and end with }.", state: "derived" },
+                  { n: 2, title: "Attempt 2 fails to parse", detail: "Throws — 'Claude returned invalid JSON after 2 attempts'.", state: "derived" },
+                  { n: 3, title: "Parses but fails Zod", detail: "On attempt 2, four fields are coerced with defaults and re-validated.", state: "partial" },
+                  { n: 4, title: "Coercion also fails", detail: "Throws. Sections default to an empty array, so a document can succeed with no content.", state: "partial" },
+                ],
+              },
+            ],
+          },
+          {
+            id: "pdf-render",
+            title: "Printing it",
+            sub: "Two browsers · one prints, one screenshots",
+            state: "derived",
+            col: 0,
+            row: 2,
+            detail:
+              "The same headless Chrome dependency does two unrelated jobs: printing the worksheet, and capturing a still of an animation to embed in notes.",
+            evidence: "src/lib/pdf-puppeteer.ts:34",
+            anatomy: [
+              {
+                kind: "map",
+                caption: "job → settings",
+                rows: [
+                  { from: "renderHtmlToPdf", to: "setContent · waitUntil load · 20s timeout", state: "derived" },
+                  { from: "screenshotAnimation", to: "600×400 viewport · 8s timeout · 600ms settle", state: "derived" },
+                  { from: "both", to: "request interception on, external loads blocked", state: "derived" },
+                ],
+              },
+              {
+                kind: "source",
+                file: "src/lib/pdf-puppeteer.ts",
+                start: 145,
+                code: "      const sampleSize = Math.min(500, buf.length);\n      const step = Math.floor(buf.length / sampleSize);\n      const uniqueBytes = new Set<number>();",
+                why: "A blank screenshot is detected by sampling up to 500 bytes and counting distinct values — a mostly-uniform image is assumed to be an animation that had not drawn yet. It is a heuristic on compressed bytes, not on pixels, so a genuinely flat-coloured animation reads as failure and the notes silently fall back to the no-screenshot wording.",
+              },
             ],
           },
         ],

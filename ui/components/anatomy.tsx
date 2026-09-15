@@ -190,6 +190,310 @@ function Block({
     );
   }
 
+  if (block.kind === "source") {
+    // The bottom of the map. Two things are kept strictly apart: the code,
+    // which is quoted verbatim from a real file at a real line, and the `why`,
+    // which is synthesized. Commentary gets its own tinted band below the
+    // code so it can never be misread as something the file says.
+    const lines = block.code.replace(/\n$/, "").split("\n");
+    const id = rowId(owner, "source");
+    const isLit = ctx.lit.has(id);
+    return (
+      <div
+        className={cn(
+          "overflow-hidden rounded-[10px] border bg-pure-white",
+          isLit ? "border-deep-green" : "border-border-gray",
+        )}
+      >
+        <button
+          ref={ctx.anchor(id)}
+          data-row
+          onClick={() => ctx.onTrace(id)}
+          className={rowClass(
+            id,
+            ctx,
+            "flex w-full items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5",
+          )}
+        >
+          <FileGlyph />
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-left font-mono text-[10.5px]",
+              isLit ? "font-semibold text-deep-green" : "text-on-surface",
+            )}
+          >
+            {block.file}
+          </span>
+          <span className="shrink-0 font-mono text-[9.5px] text-faint">
+            :{block.start}
+          </span>
+        </button>
+        {/* Real line numbers, counting from the file's own offset. A gutter
+            that restarts at 1 is a quiet lie about where this code lives. */}
+        <div className="overflow-x-auto">
+          <pre className="min-w-full py-1.5 font-mono text-[10px] leading-[1.55]">
+            {lines.map((line, i) => (
+              <div key={i} className="flex">
+                <span className="tnum sticky left-0 shrink-0 select-none bg-pure-white pl-3 pr-2.5 text-right text-faint">
+                  {block.start + i}
+                </span>
+                <code className="whitespace-pre pr-3 text-on-surface">
+                  {line || " "}
+                </code>
+              </div>
+            ))}
+          </pre>
+        </div>
+        {block.why ? (
+          <div className="flex gap-2 border-t border-border-gray bg-surface-container-low px-3 py-2">
+            <span className="mt-[3px] shrink-0 font-mono text-[9px] uppercase tracking-[0.09em] text-faint">
+              why
+            </span>
+            <p className="text-[10px] leading-relaxed text-on-surface-variant">
+              {block.why}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (block.kind === "chips") {
+    return (
+      <div className="rounded-[10px] border border-border-gray bg-pure-white px-3 py-2.5">
+        {block.caption ? (
+          <p className="mb-2 font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
+            {block.caption}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-1.5">
+          {block.rows.map((c) => {
+            const id = rowId(owner, c.label);
+            const isLit = ctx.lit.has(id);
+            return (
+              <button
+                key={c.label}
+                ref={ctx.anchor(id)}
+                data-row
+                onClick={() => ctx.onTrace(id)}
+                title={c.note}
+                className={cn(
+                  "rounded-[6px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
+                  ctx.tracing && !isLit && "opacity-55",
+                  isLit
+                    ? "border-deep-green bg-deep-green text-pure-white"
+                    : c.state === "derived"
+                      ? "border-mint-line bg-mint-success text-deep-green"
+                      : "border-amber-line bg-amber-surface text-amber-ink",
+                )}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (block.kind === "map") {
+    return (
+      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+        {block.caption ? (
+          <div className="border-b border-border-gray bg-surface px-3 py-1.5">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
+              {block.caption}
+            </span>
+          </div>
+        ) : null}
+        {block.rows.map((m) => {
+          const id = rowId(owner, m.from);
+          const isLit = ctx.lit.has(id);
+          return (
+            <button
+              key={m.from}
+              ref={ctx.anchor(id)}
+              data-row
+              onClick={() => ctx.onTrace(id)}
+              className={rowClass(
+                id,
+                ctx,
+                "flex w-full items-center gap-2 border-b border-border-gray px-3 py-1.5 last:border-b-0",
+              )}
+            >
+              <span
+                className={cn(
+                  "shrink-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
+                  isLit
+                    ? "bg-deep-green text-pure-white"
+                    : "bg-surface-container text-on-surface",
+                )}
+              >
+                {m.from}
+              </span>
+              {/* The arrow carries the relationship, so the text doesn't
+                  have to say "becomes". */}
+              <span className="shrink-0 font-mono text-[11px] text-faint">→</span>
+              <span
+                className={cn(
+                  "min-w-0 flex-1 text-left font-mono text-[9.5px] leading-snug",
+                  m.state === "derived" ? "text-muted-slate" : "text-amber-ink",
+                )}
+              >
+                {m.to}
+              </span>
+              <StateChip state={m.state} />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (block.kind === "parts") {
+    // The ratio IS the finding. Segments are sized by real weight, so a 149KB
+    // block next to a 1KB one looks like what it is — no amount of prose makes
+    // that land the way a length does.
+    const total = block.rows.reduce((sum, p) => sum + p.weight, 0) || 1;
+    return (
+      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+        <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
+          <span className="font-mono text-[11px] font-semibold text-ink">
+            {block.total}
+          </span>
+          <span className="ml-auto font-mono text-[10px] text-faint">
+            {block.rows.length} parts
+          </span>
+        </div>
+        <div className="px-3 pb-2.5 pt-2.5">
+          <div className="flex h-[22px] w-full overflow-hidden rounded-[5px]">
+            {block.rows.map((p) => {
+              const id = rowId(owner, p.label);
+              const isLit = ctx.lit.has(id);
+              return (
+                <button
+                  key={p.label}
+                  ref={ctx.anchor(id)}
+                  data-row
+                  onClick={() => ctx.onTrace(id)}
+                  title={`${p.label} — ${p.display}`}
+                  // Floored at 6%: a slice worth naming has to be visible, and
+                  // a 1%-of-the-whole block rendered ~2px wide — present in the
+                  // DOM, absent to the eye. The exact figure is in the legend;
+                  // the bar's job is the contrast, not the arithmetic.
+                  style={{ width: `${Math.max((p.weight / total) * 100, 6)}%` }}
+                  className={cn(
+                    "h-full border-r border-pure-white transition-all duration-200 last:border-r-0",
+                    ctx.tracing && !isLit && "opacity-45",
+                    isLit
+                      ? "bg-deep-green"
+                      : p.tone === "vary"
+                        ? // The thing being contrasted. Hatched rather than
+                          // merely a lighter green, because two mints side by
+                          // side read as one bar with a seam in it.
+                          "bg-amber-line"
+                        : "bg-mint-line",
+                  )}
+                />
+              );
+            })}
+          </div>
+          {/* Legend, not a table: label and size on one line each. */}
+          <ul className="mt-2 flex flex-col gap-1">
+            {block.rows.map((p) => {
+              const id = rowId(owner, p.label);
+              const isLit = ctx.lit.has(id);
+              return (
+                <li key={p.label} className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "size-[7px] shrink-0 rounded-[2px]",
+                      isLit
+                        ? "bg-deep-green"
+                        : p.tone === "vary"
+                          ? "bg-amber-line"
+                          : "bg-mint-line",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "font-mono text-[10px]",
+                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                    )}
+                  >
+                    {p.label}
+                  </span>
+                  <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-slate">
+                    {p.display}
+                  </span>
+                  <StateChip state={p.state} />
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  if (block.kind === "bars") {
+    // Comparison, not enumeration. Bars share one scale so the 250x gap
+    // between an anonymous and a premium quota is visible rather than stated.
+    const max = Math.max(...block.rows.map((b) => b.value), 1);
+    return (
+      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+        <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
+            {block.unit}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1.5 px-3 py-2.5">
+          {block.rows.map((b) => {
+            const id = rowId(owner, b.label);
+            const isLit = ctx.lit.has(id);
+            return (
+              <button
+                key={b.label}
+                ref={ctx.anchor(id)}
+                data-row
+                onClick={() => ctx.onTrace(id)}
+                className={rowClass(id, ctx, "flex items-center gap-2 rounded-[5px]")}
+              >
+                <span
+                  className={cn(
+                    "w-[92px] shrink-0 truncate text-left font-mono text-[10px]",
+                    isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                  )}
+                >
+                  {b.label}
+                </span>
+                {/* The track is the scale. Without it a short bar reads as a
+                    small number rather than a small share. */}
+                <span className="h-[9px] min-w-0 flex-1 rounded-[3px] bg-surface-container">
+                  <span
+                    style={{ width: `${Math.max((b.value / max) * 100, 2)}%` }}
+                    className={cn(
+                      "block h-full rounded-[3px] transition-all duration-200",
+                      isLit
+                        ? "bg-deep-green"
+                        : b.state === "derived"
+                          ? "bg-mint-line"
+                          : "bg-amber-line",
+                    )}
+                  />
+                </span>
+                <span className="w-[108px] shrink-0 text-right font-mono text-[9.5px] text-muted-slate">
+                  {b.display}
+                </span>
+                <StateChip state={b.state} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   if (block.kind === "flow") {
     return (
       <ol className="flex flex-col">
@@ -329,6 +633,21 @@ function Method({ method }: { method: string }) {
     >
       {method}
     </span>
+  );
+}
+
+function FileGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path
+        d="M3 1.5h3.5L9 4v6.5H3z"
+        stroke="currentColor"
+        strokeWidth="1"
+        strokeLinejoin="round"
+        className="text-muted-slate"
+      />
+      <path d="M6.4 1.6V4.2H9" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" className="text-muted-slate" />
+    </svg>
   );
 }
 

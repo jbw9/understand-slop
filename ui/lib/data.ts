@@ -49,11 +49,80 @@ export interface Pair {
   state: State;
 }
 
+/**
+ * The bottom of the map. Real source, quoted verbatim from a real file at a
+ * real line — never paraphrased, never reconstructed from memory. `why` is the
+ * one place a synthesized explanation is allowed, and it is separated from the
+ * code so nobody mistakes the commentary for the thing itself.
+ */
+export interface Source {
+  kind: "source";
+  /** Repo-relative path. */
+  file: string;
+  /** Line number of `code`'s first line, so the gutter tells the truth. */
+  start: number;
+  /** Verbatim. Leading indentation preserved. */
+  code: string;
+  /** Why it is this way. Synthesized — rendered as commentary, not as fact. */
+  why?: string;
+}
+
+/**
+ * A quantity worth comparing. `value` is what draws the bar; `display` is what
+ * a human reads, because "40 per day, 10 per hour" is the fact and 40 is only
+ * the part of it that has a length.
+ */
+export interface Bar {
+  label: string;
+  value: number;
+  display: string;
+  state: State;
+  note?: string;
+}
+
+/**
+ * One slice of a whole. Used where the RATIO is the finding — three prompt
+ * blocks whose sizes are the entire reason the split exists read as a bar in
+ * one glance and as an essay in three rows.
+ */
+export interface Part {
+  label: string;
+  weight: number;
+  display: string;
+  /** Tints the slice: the thing being contrasted, not decoration. */
+  tone?: "hold" | "vary";
+  state: State;
+}
+
+/** One accepted kind of thing. The label IS the content; no sentence needed. */
+export interface Chip {
+  label: string;
+  note?: string;
+  state: State;
+}
+
+/** A rewrite rule: what goes in, what comes out. */
+export interface Mapping {
+  from: string;
+  to: string;
+  state: State;
+}
+
 export type Anatomy =
   | { kind: "schema"; table: string; rows: Column[]; rel?: string[] }
   | { kind: "routes"; rows: Route[] }
   | { kind: "flow"; rows: Step[] }
-  | { kind: "facts"; rows: Pair[] };
+  | { kind: "facts"; rows: Pair[] }
+  // Measured against each other. A number nobody can compare is just text.
+  | { kind: "bars"; unit: string; rows: Bar[] }
+  // Measured against the whole.
+  | { kind: "parts"; total: string; rows: Part[] }
+  // A closed set. Five one-line sentences describing five accepted formats is
+  // an essay about a list; the list itself is the fact.
+  | { kind: "chips"; caption?: string; rows: Chip[] }
+  // in → out. A mapping drawn as a mapping.
+  | { kind: "map"; caption?: string; rows: Mapping[] }
+  | Source;
 
 export interface Node {
   id: string;
@@ -70,6 +139,16 @@ export interface Node {
   /** Where the claim came from. Always a real location. */
   evidence?: string;
   anatomy?: Anatomy[];
+  /**
+   * What is underneath. Depth is a property of the BRANCH, not a global level:
+   * a node with children can be opened, one without is a leaf, and nothing
+   * caps how far that nests. Some branches stop at two because nothing
+   * different lives below them; the ones that keep going do so because each
+   * level answers a question its parent could not.
+   */
+  children?: Node[];
+  /** Edges among this node's own children, drawn when it is the open node. */
+  edges?: Edge[];
 }
 
 export interface Edge {
@@ -88,95 +167,114 @@ export const RUN = {
   elapsed: "6.4s",
 };
 
-/* ── level 0 — the domains ────────────────────────────────── */
+/* ── level 0 — what the product DOES ──────────────────────────
+   Cut by product step, not by architectural layer. The layer cut
+   ("API surface", "Database", "Background work") names things a developer
+   already knows exist; it says nothing about what this particular product is,
+   so every card reads the same and none of them is a question anyone asked.
+   Read left to right, this is the path a customer actually takes.
+
+   The grouping itself is `inferred` and every card says so. Which files
+   constitute "Getting files in" is a judgement call made from naming and
+   layout — it is not something a compiler resolved, and it is the least
+   certain thing on this screen. What sits UNDER each card is derived; the
+   boxes drawn around them are not. */
 
 export const L0: Node[] = [
   {
-    id: "client",
-    title: "Web client",
-    sub: "What users see and click",
-    state: "derived",
+    id: "signin",
+    title: "Getting in",
+    sub: "Signing in and staying signed in",
+    state: "inferred",
     col: 0,
     row: 0,
     detail:
-      "Next.js App Router. 34 pages, of which 11 are behind auth and 4 are admin-only.",
-    evidence: "app/**/page.tsx",
+      "Email magic links and Google OAuth. A session is a JWT in an httpOnly cookie, checked by middleware on every /app and /api request — and never revocable once issued.",
+    evidence: "src/lib/auth/*.ts, src/app/api/auth/",
   },
   {
-    id: "auth",
-    title: "Auth & identity",
-    sub: "Who you are, what you may do",
-    state: "derived",
+    id: "workspace",
+    title: "Joining a workspace",
+    sub: "Orgs, invites, and who may do what",
+    state: "inferred",
     col: 0,
     row: 1,
     detail:
-      "Email magic links and Google OAuth. Sessions are JWTs in an httpOnly cookie, checked by middleware on every /app and /api request.",
-    evidence: "src/lib/auth/*.ts",
-  },
-  {
-    id: "api",
-    title: "API surface",
-    sub: "How the client talks to the server",
-    state: "derived",
-    col: 1,
-    row: 0,
-    detail:
-      "41 route handlers under /api. All but 3 require a session; those 3 are webhooks authenticated by signature instead.",
-    evidence: "src/app/api/**/route.ts",
-  },
-  {
-    id: "billing",
-    title: "Billing",
-    sub: "Plans, payment, and what a plan unlocks",
-    state: "derived",
-    col: 1,
-    row: 1,
-    detail:
-      "Stripe Checkout for purchase, webhooks for state. An org's plan gates seat count and project limits.",
-    evidence: "src/server/billing/*.ts",
+      "Everything belongs to an org. A user can be in several with a different role in each, and three roles nest: member, then admin, then owner.",
+    evidence: "src/lib/auth/rbac.ts, drizzle/schema.ts:31",
   },
   {
     id: "projects",
-    title: "Projects",
-    sub: "The thing customers actually make",
-    state: "derived",
-    col: 2,
+    title: "Making a project",
+    sub: "The thing customers actually create",
+    state: "inferred",
+    col: 1,
     row: 0,
     detail:
-      "The core domain object. A project belongs to one org, holds uploaded files, and is edited by members with a role.",
+      "The core object. A project belongs to one org, holds uploaded files, and is edited by members. Creating one checks the org's plan first.",
     evidence: "src/server/projects/*.ts",
   },
   {
-    id: "db",
-    title: "Database",
-    sub: "Postgres — 14 tables",
-    state: "derived",
+    id: "uploads",
+    title: "Getting files in",
+    sub: "Upload straight to storage",
+    state: "inferred",
+    col: 1,
+    row: 1,
+    detail:
+      "The browser asks for a presigned URL and PUTs the bytes to S3 itself. The app server never touches the file, only the key.",
+    evidence: "src/server/storage/s3.ts, src/app/api/projects/[id]/files/",
+  },
+  {
+    id: "processing",
+    title: "Processing after upload",
+    sub: "What happens once you stop looking",
+    state: "inferred",
+    col: 2,
+    row: 0,
+    detail:
+      "BullMQ on Redis. Thumbnails, reindexing, and emails run after the response. 7 of 9 job types resolve statically; 2 do not.",
+    evidence: "src/server/jobs/handlers.ts:77",
+  },
+  {
+    id: "billing",
+    title: "Paying for it",
+    sub: "Plans, and what a plan unlocks",
+    state: "inferred",
     col: 2,
     row: 1,
     detail:
-      "Postgres via Drizzle. 14 tables, 9 with an org_id for tenant isolation. Migrations are checked in and sequential.",
-    evidence: "drizzle/schema.ts, drizzle/migrations/",
+      "Stripe Checkout for purchase, webhooks for state. An org's plan gates seat count and project limits — so this reaches back into everything above it.",
+    evidence: "src/server/billing/*.ts",
   },
   {
-    id: "jobs",
-    title: "Background work",
-    sub: "What happens after the response",
-    state: "partial",
+    id: "db",
+    title: "Where it all lands",
+    sub: "Postgres — 14 tables",
+    state: "derived",
     col: 3,
     row: 0,
+    // The one card that is NOT a product step, and is marked `derived` rather
+    // than `inferred` because nothing was grouped to produce it — the tables
+    // are read straight out of the schema. Every step above writes here, so it
+    // reads as the floor they all stand on rather than a sixth step.
     detail:
-      "BullMQ on Redis. 9 job types, of which 7 resolve statically; 2 are registered at module load and cannot be traced from the queue.",
-    evidence: "src/server/jobs/handlers.ts:77",
+      "Postgres via Drizzle. 14 tables, 9 carrying an org_id for tenant isolation. Migrations are checked in and sequential.",
+    evidence: "drizzle/schema.ts, drizzle/migrations/",
   },
   {
     id: "storage",
     title: "File storage",
     sub: "Uploads and generated assets",
-    state: "derived",
+    state: "partial",
     col: 3,
     row: 1,
+    // Carries what the collapsed S3 capability card used to say. A level was
+    // removed here, so its content had to move up rather than disappear —
+    // including the finding, which is the part that would have been easiest to
+    // lose and the only part anyone needs to act on.
     detail:
-      "S3 behind presigned URLs. The browser uploads directly; the server only ever sees the key.",
+      "One bucket, acme-platform-uploads, behind presigned URLs — the browser uploads directly and the server only ever sees the key. Public access is blocked and every read is presigned with a 60s expiry. No lifecycle rule exists in this repo, and an upload the client never confirms leaves an object nothing points at.",
     evidence: "src/server/storage/s3.ts",
   },
   {
@@ -193,25 +291,32 @@ export const L0: Node[] = [
   },
 ];
 
+/* The customer's path, plus the two places it reaches sideways. A layer cut
+   drew "client → api → db", which is true of almost every web application and
+   therefore says nothing about this one. These edges say what happens next. */
 export const E0: Edge[] = [
-  { from: "client", to: "api", state: "derived", label: "fetch" },
-  { from: "client", to: "auth", state: "derived", label: "session" },
-  { from: "api", to: "auth", state: "derived", label: "guards" },
-  { from: "api", to: "billing", state: "derived" },
-  { from: "api", to: "projects", state: "derived" },
-  { from: "billing", to: "db", state: "derived" },
+  { from: "signin", to: "workspace", state: "derived", label: "lands you in" },
+  { from: "workspace", to: "projects", state: "derived", label: "scopes" },
+  { from: "projects", to: "uploads", state: "derived", label: "holds" },
+  { from: "uploads", to: "processing", state: "derived", label: "triggers" },
+  { from: "uploads", to: "storage", state: "derived", label: "bytes go to" },
+  // Billing is not a step in the path — it gates two of the steps above it,
+  // which is the whole reason a plan change can break project creation.
+  { from: "billing", to: "workspace", state: "derived", label: "gates seats" },
+  { from: "billing", to: "projects", state: "derived", label: "gates limits" },
+  // Everything lands in the same place.
+  { from: "signin", to: "db", state: "derived" },
+  { from: "workspace", to: "db", state: "derived" },
   { from: "projects", to: "db", state: "derived" },
-  { from: "auth", to: "db", state: "derived" },
-  { from: "projects", to: "jobs", state: "derived", label: "enqueue" },
-  { from: "projects", to: "storage", state: "derived" },
-  { from: "jobs", to: "db", state: "partial", label: "2 handlers unresolved" },
-  { from: "jobs", to: "storage", state: "derived" },
+  { from: "billing", to: "db", state: "derived" },
+  { from: "processing", to: "db", state: "partial", label: "2 handlers unresolved" },
+  { from: "processing", to: "storage", state: "derived" },
 ];
 
 /* ── level 1 — capabilities inside each domain ────────────── */
 
 export const L1: Record<string, Node[]> = {
-  auth: [
+  signin: [
     {
       id: "auth-signin",
       title: "Sign in",
@@ -242,36 +347,50 @@ export const L1: Record<string, Node[]> = {
       row: 1,
       evidence: "src/lib/auth/session.ts:22",
       anatomy: [
+        // A session is a token with a LIFECYCLE, not a bag of properties. As a
+        // label/value list its most important fact — that the last step never
+        // happens — sat in row five looking like a spec detail. As a sequence,
+        // the missing end of the path is the thing you see.
         {
-          kind: "facts",
+          kind: "flow",
           rows: [
-            { label: "Transport", value: "httpOnly, Secure, SameSite=Lax cookie", state: "derived" },
-            { label: "Algorithm", value: "HS256, secret from AUTH_SECRET", state: "derived" },
-            { label: "Lifetime", value: "30 days, refreshed on each request", state: "derived" },
-            { label: "Claims", value: "sub, org_id, role, iat, exp", state: "derived" },
-            { label: "Revocation", value: "None — a stolen token is valid until expiry", state: "derived" },
+            { n: 1, title: "Minted at verify", detail: "HS256 over sub, org_id, role, iat, exp. Secret from AUTH_SECRET.", state: "derived" },
+            { n: 2, title: "Set as a cookie", detail: "httpOnly, Secure, SameSite=Lax. Never readable from JavaScript.", state: "derived" },
+            { n: 3, title: "Read on every request", detail: "Middleware verifies the signature and reads org_id and role off the claims.", state: "derived" },
+            { n: 4, title: "Refreshed in place", detail: "30 day expiry, pushed forward on each request — an active session never ends.", state: "derived" },
+            { n: 5, title: "Revoked — never", detail: "There is no revocation path. A stolen token stays valid until it expires.", state: "partial" },
           ],
         },
       ],
     },
+  ],
+  // The role hierarchy moved here from the old auth grouping. Signing in and
+  // being allowed to do something are different questions asked at different
+  // moments, and filing them together is a layer-cut habit.
+  workspace: [
     {
       id: "auth-rbac",
       title: "Permissions",
       sub: "3 roles · checked in 28 places",
       state: "partial",
       col: 0,
-      row: 2,
+      row: 0,
       detail:
         "owner / admin / member, checked by a requireRole helper. 4 handlers query the org directly instead of using it.",
       evidence: "src/lib/auth/rbac.ts:31",
       anatomy: [
+        // Roles nest: each one is the one below it plus more. Rendered as three
+        // sibling label/value rows that relationship was invisible — you had to
+        // read all three and work it out. As a sequence it reads in one glance,
+        // and the handlers that skip the check land at the end as the finding
+        // they are, rather than as a fourth peer role.
         {
-          kind: "facts",
+          kind: "flow",
           rows: [
-            { label: "owner", value: "Billing, delete org, transfer ownership", state: "derived" },
-            { label: "admin", value: "Invite and remove members, all project actions", state: "derived" },
-            { label: "member", value: "Read and write projects they are on", state: "derived" },
-            { label: "Bypasses requireRole", value: "4 handlers — inconsistent, not necessarily wrong", state: "partial" },
+            { n: 1, title: "member", detail: "Read and write the projects they are on. The floor — every role has this.", state: "derived" },
+            { n: 2, title: "admin", detail: "Everything a member can do, plus invite and remove members and act on any project.", state: "derived" },
+            { n: 3, title: "owner", detail: "Everything an admin can do, plus billing, deleting the org, and transferring ownership.", state: "derived" },
+            { n: 4, title: "4 handlers skip this", detail: "They query the org row directly instead of calling requireRole. Inconsistent — not necessarily wrong, but nothing records why.", state: "partial" },
           ],
         },
       ],
@@ -339,6 +458,9 @@ export const L1: Record<string, Node[]> = {
         "The handler is behind the global rate limiter. Stripe retries from a rotating IP pool, so a burst can be 429'd — and Stripe counts a 429 as a failed delivery.",
       evidence: "src/middleware.ts:71",
       anatomy: [
+        // Inbound events, each with an effect — the same shape as a route
+        // table, which is what these are in everything but transport. Row keys
+        // are the event names, unchanged, because four wires land on them.
         {
           kind: "facts",
           rows: [
@@ -450,7 +572,16 @@ export const L1: Record<string, Node[]> = {
       ],
     },
   ],
-  api: [
+  // Was `api`. The route table did not move — it was re-filed under the step
+  // whose requests it serves, next to the write path those routes call into.
+  // Grouping every handler together because they share a directory is the
+  // layer cut in miniature: it puts "POST /api/projects" further from the code
+  // that creates a project than from a Stripe webhook.
+  //
+  // This key holds the whole of one product step: the routes that come in, the
+  // service code they call, and the pages that call them. Under the layer cut
+  // those three sat in three different domains.
+  projects: [
     {
       id: "api-projects",
       title: "Project endpoints",
@@ -474,13 +605,68 @@ export const L1: Record<string, Node[]> = {
       ],
     },
     {
+      id: "proj-crud",
+      title: "Create & edit",
+      sub: "The main write path",
+      state: "derived",
+      col: 0,
+      row: 1,
+      evidence: "src/server/projects/service.ts",
+      anatomy: [
+        {
+          kind: "flow",
+          rows: [
+            { n: 1, title: "Validate with zod", detail: "Rejects before touching the database.", state: "derived" },
+            { n: 2, title: "Check entitlement", detail: "Project count against the org's plan limit.", state: "derived" },
+            { n: 3, title: "Insert row", detail: "org_id taken from the session, never from the body.", state: "derived" },
+            { n: 4, title: "Enqueue reindex", detail: "Fire-and-forget; failure is logged, not surfaced.", state: "partial" },
+          ],
+        },
+      ],
+    },
+    // The pages that drive this step. An "App shell" card listing every page in
+    // the product answered "what pages exist", which nobody asks; filed against
+    // the step they serve, the same four routes answer "how do I get here".
+    {
+      id: "cl-app",
+      title: "Pages that drive this",
+      sub: "4 of the 11 authed pages",
+      state: "derived",
+      col: 0,
+      row: 2,
+      detail:
+        "Server Components throughout; 4 client components use SWR. Every page below sits behind the session check.",
+      evidence: "src/app/(app)/",
+      anatomy: [
+        // These are pages, so they render as the route table they are. The
+        // "Data fetching" row that used to sit among them was a different kind
+        // of fact wearing the same clothes — it moved up into `detail`.
+        {
+          kind: "routes",
+          rows: [
+            { method: "GET", path: "/app", auth: "session", state: "derived", note: "Project list" },
+            { method: "GET", path: "/app/projects/[id]", auth: "session + membership", state: "derived", note: "Project detail and editor" },
+            { method: "GET", path: "/app/settings/members", auth: "session + admin", state: "derived", note: "Invite and role management" },
+            { method: "GET", path: "/app/settings/billing", auth: "session + owner", state: "derived", note: "Plan and invoices" },
+          ],
+        },
+      ],
+    },
+  ],
+  // Was `jobs`. Inbound webhooks live here rather than with the other route
+  // files: an event arriving from Stripe with nobody watching is the same kind
+  // of thing as a queued job, and a different kind of thing from a page
+  // request. Filing it by directory put it next to the project routes, which
+  // is where it looked least like what it is.
+  processing: [
+    {
       id: "api-webhooks",
       title: "Inbound webhooks",
       sub: "3 routes · signature auth",
       state: "partial",
       alarm: true,
       col: 0,
-      row: 1,
+      row: 0,
       detail: "These are the only routes without a session. They authenticate by signature — and they sit behind the IP rate limiter.",
       evidence: "src/app/api/webhooks/",
       anatomy: [
@@ -494,15 +680,13 @@ export const L1: Record<string, Node[]> = {
         },
       ],
     },
-  ],
-  jobs: [
     {
       id: "jobs-queue",
       title: "Queue & dispatch",
       sub: "BullMQ · 9 types, 7 resolved",
       state: "partial",
       col: 0,
-      row: 0,
+      row: 1,
       detail:
         "JOB_HANDLERS is indexed by a runtime job.type string, so the reachable set is not statically closed.",
       evidence: "src/server/jobs/handlers.ts:77",
@@ -523,34 +707,18 @@ export const L1: Record<string, Node[]> = {
       ],
     },
   ],
-  projects: [
-    {
-      id: "proj-crud",
-      title: "Create & edit",
-      sub: "The main write path",
-      state: "derived",
-      col: 0,
-      row: 0,
-      evidence: "src/server/projects/service.ts",
-      anatomy: [
-        {
-          kind: "flow",
-          rows: [
-            { n: 1, title: "Validate with zod", detail: "Rejects before touching the database.", state: "derived" },
-            { n: 2, title: "Check entitlement", detail: "Project count against the org's plan limit.", state: "derived" },
-            { n: 3, title: "Insert row", detail: "org_id taken from the session, never from the body.", state: "derived" },
-            { n: 4, title: "Enqueue reindex", detail: "Fire-and-forget; failure is logged, not surfaced.", state: "partial" },
-          ],
-        },
-      ],
-    },
+  // Was folded in with project CRUD. Upload is its own step in the product —
+  // it is the one place bytes leave the browser, and the one place an orphan
+  // can be created — so it gets its own card rather than being a second row
+  // under "Create & edit".
+  uploads: [
     {
       id: "proj-uploads",
       title: "File uploads",
       sub: "Direct to S3",
       state: "derived",
       col: 0,
-      row: 1,
+      row: 0,
       evidence: "src/server/storage/s3.ts:44",
       anatomy: [
         {
@@ -565,60 +733,24 @@ export const L1: Record<string, Node[]> = {
       ],
     },
   ],
-  client: [
-    {
-      id: "cl-app",
-      title: "App shell",
-      sub: "11 authed pages",
-      state: "derived",
-      col: 0,
-      row: 0,
-      evidence: "src/app/(app)/",
-      anatomy: [
-        {
-          kind: "facts",
-          rows: [
-            { label: "/app", value: "Project list", state: "derived" },
-            { label: "/app/projects/[id]", value: "Project detail and editor", state: "derived" },
-            { label: "/app/settings/members", value: "Invite and role management", state: "derived" },
-            { label: "/app/settings/billing", value: "Plan and invoices", state: "derived" },
-            { label: "Data fetching", value: "Server Components; 4 client components use SWR", state: "derived" },
-          ],
-        },
-      ],
-    },
-  ],
-  storage: [
-    {
-      id: "st-s3",
-      title: "S3 bucket",
-      sub: "Presigned access only",
-      state: "derived",
-      col: 0,
-      row: 0,
-      evidence: "src/server/storage/s3.ts",
-      anatomy: [
-        {
-          kind: "facts",
-          rows: [
-            { label: "Bucket", value: "acme-platform-uploads", state: "derived" },
-            { label: "Key layout", value: "org/{org_id}/project/{project_id}/{uuid}", state: "derived" },
-            { label: "Public access", value: "Blocked — every read is presigned, 60s expiry", state: "derived" },
-            { label: "Lifecycle rule", value: "None found in this repo", state: "inferred" },
-            { label: "Orphans", value: "Unconfirmed uploads are never cleaned up", state: "partial" },
-          ],
-        },
-      ],
-    },
-  ],
+  // Collapsed deliberately. "File storage" contained exactly one capability
+  // card, "S3 bucket", whose anatomy was five unrelated assertions — a level
+  // that existed only so there would be a level. Everything it said that was
+  // worth saying now sits on the domain card itself, one click earlier. If a
+  // second storage capability ever appears, this comes back.
+  storage: [],
   obs: [],
 };
 
 export const E1: Record<string, Edge[]> = {
-  auth: [
+  signin: [
     { from: "auth-signin", to: "auth-session", state: "derived", label: "issues" },
-    { from: "auth-session", to: "auth-rbac", state: "derived", label: "claims" },
   ],
+  // auth-session → auth-rbac used to live here. It now crosses a domain
+  // boundary (Getting in → Joining a workspace), and E1 only draws edges
+  // WITHIN one open domain — so it would render as a wire to nothing. The
+  // relationship still exists; it is carried by the row-level LINKS instead.
+  workspace: [],
   billing: [
     { from: "bill-checkout", to: "bill-hooks", state: "derived", label: "confirms via" },
     { from: "bill-hooks", to: "bill-subs", state: "derived", label: "writes" },
@@ -629,10 +761,16 @@ export const E1: Record<string, Edge[]> = {
   // "projects.org_id → organizations.id" is the same fact drawn twice, once
   // vaguely, and the vague copy is the one that cuts across the middle card.
   db: [],
-  api: [{ from: "api-projects", to: "api-webhooks", state: "inferred" }],
-  jobs: [],
-  projects: [{ from: "proj-crud", to: "proj-uploads", state: "derived" }],
-  client: [],
+  // The api-projects → api-webhooks edge is gone with the layer cut. It was
+  // `inferred` and said only "these two route files sit near each other",
+  // which was an artifact of grouping by directory rather than by what the
+  // product does. Under the product cut they are in different steps and the
+  // edge has nothing to say.
+  processing: [],
+  // proj-crud → proj-uploads also crosses a boundary now (Making a project →
+  // Getting files in), so it moves to E0 as projects → uploads.
+  projects: [],
+  uploads: [],
   storage: [],
   obs: [],
 };
@@ -643,7 +781,7 @@ export const OPEN = [
     kind: "dynamic dispatch",
     at: "src/server/jobs/handlers.ts:77",
     text: "Two job types are registered at module load, so the set of reachable handlers is not statically closed.",
-    node: "jobs",
+    node: "processing",
   },
   {
     kind: "framework callback",
@@ -661,7 +799,7 @@ export const OPEN = [
     kind: "no rationale",
     at: "src/lib/auth/rbac.ts:31",
     text: "4 handlers query the org directly instead of calling requireRole. Whether that is deliberate is not recorded anywhere.",
-    node: "auth",
+    node: "workspace",
   },
   {
     kind: "absent",
@@ -708,10 +846,12 @@ export const LINKS: Link[] = [
   { from: rowId("bill-hooks", "customer.subscription.updated"), to: rowId("bill-subs", "current_period_end"), state: "derived", label: "writes" },
   { from: rowId("bill-hooks", "customer.subscription.deleted"), to: rowId("bill-subs", "canceled_at"), state: "derived", label: "writes" },
 
-  // Reads — an auth claim read out of a column.
-  { from: rowId("auth-session", "Claims"), to: rowId("db-orgs", "role"), state: "derived", label: "reads" },
+  // Reads — an auth claim read out of a column. Both endpoints moved when the
+  // session card became a lifecycle: "Claims" is now step 1 (minted, where the
+  // claims are written) and "Transport" is step 2 (set as a cookie).
+  { from: rowId("auth-session", 1), to: rowId("db-orgs", "role"), state: "derived", label: "reads" },
   { from: rowId("auth-signin", 2), to: rowId("db-users", "email"), state: "derived", label: "looks up" },
-  { from: rowId("auth-signin", 4), to: rowId("auth-session", "Transport"), state: "derived", label: "sets" },
+  { from: rowId("auth-signin", 4), to: rowId("auth-session", 2), state: "derived", label: "sets" },
 
   // Routes into the write path.
   { from: rowId("api-projects", "POST /api/projects"), to: rowId("proj-crud", 1), state: "derived", label: "handled by" },
@@ -723,8 +863,11 @@ export const LINKS: Link[] = [
   // The alarming one: the webhook route is swept in by the middleware glob.
   { from: rowId("api-webhooks", "POST /api/webhooks/stripe"), to: rowId("bill-hooks", "Rate limited"), state: "partial", alarm: true, label: "rate limited by IP" },
 
-  // Storage keys derive from the org and project ids.
-  { from: rowId("st-s3", "Key layout"), to: rowId("db-projects", "id"), state: "inferred", label: "key contains" },
+  // The storage level collapsed, taking `st-s3:Key layout` with it. The link it
+  // anchored was the weakest in the fixture — an `inferred` guess that an S3
+  // key string contains a project id, drawn from naming alone. Re-pointing it
+  // at the domain card would have preserved a wire by making it vaguer, which
+  // is the trade this whole pass exists to stop making.
 ];
 
 /** Every link touching a row, in both directions. */

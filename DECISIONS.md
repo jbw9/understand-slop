@@ -141,6 +141,40 @@ takes 30s to say "I don't know," nobody asks twice.
 
 ---
 
+## D7 — Camera values are plain MotionValues, never `useSpring`
+
+**Chose:** `useMotionValue` for pan/zoom state, with `animate(value, target, spring)`
+for deliberate camera moves.
+**Beat:** `useSpring(OVERVIEW.x, {...})`, which is what the canvas shipped with.
+
+`useSpring(80, {...})` does **not** create a settable spring. It is
+`useFollowValue(source, {type:"spring"})`, which calls
+`attachFollow(value, source, options)` — installing a passive effect that springs
+the value toward `source`. When `source` is a plain number that number is
+constant forever, so every `.set()` is routed through the passive effect and
+re-targeted back at the constant. `.jump()` bypasses it (`stopPassiveEffect()`),
+which is why it works.
+
+The correlation across seven call sites was exact: every `set()` site was broken
+(drill-in framing, the `0` key, `drillOut` returning to overview) and every
+`jump()` site worked (mount, wheel pan, drag pan, zoom). The symptom users saw
+was "clicking a card renders nothing" — the branch opened correctly and the
+camera never moved to it.
+
+Found only by instrumenting the running code. Five hypotheses formed by reading
+the source were each killed by measurement: a stale closure, a render race, a
+poisoned NaN spring, an early return on a null ref, and a broken build. The
+library source (`motion-dom/dist/es/value/index.mjs`, `follow-value.mjs`) named
+the cause in ten lines once read.
+
+**Cost accepted:** camera motion is now explicit at every call site — a move
+that forgets `animate()` cuts instead of glides, and nothing warns you.
+**Breaks at scale:** if pan/zoom ever needs to interrupt an in-flight camera
+animation, `animate()` handles are currently discarded; they would need holding
+and cancelling.
+
+---
+
 ## D6 — Build fresh, steal from CodeBoarding
 
 **Chose:** new tool; borrow CodeBoarding's grounding discipline (MIT).

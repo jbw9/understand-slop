@@ -79,15 +79,32 @@ const DASHED: Record<WireKind, string | undefined> = {
 };
 
 /**
- * Vertical offset for a long-haul wire's under-card lane.
+ * Lane assignment for wires that share a corridor.
  *
- * Several relationships can need the detour at once, and stacking them all on
- * one y turns three readable wires into a single thick bundle. Spreading by
- * span keeps them apart and is stable across re-measures — no counter, no
- * dependence on the order wires happen to be laid out in.
+ * Deriving a lane from a wire's own geometry — its span, its endpoints — is
+ * what produced the bundles: two unrelated relationships whose spans happen to
+ * agree land on the same track and draw straight over each other. The only
+ * thing that actually separates them is knowing WHICH wires share a corridor,
+ * so lanes are assigned by grouping first and indexing within the group.
+ *
+ * Keyed on the rounded corridor position, so the grouping is stable across
+ * re-measures rather than depending on wire order.
  */
-function laneOffset(sx: number, ex: number) {
-  return (Math.round(Math.abs(ex - sx) / 60) % 4) * 11;
+function assignLanes(keys: string[]): number[] {
+  const seen = new Map<string, number>();
+  const index: number[] = [];
+  for (const k of keys) {
+    const n = seen.get(k) ?? 0;
+    index.push(n);
+    seen.set(k, n + 1);
+  }
+  const total = new Map(seen);
+  // Centre each group on the corridor: with n wires, offsets run symmetrically
+  // about 0 so the bundle straddles the midline instead of drifting off it.
+  return index.map((i, at) => {
+    const n = total.get(keys[at]) ?? 1;
+    return i - (n - 1) / 2;
+  });
 }
 
 export function useWireAnchors() {
@@ -160,11 +177,40 @@ export function WireLayer({
     const k = scale || 1;
     setSize({ w: base.width / k, h: base.height / k });
 
+    // Pass 1: resolve the corridor every relation wire will run through, so
+    // lanes can be handed out by group rather than guessed from each wire's own
+    // geometry. Two wires that merely happen to share a span are a different
+    // thing from two wires that actually share a gutter, and only the second
+    // needs separating.
+    const cardOf = (el: HTMLElement) =>
+      (el.closest("[data-node]") as HTMLElement | null) ?? el;
+    const corridorKey: string[] = wires.map((wire) => {
+      if (!wire.relation) return "";
+      const a = nodes.current?.get(wire.from);
+      const b = nodes.current?.get(wire.to);
+      if (!a || !b) return "";
+      const rca = cardOf(a).getBoundingClientRect();
+      const rcb = cardOf(b).getBoundingClientRect();
+      if (Math.abs(rca.left - rcb.left) < 1) return `self:${Math.round(rca.left)}`;
+      const rightward = rcb.left >= rca.right || rcb.left > rca.left;
+      const sx = rightward ? rca.right : rca.left;
+      const ex = rightward ? rcb.left : rcb.right;
+      const gutter = Math.abs(ex - sx);
+      // Same key for both directions across one gutter: wires sharing a
+      // corridor must share a group whichever way they point.
+      const span = [Math.round(sx), Math.round(ex)].sort((p, q) => p - q);
+      return gutter > 28 && gutter < 320
+        ? `gut:${span[0]}:${span[1]}`
+        : `under:${Math.round(Math.max(rca.bottom, rcb.bottom))}`;
+    });
+    const lanes = assignLanes(corridorKey);
+
     const next: Path[] = [];
-    for (const wire of wires) {
+    for (const [wireAt, wire] of wires.entries()) {
       const a = nodes.current?.get(wire.from);
       const b = nodes.current?.get(wire.to);
       if (!a || !b) continue;
+      const lane = lanes[wireAt];
       const ra = a.getBoundingClientRect();
       const rb = b.getBoundingClientRect();
 
@@ -196,8 +242,6 @@ export function WireLayer({
         // Route around the CARDS, not the rows. A midpoint between two column
         // rows usually lands inside one of the cards, which is how the lines
         // ended up cutting straight through the tables.
-        const cardOf = (el: HTMLElement) =>
-          (el.closest("[data-node]") as HTMLElement | null) ?? el;
         const rca = cardOf(a).getBoundingClientRect();
         const rcb = cardOf(b).getBoundingClientRect();
         const CA = {
@@ -212,7 +256,18 @@ export function WireLayer({
         };
 
         const sameCard = Math.abs(CA.left - CB.left) < 1;
-        const rightward = CB.left >= CA.right || (!sameCard && bx >= ax);
+        // Direction follows where the target CARD sits, and only falls back to
+        // the rows when the cards genuinely overlap in x. Reading it off the row
+        // centres made a wire whose target row happened to sit right of its
+        // source exit rightward and then double back to land on a card to its
+        // left — two lines travelling right to arrive left.
+        const rightward = sameCard
+          ? false
+          : CB.left >= CA.right
+            ? true
+            : CA.left >= CB.right
+              ? false
+              : bx >= ax;
 
         // Exit the card's own edge, not the row's, so the stub always clears
         // the box it came from.
@@ -233,9 +288,13 @@ export function WireLayer({
           // Neighbouring cards: run the gutter between them, which is now wide
           // enough to hold a wire. Only reach for the under-card lane when
           // something actually sits in the way.
-          const adjacent = gutter > 28 && gutter < 200;
+          const adjacent = gutter > 28 && gutter < 320;
           if (adjacent) {
-            const mid = (sx + ex) / 2;
+            // Each wire crossing this gutter gets its own vertical track,
+            // centred on the corridor. Pitch is capped so a busy gutter stays
+            // inside itself rather than spilling over a card edge.
+            const pitch = Math.min(26, Math.max(0, gutter / 2 - 18));
+            const mid = (sx + ex) / 2 + lane * pitch;
             const vSign = by > ay ? 1 : -1;
             const canRound = Math.abs(by - ay) > r * 2 + 2;
             dd = canRound
@@ -263,17 +322,20 @@ export function WireLayer({
           // Both stubs turn INWARD, toward the lane's interior. Deriving them
           // from dirOut inverted the pair on right-to-left links, so the two
           // verticals crossed and the path doubled back on itself.
-          const lane = Math.max(CA.bottom, CB.bottom) + 20 + laneOffset(sx, ex);
+          // Hug the taller card. The old offset pushed long-hauls far below
+          // everything, which drew one relationship as a giant rectangle
+          // sweeping under the whole diagram; only stack when several share it.
+          const laneY = Math.max(CA.bottom, CB.bottom) + 22 + lane * 16;
           const inward = ex >= sx ? 1 : -1;
           const outX = sx + inward * 16;
           const inX = ex - inward * 16;
           dd =
             `M ${sx} ${ay} H ${outX - inward * r}` +
             ` Q ${outX} ${ay} ${outX} ${ay + r}` +
-            ` V ${lane - r}` +
-            ` Q ${outX} ${lane} ${outX + inward * r} ${lane}` +
+            ` V ${laneY - r}` +
+            ` Q ${outX} ${laneY} ${outX + inward * r} ${laneY}` +
             ` H ${inX - inward * r}` +
-            ` Q ${inX} ${lane} ${inX} ${lane - r}` +
+            ` Q ${inX} ${laneY} ${inX} ${laneY - r}` +
             ` V ${by + r}` +
             ` Q ${inX} ${by} ${inX - inward * r} ${by}` +
             ` H ${ex}`;

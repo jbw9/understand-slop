@@ -27,16 +27,29 @@ const READ_MIN = 0.75;
 const READ_MAX = 1.05;
 
 const CARD_W = 380;
-const OVERVIEW = { scale: 0.8, x: 80, y: 60 };
+/**
+ * The overview sat at 0.8 with a fixed offset, which parked the whole diagram
+ * in the upper-left and left the bottom and right of the canvas dead. Scale 1
+ * reads the cards at their designed size, and the offset is computed at mount
+ * from the real content bounds instead of guessed — see `overviewView`.
+ */
+const OVERVIEW = { scale: 1, x: 80, y: 60 };
 
 /**
  * Open-domain metrics. The camera has to frame content that does not exist yet
  * at the moment of the click, so these mirror the capability row's real layout
- * — `w-[340px]` children, `gap-14` (56px), `pl-6` (24px) — and are used both to
+ * — `w-[340px]` children, `gap-[140px]`, `pl-6` (24px) — and are used both to
  * size the world box and to aim the drill.
  */
 const CHILD_W = 340;
-const CHILD_GAP = 56;
+/**
+ * The gutter is a wire corridor, not a margin. Six foreign keys run between
+ * these cards and three of them shared one 45px channel, which is what turned
+ * distinct relationships into a single bundle that doubled back on itself.
+ * Sized to hold several lanes at the 26px pitch the wire layer spreads them
+ * by, plus clearance at each card edge. Users can zoom, so width is cheap.
+ */
+const CHILD_GAP = 140;
 const CHILD_PL = 24;
 const CARD_H = 57;
 /** Tallest expanded capability card, measured from the rendered DB domain. */
@@ -101,6 +114,47 @@ const WORLD = {
   w: Math.max(...L0.map((n) => worldPos(n).x)) + WIDEST_OPEN + 160,
   h: Math.max(...L0.map((n) => worldPos(n).y)) + CARD_H + OPEN_CHILD_H + 160,
 };
+
+/**
+ * Bounds of the CLOSED diagram — every domain card at its placed position.
+ *
+ * The world box above is sized for the widest domain once it is open, which is
+ * far larger than the overview ever shows. Centring on the world box is what
+ * pinned the diagram to the upper-left with the bottom and right of the canvas
+ * dead; the overview has to frame the cards that actually exist at that moment.
+ */
+const CONTENT = (() => {
+  const xs = L0.map((n) => worldPos(n).x);
+  const ys = L0.map((n) => worldPos(n).y);
+  const right = Math.max(...L0.map((n) => worldPos(n).x + cardWidth(n)));
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    w: right - Math.min(...xs),
+    h: Math.max(...ys) + CARD_H - Math.min(...ys),
+  };
+})();
+
+/**
+ * Centre the closed diagram in the viewport, scaled to fill it with a margin.
+ *
+ * Capped at 1 so the overview never magnifies past the cards' designed size,
+ * and floored so a very small window still gets a readable view rather than a
+ * postage stamp.
+ */
+function overviewView(vp: DOMRect) {
+  const margin = 96;
+  const fit = Math.min(
+    (vp.width - margin * 2) / CONTENT.w,
+    (vp.height - margin * 2) / CONTENT.h,
+  );
+  const scale = Math.min(1, Math.max(MIN_SCALE, fit));
+  return {
+    scale,
+    x: vp.width / 2 - (CONTENT.x + CONTENT.w / 2) * scale,
+    y: vp.height / 2 - (CONTENT.y + CONTENT.h / 2) * scale,
+  };
+}
 
 export function Canvas() {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -266,9 +320,23 @@ export function Canvas() {
   const drillOut = useCallback(() => {
     setFocus(null);
     setDepth(0);
-    ss.set(OVERVIEW.scale);
-    sx.set(OVERVIEW.x);
-    sy.set(OVERVIEW.y);
+    const vp = viewportRef.current;
+    const v = vp ? overviewView(vp.getBoundingClientRect()) : OVERVIEW;
+    ss.set(v.scale);
+    sx.set(v.x);
+    sy.set(v.y);
+  }, [ss, sx, sy]);
+
+  // Centre on mount, once the viewport has a real size. Jump rather than set:
+  // the opening view should already be correct, not spring into place from the
+  // placeholder offset.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const v = overviewView(vp.getBoundingClientRect());
+    ss.jump(v.scale);
+    sx.jump(v.x);
+    sy.jump(v.y);
   }, [ss, sx, sy]);
 
   /* ── optical zoom — never changes what is shown ───────────── */
@@ -438,11 +506,11 @@ export function Canvas() {
                     // Capabilities sit side by side in real columns. A single
                     // stack runs off the bottom of the viewport and wastes the
                     // whole width of the canvas.
-                    // The gutter is where the FK wires run. At gap-4 three
-                    // relationships shared one lane and stacked into a bundle;
-                    // this gives each its own vertical track while still
-                    // fitting three cards across a laptop screen.
-                    className="flex items-start gap-14 pl-6"
+                    // The gutter is where the FK wires run, and it has to be
+                    // wide enough that every wire crossing it gets its own
+                    // vertical track. Three cards still fit across a laptop
+                    // screen at this width once the view is fitted to them.
+                    className="flex items-start gap-[140px] pl-6"
                     initial="out"
                     animate="in"
                     exit="out"

@@ -408,6 +408,40 @@ export function WireLayer({
       const spread = n > 1 ? Math.min(30, (horizontal ? B.bottom - B.top : B.right - B.left) / (n + 1)) : 0;
       const fan = fk ? fanLane[wireAt] * spread : 0;
 
+      // THE BUS.
+      //
+      // Five things write to the store. Routed individually they arrived on
+      // three different edges of one card — two on the left, two dropping onto
+      // the top 40px apart, two stacked on the right 20px apart — plus a long
+      // haul crossing the canvas to get there. No per-edge routing fixes that;
+      // six arrowheads on one box is six relationships competing for the same
+      // landing strip.
+      //
+      // Infrastructure diagrams solve this with a bus: every writer drops onto
+      // one shared lane above the target and the lane enters it once. Five
+      // edges then read as one convergence, which is what it actually is.
+      if (fk && n >= 3) {
+        const laneY = B.top - 26;
+        const enterX = (B.left + B.right) / 2;
+        // Leave the source from whichever vertical edge faces the target, drop
+        // to the lane, run along it, and descend once into the target.
+        const startY = A.bottom <= laneY ? A.bottom : A.top;
+        const dropX = ax;
+        const busR = 7;
+        const alongRight = enterX >= dropX ? 1 : -1;
+        const canRound = Math.abs(enterX - dropX) > busR * 2 + 2 && Math.abs(laneY - startY) > busR * 2 + 2;
+        const dd = canRound
+          ? `M ${dropX} ${startY}` +
+            ` V ${laneY - busR}` +
+            ` Q ${dropX} ${laneY} ${dropX + alongRight * busR} ${laneY}` +
+            ` H ${enterX - alongRight * busR}` +
+            ` Q ${enterX} ${laneY} ${enterX} ${laneY + busR}` +
+            ` V ${B.top - 3}`
+          : `M ${dropX} ${startY} V ${laneY} H ${enterX} V ${B.top - 3}`;
+        next.push({ d: dd, kind: wire.kind, depth: wire.depth, x1: dropX, y1: startY });
+        continue;
+      }
+
       // Orthogonal, not bezier.
       //
       // These are the plain card wires — every edge on the overview. They used

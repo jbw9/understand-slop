@@ -184,6 +184,17 @@ export function WireLayer({
     // needs separating.
     const cardOf = (el: HTMLElement) =>
       (el.closest("[data-node]") as HTMLElement | null) ?? el;
+    // Fan-in lanes for PLAIN card wires. Five edges arriving at one card all
+    // aimed at its centre, which stacked them into a single thick smear at the
+    // landing point. Grouping by target lets each arrival get its own offset
+    // along the target's edge, so five separate facts read as five wires.
+    const fanKey: string[] = wires.map((wire) =>
+      wire.relation ? "" : `to:${wire.to}`,
+    );
+    const fanLane = assignLanes(fanKey);
+    const fanSize = new Map<string, number>();
+    for (const k of fanKey) if (k) fanSize.set(k, (fanSize.get(k) ?? 0) + 1);
+
     const corridorKey: string[] = wires.map((wire) => {
       if (!wire.relation) return "";
       const a = nodes.current?.get(wire.from);
@@ -204,6 +215,20 @@ export function WireLayer({
         : `under:${Math.round(Math.max(rca.bottom, rcb.bottom))}`;
     });
     const lanes = assignLanes(corridorKey);
+
+    // Every card on screen, in world space. A wire has to route around the
+    // boxes it does not connect, not just the two it does — that is the whole
+    // difference between a diagram and a bowl of spaghetti.
+    const obstacles = [...(nodes.current?.values() ?? [])].map((el) => {
+      const rc = (el.closest("[data-node]") as HTMLElement | null) ?? el;
+      const box = rc.getBoundingClientRect();
+      return {
+        left: (box.left - base.left) / k,
+        right: (box.right - base.left) / k,
+        top: (box.top - base.top) / k,
+        bottom: (box.bottom - base.top) / k,
+      };
+    });
 
     const next: Path[] = [];
     for (const [wireAt, wire] of wires.entries()) {
@@ -374,26 +399,106 @@ export function WireLayer({
 
       let x1: number, y1: number, x2: number, y2: number, d: string;
 
+      // Spread arrivals along the target's edge. With n wires landing on one
+      // card, offsets run symmetrically about its centre so the bundle
+      // straddles the midline instead of piling onto a single point. Capped so
+      // a busy target keeps its arrivals inside its own edge.
+      const fk = fanKey[wireAt];
+      const n = fk ? (fanSize.get(fk) ?? 1) : 1;
+      const spread = n > 1 ? Math.min(30, (horizontal ? B.bottom - B.top : B.right - B.left) / (n + 1)) : 0;
+      const fan = fk ? fanLane[wireAt] * spread : 0;
+
+      // Orthogonal, not bezier.
+      //
+      // These are the plain card wires — every edge on the overview. They used
+      // to draw as a cubic with a pull of up to 0.45x the distance, which is
+      // what sent long links bowing straight through whatever card sat between
+      // their endpoints. A curve cannot be told to avoid anything; it goes
+      // where its control points send it.
+      //
+      // Architectural diagrams don't do that. C4, ER, and every Sugiyama-
+      // layered renderer route edges as horizontal and vertical runs through
+      // the space BETWEEN nodes, because an orthogonal path can be moved off
+      // an obstacle one segment at a time while still arriving perpendicular
+      // to the box it points at. Same three segments as the FK wires above, so
+      // both wire systems read as one language.
+      const r = 7;
+      const clear = 18; // how far a detour stands off a card it routes around
+
       if (horizontal) {
         const rightward = bx > ax;
         x1 = rightward ? A.right : A.left;
         y1 = ay;
         x2 = rightward ? B.left : B.right;
-        y2 = by;
-        const pull = Math.min(Math.max(Math.abs(x2 - x1) * 0.45, 34), 150);
+        y2 = by + fan;
         const dir = rightward ? 1 : -1;
         const tip = x2 - dir * 3;
-        d = `M ${x1} ${y1} C ${x1 + pull * dir} ${y1}, ${tip - pull * dir} ${y2}, ${tip} ${y2}`;
+
+        // The corridor this wire turns in. Start at the midpoint of the gap,
+        // then walk it clear of anything standing in the way: a vertical run
+        // at `mid` must not cut through a card, or the line crosses content
+        // exactly the way the old curve did.
+        let mid = (x1 + x2) / 2;
+        const top = Math.min(y1, y2);
+        const bot = Math.max(y1, y2);
+        for (const box of obstacles) {
+          if (box === A || box === B) continue;
+          if (box.bottom < top - 1 || box.top > bot + 1) continue;
+          if (mid > box.left - clear && mid < box.right + clear) {
+            // Push the turn to whichever side of the blocker is nearer, but
+            // never past the endpoint it has to reach.
+            const left = box.left - clear;
+            const right = box.right + clear;
+            const pick = Math.abs(mid - left) <= Math.abs(mid - right) ? left : right;
+            mid = dir > 0 ? Math.min(Math.max(pick, x1 + r), tip - r) : Math.max(Math.min(pick, x1 - r), tip + r);
+          }
+        }
+
+        const vSign = y2 > y1 ? 1 : -1;
+        const canRound = Math.abs(y2 - y1) > r * 2 + 2 && Math.abs(mid - x1) > r && Math.abs(tip - mid) > r;
+        d = canRound
+          ? `M ${x1} ${y1} H ${mid - dir * r}` +
+            ` Q ${mid} ${y1} ${mid} ${y1 + vSign * r}` +
+            ` V ${y2 - vSign * r}` +
+            ` Q ${mid} ${y2} ${mid + dir * r} ${y2}` +
+            ` H ${tip}`
+          : Math.abs(y2 - y1) < 1
+            ? `M ${x1} ${y1} H ${tip}`
+            : `M ${x1} ${y1} H ${mid} V ${y2} H ${tip}`;
       } else {
         const downward = by > ay;
         x1 = ax;
         y1 = downward ? A.bottom : A.top;
-        x2 = bx;
+        x2 = bx + fan;
         y2 = downward ? B.top : B.bottom;
-        const pull = Math.min(Math.max(Math.abs(y2 - y1) * 0.45, 28), 120);
         const dir = downward ? 1 : -1;
         const tip = y2 - dir * 3;
-        d = `M ${x1} ${y1} C ${x1} ${y1 + pull * dir}, ${x2} ${tip - pull * dir}, ${x2} ${tip}`;
+
+        let mid = (y1 + y2) / 2;
+        const left = Math.min(x1, x2);
+        const right = Math.max(x1, x2);
+        for (const box of obstacles) {
+          if (box === A || box === B) continue;
+          if (box.right < left - 1 || box.left > right + 1) continue;
+          if (mid > box.top - clear && mid < box.bottom + clear) {
+            const above = box.top - clear;
+            const below = box.bottom + clear;
+            const pick = Math.abs(mid - above) <= Math.abs(mid - below) ? above : below;
+            mid = dir > 0 ? Math.min(Math.max(pick, y1 + r), tip - r) : Math.max(Math.min(pick, y1 - r), tip + r);
+          }
+        }
+
+        const hSign = x2 > x1 ? 1 : -1;
+        const canRound = Math.abs(x2 - x1) > r * 2 + 2 && Math.abs(mid - y1) > r && Math.abs(tip - mid) > r;
+        d = canRound
+          ? `M ${x1} ${y1} V ${mid - dir * r}` +
+            ` Q ${x1} ${mid} ${x1 + hSign * r} ${mid}` +
+            ` H ${x2 - hSign * r}` +
+            ` Q ${x2} ${mid} ${x2} ${mid + dir * r}` +
+            ` V ${tip}`
+          : Math.abs(x2 - x1) < 1
+            ? `M ${x1} ${y1} V ${tip}`
+            : `M ${x1} ${y1} V ${mid} H ${x2} V ${tip}`;
       }
 
       next.push({ d, kind: wire.kind, depth: wire.depth, x1, y1 });
@@ -450,11 +555,14 @@ export function WireLayer({
             viewBox="0 0 10 10"
             refX="8.5"
             refY="5"
-            // Small and stroked, not a filled wedge. A big solid triangle at
-            // the card edge reads as an arrow bolted onto the wire; a light
-            // chevron reads as the thread simply arriving.
-            markerWidth="4"
-            markerHeight="4"
+            // Stroked chevron, not a filled wedge — a solid triangle reads as
+            // an arrow bolted onto the wire. But at markerWidth 4 against a
+            // 1.5px stroke it was invisible at overview zoom, which left every
+            // edge undirected: you could see two cards were related and not
+            // which way it ran. Direction is half the information in a flow
+            // diagram, so it has to survive a glance.
+            markerWidth="7"
+            markerHeight="7"
             orient="auto-start-reverse"
           >
             <path

@@ -295,3 +295,30 @@ panning up, but it is not in view at rest.
 **Breaks at scale:** `deepRows` only understands `map` and `flow` blocks. A deep
 row inside `schema`, `bars`, `chips` or `routes` is silently ignored — it renders
 a caret and opens nothing, which is the worst failure mode available.
+
+## D10 — Push on a green gate, not on a clock
+
+`understand-slop` commits and pushes at each **verified milestone**: `tsc
+--noEmit` clean, `eslint` clean, and the changed behaviour actually driven in the
+running app. No milestone, no push; no asking when one is reached.
+
+Beaten: enabling `CC_CHECKPOINT_PUSH=1`, which would publish the Stop hook's
+`wip:` checkpoints every ~10 minutes; and pushing at the end of every turn that
+edits files. Both raise frequency by removing the gate, which is the only part
+worth keeping.
+
+**The browser leg is not ceremony.** D9 records four bugs that each turned a row
+click into a silent no-op, and `tsc` and `eslint` were clean through every one of
+them. A green typecheck over a dead click is exactly the state the global rule
+about `demo.sh` exists to prevent: it looks fine.
+
+**Cost accepted:** fewer pushes than a timer would produce. Long stretches of
+refactoring reach the remote only when something is provably runnable, so a
+machine failure mid-refactor loses local work the Stop hook committed but never
+pushed.
+**Breaks at scale:** this repo pushes straight to `main` with no branch, PR or
+CI, so "green" means only what was run locally. With a second contributor, or a
+deploy watching `main`, the same cadence publishes unreviewed work — the gate
+would need to move into CI before that. Each push also carries whatever `wip:`
+checkpoints accumulated, which is how 11 unpushed commits went up at once on
+15 Sept 2026.

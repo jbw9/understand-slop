@@ -78,6 +78,18 @@ const DASHED: Record<WireKind, string | undefined> = {
   inferred: "2 4",
 };
 
+/**
+ * Vertical offset for a long-haul wire's under-card lane.
+ *
+ * Several relationships can need the detour at once, and stacking them all on
+ * one y turns three readable wires into a single thick bundle. Spreading by
+ * span keeps them apart and is stable across re-measures — no counter, no
+ * dependence on the order wires happen to be laid out in.
+ */
+function laneOffset(sx: number, ex: number) {
+  return (Math.round(Math.abs(ex - sx) / 60) % 4) * 11;
+}
+
 export function useWireAnchors() {
   const nodes = useRef(new Map<string, HTMLElement>());
   const [version, setVersion] = useState(0);
@@ -215,31 +227,55 @@ export function WireLayer({
         const r = 7; // elbow radius, so corners read as drawn not aliased
         const gutter = sameCard ? 0 : Math.abs(ex - sx);
 
-        // Does any OTHER card sit horizontally between these two? If so the
-        // "gutter" between them is not empty space — it is somebody else's
-        // card, and running the vertical leg there draws straight through it.
         let dd: string;
 
-        // Capability cards sit side by side in one row, so ANY cross-card link
-        // runs level with the cards between its endpoints. Three attempts at
-        // predicting which ones collide all missed a case; the lane below the
-        // cards is unconditionally clear, so cross-card links always take it.
         if (!sameCard) {
-          // Cards are adjacent or separated by another card — there is no
-          // gutter to run down. Detour beneath both cards instead of cutting
-          // through whatever sits between them.
-          const lane = Math.max(CA.bottom, CB.bottom) + 20;
-          const outX = sx + dirOut * 16;
-          const inX = ex - dirOut * 16;
+          // Neighbouring cards: run the gutter between them, which is now wide
+          // enough to hold a wire. Only reach for the under-card lane when
+          // something actually sits in the way.
+          const adjacent = gutter > 28 && gutter < 200;
+          if (adjacent) {
+            const mid = (sx + ex) / 2;
+            const vSign = by > ay ? 1 : -1;
+            const canRound = Math.abs(by - ay) > r * 2 + 2;
+            dd = canRound
+              ? `M ${sx} ${ay} H ${mid - dirOut * r}` +
+                ` Q ${mid} ${ay} ${mid} ${ay + vSign * r}` +
+                ` V ${by - vSign * r}` +
+                ` Q ${mid} ${by} ${mid + dirOut * r} ${by}` +
+                ` H ${ex}`
+              : `M ${sx} ${ay} H ${mid} V ${by} H ${ex}`;
+            next.push({
+              d: dd,
+              kind: wire.kind,
+              depth: wire.depth,
+              x1: sx,
+              y1: ay,
+              er: {
+                many: { x: sx, y: ay, dir: dirOut },
+                one: { x: ex, y: by, dir: (rightward ? -1 : 1) as 1 | -1 },
+              },
+            });
+            continue;
+          }
+          // Far apart, with cards in between. Detour beneath everything.
+          //
+          // Both stubs turn INWARD, toward the lane's interior. Deriving them
+          // from dirOut inverted the pair on right-to-left links, so the two
+          // verticals crossed and the path doubled back on itself.
+          const lane = Math.max(CA.bottom, CB.bottom) + 20 + laneOffset(sx, ex);
+          const inward = ex >= sx ? 1 : -1;
+          const outX = sx + inward * 16;
+          const inX = ex - inward * 16;
           dd =
-            `M ${sx} ${ay} H ${outX - dirOut * r}` +
+            `M ${sx} ${ay} H ${outX - inward * r}` +
             ` Q ${outX} ${ay} ${outX} ${ay + r}` +
             ` V ${lane - r}` +
-            ` Q ${outX} ${lane} ${outX + dirOut * r} ${lane}` +
-            ` H ${inX - dirOut * r}` +
+            ` Q ${outX} ${lane} ${outX + inward * r} ${lane}` +
+            ` H ${inX - inward * r}` +
             ` Q ${inX} ${lane} ${inX} ${lane - r}` +
             ` V ${by + r}` +
-            ` Q ${inX} ${by} ${inX - dirOut * r} ${by}` +
+            ` Q ${inX} ${by} ${inX - inward * r} ${by}` +
             ` H ${ex}`;
         } else {
           // Two tables in one card: bow out into the left margin rather than

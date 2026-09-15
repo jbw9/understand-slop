@@ -219,10 +219,17 @@ export function WireLayer({
     // Every card on screen, in world space. A wire has to route around the
     // boxes it does not connect, not just the two it does — that is the whole
     // difference between a diagram and a bowl of spaghetti.
+    // Keyed by the card ELEMENT, because a wire has to be able to recognise
+    // its own endpoints here. The boxes are fresh objects built per pass, so
+    // an identity test against the wire's A/B boxes can never match — it
+    // silently made every wire dodge its own source and target, and since the
+    // last matching blocker wins, the target routinely undid the avoidance
+    // that a genuine obstacle had just applied.
     const obstacles = [...(nodes.current?.values() ?? [])].map((el) => {
       const rc = (el.closest("[data-node]") as HTMLElement | null) ?? el;
       const box = rc.getBoundingClientRect();
       return {
+        el: rc,
         left: (box.left - base.left) / k,
         right: (box.right - base.left) / k,
         top: (box.top - base.top) / k,
@@ -235,6 +242,11 @@ export function WireLayer({
       const a = nodes.current?.get(wire.from);
       const b = nodes.current?.get(wire.to);
       if (!a || !b) continue;
+      // The cards this wire actually connects. `a` and `b` may be row anchors
+      // rather than cards, and `obstacles` is keyed by card, so both sides have
+      // to be resolved the same way for the exclusion to match.
+      const cardA = cardOf(a);
+      const cardB = cardOf(b);
       const lane = lanes[wireAt];
       const ra = a.getBoundingClientRect();
       const rb = b.getBoundingClientRect();
@@ -481,17 +493,25 @@ export function WireLayer({
         let mid = (x1 + x2) / 2;
         const top = Math.min(y1, y2);
         const bot = Math.max(y1, y2);
-        for (const box of obstacles) {
-          if (box === A || box === B) continue;
-          if (box.bottom < top - 1 || box.top > bot + 1) continue;
-          if (mid > box.left - clear && mid < box.right + clear) {
-            // Push the turn to whichever side of the blocker is nearer, but
-            // never past the endpoint it has to reach.
-            const left = box.left - clear;
-            const right = box.right + clear;
-            const pick = Math.abs(mid - left) <= Math.abs(mid - right) ? left : right;
-            mid = dir > 0 ? Math.min(Math.max(pick, x1 + r), tip - r) : Math.max(Math.min(pick, x1 - r), tip + r);
+        // Settle rather than sweep once: pushing clear of one card can land
+        // the corridor inside the next, and a single pass leaves it there.
+        for (let pass = 0; pass < 3; pass++) {
+          let moved = false;
+          for (const box of obstacles) {
+            if (box.el === cardA || box.el === cardB) continue;
+            if (box.bottom < top - 1 || box.top > bot + 1) continue;
+            if (mid > box.left - clear && mid < box.right + clear) {
+              // Push the turn to whichever side of the blocker is nearer, but
+              // never past the endpoint it has to reach.
+              const left = box.left - clear;
+              const right = box.right + clear;
+              const pick = Math.abs(mid - left) <= Math.abs(mid - right) ? left : right;
+              const to = dir > 0 ? Math.min(Math.max(pick, x1 + r), tip - r) : Math.max(Math.min(pick, x1 - r), tip + r);
+              if (Math.abs(to - mid) > 0.5) moved = true;
+              mid = to;
+            }
           }
+          if (!moved) break;
         }
 
         const vSign = y2 > y1 ? 1 : -1;
@@ -517,15 +537,21 @@ export function WireLayer({
         let mid = (y1 + y2) / 2;
         const left = Math.min(x1, x2);
         const right = Math.max(x1, x2);
-        for (const box of obstacles) {
-          if (box === A || box === B) continue;
-          if (box.right < left - 1 || box.left > right + 1) continue;
-          if (mid > box.top - clear && mid < box.bottom + clear) {
-            const above = box.top - clear;
-            const below = box.bottom + clear;
-            const pick = Math.abs(mid - above) <= Math.abs(mid - below) ? above : below;
-            mid = dir > 0 ? Math.min(Math.max(pick, y1 + r), tip - r) : Math.max(Math.min(pick, y1 - r), tip + r);
+        for (let pass = 0; pass < 3; pass++) {
+          let moved = false;
+          for (const box of obstacles) {
+            if (box.el === cardA || box.el === cardB) continue;
+            if (box.right < left - 1 || box.left > right + 1) continue;
+            if (mid > box.top - clear && mid < box.bottom + clear) {
+              const above = box.top - clear;
+              const below = box.bottom + clear;
+              const pick = Math.abs(mid - above) <= Math.abs(mid - below) ? above : below;
+              const to = dir > 0 ? Math.min(Math.max(pick, y1 + r), tip - r) : Math.max(Math.min(pick, y1 - r), tip + r);
+              if (Math.abs(to - mid) > 0.5) moved = true;
+              mid = to;
+            }
           }
+          if (!moved) break;
         }
 
         const hSign = x2 > x1 ? 1 : -1;

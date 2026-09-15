@@ -466,6 +466,10 @@ export function Canvas() {
     // under it, so its rect IS the thing to frame. One measurement, no guesses.
     const col = opened.parentElement ?? opened;
     const cb = col.getBoundingClientRect();
+    // Anchoring on the card's own rect instead of the column's was tried and
+    // measured: identical tx/ty, identical card position, to the digit. The
+    // remaining error is NOT the anchor reference. See D8.
+    const ob = opened.getBoundingClientRect();
     // You read a subtree DOWNWARD from the card you just opened, so that card
     // belongs near the top of the screen with its content below it — not at
     // the midpoint of a column that overflows both edges. Fitting the whole
@@ -474,7 +478,7 @@ export function Canvas() {
     frame(
       {
         x: (cb.left - wb.left) / s,
-        y: (cb.top - wb.top) / s,
+        y: (ob.top - wb.top) / s,
         w: cb.width / s,
         h: cb.height / s,
       },

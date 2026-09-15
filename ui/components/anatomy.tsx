@@ -367,7 +367,7 @@ function Block({
         </div>
         <div className="px-3 pb-2.5 pt-2.5">
           <div className="flex h-[22px] w-full overflow-hidden rounded-[5px]">
-            {block.rows.map((p) => {
+            {block.rows.map((p, at) => {
               const id = rowId(owner, p.label);
               const isLit = ctx.lit.has(id);
               return (
@@ -388,11 +388,15 @@ function Block({
                     isLit
                       ? "bg-deep-green"
                       : p.tone === "vary"
-                        ? // The thing being contrasted. Hatched rather than
-                          // merely a lighter green, because two mints side by
-                          // side read as one bar with a seam in it.
-                          "bg-amber-line"
-                        : "bg-mint-line",
+                        ? "bg-amber-line"
+                        : // Alternating weights within the same family. Every
+                          // "hold" slice sharing one mint made a 198px and a
+                          // 33px segment read as a single bar with a hairline
+                          // seam — measured, not guessed. The ratio only lands
+                          // if adjacent slices are separable.
+                          at % 2 === 0
+                          ? "bg-deep-green/55"
+                          : "bg-mint-line",
                   )}
                 />
               );

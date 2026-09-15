@@ -429,15 +429,38 @@ export function Canvas() {
     if (members === 0) return;
     const s = ss.get() || 1;
     const wb = world.getBoundingClientRect();
-    const ob = opened.getBoundingClientRect();
-    // Height comes from the card itself, not the OPEN_CHILD_H constant. A
-    // fixed 607px box centred on a 378px card pushed the deepest level 300px
-    // below the fold: the camera was aiming at empty space under it.
+    // Frame the whole SUBTREE, measured — not a box computed from constants.
+    //
+    // The computed box assumed children unfold rightward by CHILD_W + gaps.
+    // They do not: each level indents by CHILD_PL (24px) and grows DOWNWARD,
+    // so the real column is ~340px wide and 470-670px tall while the computed
+    // box claimed 364-1324 wide and 607 tall. The camera was aiming at a
+    // rectangle the content never occupied, which is why levels 3 and 4 sat
+    // below the fold no matter what the width term said.
+    //
+    // The card's parent column already contains the card and everything nested
+    // under it, so its rect IS the thing to frame. One measurement, no guesses.
+    const col = opened.parentElement ?? opened;
+    const cb = col.getBoundingClientRect();
+    const vp = viewportRef.current?.getBoundingClientRect();
+    const colH = cb.height / s;
+    // Anchor the TOP, don't centre.
+    //
+    // An opened subtree runs 950-1450px tall against an 860px viewport, so
+    // centring it puts the bottom half off the screen every time — which is
+    // what left levels 3 and 4 below the fold through three different
+    // attempts at this. Fitting instead would need ~0.6 scale, under the
+    // READ_MIN floor, so the content would be there and unreadable.
+    //
+    // You read a subtree downward from the card you just opened. Framing a
+    // viewport-tall box at its top puts that card near the top of the screen
+    // with its content below it, and the rest is a scroll away.
+    const visibleH = vp ? vp.height / s : colH;
     frame({
-      x: (ob.left - wb.left) / s,
-      y: (ob.top - wb.top) / s,
-      w: CHILD_PL + members * CHILD_W + (members - 1) * CHILD_GAP,
-      h: ob.height / s,
+      x: (cb.left - wb.left) / s,
+      y: (cb.top - wb.top) / s,
+      w: cb.width / s,
+      h: Math.min(colH, visibleH),
     });
     // Only when the PATH changes: re-running on every frame identity change
     // would fight the user's own panning.

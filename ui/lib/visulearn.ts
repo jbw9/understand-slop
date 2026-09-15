@@ -625,8 +625,9 @@ export const L0: Node[] = [
 
   {
     id: "tables",
+    // Carries what the five deleted write-edges used to say. See E0.
     title: "Where it all lands",
-    sub: "DynamoDB — 4 tables",
+    sub: "DynamoDB — 4 tables · written by everything above, read by admin",
     state: "partial",
     col: 3,
     row: 0,
@@ -785,19 +786,22 @@ export const L0: Node[] = [
   },
 ];
 
-/** Edges between the roots. */
+/** Edges between the roots.
+ *
+ *  Request sequence only. Five write-edges into `tables` used to live here and
+ *  were the reason this layer read as clutter: a process sequence and a
+ *  dependency fan-in drawn in one edge set, which no architectural convention
+ *  does. "Everything writes to the store" is one fact about what the store is,
+ *  not five edges — it moved into the node's own line. The `tables → infra`
+ *  edge went the same way: `infra` is already a ghost node marked `inferred`
+ *  and titled "Not in this repo", which states the uncertainty better than an
+ *  arrow labelled with a question could. */
 export const E0: Edge[] = [
   { from: "asking", to: "gate", state: "derived", label: "checked by" },
   { from: "gate", to: "generating", state: "derived", label: "allows" },
   { from: "generating", to: "watching", state: "derived", label: "streams into" },
   { from: "generating", to: "keeping", state: "derived", label: "saves" },
   { from: "keeping", to: "sharing", state: "derived", label: "can publish" },
-  { from: "gate", to: "tables", state: "derived" },
-  { from: "keeping", to: "tables", state: "derived" },
-  { from: "sharing", to: "tables", state: "derived" },
-  { from: "generating", to: "tables", state: "derived", label: "cache" },
-  { from: "admin", to: "tables", state: "derived", label: "reads" },
-  { from: "tables", to: "infra", state: "inferred", label: "defined where?" },
 ];
 
 /* ── tree helpers ─────────────────────────────────────────────

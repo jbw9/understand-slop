@@ -202,3 +202,36 @@ everything.
 **Breaks at scale:** CodeBoarding is already moving toward "keep architecture
 visible while agents code." The defensible edge is granularity and speed, not a
 better architecture diagram.
+
+---
+
+## D8 — Deep drill framing is a known limitation, not a solved problem
+
+**Chose:** ship levels 3+ framed imperfectly, and say so.
+**Beat:** continuing to iterate on the framing maths.
+
+Opening a subtree past level 2 leaves the opened card's bottom past the
+viewport edge: measured, opened card at y:520 with bottom 1049 against an 861px
+viewport, deepest descendant at y:1057.
+
+Twelve attempts. The box shape was changed four times (root position, card
+height, measured subtree column, viewport-capped height), the centring rule was
+replaced with a top anchor, and the anchor reference was moved from the column
+to the card. The only change that ever moved a pixel was cancelling in-flight
+animations (D7's noted failure mode): `ty` went from pinned-at-62 to -91, and
+the card rose 153px. Every other variant produced byte-identical numbers.
+
+Two things make further iteration unreliable rather than merely slow. A subtree
+runs 950-1450px against an ~860px viewport, so no anchor shows all of it and
+fitting would need ~0.6 scale, under the READ_MIN floor - the content would be
+on screen and unreadable. And measurements taken milliseconds apart during the
+camera settle disagree: one probe read the deepest card at y:1057 and the next
+at y:-28.
+
+**Cost accepted:** the deepest level needs a scroll or a drag to read in full.
+Levels 0-2, which is where most reading happens, frame correctly.
+**Breaks at scale:** the real fix is probably structural - a subtree that
+overflows the viewport wants its own scroll container, or levels past 2 want to
+replace the view rather than nest inside it. Both are larger than a camera
+tweak and neither should be attempted without deciding what drilling four deep
+is supposed to feel like.

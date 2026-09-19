@@ -322,3 +322,51 @@ deploy watching `main`, the same cadence publishes unreviewed work — the gate
 would need to move into CI before that. Each push also carries whatever `wip:`
 checkpoints accumulated, which is how 11 unpushed commits went up at once on
 15 Sept 2026.
+
+## D11 — Re-author the fixture against taxBuddy, don't rename it
+
+**Chose:** delete `ui/lib/visulearn.ts` and write `ui/lib/taxbuddy.ts` from a
+fresh read of the target repo.
+**Beat:** find-and-replace the repo name, keeping the tree and swapping labels.
+
+The fixture is not configuration. Every `detail`, `why`, `flow` step and quoted
+block is a specific claim about one repository, carrying a real path and a real
+line number. Renaming VisuLearn to taxBuddy would have left taxBuddy's name over
+VisuLearn's facts — a file that typechecks, renders, and is wrong in every
+sentence. That is precisely the failure this project exists to study, so
+producing one as a demo was not available.
+
+**The top-level cut is `derived` here, and that is new.** VisuLearn's roots were
+`inferred` and said so on every card: grouping 115 files into "Asking a
+question" was a judgement call no compiler made. taxBuddy names its own stages —
+`ONBOARDING_STEPS` in `lib/config/onboarding.ts` is an ordered literal, and
+`Stage` in `lib/types.ts` is the union it draws from. The roots follow that list,
+so the least certain thing on the old screen is now read out of the source. Four
+roots are not wizard steps (consent gates the flow, the engine runs between two
+steps, the store sits under everything, `/check` bypasses all of it), and those
+are marked for what they are.
+
+**19 quotes, each re-read at its offset before being pasted.** The previous pass
+needed a corrective commit for five wrong line numbers (470f82a), so every
+`start` here was verified with `sed -n` against the real file rather than trusted
+from the survey that found it. Two came back richer than reported and were
+re-quoted longer: `packetCache.ts:42` carries the v8→v9 renumbering rationale,
+`profile/page.tsx:285` states its own re-read reasoning.
+
+**Five claims come from `docs/STATUS.md`, not from code**, and are marked
+`partial` naming the doc: the S3 delete 403, the ledger's 0 rows against 14
+filings, the Free-plan posture, the consent gate's reach, and the $19/1,000
+cost. These are the operator's report of what production does, which reading the
+repository cannot confirm or refute.
+
+**Cost accepted:** `LINKS` endpoints are `owner:rowKey` strings that `tsc` cannot
+check — `rowId()` takes arbitrary strings, so a typo draws no wire and reports
+nothing. Guarded with a throwaway script that re-derives each block kind's anchor
+key from `components/anatomy.tsx` (schema→column name, map→`from`, flow→`n`,
+source→the literal `"source"`, the rest→`label`) and cross-references all 48
+endpoints. It is not in the repo, so the next edit to `LINKS` has no guard unless
+someone writes it again.
+**Breaks at scale:** the fixture is one hand-authored file per repository, which
+is the thing that cannot scale at all — it is the prototype's whole premise that
+a real run would emit this shape. Nothing here computes it, and the cost of
+re-authoring is now measured: a full day's reading for one mid-size repo.

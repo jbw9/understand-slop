@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { E0, L0, LINKS, allNodes, levelAt, nodeAt } from "@/lib/visulearn";
+import { E0, L0, LINKS, allNodes, levelAt, nodeAt } from "@/lib/taxbuddy";
 import type { Edge, Node } from "@/lib/data";
 
 /**

@@ -75,36 +75,46 @@ const OPEN_CHILD_H = 410;
  * room. The irregularity is the information.
  */
 const PLACE: Record<string, { x: number; y: number; w?: number }> = {
-  // The path SERPENTINES rather than running flat. Six steps in one row is
-  // 2520px wide, and since the overview fits the whole board to the viewport,
-  // that opened at 0.52 scale on a laptop — every card half size and
-  // unreadable. Wrapping to two rows brings the board to 1280x697, which
-  // opens at 1.00. Width is not free here: it is paid for in legibility.
+  // The path SERPENTINES rather than running flat. Seven steps in one row is
+  // 3220px wide, and since the overview fits the whole board to the viewport,
+  // that opens at ~0.4 on a laptop — every card too small to read. Wrapping
+  // brings the board to 1740x697, which opens at ~0.83. Width is not free
+  // here: it is paid for in legibility, and the 4/3 split below is already
+  // one column wider than the old six-step board's 1280x697 (which opened at
+  // 1.00). A third row would buy back that scale and cost a second reversal
+  // to follow, which reads worse than slightly smaller cards.
   //
-  // Row 1, left to right.
-  asking: { x: 0, y: 80, w: 360 },
-  gate: { x: 460, y: 80, w: 360 },
-  generating: { x: 920, y: 80, w: 360 },
-  // Row 2 reads RIGHT TO LEFT, continuing the spine: generating drops to
-  // watching directly below it, then the flow runs back leftward. The order
-  // here is what keeps the sequence unbroken across the wrap — the enlarged
-  // arrowheads are what keep the reversal readable.
-  watching: { x: 920, y: 310, w: 360 },
-  keeping: { x: 460, y: 310, w: 360 },
-  sharing: { x: 0, y: 310, w: 360 },
+  // Row 1, left to right. Four steps here rather than three: the filer's path
+  // is seven steps, and 7 x 460 is 3220px — well past the width that forced
+  // the wrap in the first place. 4/3 splits it more evenly than 3/4 and keeps
+  // the turn under `reading`, which is the widest thing on the board.
+  consent: { x: 0, y: 80, w: 360 },
+  eligibility: { x: 460, y: 80, w: 360 },
+  "income-docs": { x: 920, y: 80, w: 360 },
+  reading: { x: 1380, y: 80, w: 360 },
+  // Row 2 reads RIGHT TO LEFT, continuing the spine: reading drops to identity
+  // directly below it, then the flow runs back leftward. The order here is what
+  // keeps the sequence unbroken across the wrap — the enlarged arrowheads are
+  // what keep the reversal readable.
+  identity: { x: 1380, y: 310, w: 360 },
+  engine: { x: 920, y: 310, w: 360 },
+  packet: { x: 460, y: 310, w: 360 },
 
-  // BOTTOM TIER — not steps. Five edges converge on the store, and when it
-  // sat at the END of the path those edges had to span the whole board and
-  // cut through whatever card was in the way. Underneath the path instead,
-  // every writer drops a short distance into it: same edges, same meaning,
-  // no crossings to route around.
-  tables: { x: 230, y: 540, w: 440 },
-  // The dashboard reads the store, so it sits beside it on the same tier.
-  admin: { x: 770, y: 540, w: 360 },
-  // The hole sits directly under the store it would define. Widened because
-  // "Where the tables came from" was truncating at 310px — a card whose own
-  // title does not fit is the wrong way to show an absence.
-  infra: { x: 230, y: 720, w: 440 },
+  // NOT on the path. `/check` is a second front door that bypasses the whole
+  // wizard, so it sits off the spine entirely rather than being threaded into
+  // it — E0 gives it no edge for the same reason. Left of the row-2 turn, where
+  // the serpentine leaves a gap.
+  check: { x: 0, y: 310, w: 360 },
+
+  // BOTTOM TIER — not a step. Every root above writes here, and when a store
+  // sits at the END of a path those edges have to span the whole board and cut
+  // through whatever card is in the way. Underneath instead, every writer drops
+  // a short distance into it. Wider because the subtitle carries four facts.
+  store: { x: 560, y: 540, w: 440 },
+  // The hole sits directly under the store whose stage column it describes.
+  // Widened to match: a card whose own title truncates is the wrong way to
+  // show an absence.
+  dead: { x: 560, y: 720, w: 440 },
 };
 
 function worldPos(node: Node) {

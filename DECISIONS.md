@@ -402,3 +402,74 @@ worst possible click to have a rough edge on.
 **Breaks at scale:** every root on this board has children, so this is one
 scroll on ten cards rather than an occasional annoyance. It should be fixed
 next, on its own, with the browser open — which is the only way it was found.
+
+## D13 — `withRowChildren` recurses into the rows it synthesizes
+
+`lib/taxbuddy.ts`. The helper built a node per `under`-carrying row and set
+`anatomy: r.under`, then never looked at that anatomy again. Since `under` is
+itself an `Anatomy[]`, a row inside it can carry its own `under` — so the
+second level of nesting stayed data and never became a node. Every root
+measured exactly 3 levels deep however deeply it was authored.
+
+**Beat:** authoring around it (flattening the deep material into longer
+`facts` blocks). Rejected — it would have made the file shallower to suit a
+helper, which is backwards, and the content was already written.
+
+**Cost:** the synthesized subtree is now walked twice, once to build and once
+to recurse. At this fixture's size that is microseconds at module load.
+
+**Found by:** my own endpoint audit, which reports depth per root. The
+typecheck and lint were both green with the bug present — the tree was
+structurally valid, just truncated. Nothing else would have caught it.
+
+**Carried over, not introduced:** the helper came from the visulearn fixture
+verbatim. This is the first fixture authored deeply enough to reach the limit.
+
+**At scale:** a cycle in `under` would not terminate. Nothing can author one
+today (the data is a literal), but a generated fixture could, and this would
+recurse forever rather than erroring.
+
+## D14 — depth is authored, not derived
+
+After D13 three roots reached 4 levels and seven stayed at 3. That is not a
+second defect: `deepRows` only synthesizes children for `map` and `flow` rows,
+so a branch ending in a `facts` block is a leaf by construction. The seven
+shallow roots bottomed out in `facts`.
+
+**Decision:** deepen by re-authoring those terminals as `map`/`flow` rows
+carrying a further `under` that ends in a verbatim `source`, rather than by
+teaching `deepRows` to descend into `facts`.
+
+**Beat:** making every block kind drillable. Rejected — `facts` is the shape
+used for "here are five flat attributes", and giving every one of them a caret
+would put a drill affordance on rows that have nothing underneath, which is
+the dead-affordance problem the row/card click rule exists to avoid.
+
+**At scale:** depth stays a property of what the analysis actually found. A
+branch with nothing more to say stops, and that is information.
+
+## D15 — `onOpenRow` resolves the owner with `lastIndexOf`, not `indexOf`
+
+`ui/components/canvas.tsx`. A row id is `rowId(owner, key)` = `${owner}:${key}`.
+When a row lives inside another row's `under`, its owner is itself a row node,
+so the id carries two colons: `eng-path:2:not expired`, owned by `eng-path:2`.
+`indexOf(":")` cut at the first colon and returned `eng-path` — a real node, but
+the wrong one — so `nodeAt([...at, id])` resolved null and the click did nothing
+at all. The row tinted on hover and the level never opened.
+
+**Beat:** flattening the ids (e.g. a separator that can't appear twice).
+Rejected — the id is also the wire anchor key, so changing its shape would
+have meant re-pointing every LINKS endpoint to match.
+
+**Cost:** a key containing a colon would now split in the wrong place. No key
+in this fixture does, and the anatomy row keys are authored rather than derived
+from source text, so it is controllable.
+
+**Found by:** driving the board in Chrome, not by typecheck, lint or the data
+audit — all three were green. The failure is invisible except as a click that
+does nothing, which is exactly the class of defect only a real interaction
+surfaces.
+
+**At scale:** this is the second latent limit (see D13) that only appeared once
+a fixture nested `under` inside `under`. The row-drill path had never been
+exercised past one level of nesting.

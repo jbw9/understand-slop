@@ -91,30 +91,35 @@ const PLACE: Record<string, { x: number; y: number; w?: number }> = {
   consent: { x: 0, y: 80, w: 360 },
   eligibility: { x: 460, y: 80, w: 360 },
   "income-docs": { x: 920, y: 80, w: 360 },
-  reading: { x: 1380, y: 80, w: 360 },
-  // Row 2 reads RIGHT TO LEFT, continuing the spine: reading drops to identity
-  // directly below it, then the flow runs back leftward. The order here is what
-  // keeps the sequence unbroken across the wrap — the enlarged arrowheads are
-  // what keep the reversal readable.
+  extraction: { x: 1380, y: 80, w: 360 },
+  // Row 2 reads RIGHT TO LEFT, continuing the spine: extraction drops to
+  // identity directly below it, then the flow runs back leftward. The order
+  // here is what keeps the sequence unbroken across the wrap — the enlarged
+  // arrowheads are what keep the reversal readable.
   identity: { x: 1380, y: 310, w: 360 },
   engine: { x: 920, y: 310, w: 360 },
   packet: { x: 460, y: 310, w: 360 },
 
-  // NOT on the path. `/check` is a second front door that bypasses the whole
-  // wizard, so it sits off the spine entirely rather than being threaded into
-  // it — E0 gives it no edge for the same reason. Left of the row-2 turn, where
-  // the serpentine leaves a gap.
-  check: { x: 0, y: 310, w: 360 },
+  // ⚠ NOT on the path, and its POSITION has to say so.
+  //
+  // This card used to sit at x:0,y:310 — the empty slot left by the row-2 turn.
+  // That is precisely where the eye expects the step AFTER `packet`, because
+  // row 2 reads right-to-left and x:0 is where it lands. The serpentine, not
+  // E0, is what a reader follows, so an unconnected card parked at the end of
+  // it reads as the next step no matter how few edges touch it. Giving it its
+  // own tier below the spine is the fix: nothing continues leftward past
+  // `packet`, and this sits under the board as the separate front door it is.
+  "refund-check": { x: 0, y: 560, w: 440 },
 
   // BOTTOM TIER — not a step. Every root above writes here, and when a store
   // sits at the END of a path those edges have to span the whole board and cut
   // through whatever card is in the way. Underneath instead, every writer drops
   // a short distance into it. Wider because the subtitle carries four facts.
-  store: { x: 560, y: 540, w: 440 },
+  store: { x: 700, y: 560, w: 440 },
   // The hole sits directly under the store whose stage column it describes.
   // Widened to match: a card whose own title truncates is the wrong way to
   // show an absence.
-  dead: { x: 560, y: 720, w: 440 },
+  unreachable: { x: 700, y: 740, w: 440 },
 };
 
 function worldPos(node: Node) {
@@ -448,7 +453,14 @@ export function Canvas() {
       // nothing, which is why a second row only opened after clicking out
       // first. Cutting the path back to the owner makes the first open and the
       // switch the same operation.
-      const owner = id.slice(0, id.indexOf(":"));
+      // lastIndexOf, NOT indexOf. A row that lives inside another row's `under`
+      // gets an id with two colons — `eng-path:2:not expired`, whose owner is
+      // `eng-path:2`, not `eng-path`. Taking the FIRST colon resolved the owner
+      // one level too shallow, so nodeAt found nothing and the click was a
+      // silent no-op: the row lit on hover and the level never opened. Nothing
+      // in the fixture nested `under` inside `under` until the taxBuddy pass,
+      // which is why this survived.
+      const owner = id.slice(0, id.lastIndexOf(":"));
       const ownerAt = path.indexOf(owner);
       const at = ownerAt === -1 ? [...path, owner] : path.slice(0, ownerAt + 1);
       const node = nodeAt([...at, id]);

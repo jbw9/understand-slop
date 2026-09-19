@@ -370,3 +370,35 @@ someone writes it again.
 is the thing that cannot scale at all — it is the prototype's whole premise that
 a real run would emit this shape. Nothing here computes it, and the cost of
 re-authoring is now measured: a full day's reading for one mid-size repo.
+
+## D12 — The level-1 camera is wrong, and this is not the change that fixes it
+
+Driving the taxBuddy board found it: clicking any root frames the card and
+leaves its children below the fold. One scroll reaches them, and every deeper
+level is framed correctly.
+
+**It is not a regression.** `git show HEAD:ui/components/canvas.tsx` has
+`if (path.length < 2) return;` in the post-commit framing effect and
+`frame({ x: p.x, y: p.y, w, h })` — no `"top"` anchor — in `drillInto`. So a
+first-level drill has always taken the centred pre-commit guess and never the
+measured top-anchored correction. D9's four fixes were row-drills and deep
+levels; level 1 was never in that set. The old board hid it: three roots per
+row at 360px wide centred acceptably, where a 607px computed box on this wider
+board does not.
+
+**Chose:** report it and leave the camera alone.
+**Beat:** passing `"top"` to `drillInto`'s frame call, or dropping the guard to
+`path.length < 1`.
+
+Either edit is two characters and neither is safe here. D8 records twelve
+attempts at this camera, and the guard exists because at level 1 the opened
+card is the root — the one node whose position is known before commit — so the
+measured path and the guessed path are aiming at different things by design.
+Changing it during a fixture swap means shipping an untested camera change
+inside a commit whose subject is data.
+
+**Cost accepted:** the first click of any demo needs a scroll, which is the
+worst possible click to have a rough edge on.
+**Breaks at scale:** every root on this board has children, so this is one
+scroll on ten cards rather than an occasional annoyance. It should be fixed
+next, on its own, with the browser open — which is the only way it was found.

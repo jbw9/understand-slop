@@ -2,19 +2,26 @@
 
 ## Now
 
-Round 1 of the comprehension rework is out to three builders. Contracts were
-frozen first, as real files, before anyone was dispatched.
+Round 1 of the comprehension rework has LANDED. All four workstreams are in,
+both static legs are green, and the board was driven in Chrome.
 
 | WS | What | Owns | State |
 |---|---|---|---|
 | A | Naming + density: labels not sentences, `footprint`, `summary`, `group` | `lib/taxbuddy.ts` | running |
 | B | Sequence arrows at every level, orphan roots, the D12 level-1 camera, density | `components/wires.tsx`, `components/canvas.tsx` | running |
 | C | Real code level: repo binding, row-width fix, gated editing | `components/anatomy.tsx`, `lib/repo.ts`, `app/api/source/` | running |
-| D | Orientation chrome: breadcrumb, legend, key hints | `components/chrome.tsx` | **built, not wired** |
+| D - orientation chrome | Breadcrumb, legend, key hints | `components/chrome.tsx` | landed, wired |
 
-Workstream D is done and green (tsc + eslint) but `chrome.tsx` is not yet
-mounted — wiring it needs `canvas.tsx`, which workstream B owns this round.
-Mount it at fan-in.
+Verified at fan-in, by me, in the running app:
+
+- Breadcrumb reads `taxBuddy › Profile`, and clicking a crumb returns to that depth.
+- `Profile` (a declared sequence) draws **2 arrows**; `Eligibility` (a declared
+  set) draws **none** and states its note instead. Both halves of D19.
+- `Eligibility` frames at y:72 — exactly `TOP_GUTTER` — inside an 808px
+  viewport. D12 is closed (D22).
+- Path containment refuses `../../../etc/passwd`, absolute paths, URL-encoded
+  traversal, and an escape into this repo. A stale write returns 409.
+- 0 of 10 subtitles clip, down from 7 of 10.
 
 ## Contracts (frozen, no builder edits these)
 
@@ -44,9 +51,11 @@ Mount it at fan-in.
 
 ## Next
 
-1. Fan in: read back all three diffs, mount `chrome.tsx`, re-drive in Chrome.
-2. Green gate (tsc + eslint + driven in the browser), then commit and push.
-3. Backfill `At scale:` on D1-D15 — 15 decisions still lack one.
-4. Open question nobody has answered: what the SECOND repo looks like. Every
+1. **`eng-math` renders ~3,000px tall** and no camera can frame it. This is
+   D18's accepted cost arriving in practice — the no-row-cap decision, working
+   as specified, on the one node that breaks it. Narrow fix: make that single
+   node a list-level. Needs a call before anyone builds it.
+2. Backfill `At scale:` on D1-D15 — 15 decisions still lack one.
+3. Open question nobody has answered: what the SECOND repo looks like. Every
    fixture fact is hand-authored for taxBuddy, and D11 measured the cost at a
    full day's reading per repo.

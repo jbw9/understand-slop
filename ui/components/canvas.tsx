@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { E0, L0, LINKS, allNodes, levelAt, nodeAt } from "@/lib/taxbuddy";
+import { Breadcrumb, Legend, KeyHints } from "@/components/chrome";
+import { E0, L0, LINKS, RUN, allNodes, levelAt, nodeAt } from "@/lib/taxbuddy";
 import type { Edge, Node } from "@/lib/data";
 import { BLURB_LINES } from "@/lib/view";
 
@@ -594,6 +595,40 @@ export function Canvas() {
   }, [glideTo]);
 
   /**
+   * The path as readable names — the sentence you say out loud when someone
+   * asks what you are looking at. Built from the real nodes rather than the
+   * ids, so a renamed node renames its own crumb.
+   */
+  const trail = useMemo(
+    () =>
+      path
+        .map((_, i) => nodeAt(path.slice(0, i + 1)))
+        .filter((n): n is Node => n !== null)
+        .map((n) => ({ id: n.id, title: n.title })),
+    [path],
+  );
+
+  /**
+   * Jump to a depth from the breadcrumb. Depth 0 is the overview, and lands on
+   * exactly the view `drillOut` returns to rather than a second guess at it.
+   */
+  const jumpToDepth = useCallback(
+    (d: number) => {
+      setPath((cur) => {
+        if (d >= cur.length) return cur;
+        const next = cur.slice(0, d);
+        if (next.length === 0) {
+          const vp = viewportRef.current;
+          const v = vp ? overviewView(vp.getBoundingClientRect()) : OVERVIEW;
+          glideTo(v.x, v.y, v.scale);
+        }
+        return next;
+      });
+    },
+    [glideTo],
+  );
+
+  /**
    * Frame the level that just opened — after React has committed it.
    *
    * `drillInto` cannot do this. It runs inside the click handler, where the
@@ -806,6 +841,13 @@ export function Canvas() {
       )}
       style={{ backgroundPosition: dots }}
     >
+      {/* Orientation chrome. Outside the transformed world on purpose: a
+          breadcrumb that panned away with the camera would be useless exactly
+          when you are lost. */}
+      <Breadcrumb repo={RUN.repo} trail={trail} onJump={jumpToDepth} />
+      <Legend />
+      <KeyHints />
+
       <motion.div
         ref={worldRef}
         className="absolute left-0 top-0 origin-top-left"

@@ -12,6 +12,8 @@
  * layout and is never presented as fact.
  */
 
+import type { Shape } from "@/lib/view";
+
 export type State = "derived" | "partial" | "inferred";
 
 /* ── anatomy: level 2 renders in the SHAPE of the thing ───────
@@ -170,6 +172,15 @@ export interface Node {
   summary?: string;
   /** How this node's CHILDREN relate to each other. */
   group?: Group;
+  /**
+   * Something to recognise before reading anything: brand marks for the real
+   * technologies involved, a small diagram where the arrangement is the
+   * finding, or a single number. See `Shape` in `lib/view.ts`.
+   *
+   * Only ever drawn from facts the analysis actually has. A card with nothing
+   * true to draw gets none — an invented diagram is an invented arrow (D19).
+   */
+  shape?: Shape;
   state: State;
   alarm?: boolean;
   ghost?: boolean;

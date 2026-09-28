@@ -3,6 +3,9 @@
 import { cn } from "@/lib/utils";
 import { StateChip } from "@/components/state";
 import { rowId, type Anatomy } from "@/lib/data";
+import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX } from "@/lib/view";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Slice, WriteResult } from "@/lib/repo";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -84,6 +87,73 @@ function Caret({ open }: { open: boolean }) {
   );
 }
 
+/**
+ * The label is the question; the value is the answer. The answer never gets
+ * less room than the question.
+ *
+ * Measured failure this exists to delete: a `map` row 212px wide where the
+ * label `what the code does` took 112px — 53% — and the value got 32px,
+ * rendering one word per line over twelve lines. The most important comparison
+ * on the card was the least readable thing on screen.
+ *
+ * The cause was a `shrink-0` label beside a `min-w-0 flex-1` value: the only
+ * element in the row allowed to give up space was the one carrying the content.
+ * A previous fix moved the state chip INSIDE the value column (see the comment
+ * that survives in the `map` block), which was real but addressed the wrong
+ * element — the label was still unbounded.
+ *
+ * Two rules from `lib/view.ts`, enforced together:
+ *
+ *   label ≤ ROW_LABEL_MAX_PCT (40%)   value ≥ ROW_VALUE_MIN_PX (160px)
+ *
+ * Below a certain row width both cannot hold at once, so rather than squeeze
+ * the value under its floor the pair STACKS — label above value, each with the
+ * full width. That threshold is a property of the ROW, not of the viewport: a
+ * card is a fixed-width column on a canvas that pans, so a viewport breakpoint
+ * would tell us nothing about the space this row actually has. Hence a
+ * container query.
+ *
+ * The threshold below is 267px, and it is `ROW_VALUE_MIN_PX / (1 -
+ * ROW_LABEL_MAX_PCT/100)` — the narrowest row on which a 40% label still
+ * leaves 160px. It is written as a literal in the class strings because
+ * Tailwind scans source statically: an interpolated `@min-[${n}px]:` is a
+ * class name no build step ever sees, so it would compile to nothing and the
+ * row would silently stay stacked at every width. The assertion keeps the
+ * literal honest if either constant is ever retuned.
+ */
+const STACK_BELOW_PX = Math.ceil(ROW_VALUE_MIN_PX / (1 - ROW_LABEL_MAX_PCT / 100));
+if (STACK_BELOW_PX !== 267) {
+  throw new Error(
+    `view.ts row rules changed: the @min-[267px] literals in anatomy.tsx must become @min-[${STACK_BELOW_PX}px]`,
+  );
+}
+
+/**
+ * Every pair row is its own query container. The row, not the card, is what
+ * the rules are about — a card can be wide while a row inside a rail or an
+ * indent is not.
+ */
+const PAIR_SCOPE = "@container";
+
+/**
+ * Side by side once the row can honour both rules; stacked when it cannot.
+ *
+ * The percentage cap is a MAX, not a width, so a short label keeps its natural
+ * size and does not pad out to 40% leaving the value starved for no reason.
+ */
+// Each of these is ONE unbroken literal on purpose. Tailwind's scanner reads
+// source text, not evaluated JavaScript: splitting a class list across a `+`
+// hides every class after the operator, which compiles to nothing and fails
+// silently — measured here, where only the one class that stayed inline in JSX
+// survived into the stylesheet.
+const PAIR_ROW = "flex w-full min-w-0 flex-col items-stretch gap-0.5 @min-[267px]:flex-row @min-[267px]:items-start @min-[267px]:gap-2";
+
+/** The question side. Capped, never allowed to eat the row. */
+const PAIR_LABEL = "min-w-0 text-left @min-[267px]:max-w-[40%] @min-[267px]:shrink-0";
+
+/** The answer side. Floored, and it is the only side allowed to grow. */
+const PAIR_VALUE = "w-full min-w-0 text-left @min-[267px]:w-auto @min-[267px]:flex-1 @min-[267px]:min-w-[160px]";
+
 /** Shared row chrome: lit fill, dimmed-when-others-are-lit, click to trace. */
 function rowClass(id: string, ctx: RowCtx, extra?: string) {
   const isLit = ctx.lit.has(id);
@@ -130,35 +200,45 @@ function Block({
                 className={rowClass(
                   id,
                   ctx,
-                  "flex items-center gap-2 border-b border-border-gray px-3 py-1.5 last:border-b-0",
+                  cn(PAIR_SCOPE, "border-b border-border-gray px-3 py-1.5 last:border-b-0"),
                 )}
               >
-                <span
-                  className={cn(
-                    "shrink-0 font-mono text-[10.5px]",
-                    isLit ? "font-semibold text-deep-green" : "text-on-surface",
-                  )}
-                >
-                  {c.name}
-                  {c.nullable ? <span className="text-faint">?</span> : null}
-                </span>
-                <span className="shrink-0 font-mono text-[10.5px] text-muted-slate">
-                  {c.type}
-                </span>
-                {c.key ? <KeyTag k={c.key} lit={isLit} /> : null}
-                <span className="min-w-0 flex-1" />
-                {c.note ? (
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-right text-[10px] leading-snug",
-                      c.state === "derived" ? "text-faint" : "text-amber-ink",
-                    )}
-                    title={c.note}
-                  >
-                    {c.note}
+                {/* The column name, its type and its key are the question; the
+                    note is the answer. The note was `truncate` against three
+                    `shrink-0` siblings, so it was the one thing on the row
+                    guaranteed to be cut — and it wraps now instead. */}
+                <span className={PAIR_ROW}>
+                  <span className={cn(PAIR_LABEL, "flex items-center gap-2")}>
+                    <span
+                      className={cn(
+                        "min-w-0 font-mono text-[10.5px]",
+                        isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                      )}
+                    >
+                      {c.name}
+                      {c.nullable ? <span className="text-faint">?</span> : null}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10.5px] text-muted-slate">
+                      {c.type}
+                    </span>
+                    {c.key ? <KeyTag k={c.key} lit={isLit} /> : null}
                   </span>
-                ) : null}
-                <StateChip state={c.state} />
+                  <span className={cn(PAIR_VALUE, "flex items-start gap-2")}>
+                    {c.note ? (
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 text-[10px] leading-snug @min-[267px]:text-right",
+                          c.state === "derived" ? "text-faint" : "text-amber-ink",
+                        )}
+                      >
+                        {c.note}
+                      </span>
+                    ) : (
+                      <span className="min-w-0 flex-1" />
+                    )}
+                    <StateChip state={c.state} />
+                  </span>
+                </span>
               </button>
             );
           })}
@@ -194,23 +274,31 @@ function Block({
               className={rowClass(
                 id,
                 ctx,
-                "block border-b border-border-gray px-3 py-1.5 last:border-b-0",
+                cn(PAIR_SCOPE, "block border-b border-border-gray px-3 py-1.5 last:border-b-0"),
               )}
             >
-              <span className="flex items-center gap-2">
-                <Method method={r.method} />
-                <span
-                  className={cn(
-                    "min-w-0 flex-1 truncate font-mono text-[10.5px]",
-                    isLit ? "font-semibold text-deep-green" : "text-on-surface",
-                  )}
-                >
-                  {r.path}
+              {/* The method is the label; the path is the answer, and it was
+                  `truncate` — so the one string a reader needs in full was the
+                  first thing cut. It wraps now, and the auth note drops to its
+                  own line before the path has to give up any width. */}
+              <span className={PAIR_ROW}>
+                <span className={cn(PAIR_LABEL, "flex items-center gap-2")}>
+                  <Method method={r.method} />
+                  <span
+                    className={cn(
+                      "min-w-0 font-mono text-[10.5px] break-all",
+                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                    )}
+                  >
+                    {r.path}
+                  </span>
                 </span>
-                <span className="shrink-0 font-mono text-[9.5px] text-faint">
-                  {r.auth}
+                <span className={cn(PAIR_VALUE, "flex items-start gap-2")}>
+                  <span className="min-w-0 flex-1 font-mono text-[9.5px] leading-snug text-faint @min-[267px]:text-right">
+                    {r.auth}
+                  </span>
+                  <StateChip state={r.state} />
                 </span>
-                <StateChip state={r.state} />
               </span>
               {r.note ? (
                 <span
@@ -230,71 +318,7 @@ function Block({
   }
 
   if (block.kind === "source") {
-    // The bottom of the map. Two things are kept strictly apart: the code,
-    // which is quoted verbatim from a real file at a real line, and the `why`,
-    // which is synthesized. Commentary gets its own tinted band below the
-    // code so it can never be misread as something the file says.
-    const lines = block.code.replace(/\n$/, "").split("\n");
-    const id = rowId(owner, "source");
-    const isLit = ctx.lit.has(id);
-    return (
-      <div
-        className={cn(
-          "overflow-hidden rounded-[10px] border bg-pure-white",
-          isLit ? "border-deep-green" : "border-border-gray",
-        )}
-      >
-        <button
-          ref={ctx.anchor(id)}
-          data-row
-          onClick={() => ctx.onTrace(id)}
-          className={rowClass(
-            id,
-            ctx,
-            "flex w-full items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5",
-          )}
-        >
-          <FileGlyph />
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate text-left font-mono text-[10.5px]",
-              isLit ? "font-semibold text-deep-green" : "text-on-surface",
-            )}
-          >
-            {block.file}
-          </span>
-          <span className="shrink-0 font-mono text-[9.5px] text-faint">
-            :{block.start}
-          </span>
-        </button>
-        {/* Real line numbers, counting from the file's own offset. A gutter
-            that restarts at 1 is a quiet lie about where this code lives. */}
-        <div className="overflow-x-auto">
-          <pre className="min-w-full py-1.5 font-mono text-[10px] leading-[1.55]">
-            {lines.map((line, i) => (
-              <div key={i} className="flex">
-                <span className="tnum sticky left-0 shrink-0 select-none bg-pure-white pl-3 pr-2.5 text-right text-faint">
-                  {block.start + i}
-                </span>
-                <code className="whitespace-pre pr-3 text-on-surface">
-                  {line || " "}
-                </code>
-              </div>
-            ))}
-          </pre>
-        </div>
-        {block.why ? (
-          <div className="flex gap-2 border-t border-border-gray bg-surface-container-low px-3 py-2">
-            <span className="mt-[3px] shrink-0 font-mono text-[9px] uppercase tracking-[0.09em] text-faint">
-              why
-            </span>
-            <p className="text-[10px] leading-relaxed text-on-surface-variant">
-              {block.why}
-            </p>
-          </div>
-        ) : null}
-      </div>
-    );
+    return <SourceView owner={owner} block={block} ctx={ctx} />;
   }
 
   if (block.kind === "chips") {
@@ -369,46 +393,52 @@ function Block({
                   e.stopPropagation();
                   ctx.onOpenRow(id);
                 }}
-                className={rowClass(
-                  id,
-                  ctx,
-                  "flex w-full items-start gap-2 px-3 py-1.5",
-                )}
+                className={rowClass(id, ctx, cn(PAIR_SCOPE, "px-3 py-1.5"))}
               >
-                <span
-                  className={cn(
-                    "shrink-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
-                    isLit || isOpen
-                      ? "bg-deep-green text-pure-white"
-                      : "bg-surface-container text-on-surface",
-                  )}
-                >
-                  {m.from}
-                </span>
-                {/* The arrow carries the relationship, so the text doesn't
-                    have to say "becomes". */}
-                <span className="shrink-0 font-mono text-[11px] leading-[1.5] text-faint">→</span>
-                {/* Chip sits INSIDE the flowing column, not beside it. As a
-                    sibling of the text it was `shrink-0` against a `flex-1`
-                    that could shrink to nothing, so a long `to` string was
-                    squeezed into a five-line ribbon while the chip kept its
-                    full width. Inline, the chip wraps with the words. */}
-                <span
-                  className={cn(
-                    "min-w-0 flex-1 text-left font-mono text-[9.5px] leading-snug",
-                    m.state === "derived" ? "text-muted-slate" : "text-amber-ink",
-                  )}
-                >
-                  {m.to}
-                  {m.state !== "derived" ? (
-                    <StateChip state={m.state} className="ml-1.5 align-[1px]" />
-                  ) : null}
-                </span>
-                {m.under ? (
-                  <span className="mt-[3px]">
-                    <Caret open={isOpen} />
+                <span className={PAIR_ROW}>
+                  <span className={cn(PAIR_LABEL, "flex items-start gap-2")}>
+                    <span
+                      className={cn(
+                        "min-w-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
+                        isLit || isOpen
+                          ? "bg-deep-green text-pure-white"
+                          : "bg-surface-container text-on-surface",
+                      )}
+                    >
+                      {m.from}
+                    </span>
+                    {/* The arrow carries the relationship, so the text doesn't
+                        have to say "becomes". Stacked, it would point down a
+                        column at nothing, so it is hidden there — the vertical
+                        order already says which is which. */}
+                    <span className="ml-auto hidden shrink-0 font-mono text-[11px] leading-[1.5] text-faint @min-[267px]:block">
+                      →
+                    </span>
                   </span>
-                ) : null}
+                  {/* Chip sits INSIDE the flowing column, not beside it. As a
+                      sibling of the text it was `shrink-0` against a `flex-1`
+                      that could shrink to nothing, so a long `to` string was
+                      squeezed into a five-line ribbon while the chip kept its
+                      full width. Inline, the chip wraps with the words. */}
+                  <span className={cn(PAIR_VALUE, "flex items-start gap-2")}>
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 font-mono text-[9.5px] leading-snug",
+                        m.state === "derived" ? "text-muted-slate" : "text-amber-ink",
+                      )}
+                    >
+                      {m.to}
+                      {m.state !== "derived" ? (
+                        <StateChip state={m.state} className="ml-1.5 align-[1px]" />
+                      ) : null}
+                    </span>
+                    {m.under ? (
+                      <span className="mt-[3px]">
+                        <Caret open={isOpen} />
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
               </button>
             </div>
           );
@@ -492,7 +522,10 @@ function Block({
                   />
                   <span
                     className={cn(
-                      "font-mono text-[10px]",
+                      // `min-w-0` so a long label wraps instead of shoving the
+                      // figure past the right edge. The figure stays `shrink-0`
+                      // because it is short and is the thing being compared.
+                      "min-w-0 font-mono text-[10px]",
                       isLit ? "font-semibold text-deep-green" : "text-on-surface",
                     )}
                   >
@@ -532,35 +565,45 @@ function Block({
                 ref={ctx.anchor(id)}
                 data-row
                 onClick={() => ctx.onTrace(id)}
-                className={rowClass(id, ctx, "flex items-center gap-2 rounded-[5px]")}
+                className={rowClass(id, ctx, cn(PAIR_SCOPE, "rounded-[5px]"))}
               >
-                <span
-                  className={cn(
-                    "w-[92px] shrink-0 truncate text-left font-mono text-[10px]",
-                    isLit ? "font-semibold text-deep-green" : "text-on-surface",
-                  )}
-                >
-                  {b.label}
-                </span>
-                {/* The track is the scale. Without it a short bar reads as a
-                    small number rather than a small share. */}
-                <span className="h-[9px] min-w-0 flex-1 rounded-[3px] bg-surface-container">
+                {/* The label was `w-[92px]` and the figure `w-[108px]`: 200px
+                    of fixed furniture either side of the bar, so on a narrow
+                    card the TRACK — the only part that carries the comparison
+                    — was what collapsed. Both are capped shares now, and the
+                    pair stacks before the bar can be squeezed out. */}
+                <span className={PAIR_ROW}>
                   <span
-                    style={{ width: `${Math.max((b.value / max) * 100, 2)}%` }}
                     className={cn(
-                      "block h-full rounded-[3px] transition-all duration-200",
-                      isLit
-                        ? "bg-deep-green"
-                        : b.state === "derived"
-                          ? "bg-mint-line"
-                          : "bg-amber-line",
+                      PAIR_LABEL,
+                      "truncate font-mono text-[10px]",
+                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
                     )}
-                  />
+                  >
+                    {b.label}
+                  </span>
+                  <span className={cn(PAIR_VALUE, "flex items-center gap-2")}>
+                    {/* The track is the scale. Without it a short bar reads as
+                        a small number rather than a small share. */}
+                    <span className="h-[9px] min-w-0 flex-1 rounded-[3px] bg-surface-container">
+                      <span
+                        style={{ width: `${Math.max((b.value / max) * 100, 2)}%` }}
+                        className={cn(
+                          "block h-full rounded-[3px] transition-all duration-200",
+                          isLit
+                            ? "bg-deep-green"
+                            : b.state === "derived"
+                              ? "bg-mint-line"
+                              : "bg-amber-line",
+                        )}
+                      />
+                    </span>
+                    <span className="shrink-0 text-right font-mono text-[9.5px] text-muted-slate">
+                      {b.display}
+                    </span>
+                    <StateChip state={b.state} />
+                  </span>
                 </span>
-                <span className="w-[108px] shrink-0 text-right font-mono text-[9.5px] text-muted-slate">
-                  {b.display}
-                </span>
-                <StateChip state={b.state} />
               </button>
             );
           })}
@@ -655,32 +698,337 @@ function Block({
             className={rowClass(
               id,
               ctx,
-              "flex items-start gap-3 border-b border-border-gray px-3 py-1.5 last:border-b-0",
+              cn(PAIR_SCOPE, "border-b border-border-gray px-3 py-1.5 last:border-b-0"),
             )}
           >
-            <span
-              className={cn(
-                "shrink-0 font-mono text-[10.5px]",
-                isLit ? "font-semibold text-deep-green" : "text-on-surface",
-              )}
-            >
-              {p.label}
+            <span className={PAIR_ROW}>
+              <span
+                className={cn(
+                  PAIR_LABEL,
+                  "font-mono text-[10.5px]",
+                  isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                )}
+              >
+                {p.label}
+              </span>
+              {/* Left-aligned: right-aligning a long value in a narrow column
+                  produces a ragged staircase of 3-4 wrapped lines. */}
+              <span className={cn(PAIR_VALUE, "flex items-start gap-2")}>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 text-[10px] leading-snug",
+                    p.state === "derived" ? "text-muted-slate" : "text-amber-ink",
+                  )}
+                >
+                  {p.value}
+                </span>
+                <StateChip state={p.state} />
+              </span>
             </span>
-            {/* Left-aligned: right-aligning a long value in a narrow column
-                produces a ragged staircase of 3-4 wrapped lines. */}
-            <span
-              className={cn(
-                "min-w-0 flex-1 text-left text-[10px] leading-snug",
-                p.state === "derived" ? "text-muted-slate" : "text-amber-ink",
-              )}
-            >
-              {p.value}
-            </span>
-            <StateChip state={p.state} />
           </button>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * The bottom of the map, read from the real repository.
+ *
+ * Three things are kept strictly apart, and the separation is the point:
+ *
+ *   the CODE       verbatim from a real file at a real line, read from disk
+ *   the WHY        synthesized commentary, in its own tinted band
+ *   the FINDING    when disk no longer says what the map quoted
+ *
+ * The fixture's text is still what renders first, so the card is readable
+ * before any request finishes and readable at all if the repo is not there.
+ * Once the read lands, disk wins — with a mark saying it drifted, if it did.
+ * Silently swapping fresh code under a stale explanation is the exact failure
+ * this project exists to study, so it is the one thing that cannot happen here.
+ */
+function SourceView({
+  owner,
+  block,
+  ctx,
+}: {
+  owner: string;
+  block: Extract<Anatomy, { kind: "source" }>;
+  ctx: RowCtx;
+}) {
+  const id = rowId(owner, "source");
+  const isLit = ctx.lit.has(id);
+
+  const quoted = block.code.replace(/\n$/, "");
+  const end = block.start + quoted.split("\n").length - 1;
+
+  const [slice, setSlice] = useState<Slice | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(quoted);
+  const [saved, setSaved] = useState<WriteResult | null>(null);
+
+  /**
+   * One read of the repository, resolved to what the UI should show.
+   *
+   * Pure apart from the fetch: it sets no state, which is what lets the effect
+   * below subscribe to it rather than call setState in its own body.
+   */
+  const read = useCallback(
+    async (signal?: AbortSignal) => {
+      const q = new URLSearchParams({
+        file: block.file,
+        start: String(block.start),
+        end: String(end),
+        fixture: quoted,
+      });
+      try {
+        const res = await fetch(`/api/source?${q}`, { signal });
+        const body = await res.json();
+        return res.ok
+          ? { slice: body as Slice, failed: null }
+          : { slice: null, failed: (body.refused as string) ?? "unreadable" };
+      } catch {
+        return { slice: null, failed: "unreachable" };
+      }
+    },
+    [block.file, block.start, end, quoted],
+  );
+
+  // Aborted on unmount and whenever the block changes, so a slow response for
+  // one source block can never land as the state of a different one.
+  useEffect(() => {
+    const ac = new AbortController();
+    read(ac.signal).then((r) => {
+      if (ac.signal.aborted) return;
+      setSlice(r.slice);
+      setFailed(r.failed);
+    });
+    return () => ac.abort();
+  }, [read]);
+
+  // Disk is the truth once we have it; the fixture is the fallback.
+  const shown = slice?.code ?? quoted;
+  const lines = shown.split("\n");
+  const drifted = slice != null && !slice.matchesFixture;
+
+  // Nothing is ever written without an explicit click, so this is only ever
+  // reached from the save button's own handler. Never a blur, never a timer,
+  // never navigation.
+  async function save() {
+    const res = await fetch("/api/source", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        file: block.file,
+        start: block.start,
+        end,
+        code: draft,
+        // What we read is what we claim is there. A write built on anything
+        // else is the stale-read clobber the contract exists to refuse.
+        expected: shown,
+      }),
+    });
+    const body = (await res.json()) as WriteResult;
+    setSaved(body);
+    if (body.ok) {
+      setEditing(false);
+      // Re-read rather than trusting the draft: what is now on disk is the
+      // only thing this card is allowed to show as the file's contents.
+      const r = await read();
+      setSlice(r.slice);
+      setFailed(r.failed);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-[10px] border bg-pure-white",
+        drifted ? "border-amber-line" : isLit ? "border-deep-green" : "border-border-gray",
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-2 border-b border-border-gray px-3 py-1.5",
+          drifted ? "bg-amber-surface" : "bg-surface",
+        )}
+      >
+        <button
+          ref={ctx.anchor(id)}
+          data-row
+          onClick={() => ctx.onTrace(id)}
+          className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2 rounded-[5px]")}
+        >
+          <FileGlyph />
+          {/* file:line as one addressable string, not a path with a number
+              stranded on the far side of the row. */}
+          <span
+            className={cn(
+              "min-w-0 truncate text-left font-mono text-[11px]",
+              isLit ? "font-semibold text-deep-green" : "text-on-surface",
+            )}
+          >
+            {block.file}
+            <span className="text-faint">:{block.start}</span>
+          </span>
+        </button>
+        {/* "733 of 779 lines" — where this sits in the file, which a quote
+            with no denominator cannot say. */}
+        {slice ? (
+          <span className="tnum shrink-0 font-mono text-[9.5px] text-faint">
+            {block.start.toLocaleString()} of {slice.total.toLocaleString()} lines
+          </span>
+        ) : null}
+        <CopyPath text={`${block.file}:${block.start}`} />
+        {/* Read-only is the default. Editing is a control you go and press. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDraft(shown);
+            setSaved(null);
+            setEditing((v) => !v);
+          }}
+          className={cn(
+            "shrink-0 rounded-[4px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
+            editing
+              ? "border-deep-green bg-deep-green text-pure-white"
+              : "border-border-strong text-muted-slate hover:text-on-surface",
+          )}
+        >
+          {editing ? "cancel" : "edit"}
+        </button>
+      </div>
+
+      {/* The finding, stated before the code it is about. */}
+      {drifted ? (
+        <p className="border-b border-amber-line bg-amber-surface px-3 py-1.5 text-[10px] leading-relaxed text-amber-ink">
+          <span className="font-semibold">Drifted.</span> The file no longer says
+          what the map quoted here. The code below is what is on disk now; the
+          explanation under it was written about the older text.
+        </p>
+      ) : null}
+      {failed ? (
+        <p className="border-b border-border-gray bg-surface-container-low px-3 py-1.5 text-[10px] leading-relaxed text-muted-slate">
+          Could not read the repository ({failed}). Showing the quote the map
+          was authored with, which nothing has verified against disk.
+        </p>
+      ) : null}
+
+      {editing ? (
+        <div className="px-3 py-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            spellCheck={false}
+            rows={Math.min(lines.length + 2, 24)}
+            className="w-full resize-y rounded-[6px] border border-border-strong bg-surface-container-low p-2 font-mono text-[11.5px] leading-[1.55] text-on-surface outline-none focus:border-deep-green"
+          />
+          {/* The diff is shown BEFORE the write, and the write needs this
+              click. There is no other path to disk. */}
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                void save();
+              }}
+              disabled={draft === shown}
+              className="rounded-[5px] bg-deep-green px-2 py-1 font-mono text-[10px] text-pure-white disabled:opacity-40"
+            >
+              save to disk
+            </button>
+            <span className="font-mono text-[9.5px] text-faint">
+              {draft === shown
+                ? "no change"
+                : `rewrites ${block.file}:${block.start}-${end}`}
+            </span>
+          </div>
+          {draft !== shown ? <DraftDiff before={shown} after={draft} /> : null}
+          {saved && !saved.ok ? (
+            <p className="mt-2 text-[10px] leading-relaxed text-clay-ink">
+              Refused: {saved.refused}
+              {saved.refused === "stale"
+                ? " — the file changed since this was read. Cancel and reopen to get the current text."
+                : null}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        /* Real line numbers, counting from the file's own offset. A gutter
+           that restarts at 1 is a quiet lie about where this code lives. */
+        <div className="overflow-x-auto">
+          <pre className="min-w-full py-1.5 font-mono text-[11.5px] leading-[1.55]">
+            {lines.map((line, i) => (
+              <div key={i} className="flex">
+                <span className="tnum sticky left-0 shrink-0 select-none border-r border-border-gray bg-pure-white pl-3 pr-2 text-right text-faint">
+                  {block.start + i}
+                </span>
+                <code className="whitespace-pre pl-2.5 pr-3 text-on-surface">
+                  {line || " "}
+                </code>
+              </div>
+            ))}
+          </pre>
+        </div>
+      )}
+
+      {/* Commentary, in its own band, below the code, labelled. It is
+          synthesized and must never be able to read as something the file
+          says. */}
+      {block.why ? (
+        <div className="flex gap-2 border-t border-border-gray bg-surface-container-low px-3 py-2">
+          <span className="mt-[3px] shrink-0 font-mono text-[9px] uppercase tracking-[0.09em] text-faint">
+            why
+          </span>
+          <p className="text-[10px] leading-relaxed text-on-surface-variant">
+            {block.why}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Line-wise diff of the pending edit, shown before anything is written. */
+function DraftDiff({ before, after }: { before: string; after: string }) {
+  const b = before.split("\n");
+  const a = after.split("\n");
+  return (
+    <pre className="mt-2 overflow-x-auto rounded-[6px] border border-border-gray bg-pure-white py-1.5 font-mono text-[10.5px] leading-[1.5]">
+      {b.map((l, i) => (
+        <div key={`b${i}`} className="bg-clay-surface px-3 text-clay-ink">
+          <span className="select-none">- </span>
+          {l || " "}
+        </div>
+      ))}
+      {a.map((l, i) => (
+        <div key={`a${i}`} className="bg-mint-success px-3 text-deep-green">
+          <span className="select-none">+ </span>
+          {l || " "}
+        </div>
+      ))}
+    </pre>
+  );
+}
+
+/** Copies `file:line`, the string you paste into an editor or a message. */
+function CopyPath({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard.writeText(text);
+        setDone(true);
+        timer.current = setTimeout(() => setDone(false), 1200);
+      }}
+      title={`Copy ${text}`}
+      className="shrink-0 rounded-[4px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+    >
+      {done ? "copied" : "copy path"}
+    </button>
   );
 }
 

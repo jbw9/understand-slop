@@ -8,6 +8,7 @@ import { StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { E0, L0, LINKS, allNodes, levelAt, nodeAt } from "@/lib/taxbuddy";
 import type { Edge, Node } from "@/lib/data";
+import { BLURB_LINES } from "@/lib/view";
 
 /**
  * The whole screen. A pan/zoom surface holding the diagram — no chrome, no
@@ -48,16 +49,27 @@ const OVERVIEW = { scale: 1, x: 80, y: 60 };
  * — `w-[340px]` children, `gap-[140px]`, `pl-6` (24px) — and are used both to
  * size the world box and to aim the drill.
  */
-const CHILD_W = 340;
+const CHILD_W = 400;
 
 /**
- * The gutter is a wire corridor, not a margin. Six foreign keys run between
- * these cards and three of them shared one 45px channel, which is what turned
- * distinct relationships into a single bundle that doubled back on itself.
- * Sized to hold several lanes at the 26px pitch the wire layer spreads them
- * by, plus clearance at each card edge. Users can zoom, so width is cheap.
+ * The gutter is a wire corridor, not a margin — but it was sized for lanes
+ * that do not exist.
+ *
+ * Measured on this board: 6 wires at overview, all of them root-level, none
+ * crossing a child gutter, and the widest corridor bundle anywhere is one
+ * wire. Meanwhile 7 of 10 subtitles clipped and the overview ran 14.6% ink.
+ * A 140px gutter against a 340px card is 41% of a card's width spent on empty
+ * space reserved for traffic that never arrives.
+ *
+ * 96px is not a guess. `WireLayer` treats a gutter as an adjacent corridor
+ * when it is `> 28 && < 320`, and gives each wire in it a track at
+ * `pitch = min(26, gutter / 2 - 18)`. At 96 that is the full 26px pitch, so
+ * three wires still get clean separate tracks (offsets -26/0/+26 spanning
+ * 52px inside a 96px channel) — which is more lanes than this board has ever
+ * needed. The 44px that comes off the gutter goes onto the card, where text
+ * was being cut.
  */
-const CHILD_GAP = 140;
+const CHILD_GAP = 96;
 const CHILD_PL = 24;
 const CARD_H = 57;
 /** Tallest expanded capability card, measured from the rendered DB domain. */
@@ -121,6 +133,77 @@ const PLACE: Record<string, { x: number; y: number; w?: number }> = {
   // show an absence.
   unreachable: { x: 700, y: 740, w: 440 },
 };
+
+/**
+ * The sibling wires a node's children get — the honesty rule, in one function.
+ *
+ * An arrow claims that one sibling genuinely precedes another. It is drawn
+ * ONLY where the node says so, via `group.ordering === "sequence"`. Anything
+ * else is a SET and gets no wire at all: inventing arrows to make a level look
+ * like a diagram turns a weak claim into a confident-looking one, which is the
+ * single failure `lib/view.ts` exists to prevent.
+ *
+ * Two sources of order, in priority:
+ *
+ *  1. Authored `edges`, sorted by `Edge.order`. When the analysis knows the
+ *     sequence it states it, and `order` carries the direction.
+ *  2. Otherwise the chain implied by the children's own array order. This is
+ *     NOT a guess dressed up as a fact — a node only reaches this branch by
+ *     declaring `ordering: "sequence"`, which is the assertion that its
+ *     children are a real sequence. Drawing the chain is then reading that
+ *     assertion, not adding to it.
+ *
+ * ⚠ Defensive on `group` because another workstream authors it. A node with no
+ * `group` is treated as a SET with no note — no wire, and nothing said. That is
+ * the safe direction to be wrong in: a missing arrow understates, an invented
+ * one lies.
+ */
+function siblingEdges(node: Node): Edge[] {
+  if (node.group?.ordering !== "sequence") return [];
+  const kids = (node.children ?? []).filter((c) => !c.fromRow);
+  if (kids.length < 2) return [];
+
+  const authored = node.edges ?? [];
+  if (authored.length) {
+    return [...authored].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+  return kids.slice(1).map((c, i) => ({
+    from: kids[i].id,
+    to: c.id,
+    state: kids[i].state === "derived" && c.state === "derived"
+      ? "derived"
+      : "partial",
+    order: i + 1,
+  }));
+}
+
+/**
+ * The line an unordered level says about itself.
+ *
+ * A pile of cards with no wires and no explanation reads as missing analysis —
+ * the D3 failure mode where a blind spot looks like empty space. Stating "these
+ * have no order" is information; staying silent is not.
+ */
+function setNote(node: Node): string | null {
+  if (!node.children?.length) return null;
+  if (node.group?.ordering === "sequence") return null;
+  // No group at all means the other workstream has not reached this node yet.
+  // Say nothing rather than asserting a set — an unbacked claim about ordering
+  // is the same mistake as an unbacked arrow, pointing the other way.
+  if (!node.group) return null;
+  return node.group.note ?? "No order between these — they are a set, not a flow.";
+}
+
+/**
+ * Roots that no edge in E0 touches.
+ *
+ * `refund-check`, `store` and `unreachable` connect to nothing, and that is
+ * almost certainly correct — `/check` genuinely bypasses the funnel, the store
+ * sits under every step rather than after one. But an unconnected card reads as
+ * an unfinished one, so the treatment has to SAY "deliberately outside the
+ * flow" rather than leaving the card floating and silent.
+ */
+const CONNECTED = new Set(E0.flatMap((e) => [e.from, e.to]));
 
 function worldPos(node: Node) {
   return PLACE[node.id] ?? { x: 0, y: 0 };
@@ -304,9 +387,15 @@ export function Canvas() {
     // Roots, plus the sibling edges declared by every node on the open path.
     // Each node carries its own children's edges, so this works at any depth
     // without the canvas knowing what a "level" is.
+    // Every node on the open path contributes the wires between ITS children,
+    // which is what puts arrows at every level rather than only at the root.
+    // `siblingEdges` is the gate: a node that has not declared a sequence
+    // contributes nothing, so a level with no real ordering stays wireless and
+    // says so in its own note instead.
     const edges: Edge[] = [...E0];
     for (let i = 0; i < path.length; i++) {
-      edges.push(...(nodeAt(path.slice(0, i + 1))?.edges ?? []));
+      const on = nodeAt(path.slice(0, i + 1));
+      if (on) edges.push(...siblingEdges(on));
     }
     const mapped: Wire[] = edges.map((e) => ({
       from: e.from,
@@ -555,12 +644,31 @@ export function Canvas() {
     //
     // The card's parent column already contains the card and everything nested
     // under it, so its rect IS the thing to frame. One measurement, no guesses.
-    const col = opened.parentElement ?? opened;
-    const cb = col.getBoundingClientRect();
-    // Anchoring on the card's own rect instead of the column's was tried and
-    // measured: identical tx/ty, identical card position, to the digit. The
-    // remaining error is NOT the anchor reference. See D8.
+    //
+    // ⚠ Except at level 1, where the parent column is a FIXED-WIDTH wrapper.
+    // A root sits in an absolutely-positioned div with `width: cardWidth(node)`
+    // — 360px — and its children overflow that box horizontally rather than
+    // stretching it. Measured on `identity`: the wrapper reported 309px wide
+    // (scaled) while the three children it holds actually ran 1054px, to
+    // x:2452 on a 1920px viewport. So the column's rect was a truthful
+    // measurement of the wrong rectangle, and framing it centred a 360px box
+    // and left two of three children off the right edge.
+    //
+    // Take the UNION of the opened card and the children on screen instead.
+    // At depth 2+ the column already is that union, so this is identical
+    // there and the deep-drill behaviour D8 measured is unchanged.
     const ob = opened.getBoundingClientRect();
+    const kids = (node?.children ?? [])
+      .map((c) =>
+        world.querySelector<HTMLElement>(
+          `[data-node-id="${CSS.escape(c.id)}"]`,
+        ),
+      )
+      .filter((el): el is HTMLElement => el !== null)
+      .map((el) => (el.parentElement ?? el).getBoundingClientRect());
+    const left = Math.min(ob.left, ...kids.map((r) => r.left));
+    const right = Math.max(ob.right, ...kids.map((r) => r.right));
+    const bottom = Math.max(ob.bottom, ...kids.map((r) => r.bottom));
     // You read a subtree DOWNWARD from the card you just opened, so that card
     // belongs near the top of the screen with its content below it — not at
     // the midpoint of a column that overflows both edges. Fitting the whole
@@ -568,10 +676,10 @@ export function Canvas() {
     // would be on screen and unreadable.
     frame(
       {
-        x: (cb.left - wb.left) / s,
+        x: (left - wb.left) / s,
         y: (ob.top - wb.top) / s,
-        w: cb.width / s,
-        h: cb.height / s,
+        w: (right - left) / s,
+        h: (bottom - ob.top) / s,
       },
       "top",
     );
@@ -821,6 +929,9 @@ function Branch({
   // I am the deepest open node — the one being read.
   const isLeafOfPath = onPath && path.length === here.length;
   const root = at.length === 0;
+  // Only the authored children get a note — row children are answers to
+  // separate questions, never a set anybody is comparing.
+  const note = rowOpened ? null : setNote(node);
 
   return (
     <>
@@ -830,6 +941,10 @@ function Branch({
         compact={!root}
         inert={inert}
         selected={isLeafOfPath}
+        // Off the spine on purpose. Only roots can be: every deeper level is
+        // either a declared sequence or a declared set, and both of those say
+        // what they are in their own terms.
+        aside={root && !CONNECTED.has(node.id)}
         // Anatomy shows on the node you have actually opened to, and on the
         // cards of the level you are looking at — not on every ancestor, which
         // would stack four expanded cards down the screen at once.
@@ -851,6 +966,24 @@ function Branch({
         }
       />
 
+      {/* An unordered level states that it is unordered. Quiet — it is a
+          caption on the level, not a finding — but present, because a level
+          with no wires and no sentence reads as analysis that stopped. */}
+      <AnimatePresence>
+        {showChildren && note ? (
+          <motion.p
+            key="setnote"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, delay: 0.1 }}
+            className="pl-6 text-[10.5px] italic leading-snug text-faint"
+          >
+            {note}
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showChildren ? (
           <motion.div
@@ -859,7 +992,11 @@ function Branch({
             // the canvas; side-by-side keeps a level readable in one screenful.
             // The gutter is also where the FK wires run, and it has to be wide
             // enough that every wire crossing it gets its own vertical track.
-            className="flex items-start gap-[140px] pl-6"
+            // Driven off CHILD_GAP rather than a literal: the camera sizes its
+            // pre-commit box from that constant, and the two drifting apart is
+            // a camera aiming at a width the layout does not have.
+            className="flex items-start pl-6"
+            style={{ gap: CHILD_GAP }}
             initial="out"
             animate="in"
             exit="out"
@@ -907,6 +1044,7 @@ function NodeCard({
   inert,
   selected,
   detail,
+  aside,
   ctx,
   onClick,
 }: {
@@ -917,6 +1055,14 @@ function NodeCard({
   inert?: boolean;
   selected?: boolean;
   detail?: boolean;
+  /**
+   * No edge touches this card, and that is the finding rather than a gap.
+   * Drawn as a card standing beside the flow instead of one that fell out of
+   * it: a left rule where its inbound wire would have landed, and a label
+   * saying so. Silence would read as the analysis having missed something,
+   * which is the one thing this card must not look like.
+   */
+  aside?: boolean;
   /** Row anchoring and trace state, threaded down to the anatomy rows. */
   ctx?: RowCtx;
   onClick?: () => void;
@@ -952,6 +1098,10 @@ function NodeCard({
         node.ghost
           ? "border-dashed border-border-strong bg-surface-container-low/60"
           : "border-border-gray",
+        // The left rule sits exactly where an inbound arrow would have landed,
+        // so the eye reads "nothing arrives here, and that is stated" rather
+        // than "nothing arrives here".
+        aside && !node.ghost && "border-l-[3px] border-l-muted-slate",
         selected && "border-deep-green ring-1 ring-deep-green",
         onClick && !inert && "hover:border-border-strong hover:shadow-panel",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
@@ -968,14 +1118,25 @@ function NodeCard({
         </span>
         <StateChip state={node.state} alarm={node.alarm} />
       </div>
+      {/* Wraps to BLURB_LINES, never `truncate`d. Measured on the shipped
+          board: 7 of 10 subtitles were cut, several by 12-95px, on a viewport
+          that was 85% empty — and the most interesting claim on the screen was
+          one of them. A blurb that does not fit two lines is too long and gets
+          rewritten; it does not get sliced. See lib/view.ts. */}
       <p
         className={cn(
-          "mt-0.5 truncate font-mono text-faint",
-          compact ? "text-[10px]" : "text-[11.5px]",
+          "mt-0.5 font-mono text-faint [display:-webkit-box] [overflow:hidden] [-webkit-box-orient:vertical]",
+          compact ? "text-[10px] leading-[1.35]" : "text-[11.5px] leading-[1.35]",
         )}
+        style={{ WebkitLineClamp: BLURB_LINES }}
       >
         {node.sub}
       </p>
+      {aside ? (
+        <p className="mt-1.5 text-[9.5px] uppercase tracking-[0.07em] text-muted-slate">
+          Off the flow — nothing leads here
+        </p>
+      ) : null}
       <AnimatePresence initial={false}>
         {detail && (node.detail || node.anatomy) ? (
           <motion.div

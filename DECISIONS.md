@@ -473,3 +473,141 @@ surfaces.
 **At scale:** this is the second latent limit (see D13) that only appeared once
 a fixture nested `under` inside `under`. The row-drill path had never been
 exercised past one level of nesting.
+
+## D16 — The top level is features, and the directory spread is the evidence
+
+**Chose:** roots are product features (Consent, Eligibility, Extraction, Engine…).
+**Beat:** an architecture cut (frontend / backend / database / server), which was
+the live alternative.
+
+Not taste. I mapped every root to the directories its content actually came
+from:
+
+| root | directories |
+|---|---|
+| `eligibility` | `lib/rules` |
+| `extraction` | `lib/parsing`, `lib/ai`, `lib/extraction` |
+| `identity` | `app/(protected)`, `lib/rules`, `app/api` |
+| `packet` | `lib/server`, `lib/rules`, `lib/pdf` |
+
+Features cut across directories, and `lib/rules` alone is touched by four of
+them. An architecture cut would put `lib/rules` in one box and force
+eligibility, engine, identity and packet to share it — which is precisely the
+"I don't know what belongs to what" confusion this round exists to delete. The
+feature cut keeps each question in one place; the cost is that a directory
+appears under several features, which is why `Node.footprint` now states the
+file footprint explicitly rather than leaving it to be inferred from the title.
+
+**Cost accepted:** "show me the backend" is not a question this board answers.
+Someone looking for a layer rather than a behaviour has to know which feature
+owns it.
+**Breaks at scale:** feature extraction is the hard part of a real run. The
+fixture's ten roots were read out of `ONBOARDING_STEPS`, an ordered literal —
+a repo with no such list gives the analysis nothing to anchor on, and the
+top-level cut becomes `inferred` rather than `derived`.
+
+## D17 — Depth was never the inconsistency; breadth was
+
+**Chose:** leave the four-level depth alone and attack text volume per card.
+**Beat:** adding levels to the shallow branches, which is what the symptom
+("some parts go as deep as the code, for some it just goes very shallow")
+suggests on its face.
+
+The symptom is real and the diagnosis it implies is wrong. Audited: 9 of 10
+roots are exactly 4 levels, `unreachable` is 3, and **all 10 reach a real
+`source` block**. 56 of 85 leaves are source. Depth is already uniform.
+
+What varies by 26x is content per card:
+
+| node | children | anatomy chars |
+|---|---|---|
+| `engine › Every formula` | 13 | 12,742 |
+| `store › What is stored in the clear` | 0 | 483 |
+
+Identical card treatment over that range is what reads as "no consistency at
+all". The fix is `summary` on the dense ones and authoring the outliers down —
+not new levels under the sparse ones, which would have invented structure the
+analysis never found.
+
+**Cost accepted:** a sparse branch still looks sparse. `store › What is stored
+in the clear` is one fact and stays one fact.
+**Breaks at scale:** `CARD_ROWS_SOFT = 8` is a guess from one fixture. On a
+repo whose average card is denser, the threshold stops separating anything.
+
+## D18 — Cards scale to content; no hard row cap
+
+**Chose:** let a card's size follow what it holds, and require a `summary` line
+past `CARD_ROWS_SOFT`.
+**Beat:** a hard cap of ~5 rows per card, pushing overflow into child levels —
+which would have produced a perfectly even rhythm at every depth.
+
+A card's size is information about the thing it describes. `engine › Every
+formula` holding 13 formulas *should* look denser than a card holding one fact;
+flattening both to five rows throws that signal away and hides exactly the
+outliers that most need authoring attention. The even rhythm would have been
+bought by making the board lie about the shape of the code.
+
+**Cost accepted:** the board's rhythm stays irregular, which is the thing the
+user noticed first. `summary` mitigates it (you know what you are scrolling
+before you scroll) but does not remove it.
+**Breaks at scale:** a card with 60 rows has no good rendering under this rule.
+Past some breadth the honest move is to say "60 formulas" and make the level
+itself the list, which is a different layout, not a taller card.
+
+## D19 — An arrow claims real sequence, or there is no arrow
+
+**Chose:** wires only between siblings where one genuinely precedes another;
+unordered siblings render as a `set` with a note saying so.
+**Beat:** connecting everything with typed edges (`then` / `calls` / `reads` /
+`writes`), which would have made every level look like a diagram.
+
+The board shipped with 6 edges, all at root, and none below it — so every level
+past the first was a silent pile of cards. Both the silence and the fix-by-
+connecting-everything are failures of the same kind: the first lets a real
+relationship go unstated, the second states relationships the analysis cannot
+support. D3's principle applies to edges exactly as it applies to nodes —
+inventing arrows turns a weak claim into a confident-looking one, and a reader
+cannot tell which arrows were earned.
+
+Saying "these five are unordered, they all read the same table" is information.
+Saying nothing reads as missing analysis.
+
+**Cost accepted:** some levels will have no arrows at all and will look plainer
+than a diagram tool's output. That is the honest rendering of a set.
+**Breaks at scale:** `ordering` is authored per node here. Deriving it from a
+real analysis means proving one call happens before another, which is a
+dataflow question, not an import-graph one — and the import graph is the only
+thing D2 established as 98-100% precise.
+
+## D20 — The code level reads the real repository
+
+**Chose:** read `source` slices from `~/Desktop/Code/taxBuddy` at request time,
+and allow a gated write back.
+**Beat:** keeping the verbatim text pasted in `lib/taxbuddy.ts` (the shipped
+design), and separately, refusing editing entirely.
+
+The pasted text was verified once at authoring time and drifts silently the
+moment the file changes — a map that is confidently wrong about code it quotes,
+which is the exact failure this project exists to study. D11 already paid for
+this once: five wrong line numbers needed a corrective commit. The repo is a
+live git checkout and every spot-checked anchor (`lib/rules/income.ts:733`,
+`:189`, `lib/payoutBreakdown.ts:8`, `lib/extraction/disagreementLog.ts:85`)
+resolved to the right line, so reading it is sound today.
+
+`matchesFixture` is the load-bearing field: when disk and fixture disagree the
+UI must say the map has drifted, never silently render fresh text under a stale
+explanation.
+
+**Writing is the one operation that can destroy work**, so it is narrow by
+construction: inside the repo root only, one contiguous slice at a time,
+`expected` must still match disk (optimistic concurrency), a diff is shown, and
+nothing is ever written on blur, on a timer, or on navigation.
+
+**Cost accepted:** the prototype now depends on a second repository existing at
+a known path. A missing or moved `taxBuddy` degrades the deepest level of the
+demo, and the read endpoint takes arbitrary caller-supplied paths — the
+containment check is the entire security model.
+**Breaks at scale:** one hard-coded `REPO_ROOT` per run. Mapping several repos,
+or a repo the server does not have on local disk, needs a different binding
+altogether — and a write endpoint reachable by anything other than localhost
+would need real authorization before it could ship.

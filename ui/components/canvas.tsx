@@ -519,7 +519,16 @@ export function Canvas() {
    * `frame` speaks.
    */
   useLayoutEffect(() => {
-    if (path.length < 2) return;
+    // `< 1`, not `< 2`. D12 recorded the guard at 2, which meant a FIRST-level
+    // drill never reached this measured correction and kept only the centred
+    // guess `drillInto` makes before commit. Measured in Chrome: clicking
+    // `identity` left the card at x:1398 — exactly where it already was, the
+    // camera never moving — while its three children ran to x:2452 against a
+    // 1920px viewport and to y:1014 against an 808px one. Two of three were
+    // off-screen. Level 1 is not a special case; it is the level whose
+    // children fan out furthest, because a root's column is the widest thing
+    // the board ever opens.
+    if (path.length < 1) return;
     const world = worldRef.current;
     const opened = world?.querySelector<HTMLElement>(
       `[data-node-id="${CSS.escape(path[path.length - 1])}"]`,

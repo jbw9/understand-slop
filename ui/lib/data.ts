@@ -144,9 +144,32 @@ export type Anatomy =
 
 export interface Node {
   id: string;
+  /**
+   * The thing's own name, 1-3 words, Title Case. A LABEL, not a sentence.
+   *
+   * The board shipped with prose here — "Agreeing to be read", "Where it all
+   * lands" — and a reader cannot tell from those what part of the product they
+   * name, so the first level read as ten riddles. The sentence belongs in
+   * `sub`. See `lib/view.ts`.
+   */
   title: string;
   /** One line, plain English. What this IS — never a file path. */
   sub: string;
+  /**
+   * Where this card's code actually lives: the direct answer to "what belongs
+   * to what". Features cut across directories (`identity` spans
+   * `app/(protected)`, `lib/rules` and `app/api`), so the footprint is stated
+   * rather than left to be inferred from the title.
+   */
+  footprint?: { dirs: string[]; files: number };
+  /**
+   * Set on cards holding more rows than `CARD_ROWS_SOFT`: the shape of what is
+   * inside, so the reader knows what they are scrolling before they scroll it.
+   * e.g. "13 formulas, one per 1040-NR line".
+   */
+  summary?: string;
+  /** How this node's CHILDREN relate to each other. */
+  group?: Group;
   state: State;
   alarm?: boolean;
   ghost?: boolean;
@@ -185,6 +208,30 @@ export interface Edge {
   state: State;
   alarm?: boolean;
   label?: string;
+  /**
+   * Position in a real sequence, 1-indexed.
+   *
+   * An edge claims that `from` genuinely precedes `to` — a pipeline stage, a
+   * request path, an ordered write. Siblings with no true ordering get no edge
+   * at all and render as a SET (see `Group.ordering`), because inventing
+   * arrows to make a level look like a diagram turns a weak claim into a
+   * confident-looking one.
+   */
+  order?: number;
+}
+
+/**
+ * How a set of siblings relates to each other.
+ *
+ * The board shipped with 6 edges, all at the root, and none below it — so
+ * every level past the first was a silent pile of cards with no stated
+ * relationship. Saying "these are unordered" is information; saying nothing
+ * reads as missing analysis.
+ */
+export interface Group {
+  ordering: "sequence" | "set";
+  /** Shown when `set`: why these belong together despite having no order. */
+  note?: string;
 }
 
 export const RUN = {

@@ -611,3 +611,100 @@ containment check is the entire security model.
 or a repo the server does not have on local disk, needs a different binding
 altogether — and a write endpoint reachable by anything other than localhost
 would need real authorization before it could ship.
+
+## D21 — A declared sequence draws its chain from child order
+
+**Chose:** when a node declares `group.ordering === "sequence"` but authors no
+`edges`, chain its children in array order; the synthesized edge is `derived`
+only if both endpoints are.
+**Beat:** requiring authored `edges` before any wire is drawn.
+
+Load-bearing, not a fallback. Workstream A landed `group` on 42 nodes — 14
+sequence, 28 set — and **zero `edges:` anywhere in `taxbuddy.ts`**. Requiring
+authored edges would have shipped sequence arrows as dead code against the only
+data that exists.
+
+The honesty argument is that a node reaches this branch only by asserting
+`ordering: "sequence"`. Drawing the chain *reads* that assertion rather than
+adding to it. The state rule is what keeps it from overclaiming: a synthesized
+edge inherits `partial` unless both endpoints are `derived`, so an inferred
+sequence never renders as a confident one. Authored `edges` still win, sorted
+by `Edge.order`.
+
+Verified in the running app: `identity` (sequence) draws 2 arrows chaining its
+three children; `eligibility` (set) draws none and states its note instead.
+
+**Cost accepted:** child array order is now semantically load-bearing in the
+fixture. Reordering two children of a `sequence` node silently redraws the
+chain, and nothing type-checks that.
+**Breaks at scale:** a generated fixture would have to emit children in true
+execution order or declare `set`. Deriving that order means proving one call
+precedes another — a dataflow question, not an import-graph one, and the import
+graph is the only thing D2 established as 98-100% precise.
+
+## D22 — The level-1 camera framed a box the content does not occupy
+
+**Chose:** frame the union of the opened card and its children's columns.
+**Beat:** framing `opened.parentElement` (what shipped), and computing the box
+from `CHILD_W`/`CHILD_GAP`.
+
+D12 named one defect — `if (path.length < 2) return;` skipping the measured
+correction at level 1. Lifting that guard was not enough, and the second defect
+only became visible once the first was gone: the effect framed the opened card's
+parent, which at level 1 is the root wrapper carrying a **fixed**
+`width: cardWidth(node)`. Children overflow it horizontally rather than
+stretching it. Measured on `identity`: the wrapper reported **309px** wide while
+its three children actually spanned **1054px**. The old code was truthfully
+measuring a rectangle the content does not occupy.
+
+At depth ≥2 the parent column genuinely is the subtree, so the union equals the
+column and D8's deep-drill behaviour is byte-identical there. That is why twelve
+previous attempts never hit this: none of them were at level 1.
+
+Measured, `identity`, viewport 1920×808:
+
+| | before | after |
+|---|---|---|
+| world transform | `212.5, 27.3` — identical to overview; the camera never fired | `-627.6, -194.3` |
+| owner card y | 294 | **72** (= `TOP_GUTTER`) |
+| deepest child right edge | 2202 → **282px off-screen** | 1365 → 555px spare |
+| content bottom | 1097 vs 808 → **289px below fold** | 892 → 84px below fold |
+
+Rejected `width: max-content` on the wrapper: it would have broken the
+deliberate fixed tier width that stops a one-line title card spanning 1100px.
+Rejected computing from constants — D8 records that guessed boxes are exactly
+what failed twelve times.
+
+**Cost accepted:** two extra `querySelector` calls per drill, and the camera now
+depends on children being in the DOM at measure time.
+**Breaks at scale:** a card whose subtree exceeds the viewport still cannot be
+framed by any box. `eng-math` renders ~3,000px tall and is the live proof — see
+D18's accepted cost.
+
+## D23 — Orientation chrome lives outside the camera transform
+
+**Chose:** breadcrumb, legend and key hints as fixed overlays, mounted as
+siblings of the transformed world.
+**Beat:** placing them in the world so they sit with the diagram.
+
+Driven in Chrome three levels deep, the board carried no `h1`, no nav landmark,
+no breadcrumb and no legend — nothing but cards on a dot grid. There was no way
+to answer "where am I" except from memory, which is the exact failure this
+project was started over.
+
+A breadcrumb that panned away with the camera would be useless precisely when a
+reader is lost, so none of it rides the transform. `trail` is built from real
+nodes rather than ids, so a renamed node renames its own crumb; `jumpToDepth`
+reuses the same `overviewView` computation `drillOut` does, rather than making a
+second guess at where the overview is.
+
+The legend is collapsed by default. 7 of 10 root cards read `partial`, and with
+nothing defining the word the board read as "mostly broken" rather than
+"honestly bounded" — but an always-open glossary in the corner is clutter, so
+the meanings are one click away.
+
+**Cost accepted:** three fixed overlays occupy screen corners permanently, and
+the Next dev badge overlaps the key hints in development.
+**Breaks at scale:** the breadcrumb is one line. A path ten levels deep would
+need eliding in the middle, and `max-w-[min(680px,60vw)]` currently just
+truncates the last crumb.

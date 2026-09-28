@@ -3,7 +3,8 @@
 import { cn } from "@/lib/utils";
 import { StateChip } from "@/components/state";
 import { rowId, type Anatomy } from "@/lib/data";
-import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX } from "@/lib/view";
+import { ShapeView } from "@/components/shapes";
+import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX, type Shape } from "@/lib/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Slice, WriteResult } from "@/lib/repo";
 
@@ -41,15 +42,35 @@ export function AnatomyView({
   owner,
   blocks,
   ctx,
+  opened = false,
+  shape,
 }: {
   owner: string;
   blocks: Anatomy[];
   ctx: RowCtx;
+  /**
+   * The card's shape, drawn above its rows: something to recognise before
+   * reading anything. Optional because it lives on the `Node` and only the
+   * canvas has one — a card with nothing true to draw passes nothing, and
+   * `ShapeView` itself returns null for a shape it cannot draw honestly.
+   */
+  shape?: Shape;
+  /**
+   * True only on the card the reader actually opened to. Everything else on
+   * the level is a SIBLING, and a sibling answers a question nobody has asked
+   * yet — so its long-form content stays folded until it is chosen.
+   *
+   * Optional, defaulting to sibling treatment: the caller that knows which
+   * card was opened is `components/canvas.tsx`, and until it passes this every
+   * card is folded, which is the safe direction to be wrong in.
+   */
+  opened?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3">
+      {shape ? <ShapeView shape={shape} /> : null}
       {blocks.map((block, i) => (
-        <Block key={i} owner={owner} block={block} ctx={ctx} />
+        <Block key={i} owner={owner} block={block} ctx={ctx} opened={opened} />
       ))}
     </div>
   );
@@ -170,10 +191,12 @@ function Block({
   owner,
   block,
   ctx,
+  opened,
 }: {
   owner: string;
   block: Anatomy;
   ctx: RowCtx;
+  opened: boolean;
 }) {
   if (block.kind === "schema") {
     return (
@@ -673,9 +696,20 @@ function Block({
                     </span>
                   ) : null}
                 </span>
-                <span className="mt-0.5 block text-[10px] leading-relaxed text-on-surface-variant">
-                  {s.detail}
-                </span>
+                {/* A step that has somewhere to go shows its TITLE and nothing
+                    else. Its `detail` is the level behind the click, and
+                    printing it here painted the next level onto this one — 226
+                    words on this card alone, measured, of which four paragraphs
+                    were the four children it already had.
+
+                    A step with no `under` keeps its line, because for that row
+                    there is no deeper level to defer to and the sentence is the
+                    whole fact. See LEVEL_WORD_BUDGET in lib/view.ts. */}
+                {s.under ? null : (
+                  <span className="mt-0.5 block text-[10px] leading-relaxed text-on-surface-variant">
+                    {s.detail}
+                  </span>
+                )}
               </button>
             </li>
           );
@@ -684,9 +718,39 @@ function Block({
     );
   }
 
+  return <Facts owner={owner} block={block} ctx={ctx} opened={opened} />;
+}
+
+/**
+ * Facts fold past FACTS_VISIBLE on a card nobody opened.
+ *
+ * The rest are not dropped — they are one click away, on the same card, and
+ * the count says exactly how many are waiting. A sibling card's job is to say
+ * WHAT it holds so the reader can choose it; enumerating every pair is the
+ * document behaviour this level is supposed to stop being.
+ */
+const FACTS_VISIBLE = 3;
+
+function Facts({
+  owner,
+  block,
+  ctx,
+  opened,
+}: {
+  owner: string;
+  block: Extract<Anatomy, { kind: "facts" }>;
+  ctx: RowCtx;
+  opened: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  // The opened card shows everything; a sibling folds unless the reader asked.
+  const folded = !opened && !expanded && block.rows.length > FACTS_VISIBLE;
+  const rows = folded ? block.rows.slice(0, FACTS_VISIBLE) : block.rows;
+  const hidden = block.rows.length - rows.length;
+
   return (
     <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
-      {block.rows.map((p) => {
+      {rows.map((p) => {
         const id = rowId(owner, p.label);
         const isLit = ctx.lit.has(id);
         return (
@@ -728,6 +792,28 @@ function Block({
           </button>
         );
       })}
+      {/* Nothing is thrown away: the count is the affordance, and the rows it
+          names are one click down on this same card. */}
+      {hidden > 0 ? (
+        <button
+          onClick={(e) => {
+            // The card behind this is itself clickable, and a real click
+            // bubbles — without this the card would collapse the level on the
+            // same gesture that expanded the facts. Same reason as the map and
+            // flow rows above.
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+          className="flex w-full items-center gap-1.5 border-t border-border-gray bg-surface-container-low px-3 py-1.5 text-left transition-colors hover:bg-surface-container"
+        >
+          <span className="font-mono text-[9.5px] text-muted-slate">
+            {hidden} more {hidden === 1 ? "fact" : "facts"}
+          </span>
+          <span className="ml-auto">
+            <Caret open={false} />
+          </span>
+        </button>
+      ) : null}
     </div>
   );
 }

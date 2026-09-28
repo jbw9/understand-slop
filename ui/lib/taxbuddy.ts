@@ -1493,6 +1493,352 @@ export const aiProvider: AiProvider =
         ],
       },
       {
+        id: "eng-math",
+        title: "Every formula, and one return end to end",
+        sub: "The actual arithmetic — not the names of the steps",
+        state: "derived",
+        col: 0,
+        row: 1,
+        detail:
+          "Each variable, the expression that produces it, and then a single real filer carried from a $3,500 W-2 to the $201 they owe. Every figure in the walkthrough is asserted by a passing golden test, so none of it is arithmetic done here.",
+        evidence: "lib/rules/income.ts:605, tests/golden/1040nr-scheduleOI.test.ts:217",
+        anatomy: [
+          {
+            kind: "map",
+            caption: "variable = expression",
+            rows: [
+              {
+                from: "wagesTaxable",
+                to: "round2(substantiatedBy1042S ? wagesGross : wagesGross − wagesTreatyExempt)",
+                state: "derived",
+              },
+              {
+                from: "wagesTreatyExempt",
+                to: "min(wagesGross, rule.exempt_amount ?? ∞) — 0 if the rule is expired or foreign-source-only",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 258,
+                    code: `  const wagesTreatyExempt = wagesExemptSubstantiatedBy1042S
+    ? Math.min(wageTreaty1042SReported, wagesTreatyApplies ? (wagesTreatyRule!.exempt_amount ?? Infinity) : 0)
+    : wagesTreatyApplies
+      ? Math.min(wagesGross, wagesTreatyRule!.exempt_amount ?? Infinity)
+      : 0;`,
+                    why: "The cap is a min against the treaty's own exempt_amount, and an uncapped article (null) becomes Infinity so the min yields the whole wage. That `?? Infinity` is why the source-restriction test has to run BEFORE it — otherwise an uncapped foreign-source-only article would exempt everything.",
+                  },
+                ],
+              },
+              {
+                from: "scholarshipTaxable",
+                to: "scholarship1042SReported − scholarshipTreatyExempt",
+                state: "derived",
+              },
+              {
+                from: "ECI (line 9)",
+                to: "round2(wagesTaxable + scheduleOneAdditionalIncome), where scheduleOneAdditionalIncome = scholarshipTaxable",
+                state: "derived",
+              },
+              {
+                from: "AGI (line 11)",
+                to: "round2(ECI − scheduleOneAdjustmentsToIncome), and adjustments are hardcoded 0",
+                state: "derived",
+              },
+              {
+                from: "deduction (line 14)",
+                to: "usesStandardDeduction ? 15750 : min(stateLocalWithheld, saltCap) + charity",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 548,
+                    code: `  const saltCap = profile.filingStatus === "married_nra" ? config.salt_cap_mfs : config.salt_cap_single;
+  const stateLocalTaxDeduction = Math.min(stateLocalTaxesWithheld, saltCap);
+  // Line 8 = 1b + 5 + 6 + 7; lines 6 (casualty) and 7 (other) aren't modeled.
+  const itemizedDeductions = round2(stateLocalTaxDeduction + charitableContributions);`,
+                    why: "SALT is capped at $40,000 single / $20,000 MFS before charity is added. Both figures come from the OBBBA, not Rev. Proc. 2024-40 — the config warns against \"correcting\" them back.",
+                  },
+                ],
+              },
+              {
+                from: "usesStandardDeduction",
+                to: "coverage.allows_standard_deduction && itemized < 15750 — true for exactly one country",
+                state: "derived",
+                under: [
+                  {
+                    kind: "facts",
+                    rows: [
+                      { label: "The only true row", value: "India — country_code IN, article 21(2), confidence verified", state: "derived" },
+                      { label: "Everyone else", value: "Itemizes, even when itemizing is worse, because the standard deduction isn't available to them at all", state: "derived" },
+                      { label: "Read off what", value: "The COUNTRY coverage row, not the scholarship rule — a filer with wages and no scholarship 1042-S used to miss it", state: "derived" },
+                    ],
+                  },
+                ],
+              },
+              {
+                from: "taxableIncome (line 15)",
+                to: "max(0, round2(AGI − deduction)) — clamped, so a deduction bigger than income gives 0, never negative",
+                state: "derived",
+              },
+              {
+                from: "bracketTax(x)",
+                to: "Σ over brackets of (min(x, ceiling) − floor) × rate, stopping once x ≤ floor",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 733,
+                    code: `// Standard marginal-bracket tax: each [floor, ceiling, rate] slice taxes only
+// the income that falls within it.
+function bracketTax(taxableIncome: number, brackets: readonly [number, number, number][]): number {
+  let tax = 0;
+  for (const [floor, ceiling, rate] of brackets) {
+    if (taxableIncome <= floor) break;
+    const taxedInBracket = Math.min(taxableIncome, ceiling) - floor;
+    tax += taxedInBracket * rate;
+  }
+  return tax;
+}`,
+                    why: "The whole marginal-rate idea in six lines. `min(income, ceiling) − floor` is the slice of income sitting inside this bracket, and the early break stops as soon as the brackets run past the income — so a $20,000 filer never touches the 37% tuple.",
+                  },
+                ],
+              },
+              {
+                from: "the 2025 brackets",
+                to: "7 tuples, single and MFS identical until the top one splits at 626,350 vs 375,800",
+                state: "derived",
+                under: [
+                  {
+                    kind: "bars",
+                    unit: "bracket floor (USD), single",
+                    rows: [
+                      { label: "10%", value: 0, display: "0 – 11,925", state: "derived" },
+                      { label: "12%", value: 11925, display: "11,925 – 48,475", state: "derived" },
+                      { label: "22%", value: 48475, display: "48,475 – 103,350", state: "derived" },
+                      { label: "24%", value: 103350, display: "103,350 – 197,300", state: "derived" },
+                      { label: "32%", value: 197300, display: "197,300 – 250,525", state: "derived" },
+                      { label: "35%", value: 250525, display: "250,525 – 626,350", state: "derived" },
+                      { label: "37%", value: 626350, display: "626,350 – ∞", state: "derived" },
+                    ],
+                  },
+                ],
+              },
+              {
+                from: "tax (line 16)",
+                to: "roundToDollar(bracketTax(x < 100000 ? tableMidpoint(x) : x))",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 774,
+                    code: `function taxForIncome(taxableIncome: number, brackets: readonly [number, number, number][]): number {
+  if (taxableIncome <= 0) return 0;
+  const lookupIncome = taxableIncome < 100000 ? taxTableRowMidpoint(taxableIncome) : taxableIncome;
+  return roundToDollar(bracketTax(lookupIncome, brackets));
+}`,
+                    why: "One ternary separates two legally distinct methods. Below $100k the IRS mandates its printed Tax Table, so the bracket formula is applied to the BAND MIDPOINT rather than the filer's actual income; at or above it, the Tax Computation Worksheet is the continuous formula.",
+                  },
+                ],
+              },
+              {
+                from: "dividendsTax",
+                to: "round2(dividendsGross × (treatyRate ?? 0.30))",
+                state: "derived",
+                under: [
+                  {
+                    kind: "map",
+                    caption: "where a treaty rate comes from",
+                    rows: [
+                      {
+                        from: "Indonesia",
+                        to: "0.15 — Art 11(2), the GENERAL column, deliberately not the 10% one",
+                        state: "derived",
+                        under: [
+                          {
+                            kind: "source",
+                            file: "lib/rules/data/2025/treatyRules.json",
+                            start: 2308,
+                            code: `      "country_code": "ID",
+      "income_type": "dividends",
+      "article": "11(2)",
+      "nec_treaty_rate": 0.15,
+      "notes": "IRS Tax Treaty Table 1, dividends paid by US corporations, GENERAL column (15). The qualifying-for-direct-dividend column (10) is deliberately NOT used: it applies to a corporate shareholder holding a threshold stake, whereas an F-1 student holding shares through a broker is a portfolio holder.",`,
+                            why: "A data row carrying its own reasoning. The 10% column exists and is wrong for this population, so the note records the rejected alternative — which is what stops someone 'optimising' the rate later.",
+                          },
+                        ],
+                      },
+                      { from: "no treaty row", to: "0.30 — the statutory NEC rate from the tax-year config", state: "derived" },
+                    ],
+                  },
+                ],
+              },
+              {
+                from: "capitalGainsTax",
+                to: "taxable ? round2(capitalGainsNet × 0.30) : 0, where taxable = daysPresent ≥ 183 AND net > 0",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 469,
+                    code: `      headline: capitalGainsTaxable
+        ? \`Present \${capitalGainsPresentDays} days this year (≥\${config.capital_gains_presence_days}), so your $\${capitalGainsNet} net capital gain is taxable at 30% on Schedule NEC.\`
+        : \`Present \${capitalGainsPresentDays} days this year (<\${config.capital_gains_presence_days}), so your capital gains/losses aren't taxable.\`,
+      amountUsd: capitalGainsTax || undefined,
+      detail: "IRC §871(a)(2): a nonresident alien's US-source capital gains are taxed only if present 183+ days in the tax year.",`,
+                    why: "The engine narrating its own arithmetic back to the filer, with the days, the threshold and the rate all interpolated from the same values it computed with — so the sentence cannot drift from the number.",
+                  },
+                ],
+              },
+              {
+                from: "totalTax (line 24)",
+                to: "round2(taxAfterCredits + necTax), where necTax = dividendsTax + capitalGainsTax",
+                state: "derived",
+              },
+              {
+                from: "refundOrDue (34/37)",
+                to: "round2(totalWithholding − totalTax) — positive is a refund",
+                state: "derived",
+              },
+              {
+                from: "round2",
+                to: "Math.round(v × 100) / 100 — applied at every step, not once at the end",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 725,
+                    code: `function sum(values: number[]): number {
+  return round2(values.reduce((total, value) => total + value, 0));
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}`,
+                    why: "Every intermediate is rounded to cents as it is produced, and `sum` rounds its own total. Rounding once at the end instead would let float drift accumulate across a dozen additions and land a cent off the printed form.",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            kind: "flow",
+            rows: [
+              {
+                n: 1,
+                title: "The filer",
+                detail: "Indonesian F-1, 3rd exempt year, present 300 days. W-2 $3,500 (box 2 $200). Scholarship 1042-S $12,000. Interest $50. Dividends $500 ($75 withheld). One stock lot: sold $2,000, cost $1,000. Charity $500.",
+                state: "derived",
+                under: [
+                  {
+                    kind: "facts",
+                    rows: [
+                      { label: "Why this filer", value: "The fixture exercises every income type at once, with values chosen so no two lines share a number", state: "derived" },
+                      { label: "Every figure below", value: "Asserted by tests/golden/1040nr-scheduleOI.test.ts — none of it is computed here", state: "derived" },
+                    ],
+                  },
+                ],
+              },
+              {
+                n: 2,
+                title: "Wages: 3,500 − 2,000 = 1,500",
+                detail: "Indonesia Art 19(1)(b)(iii) caps the wage exemption at $2,000/yr. min(3500, 2000) = 2000 exempt, so wagesTaxable = 1,500.",
+                state: "derived",
+              },
+              {
+                n: 3,
+                title: "Scholarship: 12,000 − 12,000 = 0",
+                detail: "Art 19(1)(b)(ii) is uncapped and carries no source restriction, so exempt_amount is null → Infinity → min(12000, ∞) = 12,000 exempt. scholarshipTaxable = 0.",
+                state: "derived",
+              },
+              {
+                n: 4,
+                title: "ECI = 1,500 + 0 = 1,500",
+                detail: "Adjustments are 0, so AGI is also 1,500.",
+                state: "derived",
+              },
+              {
+                n: 5,
+                title: "Deduction = 500 (itemized)",
+                detail: "Indonesia is not India, so no standard deduction. SALT withheld is 0, charity is 500 → itemized = 500. taxableIncome = max(0, 1500 − 500) = 1,000.",
+                state: "derived",
+              },
+              {
+                n: 6,
+                title: "Income tax = 101, not 100",
+                detail: "1,000 is under 100k, so the Tax Table applies: the $1,000–$1,025 row's midpoint is $1,012.50, × 10% = $101.25, rounded to $101. Taxing 1,000 directly would have given 100.",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "tests/golden/1040nr-scheduleOI.test.ts",
+                    start: 219,
+                    code: `    expect(income.taxableIncome).toBe(1000); // 1500 - 500 itemized deduction
+    // Tax Table lookup, not a flat 1000 * 10%: taxable income $1,000 falls in
+    // the $1,000-$1,025 row, taxed on its $1,012.50 midpoint (IRS mandates
+    // the table, not the continuous formula, below $100,000 taxable income).
+    expect(income.effectivelyConnectedTax).toBe(101); // 1012.50 * 10% = 101.25 -> rounds to 101`,
+                    why: "The one-dollar difference between the table and the formula, pinned by a test. This is the assertion that would fail if someone 'simplified' taxForIncome into a direct bracket calculation.",
+                  },
+                ],
+              },
+              {
+                n: 7,
+                title: "NEC tax = 75 + 300 = 375",
+                detail: "Dividends 500 × 15% (Indonesia Art 11(2)) = 75. Capital gain 2,000 − 1,000 = 1,000 net; present 300 days ≥ 183 so it is taxable at the flat 30% → 300.",
+                state: "derived",
+              },
+              {
+                n: 8,
+                title: "Total tax = 101 + 375 = 476",
+                detail: "The $50 of bank interest never enters: §871(i) exempts portfolio interest paid to a nonresident regardless of treaty.",
+                state: "derived",
+              },
+              {
+                n: 9,
+                title: "Withheld = 200 + 75 = 275",
+                detail: "W-2 box 2 plus the 1099-DIV box 4. The FICA on this W-2 — boxes 4 and 6, $217.00 and $50.75 — is deliberately NOT in this total: it is recovered on Form 843, not on this return.",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/rules/income.ts",
+                    start: 210,
+                    code: `  const ficaWithheldInError = sum(w2s.map((w2) => w2.box4 + w2.box6));`,
+                    why: "Social Security (box 4) and Medicare (box 6) summed together — the figure an F-1 in their exempt years should never have had withheld. It is surfaced as a finding and pointedly kept out of totalWithholding, because folding it into the refund would claim it on the wrong form.",
+                  },
+                ],
+              },
+              {
+                n: 10,
+                title: "refundOrDue = 275 − 476 = −201",
+                detail: "Negative, so the filer owes $201. The payout screen renders this same figure with the label \"You owe\" and never recomputes it.",
+                state: "derived",
+                under: [
+                  {
+                    kind: "source",
+                    file: "lib/payoutBreakdown.ts",
+                    start: 8,
+                    code: `// INVARIANT: this module performs no tax arithmetic. Every figure below is read
+// straight off IncomeEngineResult or off a source document's own boxes. Per
+// CLAUDE.md, no module may recompute a value the engine already produced. The
+// only additions are presentational subtotals that must equal an engine field,
+// and tests/golden/payoutBreakdown.test.ts asserts exactly that — if the rows
+// stop footing to refundOrDue, the screen is lying to the filer.`,
+                    why: "One engine, one set of numbers. The screen is forbidden from doing arithmetic precisely so it cannot disagree with the form being mailed — and a test enforces the footing rather than trusting the rule.",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         id: "eng-table",
         title: "Why the tax isn't just a multiplication",
         sub: "Below $100k the IRS uses a lookup table, not the brackets",

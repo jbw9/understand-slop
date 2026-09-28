@@ -708,3 +708,72 @@ the Next dev badge overlaps the key hints in development.
 **Breaks at scale:** the breadcrumb is one line. A path ten levels deep would
 need eliding in the middle, and `max-w-[min(680px,60vw)]` currently just
 truncates the last crumb.
+
+## D24 — A card shows what it contains, not the contents
+
+**Chose:** a row that has somewhere to go renders its TITLE only; its
+explanation moves to the level behind the click.
+**Beat:** shortening the prose in place, which was the obvious read of "it's
+very text-heavy".
+
+Measured, and the number is the argument:
+
+| level | words rendered at once |
+|---|---|
+| `extraction` | **732** |
+| `engine` | **1,085** |
+| `packet` | 560 |
+| `interview` | 467 |
+
+732 words is a three-minute read — two pages of prose — presented as one
+screen. Trimming sentences would have taken that to maybe 400 and changed
+nothing about why it is unreadable.
+
+**The actual defect is structural.** The card `BDA Parse` already has four real
+children: "Stage the PDF in S3", "Sign the request by hand", "Invoke, then
+poll", "Follow the pointer". It *also* printed all four inline with their full
+`detail` paragraphs — 240 words on one card. The next level was being painted
+onto the current one, so drilling revealed nothing that was not already on
+screen, and the level read as an essay in columns rather than a map.
+
+This is the failure the whole product is supposed to delete. D1 rejected a
+zoomable map in favour of question-answering, but a level that renders every
+answer at once is not answering a question — it is the wall of context the tool
+exists to replace. The user's own words: *"It's just like talking into a
+chatbot, right? It doesn't really help."*
+
+**Cost accepted:** more clicks to reach the same sentence, and a level now
+shows less than it knows. A reader who wants everything at once cannot get it.
+**Breaks at scale:** `LEVEL_WORD_BUDGET` is 120 against a fixture whose densest
+level is 1,085. If real analysis output is uniformly dense, the budget becomes
+a cap on what can be authored rather than a check on what is rendered — at
+which point the honest move is more levels, not smaller type.
+
+## D25 — Logos and diagrams are facts, drawn only where they are true
+
+**Chose:** hand-authored inline SVG — brand marks for real dependencies, and
+purpose-built figures where the arrangement IS the finding.
+**Beat:** an icon package (no network; npm cache is broken), and diagrams-only
+with no brand marks.
+
+The marks are not decoration. Every brand rendered is a real entry in the
+mapped repo's `package.json` — `@aws-sdk/client-bedrock-runtime`,
+`@supabase/supabase-js`, `openai`, `next`, `pdf-lib`, `zod` — and the fixture
+already names them in prose 19, 18 and 16 times respectively. A Supabase glyph
+says in one symbol what "Supabase Postgres, one wide row per filing" says in
+seven words, and a reader scanning ten cards for "where is the database" finds
+it without reading anything.
+
+The figures are held to D19's standard: an invented diagram is an invented
+arrow. A fan-out is drawn only where three legs genuinely run, a pipeline only
+where the stages are real. A card with nothing true to draw gets no shape.
+
+**Cost accepted:** hand-authored glyphs are simplified silhouettes, not the
+real corporate artwork, and they will look approximate to anyone who knows the
+brands well. Nine marks and four figures are also a maintenance surface that
+grows with every new technology a mapped repo uses.
+**Breaks at scale:** this does not generalise. A real run against an unknown
+repo would meet technologies with no authored glyph and no authored figure, and
+fall back to the neutral chip — so the visual richness that makes this board
+readable is exactly the part that is hand-made. The honest version is a mark
+registry keyed on package name, which is a project, not a file.

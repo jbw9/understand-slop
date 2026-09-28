@@ -116,3 +116,60 @@ export const STATE_MEANING = {
  * exists to prevent: it turns a weak claim into a confident-looking one.
  */
 export type Ordering = "sequence" | "set";
+
+/* ────────────────────────────────────────────────────────────────────
+   PROGRESSIVE DISCLOSURE — added after the Extraction level was measured
+   at 732 words on one screen (Tax Engine: 1,085).
+   ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * A card shows WHAT it contains, never the contents themselves.
+ *
+ * The defect, measured on `extraction`: the card `BDA Parse` already had four
+ * real children — "Stage the PDF in S3", "Sign the request by hand", "Invoke,
+ * then poll", "Follow the pointer" — AND printed all four inline with their
+ * full explanatory paragraphs, 240 words on one card. The next level was being
+ * painted onto the current one, so drilling revealed nothing new and the level
+ * read as an essay in columns.
+ *
+ * The rule: a step row on a card renders its TITLE and nothing else when it has
+ * somewhere to go. Its `detail` belongs to the level behind the click. A row
+ * with no child may keep one short line, because for that row there is no
+ * "deeper" to defer to.
+ *
+ * This is what makes a level a menu rather than a document, and it is the whole
+ * reason the tool is a map instead of a chat window.
+ */
+export const LEVEL_WORD_BUDGET = 120;
+
+/**
+ * Prose that may appear on a card that is NOT the one you opened to.
+ *
+ * `detail` on a sibling card is the single largest contributor to the word
+ * count, and it is always answering a question the reader has not asked yet.
+ * Zero means: siblings show title, blurb, shape and step titles only.
+ */
+export const SIBLING_PROSE_LINES = 0;
+
+/**
+ * Every card earns a SHAPE: something to recognise before reading anything.
+ *
+ * "Right now it's pretty boring to look at and it's pretty hard to understand
+ * what's going on." A wall of uniform text gives the eye no purchase, so the
+ * reader has to parse sentences to find out whether a card is even relevant.
+ *
+ * A shape is one of:
+ *  - `marks`  brand glyphs for the real technologies involved (Bedrock, S3,
+ *             Supabase, OpenAI). These are FACTS — every one is a dependency in
+ *             the mapped repo's package.json, not decoration.
+ *  - `figure` a small purpose-built diagram where the arrangement IS the
+ *             finding: a fan-out to three models, a pipeline, a gate.
+ *  - `count`  a single number with a unit, where magnitude is the point.
+ *
+ * A card with nothing true to draw gets none. An invented diagram is the same
+ * failure as an invented arrow (D19).
+ */
+export type Shape =
+  | { kind: "marks"; ids: string[]; note?: string }
+  | { kind: "figure"; id: string; note?: string }
+  | { kind: "count"; value: string; unit: string };

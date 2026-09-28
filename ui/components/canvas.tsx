@@ -996,6 +996,12 @@ function Branch({
         // would mean backing out a level just to read the next one. The row you
         // picked stays lit, so the list doubles as your position marker.
         detail={!root && (!showChildren || rowOpened)}
+        // SIBLING_PROSE_LINES is 0: only the card the reader actually opened to
+        // spends words on a paragraph. On the five siblings beside it that
+        // prose answers a question nobody has asked yet, and measured 184 of
+        // the level's words. They keep their title, blurb, shape and row
+        // titles — enough to choose from, which is all a menu owes you.
+        opened={isLeafOfPath}
         ctx={rowCtx}
         // Openable is judged on the AUTHORED children, not the filtered ones.
         // `members` hides unopened row children, so a card whose only children
@@ -1086,6 +1092,7 @@ function NodeCard({
   inert,
   selected,
   detail,
+  opened,
   aside,
   ctx,
   onClick,
@@ -1097,6 +1104,8 @@ function NodeCard({
   inert?: boolean;
   selected?: boolean;
   detail?: boolean;
+  /** True only on the card the reader opened to. Gates prose; see view.ts. */
+  opened?: boolean;
   /**
    * No edge touches this card, and that is the finding rather than a gap.
    * Drawn as a card standing beside the flow instead of one that fell out of
@@ -1189,14 +1198,20 @@ function NodeCard({
             className="overflow-hidden"
           >
             <div className="mt-2 border-t border-border-gray pt-2">
-              {node.detail ? (
+              {node.detail && opened ? (
                 <p className="text-[10.5px] leading-relaxed text-on-surface-variant">
                   {node.detail}
                 </p>
               ) : null}
               {node.anatomy && ctx ? (
-                <div className={cn(node.detail && "mt-2.5")}>
-                  <AnatomyView owner={node.id} blocks={node.anatomy} ctx={ctx} />
+                <div className={cn(node.detail && opened && "mt-2.5")}>
+                  <AnatomyView
+                    owner={node.id}
+                    blocks={node.anatomy}
+                    ctx={ctx}
+                    opened={opened}
+                    shape={node.shape}
+                  />
                 </div>
               ) : null}
               {/* Provenance, always. A claim with no location is the failure

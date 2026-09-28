@@ -73,11 +73,15 @@ const AUTHORED: Node[] = [
       files: 4,
     },
     group: { ordering: "set", note: "The wording and the stamp — what is agreed, and where it is recorded." },
+    // The gate IS the finding: a modal standing between the filer and the first
+    // upload, with the public /check funnel routing around it. Drawn, because
+    // the arrangement is what a paragraph kept failing to convey.
+    shape: { kind: "figure", id: "consent-gate", note: "Wizard passes through it; /check does not" },
     state: "derived",
     col: 0,
     row: 0,
     detail:
-      "US law forbids a preparer disclosing return information without written consent naming who receives it. taxBuddy names exactly two companies. That sentence is why the AI provider default is a compliance control rather than a preference.",
+      "US law forbids disclosing return information without written consent naming who receives it. taxBuddy names exactly two companies — which is why the AI provider default is a compliance control.",
     evidence: "components/consent-modal.tsx, lib/config/consent.ts",
     children: [
       {
@@ -256,7 +260,7 @@ const AUTHORED: Node[] = [
     col: 0,
     row: 0,
     detail:
-      "taxBuddy files Form 1040-NR, which is only correct for a nonresident. The whole product rests on this gate — and the IRS's actual residency test, the 3-year weighted substantial-presence formula, is not in the codebase.",
+      "Form 1040-NR is only correct for a nonresident, so the whole product rests on this gate — and the IRS's actual residency test is not in the codebase.",
     evidence: "lib/rules/eligibility.ts",
     children: [
       {
@@ -269,7 +273,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 0,
         detail:
-          "An F-1 student is an 'exempt individual' — exempt from counting days toward residency — for five calendar years. Year six, they are a resident and this product no longer applies to them.",
+          "An F-1 student is an 'exempt individual' — exempt from counting days toward residency — for five calendar years. In year six they are a resident, and this product no longer applies.",
         evidence: "lib/rules/eligibility.ts:208",
         anatomy: [
           {
@@ -351,7 +355,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 1,
         detail:
-          "The IRS residency test is a weighted three-year sum: all of this year's days, a third of last year's, a sixth of the year before. 183 or more and you are a resident. That formula does not exist in this repository.",
+          "The IRS test is a weighted three-year sum — this year's days, a third of last year's, a sixth of the year before, 183 or more means resident. That formula is not in this repository.",
         evidence: "grep: no 1/3, no 1/6, no weighted sum in lib/rules/",
         anatomy: [
           {
@@ -447,7 +451,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 2,
         detail:
-          "Every exempt individual files this, income or not. Lines 11 and 12 are the five-year rule written onto paper — and line 12 is computed from the same count as the gate so the two can never contradict.",
+          "Every exempt individual files this, income or not. Lines 11 and 12 are the five-year rule on paper, and line 12 uses the gate's own count so the two cannot contradict.",
         evidence: "lib/rules/forms/f8843.ts:85",
         anatomy: [
           {
@@ -504,7 +508,7 @@ const AUTHORED: Node[] = [
     col: 0,
     row: 0,
     detail:
-      "Every step that uploads a document is followed by questions that don't depend on it, so the parse runs while the filer types. The ordering of this wizard is a performance decision written into a config file.",
+      "Every upload step is followed by questions that don't depend on it, so the parse runs while the filer types. The wizard's order is a performance decision in a config file.",
     evidence: "lib/config/onboarding.ts, lib/client/incomeExtractionQueue.ts",
     children: [
       {
@@ -584,7 +588,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 1,
         detail:
-          "Uploads are fire-and-forget. A module-level registry tracks what is in flight so a later step can ask 'may I advance yet' — and it is deliberately scoped to the JS context, because a reload kills the fetches too.",
+          "Uploads are fire-and-forget. A module-level registry tracks what is in flight so a later step can ask 'may I advance yet', scoped to the JS context because a reload kills the fetches too.",
         evidence: "lib/client/incomeExtractionQueue.ts:19",
         anatomy: [
           {
@@ -673,7 +677,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 2,
         detail:
-          "Answer yes, drop a W-2, change to no before the parse lands. The clear was gated on the data having already arrived — which is precisely false during the window that matters. The read committed wages after the filer said they had none.",
+          "Answer yes, drop a W-2, change to no before the parse lands. The clear was gated on data having already arrived — false in exactly that window, so the read committed wages the filer had disclaimed.",
         evidence: "app/(protected)/onboarding/interview/page.tsx:180",
         anatomy: [
           {
@@ -740,7 +744,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 3,
         detail:
-          "Each upload computed [...items, extracted] from the state captured when it started. Two documents dropped together meant the second save erased the first — after it had been extracted and paid for.",
+          "Each upload computed [...items, extracted] from the state captured when it started. Two dropped together meant the second save erased the first, after it was extracted and paid for.",
         evidence: "lib/client/useIncomeUploads.ts:25",
         anatomy: [
           {
@@ -807,12 +811,16 @@ const AUTHORED: Node[] = [
       files: 37,
     },
     group: { ordering: "sequence" },
+    // The fan-out to three models is the whole design, and it is the one thing
+    // a sentence could never show: which model reads which input, and that two
+    // of the three share a single upstream parse.
+    shape: { kind: "figure", id: "three-legs", note: "haiku·markdown, minimax·markdown, haiku·PDF" },
     state: "partial",
     alarm: true,
     col: 0,
     row: 0,
     detail:
-      "A PDF goes to AWS Bedrock Data Automation for markdown, then three independent model legs read that markdown into typed fields. They are compared, and disagreements are supposed to be logged. The ledger reports zero rows against fourteen filings.",
+      "BDA turns a PDF into markdown; three model legs read it into typed fields and are compared. Disagreements are supposed to be logged — the ledger reports zero rows against fourteen filings.",
     evidence: "lib/parsing/bdaParse.ts, lib/extraction/, lib/ai/",
     children: [
       {
@@ -822,11 +830,15 @@ const AUTHORED: Node[] = [
         footprint: { dirs: ["lib/parsing/bdaParse.ts"], files: 1 },
         summary: "9 steps: stage, sign, invoke, poll, then two pointer hops",
         group: { ordering: "sequence" },
+        // The stage → sign → invoke → poll → two-hop pipeline, drawn. Marks
+        // rather than a count because the surprise is WHICH services a file
+        // with no Bedrock SDK still reaches: S3 and Bedrock, hand-signed.
+        shape: { kind: "figure", id: "bda-pipeline", note: "306 lines, no Bedrock SDK" },
         state: "derived",
         col: 0,
         row: 0,
         detail:
-          "There is no SDK for this. 306 lines sign their own AWS requests, stage the PDF in S3, poll for completion, then follow a pointer inside a pointer to find the output.",
+          "No SDK for this. 306 lines sign their own AWS requests, stage the PDF in S3, poll, then follow a pointer inside a pointer to the output.",
         evidence: "lib/parsing/bdaParse.ts",
         anatomy: [
           {
@@ -939,11 +951,15 @@ const AUTHORED: Node[] = [
         sub: "Two models read the markdown, one reads the raw PDF",
         footprint: { dirs: ["lib/ai/", "lib/extraction/"], files: 6 },
         group: { ordering: "set", note: "Three legs run concurrently — no leg waits for another." },
+        // The card the user asked for by name. The rows below still say what
+        // each leg reads; the figure says which of them share an input, which
+        // is the fact that explains why a third leg exists at all.
+        shape: { kind: "figure", id: "three-legs", note: "A and B share BDA's markdown; only C sees the PDF" },
         state: "derived",
         col: 0,
         row: 1,
         detail:
-          "The same document is read three independent ways. Agreement is evidence; disagreement is the signal that a parser dropped something.",
+          "The same document read three independent ways. Agreement is evidence; disagreement is the signal that a parser dropped something.",
         evidence: "lib/ai/bedrockConfig.ts, lib/extraction/",
         anatomy: [
           {
@@ -997,7 +1013,7 @@ const AUTHORED: Node[] = [
         col: 0,
         row: 2,
         detail:
-          "Each document type has a hand-written JSON Schema whose field descriptions the model reads, plus a Zod schema that re-validates the reply. The two are maintained in parallel with no generation between them.",
+          "Each document type has a hand-written JSON Schema whose field descriptions the model reads, plus a Zod schema re-validating the reply. Nothing generates either from the other.",
         evidence: "lib/ai/extractionSpecs.ts",
         anatomy: [
           {
@@ -1057,11 +1073,14 @@ const AUTHORED: Node[] = [
         sub: "Arithmetic footing check, then a re-read off a second text layer",
         footprint: { dirs: ["lib/extraction/resolve.ts", "lib/parsing/pdfPages.ts"], files: 2 },
         group: { ordering: "sequence" },
+        // Rungs, in order, with the escalation between them. ResolvedBy names
+        // five: primary, secondary, arithmetic, source-text, filer.
+        shape: { kind: "figure", id: "resolution-ladder", note: "primary · secondary · arithmetic · source-text · filer" },
         state: "derived",
         col: 0,
         row: 3,
         detail:
-          "Before comparing legs, each read is checked against itself: do the parts sum to the total? If not, a different text extractor gets a turn.",
+          "Each read is first checked against itself: do the parts sum to the total? If not, a different text extractor gets a turn.",
         evidence: "lib/extraction/resolve.ts",
         anatomy: [
           {
@@ -1106,12 +1125,15 @@ const AUTHORED: Node[] = [
           files: 3,
         },
         group: { ordering: "set", note: "The write path and the read path of a ledger with no rows." },
+        // Zero is the finding. A number nobody can see is a sentence; drawn, it
+        // is the first thing on the card.
+        shape: { kind: "count", value: "0", unit: "rows, against 14 filings" },
         state: "partial",
         alarm: true,
         col: 0,
         row: 4,
         detail:
-          "When legs disagree the difference is meant to be written to a table for review. docs/STATUS.md reports zero rows against fourteen filings — and five nested swallows mean a broken writer and a genuinely quiet extractor look identical.",
+          "Disagreements are meant to be written to a table for review. Five nested swallows mean a broken writer and a genuinely quiet extractor look identical.",
         evidence: "lib/extraction/disagreementLog.ts:85",
         anatomy: [
           {
@@ -1162,12 +1184,16 @@ const AUTHORED: Node[] = [
           files: 3,
         },
         group: { ordering: "set", note: "Two comments and the constant that contradicts them." },
+        // Both providers are real dependencies and both are reachable from this
+        // one ternary — which is the entire point of the card. The note carries
+        // which one unset actually selects.
+        shape: { kind: "marks", ids: ["bedrock", "openai"], note: "AI_PROVIDER unset ⇒ bedrock" },
         state: "partial",
         alarm: true,
         col: 0,
         row: 5,
         detail:
-          "Unset AI_PROVIDER resolves to Bedrock, and the default was flipped specifically to keep the consent promise true. Two files still carry comments saying it lands on OpenAI. The finding is the stale comment, not the egress.",
+          "Unset AI_PROVIDER resolves to Bedrock, flipped specifically to keep the consent promise true. Two files still say it lands on OpenAI. The finding is the stale comment.",
         evidence: "lib/ai/bedrockConfig.ts:22",
         anatomy: [
           {
@@ -1258,7 +1284,7 @@ export const aiProvider: AiProvider =
     col: 0,
     row: 0,
     detail:
-      "Profile collects the filer's legal identity and SSN/ITIN. Its Continue button holds the whole flow until every income document has finished reading — because the next screen states a refund, and a refund computed from a half-parsed case file is worse than a slow one.",
+      "Collects legal identity and SSN/ITIN. Continue holds the flow until every income document has finished reading, because the next screen states a refund and a half-parsed one is worse than a slow one.",
     evidence: "app/(protected)/onboarding/profile/page.tsx, app/api/profile/route.ts",
     children: [
       {
@@ -1459,7 +1485,7 @@ export const aiProvider: AiProvider =
         col: 0,
         row: 2,
         detail:
-          "Unsaved form input is kept per-tab so a refresh doesn't lose it, deliberately instead of a server round-trip. The watched draft covers every field, so the SSN/ITIN is in it until Continue.",
+          "Unsaved input is kept per-tab so a refresh doesn't lose it, deliberately instead of a server round-trip. The draft watches every field, so the SSN/ITIN is in it until Continue.",
         evidence: "lib/client/useSessionFormDraft.ts:5",
         anatomy: [
           {
@@ -1487,11 +1513,15 @@ export const aiProvider: AiProvider =
     sub: "One straight-line pass from W-2 box 1 to the number on line 34",
     footprint: { dirs: ["lib/rules/", "lib/rules/forms/", "lib/rules/data/2025/"], files: 17 },
     group: { ordering: "set", note: "The path, the formulas behind it, and the two tables it reads." },
+    // No marks: lib/rules/ imports no third-party library at all — the whole
+    // engine is plain TypeScript over two JSON tables. The magnitude is the
+    // fact, so it gets a count rather than a borrowed logo.
+    shape: { kind: "count", value: "563", unit: "lines, one straight path, no branching" },
     state: "derived",
     col: 0,
     row: 0,
     detail:
-      "computeIncomeEngine is 563 lines of ordered assignments with no branching on filer type. Every dollar follows one path, and each line of that path corresponds to a numbered line on Form 1040-NR.",
+      "computeIncomeEngine is 563 lines of ordered assignments with no branching on filer type. Every dollar follows one path, each step naming its Form 1040-NR line.",
     evidence: "lib/rules/income.ts:160",
     children: [
       {
@@ -1634,7 +1664,7 @@ export const aiProvider: AiProvider =
         col: 0,
         row: 1,
         detail:
-          "Each variable, the expression that produces it, and then a single real filer carried from a $3,500 W-2 to the $201 they owe. Every figure in the walkthrough is asserted by a passing golden test, so none of it is arithmetic done here.",
+          "Each variable and the expression producing it, then one real filer carried from a $3,500 W-2 to the $201 owed. Every figure is asserted by a passing golden test.",
         evidence: "lib/rules/income.ts:605, tests/golden/1040nr-scheduleOI.test.ts:217",
         anatomy: [
           {
@@ -1982,7 +2012,7 @@ function round2(value: number): number {
         col: 0,
         row: 1,
         detail:
-          "For taxable income under $100,000 the IRS publishes a table in $50 bands, and the tax for a band is the bracket tax at its MIDPOINT. Applying the brackets directly gives a different number — and the return would be wrong.",
+          "Under $100,000 the IRS publishes a table in $50 bands, and a band's tax is the bracket tax at its MIDPOINT. Applying the brackets directly gives a different, wrong number.",
         evidence: "lib/rules/income.ts:751",
         anatomy: [
           {
@@ -2066,12 +2096,16 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
           files: 6,
         },
         group: { ordering: "set", note: "Two ways of slicing the same 142-row table." },
+        // Counted directly over treatyRules.json: 142 rules, 15 confidence
+        // "verified". The `parts` block below splits it; the count says how big
+        // the thing being split is before any of it is read.
+        shape: { kind: "count", value: "142", unit: "treaty rows · 15 verified" },
         state: "partial",
         alarm: true,
         col: 0,
         row: 2,
         detail:
-          "Treaty benefits come from a JSON table, not from code. Fifteen rows have been checked against the treaty text; the other 127 are marked provisional and are used anyway.",
+          "Treaty benefits come from a JSON table, not from code. 15 rows are checked against the treaty text; the other 127 are provisional and used anyway.",
         evidence: "lib/rules/treatyRules.json",
         anatomy: [
           {
@@ -2177,11 +2211,15 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       files: 31,
     },
     group: { ordering: "sequence" },
+    // pdf-lib does the AcroForm filling and the flattening in lib/pdf/. One
+    // mark, because it is the only library in this branch — the seven IRS
+    // templates are checked-in PDFs, not a dependency.
+    shape: { kind: "marks", ids: ["pdf"], note: "7 IRS templates, filled by field name and flattened" },
     state: "partial",
     col: 0,
     row: 0,
     detail:
-      "The engine's numbers become strings, the strings become AcroForm field values, and the pages are stacked in the order the IRS asks paper to be assembled. Printing it and discarding page 1 leaves a ready envelope.",
+      "Engine numbers become strings, strings become AcroForm field values, and pages stack in IRS attachment order. Print it, discard page 1, and the envelope is ready.",
     evidence: "lib/server/generateReturnForms.ts, lib/pdf/",
     children: [
       {
@@ -2350,7 +2388,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
         col: 0,
         row: 2,
         detail:
-          "Schedule NEC's line 16 has five printed rows. Lot six onward goes to a continuation sheet drawn from scratch — and the number 5 is declared independently in two files, with two more hardcoded copies bypassing both.",
+          "Line 16 has five printed rows; lot six onward goes to a continuation sheet. The number 5 is declared independently in two files, with two more hardcoded copies bypassing both.",
         evidence: "lib/server/generateReturnForms.ts:28, lib/rules/forms/scheduleNEC.ts:9",
         anatomy: [
           {
@@ -2424,7 +2462,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
         col: 0,
         row: 3,
         detail:
-          "The IRS asks W-2s and 1042-S at the front unconditionally, and a 1099 only when tax was withheld. Those rules are an object whose key order IS the stacking order — and one document type has no entry at all.",
+          "W-2s and 1042-S travel unconditionally, a 1099 only when tax was withheld. Those rules are an object whose key order IS the stacking order — and one document type has no entry.",
         evidence: "lib/server/filingAttachments.ts:39",
         anatomy: [
           {
@@ -2539,7 +2577,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
     col: 0,
     row: 0,
     detail:
-      "A static page that takes documents from anyone, runs the same tax engine behind hardcoded assumptions, and blurs the answer until you sign up. It is the product's own name for this page.",
+      "A static page that takes documents from anyone, runs the same tax engine behind hardcoded assumptions, and blurs the answer until you sign up.",
     evidence: "public/check.html, lib/check/, app/api/check/",
     children: [
       {
@@ -2620,7 +2658,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
         col: 0,
         row: 1,
         detail:
-          "Upload a filed 1040-NR and it is read once, then diffed against what the engine would have written. The mapping is the same one used to FILL those lines, so grading and filling cannot drift.",
+          "A filed 1040-NR is read once, then diffed against what the engine would have written. The mapping is the one used to FILL those lines, so grading and filling cannot drift.",
         evidence: "lib/check/f1040nrScoring.ts:113",
         anatomy: [
           {
@@ -2688,11 +2726,13 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
         sub: "MAX_REVEAL = 2 findings shown; the rest is a CSS blur",
         footprint: { dirs: ["public/check.html"], files: 1 },
         group: { ordering: "set", note: "What is shown and what is blurred, decided per finding." },
+        // The whole conversion mechanic is one integer, declared in the page.
+        shape: { kind: "count", value: "2", unit: "mismatches revealed; the rest blurred" },
         state: "partial",
         col: 0,
         row: 2,
         detail:
-          "Matched lines are free. The first two mismatches show real numbers; the rest keep their sign colour and lose their magnitude. The blurred values are real text in the DOM.",
+          "Matched lines are free. The first two mismatches show real numbers; the rest keep their sign colour and lose their magnitude, as text still in the DOM.",
         evidence: "public/check.html:751",
         anatomy: [
           {
@@ -2746,7 +2786,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
         col: 0,
         row: 3,
         detail:
-          "A fingerprint module, a migration, an index, an RLS posture and a session header all exist. Nothing sends the header, the migration is unapplied, and the route's own comment still describes the system as active.",
+          "A fingerprint module, a migration, an index, an RLS posture and a session header all exist. Nothing sends the header, the migration is unapplied, and the route still calls it active.",
         evidence: "lib/check/fingerprint.ts, docs/STATUS.md:186",
         anatomy: [
           {
@@ -2778,11 +2818,15 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       files: 15,
     },
     group: { ordering: "set", note: "One row, one column on it, two side tables, and a bucket." },
+    // Both marks are earned separately: @supabase/ssr and @supabase/supabase-js
+    // are the only clients in lib/supabase/, and the storage is Postgres —
+    // JSONB columns and 10 checked-in SQL migrations.
+    shape: { kind: "marks", ids: ["supabase", "postgres"], note: "RLS by user · 10 migrations" },
     state: "partial",
     col: 0,
     row: 0,
     detail:
-      "One row per filer per tax year, with the wizard's answers held as JSONB columns rather than normalised tables. Every step above writes into it, and the packet cache hashes ten of its columns.",
+      "One row per filer per tax year, the wizard's answers held as JSONB columns rather than normalised tables. The packet cache hashes ten of them.",
     evidence: "supabase/migrations/, lib/server/engineContext.ts",
     children: [
       {
@@ -3074,7 +3118,7 @@ export const E0: Edge[] = [
 
 /** The rows of one anatomy block that carry `under`, as {key, label, blocks}. */
 function deepRows(blocks: Anatomy[]) {
-  const out: { key: string; label: string; sub?: string; under: Anatomy[] }[] = [];
+  const out: { key: string; label: string; sub?: string; detail?: string; under: Anatomy[] }[] = [];
   for (const b of blocks) {
     if (b.kind === "map") {
       for (const r of b.rows) {
@@ -3086,7 +3130,12 @@ function deepRows(blocks: Anatomy[]) {
       }
     } else if (b.kind === "flow") {
       for (const r of b.rows) {
-        if (r.under) out.push({ key: String(r.n), label: r.title, under: r.under });
+        // `detail` rides along. The card no longer renders a step's paragraph
+        // when that step has somewhere to go (D24) — so if it does not land on
+        // the child it lands nowhere, which is content present in the file and
+        // invisible in the UI. That is the exact failure this tool exists to
+        // find, and it stayed green through tsc and lint.
+        if (r.under) out.push({ key: String(r.n), label: r.title, detail: r.detail, under: r.under });
       }
     }
   }
@@ -3126,6 +3175,7 @@ function withRowChildren(nodes: Node[]): Node[] {
             // "what belongs to what" question. The generic "what happens to
             // it" it replaces said nothing on all 93.
             sub: r.sub ?? `Inside ${n.title}`,
+            detail: r.detail,
             state: "derived",
             col: 0,
             row: authored.length + i,

@@ -777,3 +777,47 @@ repo would meet technologies with no authored glyph and no authored figure, and
 fall back to the neutral chip — so the visual richness that makes this board
 readable is exactly the part that is hand-made. The honest version is a mark
 registry keyed on package name, which is a project, not a file.
+
+## D26 — A figure renders at its designed width or it is decoration
+
+**Chose:** `minWidth: FIG_W` on every figure, letting the card column give way.
+**Beat:** `width: 100%` inside the anatomy column, which is what shipped.
+
+Measured on the Extraction level: figures authored at a 240x120 viewBox
+rendered **113px wide**, scaling their 6.5px labels to an effective **5.6px**.
+A diagram whose text cannot be read is exactly the decoration D25 says these
+must never be — it occupies the space of a finding and delivers none of it.
+After the fix they render at 206px and are legible at the reading zoom.
+
+**Found only by measuring in the browser.** `tsc` and `eslint` were green with
+the figures at half size, and a screenshot alone reads as "the diagrams are a
+bit small" rather than "their labels are at 5.6px". The number is what made it
+actionable.
+
+**Cost accepted:** a card containing a figure is now at least 240px wide plus
+padding, so figures set a floor on card width that text-only cards do not pay.
+**Breaks at scale:** two figures side by side in one card, or a figure inside a
+deeply nested row, would both overflow. Nothing authors that today.
+
+## D27 — The deferred paragraph has to land somewhere
+
+**Chose:** carry `Step.detail` through `deepRows` onto the synthesized child
+node.
+**Beat:** leaving it, which is what D24's first implementation did.
+
+D24 stopped a card rendering a step's paragraph when that step has somewhere to
+go. But `withRowChildren` never copied `Step.detail` onto the child it builds,
+so the paragraph was rendered on the parent, suppressed there, and never picked
+up below: **content present in the fixture and invisible in the entire UI**.
+
+That is the precise failure this project exists to find, produced by this
+project, and it stayed green through `tsc` and `eslint` — the same class as
+D9's four silent no-op clicks. It was caught by a builder reading its own work
+rather than by any check.
+
+**Cost accepted:** row children now carry both a `sub` and a `detail`, which on
+a `map` row can restate the same fact twice if an author writes both.
+**Breaks at scale:** every future "defer this to the level below" change has
+the same hazard — suppression and re-rendering live in different files
+(`anatomy.tsx` decides, `taxbuddy.ts` carries), and nothing checks that what
+one hides the other shows.

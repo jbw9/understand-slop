@@ -61,8 +61,18 @@ const AUTHORED: Node[] = [
      means → the wording itself → the legal determination → WISP Attachment G. */
   {
     id: "consent",
-    title: "Agreeing to be read",
-    sub: "IRS §7216 disclosure, before anything is uploaded",
+    title: "Consent",
+    sub: "IRS §7216 disclosure, shown before any document is uploaded",
+    footprint: {
+      dirs: [
+        "components/consent-modal.tsx",
+        "lib/config/consent.ts",
+        "app/api/consent/",
+        "supabase/migrations/",
+      ],
+      files: 4,
+    },
+    group: { ordering: "set", note: "The wording and the stamp — what is agreed, and where it is recorded." },
     state: "derived",
     col: 0,
     row: 0,
@@ -72,8 +82,10 @@ const AUTHORED: Node[] = [
     children: [
       {
         id: "consent-wording",
-        title: "What the filer agrees to",
-        sub: "The panel text, and the promise inside it",
+        title: "Disclosure Text",
+        sub: "The panel wording, and the two companies it names as recipients",
+        footprint: { dirs: ["components/consent-modal.tsx", "WISP.md"], files: 2 },
+        group: { ordering: "set", note: "The clauses of one panel; a filer reads them together." },
         state: "derived",
         col: 0,
         row: 0,
@@ -128,8 +140,17 @@ const AUTHORED: Node[] = [
       },
       {
         id: "consent-once",
-        title: "Stamped once, never re-asked",
-        sub: "POST /api/consent · write-once columns",
+        title: "Consent Stamp",
+        sub: "POST /api/consent writes a timestamp and version, write-once",
+        footprint: {
+          dirs: [
+            "app/api/consent/route.ts",
+            "lib/config/consent.ts",
+            "supabase/migrations/",
+          ],
+          files: 3,
+        },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 1,
@@ -218,8 +239,18 @@ const AUTHORED: Node[] = [
      that is absent → Form 8843's lines → the source. */
   {
     id: "eligibility",
-    title: "Can we even file for you",
-    sub: "The five-year rule, and the one test that isn't implemented",
+    title: "Eligibility",
+    sub: "The five-year rule — and the residency test that is not implemented",
+    footprint: {
+      dirs: [
+        "lib/rules/",
+        "lib/pdf/fieldMaps/",
+        "app/api/eligibility/",
+        "app/(protected)/onboarding/",
+      ],
+      files: 7,
+    },
+    group: { ordering: "set", note: "The rule that is implemented, the one that is not, and the form that proves it." },
     state: "partial",
     alarm: true,
     col: 0,
@@ -230,8 +261,10 @@ const AUTHORED: Node[] = [
     children: [
       {
         id: "elig-rule",
-        title: "The five-year rule",
-        sub: "EXEMPT_YEAR_LIMIT = 5 · the gate is >",
+        title: "Five-Year Rule",
+        sub: "EXEMPT_YEAR_LIMIT = 5, and the gate compares with > not >=",
+        footprint: { dirs: ["lib/rules/eligibility.ts"], files: 1 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 0,
@@ -309,8 +342,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "elig-missing",
-        title: "The test that isn't here",
-        sub: "Substantial presence — not implemented",
+        title: "Substantial Presence",
+        sub: "The IRS residency formula is absent from the codebase",
+        footprint: { dirs: ["lib/rules/"], files: 7 },
+        group: { ordering: "set", note: "Two rewrites and a source, each answering a different question." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -397,8 +432,17 @@ const AUTHORED: Node[] = [
       },
       {
         id: "elig-8843",
-        title: "Form 8843, line by line",
-        sub: "The form that proves the exemption",
+        title: "Form 8843",
+        sub: "The form that proves the exemption the gate relies on",
+        footprint: {
+          dirs: [
+            "lib/rules/forms/f8843.ts",
+            "lib/pdf/fieldMaps/f8843.ts",
+            "app/api/documents/generate/f8843/",
+          ],
+          files: 3,
+        },
+        group: { ordering: "set", note: "Form lines, each fed from a different fact." },
         state: "derived",
         col: 0,
         row: 2,
@@ -443,8 +487,19 @@ const AUTHORED: Node[] = [
      queue → the cancel race → the source. */
   {
     id: "income-docs",
-    title: "Handing over the documents",
-    sub: "Upload order is a latency budget, not a narrative",
+    title: "Interview",
+    sub: "The upload wizard: five stages ordered to hide each parse",
+    footprint: {
+      dirs: [
+        "lib/client/",
+        "lib/config/",
+        "app/(protected)/onboarding/",
+        "components/onboarding/",
+        "app/api/documents/",
+      ],
+      files: 20,
+    },
+    group: { ordering: "set", note: "The stage order, then three separate defects in the upload machinery." },
     state: "derived",
     col: 0,
     row: 0,
@@ -454,8 +509,10 @@ const AUTHORED: Node[] = [
     children: [
       {
         id: "inc-order",
-        title: "Why the steps are in this order",
-        sub: "5 stages, each hiding the previous one's parse",
+        title: "Stage Order",
+        sub: "Five stages, each one hiding the previous stage's parse latency",
+        footprint: { dirs: ["lib/config/onboarding.ts", "app/(protected)/onboarding/"], files: 6 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 0,
@@ -519,8 +576,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "inc-queue",
-        title: "The client-side queue",
-        sub: "Module state that outlives every component",
+        title: "Upload Queue",
+        sub: "Module-level state that outlives every component that reads it",
+        footprint: { dirs: ["lib/client/incomeExtractionQueue.ts"], files: 1 },
+        group: { ordering: "set", note: "Three independent behaviours of the same module-level registry." },
         state: "derived",
         col: 0,
         row: 1,
@@ -605,8 +664,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "inc-cancel",
-        title: "The race that wrote a wrong return",
-        sub: "A guard that was false exactly when it mattered",
+        title: "Cancel Race",
+        sub: "A guard that read false exactly when it needed to be true",
+        footprint: { dirs: ["app/(protected)/onboarding/interview/page.tsx"], files: 1 },
+        group: { ordering: "sequence" },
         state: "partial",
         alarm: true,
         col: 0,
@@ -671,8 +732,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "inc-lost",
-        title: "The lost-update bug",
-        sub: "Two documents, one stale snapshot",
+        title: "Lost Update",
+        sub: "Two documents finishing together, one stale snapshot written",
+        footprint: { dirs: ["lib/client/useIncomeUploads.ts"], files: 1 },
+        group: { ordering: "set", note: "Two snapshot reads that race; neither precedes the other." },
         state: "derived",
         col: 0,
         row: 3,
@@ -732,8 +795,18 @@ const AUTHORED: Node[] = [
      call → the S3 two-hop → the poll schedule → the source. */
   {
     id: "extraction",
-    title: "Turning documents into data",
-    sub: "A PDF becomes numbers — three models, one arbiter",
+    title: "Extraction",
+    sub: "A PDF becomes typed numbers — three model reads, one arbiter",
+    footprint: {
+      dirs: [
+        "lib/ai/",
+        "lib/extraction/",
+        "lib/parsing/",
+        "app/api/documents/extract/",
+      ],
+      files: 37,
+    },
+    group: { ordering: "sequence" },
     state: "partial",
     alarm: true,
     col: 0,
@@ -744,8 +817,11 @@ const AUTHORED: Node[] = [
     children: [
       {
         id: "read-bda",
-        title: "How BDA actually works",
-        sub: "Hand-rolled SigV4 · S3 staging · a two-hop indirection",
+        title: "BDA Parse",
+        sub: "Hand-signed SigV4, S3 staging, and a pointer inside a pointer",
+        footprint: { dirs: ["lib/parsing/bdaParse.ts"], files: 1 },
+        summary: "9 steps: stage, sign, invoke, poll, then two pointer hops",
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 0,
@@ -859,8 +935,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "read-legs",
-        title: "Three readers, one answer",
-        sub: "Two models on markdown, one on the raw PDF",
+        title: "Three Legs",
+        sub: "Two models read the markdown, one reads the raw PDF",
+        footprint: { dirs: ["lib/ai/", "lib/extraction/"], files: 6 },
+        group: { ordering: "set", note: "Three legs run concurrently — no leg waits for another." },
         state: "derived",
         col: 0,
         row: 1,
@@ -911,8 +989,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "read-prompt",
-        title: "What the model is told",
-        sub: "Dual schema · the field descriptions ARE the prompt",
+        title: "Extraction Specs",
+        sub: "A dual schema whose field descriptions ARE the prompt",
+        footprint: { dirs: ["lib/ai/extractionSpecs.ts", "lib/extraction/schemas/"], files: 9 },
+        group: { ordering: "set", note: "Two schema halves, read together rather than in turn." },
         state: "partial",
         col: 0,
         row: 2,
@@ -973,8 +1053,10 @@ const AUTHORED: Node[] = [
       },
       {
         id: "read-ladder",
-        title: "When the numbers don't foot",
-        sub: "Arithmetic check, then a second text layer",
+        title: "Resolution Ladder",
+        sub: "Arithmetic footing check, then a re-read off a second text layer",
+        footprint: { dirs: ["lib/extraction/resolve.ts", "lib/parsing/pdfPages.ts"], files: 2 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 3,
@@ -1013,8 +1095,17 @@ const AUTHORED: Node[] = [
       },
       {
         id: "read-ledger",
-        title: "The disagreement ledger",
-        sub: "Built, wired, and reporting nothing",
+        title: "Disagreement Log",
+        sub: "Built, wired, migrated — and reporting zero rows",
+        footprint: {
+          dirs: [
+            "lib/extraction/disagreementLog.ts",
+            "supabase/migrations/",
+            "app/api/admin/disagreements/",
+          ],
+          files: 3,
+        },
+        group: { ordering: "set", note: "The write path and the read path of a ledger with no rows." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -1060,8 +1151,17 @@ const AUTHORED: Node[] = [
       },
       {
         id: "read-egress",
-        title: "Which company reads the document",
+        title: "Provider Default",
         sub: "Two stale comments describe a posture the code dropped",
+        footprint: {
+          dirs: [
+            "lib/ai/bedrockConfig.ts",
+            "lib/ai/openaiClient.ts",
+            "lib/ai/runMarkdownExtraction.ts",
+          ],
+          files: 3,
+        },
+        group: { ordering: "set", note: "Two comments and the constant that contradicts them." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -1142,8 +1242,17 @@ export const aiProvider: AiProvider =
      the server → the durable expression of the gate → the source. */
   {
     id: "identity",
-    title: "Who is filing, and the payout gate",
-    sub: "The longest form — and the barrier before any refund is shown",
+    title: "Profile",
+    sub: "The longest form, and the gate before any refund is shown",
+    footprint: {
+      dirs: [
+        "app/(protected)/onboarding/",
+        "app/api/profile/",
+        "lib/client/",
+      ],
+      files: 6,
+    },
+    group: { ordering: "sequence" },
     state: "partial",
     alarm: true,
     col: 0,
@@ -1154,8 +1263,10 @@ export const aiProvider: AiProvider =
     children: [
       {
         id: "id-gate",
-        title: "The gate before the number",
-        sub: "Check synchronously, await, then re-read the server",
+        title: "Payout Gate",
+        sub: "Check synchronously, await the save, then re-read the server",
+        footprint: { dirs: ["app/(protected)/onboarding/profile/page.tsx"], files: 1 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 0,
@@ -1290,8 +1401,10 @@ export const aiProvider: AiProvider =
       },
       {
         id: "id-validation",
-        title: "What the server checks",
-        sub: "The body is cast, not parsed",
+        title: "Profile API",
+        sub: "The request body is cast to a type, never parsed or validated",
+        footprint: { dirs: ["app/api/profile/route.ts"], files: 1 },
+        group: { ordering: "set", note: "Checks that are made, and checks that are skipped." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -1333,8 +1446,15 @@ export const aiProvider: AiProvider =
       },
       {
         id: "id-draft",
-        title: "Where half-typed answers live",
-        sub: "sessionStorage — including the SSN",
+        title: "Form Draft",
+        sub: "Half-typed answers live in sessionStorage, the SSN among them",
+        footprint: {
+          dirs: [
+            "lib/client/useSessionFormDraft.ts",
+            "lib/client/profileForm.ts",
+          ],
+          files: 2,
+        },
         state: "partial",
         col: 0,
         row: 2,
@@ -1363,8 +1483,10 @@ export const aiProvider: AiProvider =
      the lookup → the data → the source. This is the deepest branch. */
   {
     id: "engine",
-    title: "Computing the refund",
-    sub: "One straight-line pass — W-2 box 1 to the number on line 34",
+    title: "Tax Engine",
+    sub: "One straight-line pass from W-2 box 1 to the number on line 34",
+    footprint: { dirs: ["lib/rules/", "lib/rules/forms/", "lib/rules/data/2025/"], files: 17 },
+    group: { ordering: "set", note: "The path, the formulas behind it, and the two tables it reads." },
     state: "derived",
     col: 0,
     row: 0,
@@ -1374,8 +1496,10 @@ export const aiProvider: AiProvider =
     children: [
       {
         id: "eng-path",
-        title: "One dollar's journey",
-        sub: "W-2 box 1 → the refund, in eight named steps",
+        title: "Refund Path",
+        sub: "W-2 box 1 to the refund, in eight named engine steps",
+        footprint: { dirs: ["lib/rules/income.ts"], files: 1 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 0,
@@ -1494,8 +1618,18 @@ export const aiProvider: AiProvider =
       },
       {
         id: "eng-math",
-        title: "Every formula, and one return end to end",
-        sub: "The actual arithmetic — not the names of the steps",
+        title: "Formulas",
+        sub: "The arithmetic itself, then one real filer carried end to end",
+        footprint: {
+          dirs: [
+            "lib/rules/income.ts",
+            "lib/rules/capitalGains.ts",
+            "tests/golden/",
+          ],
+          files: 4,
+        },
+        summary: "16 formulas, then the same filer carried through all 10 of them",
+        group: { ordering: "set", note: "Each formula opens on its own; they are definitions, not steps." },
         state: "derived",
         col: 0,
         row: 1,
@@ -1634,7 +1768,7 @@ function bracketTax(taxableIncome: number, brackets: readonly [number, number, n
                   {
                     kind: "source",
                     file: "lib/rules/income.ts",
-                    start: 774,
+                    start: 775,
                     code: `function taxForIncome(taxableIncome: number, brackets: readonly [number, number, number][]): number {
   if (taxableIncome <= 0) return 0;
   const lookupIncome = taxableIncome < 100000 ? taxTableRowMidpoint(taxableIncome) : taxableIncome;
@@ -1684,7 +1818,7 @@ function bracketTax(taxableIncome: number, brackets: readonly [number, number, n
                   {
                     kind: "source",
                     file: "lib/rules/income.ts",
-                    start: 469,
+                    start: 470,
                     code: `      headline: capitalGainsTaxable
         ? \`Present \${capitalGainsPresentDays} days this year (≥\${config.capital_gains_presence_days}), so your $\${capitalGainsNet} net capital gain is taxable at 30% on Schedule NEC.\`
         : \`Present \${capitalGainsPresentDays} days this year (<\${config.capital_gains_presence_days}), so your capital gains/losses aren't taxable.\`,
@@ -1840,8 +1974,10 @@ function round2(value: number): number {
       },
       {
         id: "eng-table",
-        title: "Why the tax isn't just a multiplication",
-        sub: "Below $100k the IRS uses a lookup table, not the brackets",
+        title: "Tax Table",
+        sub: "Below $100k the IRS uses a band lookup, not the bracket formula",
+        footprint: { dirs: ["lib/rules/income.ts", "lib/rules/data/2025/"], files: 5 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 1,
@@ -1919,8 +2055,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "eng-treaty",
-        title: "The treaty table",
-        sub: "142 rows · 15 verified · 127 provisional",
+        title: "Treaty Table",
+        sub: "142 rows — 15 verified against the treaty text, 127 provisional",
+        footprint: {
+          dirs: [
+            "lib/rules/treaties.ts",
+            "lib/rules/treatySchema.ts",
+            "lib/rules/data/2025/",
+          ],
+          files: 6,
+        },
+        group: { ordering: "set", note: "Two ways of slicing the same 142-row table." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -1965,8 +2110,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "eng-findings",
-        title: "What the engine flags",
-        sub: "Findings, and one that rests on a gate elsewhere",
+        title: "Engine Flags",
+        sub: "What the engine reports, and one flag resting on a gate elsewhere",
+        footprint: { dirs: ["lib/rules/income.ts"], files: 1 },
+        group: { ordering: "set", note: "Independent flags; the engine raises whichever apply." },
         state: "partial",
         col: 0,
         row: 3,
@@ -2017,8 +2164,19 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
      semantic key → an AcroForm name → the source. */
   {
     id: "packet",
-    title: "Printing something you can mail",
-    sub: "Seven IRS templates, filled by field name and flattened",
+    title: "Packet",
+    sub: "Seven IRS templates, filled by field name and flattened to print",
+    footprint: {
+      dirs: [
+        "lib/pdf/",
+        "lib/pdf/fieldMaps/",
+        "lib/pdf/templates/",
+        "lib/server/",
+        "app/api/documents/generate/",
+      ],
+      files: 31,
+    },
+    group: { ordering: "sequence" },
     state: "partial",
     col: 0,
     row: 0,
@@ -2028,8 +2186,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
     children: [
       {
         id: "pkt-which",
-        title: "Which forms you get",
-        sub: "One function decides — and the audit trail calls it too",
+        title: "Form Selection",
+        sub: "One function decides which forms you get; the audit trail calls it too",
+        footprint: { dirs: ["lib/server/generateReturnForms.ts"], files: 1 },
+        group: { ordering: "set", note: "Per-form conditions, each evaluated on its own." },
         state: "derived",
         col: 0,
         row: 0,
@@ -2049,7 +2209,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
                   {
                     kind: "source",
                     file: "lib/server/generateReturnForms.ts",
-                    start: 76,
+                    start: 75,
                     code: `  // An F-1 student with no US income, no withholding to reclaim and no treaty
   // claim owes the IRS nothing and files nothing except Form 8843 — which is a
   // standalone filing in that case, so it carries its own address block.
@@ -2102,8 +2262,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "pkt-fields",
-        title: "How a number reaches a box",
-        sub: "Semantic key → AcroForm field → flattened widget",
+        title: "Field Mapping",
+        sub: "Semantic key → AcroForm field name → flattened widget",
+        footprint: {
+          dirs: [
+            "lib/pdf/fillForm.ts",
+            "lib/pdf/fieldMaps/",
+            "lib/pdf/winansi.ts",
+          ],
+          files: 10,
+        },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 1,
@@ -2165,8 +2334,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "pkt-overflow",
-        title: "The sixth capital-gains lot",
-        sub: "Two constants, two files, one comment holding them together",
+        title: "Lot Overflow",
+        sub: "Two constants in two files, held together by one comment",
+        footprint: {
+          dirs: [
+            "lib/server/generateReturnForms.ts",
+            "lib/rules/forms/scheduleNEC.ts",
+            "lib/pdf/generateCapitalGainsAttachment.ts",
+          ],
+          files: 3,
+        },
+        group: { ordering: "set", note: "Two constants in two files that must agree." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -2230,8 +2408,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "pkt-attach",
-        title: "What goes in the envelope",
-        sub: "Mailing order is the iteration order of one object",
+        title: "Attachments",
+        sub: "Mailing order is the iteration order of a single object",
+        footprint: {
+          dirs: [
+            "lib/server/filingAttachments.ts",
+            "lib/pdf/generateFilingInstructions.ts",
+            "lib/rules/forms/filingInstructions.ts",
+          ],
+          files: 3,
+        },
+        group: { ordering: "set", note: "The envelope contents — order here is mailing order, not causation." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -2275,8 +2462,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "pkt-cache",
-        title: "Not regenerating the same PDF",
-        sub: "SHA-256 over ten columns plus an engine version",
+        title: "Packet Cache",
+        sub: "SHA-256 over ten filing columns plus the engine version",
+        footprint: { dirs: ["lib/server/packetCache.ts", "supabase/migrations/"], files: 2 },
+        group: { ordering: "sequence" },
         state: "derived",
         col: 0,
         row: 4,
@@ -2333,8 +2522,18 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
      → the assumption → the source. NOT a wizard step — a separate front door. */
   {
     id: "refund-check",
-    title: "Free Refund Check",
-    sub: "No login, no consent screen — the public funnel at /check",
+    title: "Refund Check",
+    sub: "The logged-out funnel at /check — no account, no consent screen",
+    footprint: {
+      dirs: [
+        "lib/check/",
+        "app/api/check/",
+        "public/check.html",
+        "components/onboarding/",
+      ],
+      files: 8,
+    },
+    group: { ordering: "set", note: "Four independent facts about the same logged-out funnel." },
     state: "partial",
     alarm: true,
     col: 0,
@@ -2345,8 +2544,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
     children: [
       {
         id: "chk-assume",
-        title: "What it assumes about you",
-        sub: "Single, F-1, nonresident, 300 days present",
+        title: "Assumptions",
+        sub: "Single, F-1, nonresident, 300 days present — all four hardcoded",
+        footprint: { dirs: ["lib/check/engine.ts", "app/api/check/estimate/"], files: 2 },
+        group: { ordering: "set", note: "Four hardcoded assumptions, none dependent on another." },
         state: "partial",
         alarm: true,
         col: 0,
@@ -2411,8 +2612,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "chk-score",
-        title: "Grading a return you already filed",
-        sub: "11 compared lines, whole-dollar equality",
+        title: "Return Score",
+        sub: "Eleven 1040-NR lines compared for whole-dollar equality",
+        footprint: { dirs: ["lib/check/f1040nrScoring.ts", "app/api/check/"], files: 3 },
+        group: { ordering: "set", note: "How each side is read, and what the asymmetry costs." },
         state: "partial",
         col: 0,
         row: 1,
@@ -2459,7 +2662,7 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
                           {
                             kind: "source",
                             file: "lib/check/f1040nrScoring.ts",
-                            start: 66,
+                            start: 67,
                             code: `    systemPrompt:
       "You read the values a nonresident alien filer has already entered on a completed US Form 1040-NR " +
       "(U.S. Nonresident Alien Income Tax Return). Report the number actually printed on each requested line, " +
@@ -2481,8 +2684,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "chk-reveal",
-        title: "What it shows and what it blurs",
-        sub: "MAX_REVEAL = 2 · the rest is CSS blur",
+        title: "Reveal Gate",
+        sub: "MAX_REVEAL = 2 findings shown; the rest is a CSS blur",
+        footprint: { dirs: ["public/check.html"], files: 1 },
+        group: { ordering: "set", note: "What is shown and what is blurred, decided per finding." },
         state: "partial",
         col: 0,
         row: 2,
@@ -2533,8 +2738,9 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "chk-dedup",
-        title: "The abuse control that isn't wired",
-        sub: "Built, tested, imported by nothing",
+        title: "Fingerprint",
+        sub: "An abuse control that is built and tested but imported by nothing",
+        footprint: { dirs: ["lib/check/fingerprint.ts", "supabase/migrations/"], files: 2 },
         state: "partial",
         alarm: true,
         col: 0,
@@ -2561,8 +2767,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
   /* ═══ 9. THE STORE ═════════════════════════════════════════════ */
   {
     id: "store",
-    title: "Where it all lands",
-    sub: "Supabase Postgres · one wide row per filing · RLS by user",
+    title: "Storage",
+    sub: "Supabase Postgres — one wide row per filing, RLS by user",
+    footprint: {
+      dirs: [
+        "supabase/migrations/",
+        "lib/supabase/",
+        "lib/server/engineContext.ts",
+      ],
+      files: 15,
+    },
+    group: { ordering: "set", note: "One row, one column on it, two side tables, and a bucket." },
     state: "partial",
     col: 0,
     row: 0,
@@ -2572,8 +2787,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
     children: [
       {
         id: "st-filings",
-        title: "The filings row",
-        sub: "The case file — every step writes a column",
+        title: "Filings Row",
+        sub: "The case file — every wizard step writes one of its columns",
+        footprint: { dirs: ["supabase/migrations/", "lib/server/engineContext.ts"], files: 11 },
+        summary: "11 of the row's columns, one per wizard step plus the cache key",
         state: "partial",
         col: 0,
         row: 0,
@@ -2604,8 +2821,9 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "st-plaintext",
-        title: "What is stored in the clear",
-        sub: "The identifier the ledger redacts",
+        title: "Plaintext SSN",
+        sub: "The identifier the audit ledger redacts is stored unredacted",
+        footprint: { dirs: ["app/api/profile/route.ts", "supabase/migrations/"], files: 2 },
         state: "partial",
         alarm: true,
         col: 0,
@@ -2627,8 +2845,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "st-side",
-        title: "Tables beside the case file",
-        sub: "One reporting nothing, one with no caller",
+        title: "Side Tables",
+        sub: "One reports nothing; the other has no caller anywhere",
+        footprint: {
+          dirs: [
+            "supabase/migrations/",
+            "lib/extraction/disagreementLog.ts",
+            "lib/check/fingerprint.ts",
+          ],
+          files: 4,
+        },
+        group: { ordering: "set", note: "Two tables with unrelated problems." },
         state: "partial",
         col: 0,
         row: 2,
@@ -2695,8 +2922,17 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
       },
       {
         id: "st-bucket",
-        title: "Object storage",
-        sub: "Filing documents, and the staging copies",
+        title: "Object Store",
+        sub: "Filing documents, plus the staging copies BDA needs",
+        footprint: {
+          dirs: [
+            "lib/parsing/bdaParse.ts",
+            "lib/server/resolveUploadedDoc.ts",
+            "app/api/documents/",
+          ],
+          files: 4,
+        },
+        group: { ordering: "set", note: "Two kinds of object in one bucket, written by different paths." },
         state: "partial",
         col: 0,
         row: 3,
@@ -2739,8 +2975,10 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
   /* ═══ 10. UNREACHABLE STAGES ═══════════════════════════════════ */
   {
     id: "unreachable",
-    title: "Unreachable stages",
-    sub: "Two values the type declares that nothing ever writes",
+    title: "Dead Stages",
+    sub: "Two Stage values the type declares that no code ever writes",
+    footprint: { dirs: ["lib/types.ts", "lib/config/onboarding.ts"], files: 2 },
+    group: { ordering: "set", note: "Two unrelated Stage values that happen to share the same defect." },
     state: "partial",
     ghost: true,
     alarm: true,
@@ -2815,12 +3053,16 @@ function taxForIncome(taxableIncome: number, brackets: readonly [number, number,
    The store and the unreachable stages are not steps either. Every root writes
    to the store, so it sits underneath rather than at the end. */
 export const E0: Edge[] = [
-  { from: "consent", to: "eligibility", state: "partial", label: "should gate" },
-  { from: "eligibility", to: "income-docs", state: "derived", label: "passes into" },
-  { from: "income-docs", to: "extraction", state: "derived", label: "uploads to" },
-  { from: "extraction", to: "identity", state: "derived", label: "must land before" },
-  { from: "identity", to: "engine", state: "derived", label: "releases" },
-  { from: "engine", to: "packet", state: "derived", label: "fills" },
+  // `order` is real here and nowhere else in this fixture: these six edges are
+  // one chain in the order ONBOARDING_STEPS declares, so a filer cannot reach
+  // step n without having passed n-1. The roots off the chain — refund-check,
+  // store, unreachable — get no edge and therefore no order.
+  { from: "consent", to: "eligibility", state: "partial", label: "should gate", order: 1 },
+  { from: "eligibility", to: "income-docs", state: "derived", label: "passes into", order: 2 },
+  { from: "income-docs", to: "extraction", state: "derived", label: "uploads to", order: 3 },
+  { from: "extraction", to: "identity", state: "derived", label: "must land before", order: 4 },
+  { from: "identity", to: "engine", state: "derived", label: "releases", order: 5 },
+  { from: "engine", to: "packet", state: "derived", label: "fills", order: 6 },
 ];
 
 /* ── rows that go deeper ──────────────────────────────────────
@@ -2832,11 +3074,15 @@ export const E0: Edge[] = [
 
 /** The rows of one anatomy block that carry `under`, as {key, label, blocks}. */
 function deepRows(blocks: Anatomy[]) {
-  const out: { key: string; label: string; under: Anatomy[] }[] = [];
+  const out: { key: string; label: string; sub?: string; under: Anatomy[] }[] = [];
   for (const b of blocks) {
     if (b.kind === "map") {
       for (const r of b.rows) {
-        if (r.under) out.push({ key: r.from, label: r.from, under: r.under });
+        // `to` is carried so the node can state the rule itself. On the engine
+        // cards `from → to` IS the formula, and a card titled "dividendsTax"
+        // whose subtitle only named its parent would hide the one line the
+        // reader opened it for.
+        if (r.under) out.push({ key: r.from, label: r.from, sub: r.to, under: r.under });
       }
     } else if (b.kind === "flow") {
       for (const r of b.rows) {
@@ -2873,7 +3119,13 @@ function withRowChildren(nodes: Node[]): Node[] {
           deepRows(n.anatomy).map((r, i): Node => ({
             id: rowId(n.id, r.key),
             title: r.label,
-            sub: "what happens to it",
+            // Not authored per row: 93 of these exist. A map row already
+            // states the rule on its `to` side, so that becomes the subtitle —
+            // on the engine cards it is literally the formula. Everything else
+            // falls back to naming the card it opened out of, which is the
+            // "what belongs to what" question. The generic "what happens to
+            // it" it replaces said nothing on all 93.
+            sub: r.sub ?? `Inside ${n.title}`,
             state: "derived",
             col: 0,
             row: authored.length + i,

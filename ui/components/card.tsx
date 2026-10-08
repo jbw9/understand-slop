@@ -53,7 +53,24 @@ export function UnitHead({ id, unit }: { id: string; unit: CodeUnit }) {
         {unit.complete ? null : <span className="shrink-0">· excerpt</span>}
         {u.edited ? (
           <>
-            <span className="shrink-0 text-deep-green">· edited</span>
+            <span className="shrink-0 text-deep-green">
+              · {u.saving?.kind === "saving" ? "saving…" : "edited"}
+            </span>
+            {u.save ? (
+              <button
+                type="button"
+                data-row
+                disabled={u.saving?.kind === "saving"}
+                title="Write this unit back to its file (Ctrl+S in the code)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void u.save?.();
+                }}
+                className="ml-auto shrink-0 cursor-pointer rounded-[4px] bg-deep-green px-1.5 font-semibold text-pure-white transition-opacity duration-150 hover:opacity-90 disabled:cursor-default disabled:opacity-60"
+              >
+                save
+              </button>
+            ) : null}
             <button
               type="button"
               data-row
@@ -61,13 +78,23 @@ export function UnitHead({ id, unit }: { id: string; unit: CodeUnit }) {
                 e.stopPropagation();
                 u.revert();
               }}
-              className="ml-auto shrink-0 cursor-pointer rounded-[4px] px-1 text-on-surface-variant transition-[background-color,color] duration-150 hover:bg-surface hover:text-ink"
+              className={cn(
+                u.save ? "" : "ml-auto",
+                "shrink-0 cursor-pointer rounded-[4px] px-1 text-on-surface-variant transition-[background-color,color] duration-150 hover:bg-surface hover:text-ink",
+              )}
             >
               revert
             </button>
           </>
         ) : null}
       </p>
+      {u.saving?.kind === "failed" ? (
+        // Nothing was written. Revert drops the edit and shows the file as it
+        // is now; the edit is kept until then so it can be copied out.
+        <p role="alert" className="mt-1 font-mono text-[9.5px] leading-snug text-clay-ink">
+          Not saved: {u.saving.message}. Revert to see the file as it is now.
+        </p>
+      ) : null}
     </>
   );
 }
@@ -87,6 +114,7 @@ export function UnitBody({ id, unit }: { id: string; unit: CodeUnit }) {
         lang={unit.lang}
         start={unit.start}
         onChange={u.setBody}
+        onSave={u.save ?? undefined}
         label={`${unit.file} lines ${unit.start}–${u.end}`}
       />
     </div>

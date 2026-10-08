@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { KindLabel, UnitBody, UnitHead } from "@/components/card";
 import { StateChip } from "@/components/state";
-import { EASE, ownerOf, titleOf } from "@/components/level";
+import { EASE, ownerOf } from "@/components/level";
+import { useMap } from "@/components/map-context";
 import type { Node } from "@/lib/data";
-import { LINKS, RUN, allNodes } from "@/lib/current";
 
-const BY_ID = new Map(allNodes().map((n) => [n.id, n]));
 const codeUnder = (n: Node | undefined) => (n?.children ?? []).filter((c) => c.unit);
 
 /** How the pane got to the list it shows: whose calls, or whose methods. */
@@ -30,6 +29,7 @@ interface Step {
  * Cycles (A calls B calls A) are fine: it is a stack, not a tree walk.
  */
 function CodeList({ node }: { node: Node }) {
+  const { byId: BY_ID, titleOf } = useMap();
   const [stack, setStack] = useState<Step[]>([]);
   const top = stack[stack.length - 1];
   const list = useMemo(() => {
@@ -37,7 +37,7 @@ function CodeList({ node }: { node: Node }) {
     const of = BY_ID.get(top.of);
     if (top.via === "methods") return codeUnder(of);
     return (of?.unit?.calls ?? []).flatMap((id) => BY_ID.get(id) ?? []);
-  }, [node, top]);
+  }, [node, top, BY_ID]);
   const section = useRef<HTMLElement>(null);
 
   // A drill swaps the whole list, so bring its top into view — otherwise you
@@ -115,6 +115,7 @@ function UnitPanel({
   node: Node;
   onDrill: (via: Step["via"]) => void;
 }) {
+  const { byId: BY_ID } = useMap();
   if (!node.unit) return null;
   const methods = codeUnder(node);
   const calls = (node.unit.calls ?? []).flatMap((id) => BY_ID.get(id) ?? []);
@@ -184,6 +185,7 @@ export function Detail({
   traced: string | null;
   onJump: (id: string, trace?: string) => void;
 }) {
+  const { LINKS, RUN, titleOf } = useMap();
   const links = traced
     ? LINKS.filter((l) => l.from === traced || l.to === traced)
     : [];

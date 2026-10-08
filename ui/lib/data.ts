@@ -195,6 +195,8 @@ export interface CodeUnit {
    * first appear in the body. What the code pane drills into.
    */
   calls?: string[];
+  /** The index id this unit was read from — what a save writes back to. */
+  symbol?: string;
 }
 
 export interface Node {

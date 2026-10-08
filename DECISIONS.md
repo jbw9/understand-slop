@@ -613,7 +613,7 @@ That is exact for snecko and wrong in general (shadowing, method calls on object
 
 ---
 
-## D17 — The map follows the repo while it is edited (proposed, not built)
+## D17 — The map follows the repo while it is edited (proposed, not built; superseded by D18)
 
 **Proposed:** a watcher that re-runs `scripts/gen_snecko.py` whenever
 `~/projects/snecko` changes. `next dev` already hot-reloads a rewritten
@@ -674,3 +674,97 @@ the watcher and the UI tolerance stay.
    0.
 4. With dev and the watcher both running, editing the focused function updates
    the pane within ~1s, and the trail is kept.
+
+---
+
+## D17 — Maps are JSON files; the LLM writes the story, the repo writes the code
+
+**Chose:** one JSON file per codebase, `ui/public/maps/<name>.map.json`, in the format defined by `ui/lib/schema.ts` (zod). The app loads it at runtime (`ui/lib/load.ts`, `ui/components/map-context.tsx`), picked by `?map=<name>` or the switcher in the header, from the list in `ui/public/maps/index.json`. `scripts/emit_schema.mjs` writes the same schema as JSON Schema (`map.schema.json`) for constraining an LLM's structured output.
+
+**Beat:**
+- **`.ts` modules** (what the maps were): compiled into the app, so a new codebase meant a rebuild, and an LLM writing TypeScript can break the build.
+- **Markdown:** readable, but the data is a graph with ids and line ranges, and every formatting drift would be a parser bug.
+
+**The split that matters.** A map file has two halves:
+- **`index` (machine-filled from the repo):** every function and class (body, line range, signature, calls, class/method parent), and every quoted snippet.
+- **`nodes` / `edges` / `links` (the narrative, the part an LLM writes):** cards, flows, labels, and which code belongs where. It refers to code only by symbol or snippet id.
+
+An LLM retyping forty functions would quietly change some of them; a lookup can't. `scripts/gen_snecko.py` is the hand-written stand-in for that pipeline: narrative in the script, index read from `~/projects/snecko`.
+
+**Shape choices:**
+- **Nodes are a flat list with `parent`, not a nested tree.** It is easier for a model to write and to check, and `buildMap` rebuilds the tree.
+- **A card's `code` is a list of symbol ids**, optionally with an id and narrative. A class's methods follow from the index, so they can't be forgotten or invented.
+- **Edges name their `parent`**, so "both ends are siblings" is checkable.
+
+**Loading checks twice and fails loudly:**
+1. The schema.
+2. The references it can't express: unique ids, parents exist and don't loop, edge ends are siblings, links land on real rows, and every symbol, call and snippet a card names is in the index.
+
+Problems are listed by path (`nodes[3].parent: no node "x"`) on the page, instead of rendering something subtly wrong.
+
+**Verified on conversion:** both maps load to exactly the trees the `.ts` modules produced — every title, state, anatomy row, code body, line range, call and edge. The checks surfaced four VisuLearn links that had never drawn because their rows didn't exist (the "Match rule" / "Match" kind). Three were typos and are repaired; one ("PDF export" on the quota card) had no matching row and was dropped.
+
+**Removed:** the zoom canvas (`canvas.tsx`), the columns view (`columns.tsx`) and the `.ts` datasets. They are in the snapshot commit before this change. `wires.tsx` keeps its router code (unused now) alongside the colours the explorer uses.
+
+**Breaks at scale / next:**
+- Calls are still matched by name in the generator. The real indexer (TS compiler or tree-sitter) replaces that and fills `index` for any repo.
+- VisuLearn's index holds only the code its map quotes, because its repo isn't on this machine.
+
+---
+
+## D18 — Standalone: `slop` + a Claude Code skill; the story and the code live apart
+
+**Chose:**
+- **A local CLI that opens the browser.** `bin/slop.mjs` indexes the repo, checks its story, and runs the Next app on 127.0.0.1 with `SLOP_REPO` set.
+- **The narrative comes from a Claude Code skill.** `skills/slop-map` writes `.slop/story.json` and loops on `slop check`; it does not call the API.
+
+**Beat:**
+- **A Tauri desktop app:** a Rust shell and packaging, for a window around the same web UI.
+- **A VS Code extension:** the UI moves into a webview and the extension API.
+- **API calls from the CLI:** billed per run and needs a key. A skill uses the plan the user already has, and Claude can read the repo properly instead of being handed a dump.
+
+**The map is split in two files, by who can be trusted with what:**
+- **`.slop/story.json`** (Claude, committed): nodes, edges, links. Code is named by symbol id only, and ids never contain line numbers.
+- **The index** (machine): rebuilt from the code on *every* map load (`lib/server/indexer.ts`, the TypeScript compiler API). `.slop/index.json` is a copy for reading, and git-ignored.
+
+This is what D17 was reaching for with `locate()`. With no line numbers in anything hand-written, a shifted file needs no repair. Verified on snecko:
+- 5 lines added to the top of App.tsx move every start line by 5, and every body is identical;
+- renaming `pickDir` turns only its card partial, and the check still passes.
+
+**The new indexer agrees with the old one.** For the 35 TS units `gen_snecko.py` produced, `indexRepo` gives the same id, kind, parent, start, end, body, signature and calls. The story converted from snecko.map.json merges to the same 57 cards. The one exception is the Rust unit, which is now a drift warning.
+
+**Drift is a warning, not a failure (`lib/load.ts`).** A code ref or quote missing from the index renders as a partial, alarmed card saying what is gone. Schema errors, bad references and malformed blocks still fail the whole map.
+
+**Quotes that aren't units** use anchors: `file` + `at` (the first line, or several lines joined by `\n`) + `lines`. They are resolved at merge time. An anchor that matches twice is a warning naming the line numbers. A converted snecko quote anchored on `{` matched 8 places, which is how that warning came to exist.
+
+**Saving (`/api/save`, `saveSymbol`):**
+- The browser sends the symbol id, the body the edit *started from*, and the new body.
+- The server re-reads the file, finds the unit by id, and writes only if it still reads `before`; otherwise it returns 409 and writes nothing.
+- The write is a temp file plus a rename, keeping the file's mode.
+- The page then re-reads the whole map, so every later line number in that file moves too.
+- Reverting after a refused save also re-reads, so the card shows the disk version.
+
+**The server only answers its own page:**
+- it binds to 127.0.0.1;
+- the Host header must be localhost, which stops DNS rebinding;
+- writes must come from the same origin;
+- a save path must resolve inside the repo.
+
+**What counts as a unit:**
+- function declarations at any depth;
+- consts holding a function;
+- consts whose value is a call wrapping a block-bodied function (`useCallback((e) => { … })`, `ViewPlugin.fromClass(class …)`);
+- classes and their members.
+
+Not `xs.filter(v => …)`, `useMemo(…)` or `count((f) => f.short)`, which make values. Object-literal methods aren't units either.
+
+**Cost accepted:**
+- TS/JS only (D2). Other languages are quotable by anchor, but they get no cards of their own.
+- Every map load re-indexes the repo: about 0.6s on snecko and 2.5s on this repo with the type checker. Fine at this size; at a few thousand files it wants a per-file cache keyed on mtime.
+- The build is rebuilt whenever any app source is newer than it, so the first `slop` after an update takes about a minute.
+
+**Breaks at scale / next:**
+- No live re-index while you edit in another editor: reload the page.
+- A destructured-props head (`function F({`) still reads as a one-line signature `function F(` (the rule in `lib/signature.ts`).
+- Calls into object-literal methods are not resolved.
+

@@ -14,11 +14,11 @@ import { KindLabel } from "@/components/card";
 import { Detail } from "@/components/detail";
 import { EditsProvider } from "@/components/edits";
 import { EASE, LAYER_NAME, LevelList, membersAt, opensLevel } from "@/components/level";
-import { useMapNav } from "@/components/nav";
+import { onPlainClick, useMapNav } from "@/components/nav";
 import { StateChip } from "@/components/state";
 import { DASHED, STROKE, wireKind, type WireKind } from "@/components/wires";
 import { layerOf, type Edge, type Node } from "@/lib/data";
-import { E0, L0, RUN, edgesOf, nodeAt } from "@/lib/current";
+import { useMap } from "@/components/map-context";
 import { MAP_CARD_H, MAP_CARD_W, MAP_LANE_W, edgeKey, layoutRoots, type MapLayout } from "@/lib/layout";
 
 /**
@@ -36,7 +36,9 @@ import { MAP_CARD_H, MAP_CARD_W, MAP_LANE_W, edgeKey, layoutRoots, type MapLayou
  */
 
 export function Explorer() {
-  const { path, go, traced, setTraced, jump, rowCtx } = useMapNav();
+  const map = useMap();
+  const { RUN, edgesOf, nodeAt } = map;
+  const { path, go, traced, setTraced, jump, rowCtx, href } = useMapNav();
   const [pointed, setPointed] = useState<string | null>(null);
 
   const view = useMemo(() => {
@@ -53,10 +55,10 @@ export function Explorer() {
     const opens = open ? opensLevel(open) : false;
     const listAt = opens ? at : at.slice(0, -1);
     const selected = opens ? undefined : at[at.length - 1];
-    const members = at.length && (opens || at.length > 1) ? membersAt(listAt, selected) : [];
+    const members = at.length && (opens || at.length > 1) ? membersAt(map, listAt, selected) : [];
     const listParent = listAt.length ? nodeAt(listAt) : null;
     return { focusUnit, at, open, listAt, selected, members, listParent };
-  }, [path]);
+  }, [path, map, nodeAt]);
   const { focusUnit, at, open, listAt, selected, members, listParent } = view;
 
   /* ── keyboard ──────────────────────────────────────────────── */
@@ -104,12 +106,37 @@ export function Explorer() {
       <LayoutGroup>
         <div className="flex h-dvh flex-col bg-warm-cream">
           <header className="flex shrink-0 items-baseline gap-3 border-b border-border-gray px-5 py-3">
-            <span className="text-[13px] font-semibold tracking-[-0.01em] text-ink">
-              {RUN.repo}
-            </span>
+            {map.maps.length > 1 ? (
+              // Which codebase: every map in /maps/index.json.
+              <select
+                aria-label="Codebase"
+                value={map.name}
+                onChange={(e) => map.switchTo(e.target.value)}
+                className="cursor-pointer rounded-[6px] border border-transparent bg-transparent py-0.5 pr-1 text-[13px] font-semibold tracking-[-0.01em] text-ink transition-[border-color] duration-150 hover:border-border-gray"
+              >
+                {map.maps.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.title ?? m.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[13px] font-semibold tracking-[-0.01em] text-ink">{RUN.repo}</span>
+            )}
             <span className="font-mono text-[10.5px] text-faint">
               {RUN.commit} · {RUN.files} files
             </span>
+            {map.warnings.length ? (
+              // Drift: code the story names that the repo no longer has. The
+              // cards say so too; this is the count, with the list on hover.
+              <span
+                title={map.warnings.join("\n")}
+                className="cursor-help font-mono text-[10.5px] font-semibold text-clay-ink"
+              >
+                {map.warnings.length} warning{map.warnings.length === 1 ? "" : "s"}
+              </span>
+            ) : null}
+            {map.editable ? null : <span className="font-mono text-[10.5px] text-faint">· demo, read-only</span>}
             <span className="ml-auto hidden font-mono text-[10px] text-faint md:inline">
               {at.length ? "↑ ↓ move · → open · ← back · 0 map" : "click a card to open it"}
             </span>
@@ -118,7 +145,7 @@ export function Explorer() {
           <div className="relative min-h-0 flex-1">
             <AnimatePresence initial={false} mode="popLayout">
               {at.length === 0 ? (
-                <MapView key="map" onOpen={(id) => go([id])} />
+                <MapView key="map" onOpen={(id) => go([id])} hrefOf={(id) => href([id])} />
               ) : (
                 <motion.div
                   key="focus"
@@ -129,7 +156,7 @@ export function Explorer() {
                   transition={{ duration: 0.2, ease: EASE }}
                 >
                   <div className="flex w-[380px] shrink-0 flex-col border-r border-border-gray">
-                    <Trail at={at} onGo={go} />
+                    <Trail at={at} onGo={go} href={href} />
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
                       {members.length ? (
                         <>
@@ -140,6 +167,7 @@ export function Explorer() {
                             selected={selected}
                             pointed={pointed}
                             ruleStores={listAt.length === 0}
+                            hrefOf={(id) => href([...listAt, id])}
                             onPick={(id) => {
                               setPointed(null);
                               go([...listAt, id]);
@@ -190,8 +218,15 @@ type View = { s: number; x: number; y: number };
  *  - the buttons in the corner zoom, and "fit" brings the whole map back.
  * The dot grid moves and scales with the board, so it reads as one surface.
  */
-function MapView({ onOpen }: { onOpen: (id: string) => void }) {
-  const layout = useMemo(() => layoutRoots(L0, E0), []);
+function MapView({
+  onOpen,
+  hrefOf,
+}: {
+  onOpen: (id: string) => void;
+  hrefOf: (id: string) => string;
+}) {
+  const { L0, E0 } = useMap();
+  const layout = useMemo(() => layoutRoots(L0, E0), [L0, E0]);
   const viewport = useRef<HTMLDivElement>(null);
   // Map cards are a fixed size, so the wires are drawn from the layout alone:
   // nothing is measured, so nothing can be measured mid-animation.
@@ -380,7 +415,7 @@ function MapView({ onOpen }: { onOpen: (id: string) => void }) {
               className="absolute"
               style={{ left: p.x, top: p.y, width: MAP_CARD_W, height: MAP_CARD_H }}
             >
-              <MapCard node={n} onClick={() => onOpen(n.id)} />
+              <MapCard node={n} href={hrefOf(n.id)} onClick={() => onOpen(n.id)} />
             </div>
           );
         })}
@@ -429,18 +464,21 @@ function MapButton({
   );
 }
 
-function MapCard({ node, onClick }: { node: Node; onClick: () => void }) {
+function MapCard({ node, href, onClick }: { node: Node; href: string; onClick: () => void }) {
   return (
-    <motion.button
-      type="button"
+    // A link, so middle-click opens the card in a new tab. Not draggable: a
+    // link's native drag (a URL ghost) would fight the board's own panning.
+    <motion.a
+      href={href}
+      draggable={false}
       // The same layoutId as the trail's first card: the card you click on
       // the map is the card that lands in the top-left.
       layoutId={`card-${node.id}`}
       data-node-id={node.id}
-      onClick={onClick}
+      onClick={(e) => onPlainClick(e, onClick)}
       transition={{ duration: 0.4, ease: EASE }}
       className={cn(
-        "h-full w-full cursor-pointer rounded-[14px] border bg-pure-white px-4 py-3 text-left",
+        "block h-full w-full cursor-pointer select-none rounded-[14px] border bg-pure-white px-4 py-3 text-left",
         "transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-panel",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
@@ -454,7 +492,7 @@ function MapCard({ node, onClick }: { node: Node; onClick: () => void }) {
         <StateChip state={node.state} alarm={node.alarm} />
       </span>
       <span className="mt-0.5 block truncate font-mono text-[10.5px] text-faint">{node.sub}</span>
-    </motion.button>
+    </motion.a>
   );
 }
 
@@ -670,16 +708,25 @@ function MapWires({
  * step further in. The first card is the one that left the map. Clicking a
  * card goes back to it; "Map" goes all the way out.
  */
-function Trail({ at, onGo }: { at: string[]; onGo: (path: string[]) => void }) {
+function Trail({
+  at,
+  onGo,
+  href,
+}: {
+  at: string[];
+  onGo: (path: string[]) => void;
+  href: (path: string[]) => string;
+}) {
+  const { nodeAt } = useMap();
   return (
     <nav aria-label="Trail" className="shrink-0 border-b border-border-gray px-4 pb-3 pt-3">
-      <button
-        type="button"
-        onClick={() => onGo([])}
-        className="mb-2 cursor-pointer rounded-[6px] px-1 font-mono text-[10px] text-faint transition-[background-color,color] duration-150 hover:bg-surface hover:text-ink"
+      <a
+        href={href([])}
+        onClick={(e) => onPlainClick(e, () => onGo([]))}
+        className="mb-2 inline-block cursor-pointer rounded-[6px] px-1 font-mono text-[10px] text-faint transition-[background-color,color] duration-150 hover:bg-surface hover:text-ink"
       >
         ← map
-      </button>
+      </a>
       <ol className="flex flex-col gap-1.5">
         {at.map((id, i) => {
           const n = nodeAt(at.slice(0, i + 1));
@@ -692,14 +739,14 @@ function Trail({ at, onGo }: { at: string[]; onGo: (path: string[]) => void }) {
               // the titles: past three, the order says the rest.
               style={{ paddingLeft: Math.min(i, 3) * 14 }}
             >
-              <motion.button
-                type="button"
+              <motion.a
+                href={href(at.slice(0, i + 1))}
                 layoutId={i === 0 ? `card-${id}` : undefined}
                 transition={{ duration: 0.4, ease: EASE }}
-                onClick={() => onGo(at.slice(0, i + 1))}
+                onClick={(e) => onPlainClick(e, () => onGo(at.slice(0, i + 1)))}
                 aria-current={last ? "location" : undefined}
                 className={cn(
-                  "w-full cursor-pointer rounded-[12px] border bg-pure-white px-3 py-2 text-left",
+                  "block w-full cursor-pointer rounded-[12px] border bg-pure-white px-3 py-2 text-left",
                   "transition-[border-color,box-shadow] duration-150",
                   last
                     ? "border-deep-green ring-1 ring-deep-green"
@@ -718,7 +765,7 @@ function Trail({ at, onGo }: { at: string[]; onGo: (path: string[]) => void }) {
                   </span>
                   <StateChip state={n.state} alarm={n.alarm} />
                 </span>
-              </motion.button>
+              </motion.a>
             </li>
           );
         })}
@@ -728,6 +775,7 @@ function Trail({ at, onGo }: { at: string[]; onGo: (path: string[]) => void }) {
 }
 
 function LevelHeader({ members, parent }: { members: Node[]; parent: Node | null }) {
+  const { RUN } = useMap();
   const layer = LAYER_NAME[layerOf(members[0]?.kind)];
   return (
     <div className="pb-2 pt-4">

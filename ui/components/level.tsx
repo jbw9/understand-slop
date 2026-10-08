@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 import { KindLabel } from "@/components/card";
 import { StateChip } from "@/components/state";
 import type { Edge, Node } from "@/lib/data";
-import { allNodes, levelAt } from "@/lib/current";
+import { useMap, type MapData } from "@/components/map-context";
+import { hrefFor, onPlainClick } from "@/components/nav";
 
 /**
  * One level of the map as a list: cards in order, an edge between two
@@ -16,8 +17,6 @@ import { allNodes, levelAt } from "@/lib/current";
 export const EASE = [0.22, 1, 0.36, 1] as const;
 export const LAYER_NAME = { surface: "surface", flow: "data flow", code: "code" } as const;
 
-const TITLE = new Map(allNodes().map((n) => [n.id, n.title]));
-export const titleOf = (id: string) => TITLE.get(id) ?? id;
 /** A row id names its owner before the colon: `gate-quota:Anonymous`. */
 export const ownerOf = (rowKey: string) => rowKey.slice(0, rowKey.indexOf(":"));
 
@@ -27,8 +26,8 @@ export const ownerOf = (rowKey: string) => rowKey.slice(0, rowKey.indexOf(":"));
  * Code units are never listed: they are read and edited together in their
  * owner's pane, so picking a flow shows every function behind it at once.
  */
-export function membersAt(parentPath: string[], selected: string | undefined) {
-  return levelAt(parentPath).filter(
+export function membersAt(map: MapData, parentPath: string[], selected: string | undefined) {
+  return map.levelAt(parentPath).filter(
     (n) => !n.unit && (!n.fromRow || n.id === selected),
   );
 }
@@ -42,6 +41,7 @@ export function LevelList({
   selected,
   pointed,
   ruleStores,
+  hrefOf,
   onPick,
   onJump,
   onPoint,
@@ -52,6 +52,8 @@ export function LevelList({
   pointed: string | null;
   /** Draw "behind the surface" before the first store (the root level). */
   ruleStores?: boolean;
+  /** The link each card is, so it can open in a new tab. */
+  hrefOf?: (id: string) => string;
   onPick: (id: string) => void;
   onJump: (id: string) => void;
   onPoint: (id: string | null) => void;
@@ -95,6 +97,7 @@ export function LevelList({
               node={n}
               selected={n.id === selected}
               pointed={n.id === pointed}
+              href={hrefOf?.(n.id)}
               onClick={() => onPick(n.id)}
             >
               {/* Inside the card, not under it: under it, the chips sat
@@ -153,18 +156,21 @@ export function RelationChip({
   onPoint: (id: string | null) => void;
   onJump: (id: string) => void;
 }) {
+  const { titleOf, pathTo, name } = useMap();
   return (
-    <button
-      type="button"
+    <a
+      href={hrefFor(name, pathTo(edge.to) ?? [])}
       data-row
       onMouseEnter={() => onPoint(edge.to)}
       onMouseLeave={() => onPoint(null)}
       onFocus={() => onPoint(edge.to)}
       onBlur={() => onPoint(null)}
-      onClick={() => {
-        onPoint(null);
-        onJump(edge.to);
-      }}
+      onClick={(e) =>
+        onPlainClick(e, () => {
+          onPoint(null);
+          onJump(edge.to);
+        })
+      }
       className={cn(
         "max-w-full cursor-pointer truncate rounded-full border bg-pure-white px-2 py-[3px] font-mono text-[9.5px] text-on-surface-variant",
         "transition-[border-color,color] duration-150 hover:border-border-strong hover:text-ink",
@@ -173,7 +179,7 @@ export function RelationChip({
     >
       → {edge.label ? `${edge.label} · ` : ""}
       {titleOf(edge.to)}
-    </button>
+    </a>
   );
 }
 
@@ -181,12 +187,16 @@ export function ListCard({
   node,
   selected,
   pointed,
+  href,
   onClick,
   children,
 }: {
   node: Node;
   selected: boolean;
   pointed: boolean;
+  /** Where this card lives, as a link: a plain click is `onClick`, and the
+   *  browser keeps middle-click and ctrl/⌘-click for opening a new tab. */
+  href?: string;
   onClick: () => void;
   /** Relation chips, drawn as the card's footer. */
   children?: React.ReactNode[];
@@ -196,8 +206,8 @@ export function ListCard({
   const more = (node.children ?? []).some((c) => !c.unit);
   const code = (node.children ?? []).filter((c) => c.unit).length;
   return (
-    // A div holding two kinds of button — the card face, and its chips —
-    // because a button cannot contain another.
+    // A div holding two kinds of link — the card face, and its chips —
+    // because a link cannot contain another.
     <div
       className={cn(
         "rounded-[14px] border bg-pure-white",
@@ -212,12 +222,12 @@ export function ListCard({
             : "hover:border-border-strong hover:shadow-panel",
       )}
     >
-      <button
-        type="button"
-        onClick={onClick}
+      <a
+        href={href ?? "#"}
+        onClick={(e) => onPlainClick(e, onClick)}
         aria-current={selected ? "true" : undefined}
         data-title={node.title}
-        className="flex w-full cursor-pointer items-start gap-2 rounded-[14px] px-3.5 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green"
+        className="flex w-full cursor-pointer select-none items-start gap-2 rounded-[14px] px-3.5 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green"
       >
         <span className="min-w-0 flex-1">
           <KindLabel kind={node.kind} />
@@ -251,7 +261,7 @@ export function ListCard({
             ›
           </span>
         )}
-      </button>
+      </a>
       {children?.length ? (
         <div className="flex flex-wrap gap-1 border-t border-border-gray px-3 py-2">
           {children}

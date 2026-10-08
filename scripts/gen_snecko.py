@@ -1,6 +1,12 @@
-"""Write ui/lib/snecko.ts: the snecko map, with every quote pulled verbatim
-from ~/projects/snecko at its current commit. The narrative is authored here;
-the code, line numbers and signatures are read from disk, never retyped.
+"""Write ui/public/maps/snecko.map.json: the snecko map, in the map file format
+(ui/lib/schema.ts), with every quote pulled verbatim from ~/projects/snecko at
+its current commit.
+
+This script stands in for the pipeline the format is built for. The narrative
+below (cards, flows, labels, which functions belong where) is the part an LLM
+would write; the index (symbol bodies, line ranges, signatures, calls, quoted
+snippets) is the part a machine fills in from the repo, so code is never
+retyped.
 
     python3 scripts/gen_snecko.py
 
@@ -9,7 +15,7 @@ declaration it names fails an assert rather than shipping the wrong code."""
 import json, os, re, subprocess, sys
 
 REPO = os.path.expanduser("~/projects/snecko")
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "ui", "lib", "snecko.ts")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "ui", "public", "maps", "snecko.map.json")
 COMMIT = subprocess.check_output(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], text=True).strip()
 FILES = len(subprocess.check_output(["git", "-C", REPO, "ls-files"], text=True).splitlines())
 _cache = {}
@@ -446,40 +452,6 @@ LINKS = [
     ("ed-save", 4, "disk", "Format", "overwrites", "derived", False),
 ]
 
-# ── emit ────────────────────────────────────────────────────────
-
-def tpl(s):
-    return "`" + s.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${") + "`"
-
-def emit(v, ind=0):
-    pad = "  " * ind
-    if isinstance(v, Code):
-        return tpl(v)
-    if isinstance(v, str):
-        return json.dumps(v, ensure_ascii=False)
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        return str(v)
-    if isinstance(v, list):
-        if not v:
-            return "[]"
-        return "[\n" + "".join(f"{pad}  {emit(x, ind + 1)},\n" for x in v) + f"{pad}]"
-    if isinstance(v, dict):
-        return "{\n" + "".join(f"{pad}  {k}: {emit(x, ind + 1)},\n" for k, x in v.items()) + f"{pad}}}"
-    raise TypeError(v)
-
-def place(nodes):
-    for i, n in enumerate(nodes):
-        n.setdefault("col", 0)
-        n.setdefault("row", i)
-        place(n.get("children", []))
-    # keep col/row ahead of the bulky fields
-    for n in nodes:
-        for k in ("detail", "evidence", "unit", "anatomy", "edges", "children"):
-            if k in n:
-                n[k] = n.pop(k)
-
 # ── calls: which units each unit calls ─────────────────────────
 # Matched by name: `name(` in a unit's verbatim body, against the names of the
 # other units in this map. A unit's own name is skipped, and a name two units
@@ -514,58 +486,108 @@ for u in UNITS:
         if os.environ.get("SHOW_CALLS"):
             print(f"  {u['id']} -> {', '.join(u['unit']['calls'])}")
 
-place(AUTHORED)
-ids = []
-def walk(ns):
+# ── emit: the map file (ui/lib/schema.ts) ───────────────────────
+# The narrative above is what an LLM would write; everything pulled from the
+# repo goes into `index`: one symbol per code unit, one snippet per quote.
+# Cards point into it by id, so the file holds each piece of code once.
+
+def lang_of(f):
+    ext = f.rsplit(".", 1)[-1]
+    return ext if ext in ("ts", "tsx", "rs") else "text"
+
+SYMBOLS, SNIPPETS, NODES, EDGES = {}, {}, [], []
+SYMBOL_OF = {}  # unit card id -> symbol id
+
+def snippet(b):
+    end = b["start"] + len(b["code"].rstrip("\n").split("\n")) - 1
+    sid = f"{b['file']}:{b['start']}-{end}"
+    assert sid not in SNIPPETS or SNIPPETS[sid]["body"] == b["code"], sid
+    SNIPPETS[sid] = {"file": b["file"], "start": b["start"], "lang": lang_of(b["file"]), "body": str(b["code"])}
+    return sid
+
+def anatomy(blocks):
+    out = []
+    for b in blocks:
+        if b["kind"] == "source":
+            d = {"kind": "source", "snippet": snippet(b)}
+            if b.get("why"):
+                d["why"] = b["why"]
+            out.append(d)
+        elif b["kind"] in ("flow", "map"):
+            out.append({**b, "rows": [{**r, "under": anatomy(r["under"])} if r.get("under") else r for r in b["rows"]]})
+        else:
+            out.append(b)
+    return out
+
+def add_symbol(n, parent_sym):
+    u = n["unit"]
+    sid = f"{parent_sym}.{n['title']}" if parent_sym else f"{u['file']}#{n['title']}"
+    assert sid not in SYMBOLS, f"two units share the symbol id {sid}"
+    SYMBOLS[sid] = {
+        "kind": "method" if parent_sym else n["kind"],
+        "lang": u["lang"], "file": u["file"], "start": u["start"], "end": u["end"],
+        "signature": u["signature"], "body": str(u["body"]), "complete": u["complete"],
+        "calls": u.get("calls", []),  # card ids for now; mapped to symbol ids below
+        "parent": parent_sym,
+    }
+    SYMBOL_OF[n["id"]] = sid
+    return sid
+
+def note(n, sid):
+    d = {"symbol": sid, "id": n["id"]}
+    for k in ("sub", "detail"):
+        if n.get(k):
+            d[k] = n[k]
+    if n["state"] != "derived":
+        d["state"] = n["state"]
+    if n.get("alarm"):
+        d["alarm"] = True
+    return d
+
+def walk(ns, parent):
     for n in ns:
-        ids.append(n["id"]); walk(n.get("children", []))
-walk(AUTHORED)
+        if "unit" in n:
+            continue  # emitted through its owner's `code`
+        m = {"id": n["id"], "parent": parent, "kind": n["kind"], "title": n["title"], "sub": n["sub"], "state": n["state"]}
+        for k in ("alarm", "ghost", "detail", "evidence"):
+            if n.get(k):
+                m[k] = n[k]
+        if n.get("anatomy"):
+            m["anatomy"] = anatomy(n["anatomy"])
+        kids = n.get("children", [])
+        code = []
+        for c in (c for c in kids if "unit" in c):
+            sid = add_symbol(c, None)
+            d = note(c, sid)
+            methods = [note(k, add_symbol(k, sid)) for k in c.get("children", []) if "unit" in k]
+            if methods:
+                d["methods"] = methods
+            code.append(d)
+        if code:
+            m["code"] = code
+        NODES.append(m)
+        EDGES.extend({"parent": n["id"], **e} for e in n.get("edges", []))
+        walk(kids, n["id"])
+
+EDGES.extend({"parent": None, **e} for e in E0)
+walk(AUTHORED, None)
+for sym in SYMBOLS.values():
+    sym["calls"] = [SYMBOL_OF[c] for c in sym["calls"]]
+
+ids = [n["id"] for n in NODES] + list(SYMBOL_OF)
 assert len(ids) == len(set(ids)), "duplicate ids"
 
-links = ",\n".join(
-    f'  {{ from: rowId("{a}", {json.dumps(k)}), to: rowId("{b}", {json.dumps(r)}), state: "{s}", '
-    + ("alarm: true, " if al else "") + f'label: "{lab}" }}'
-    for a, k, b, r, lab, s, al in LINKS
-)
-
-out = f'''/**
- * snecko — a real repository, read at ~/projects/snecko, commit {COMMIT}.
- *
- * GENERATED by scripts/gen_snecko.py, which holds the narrative and pulls
- * every quote, line number and signature verbatim from the source, so the
- * code here cannot drift from the file it names. Edit the generator, not
- * this file.
- *
- * A Tauri desktop app for markdown notes: vaults (folders) in a sidebar, a
- * file tree, and a CodeMirror editor with live preview that saves as you
- * type. Cut the same way as every map here: the surface you see, the data
- * flow behind each part of it, and the functions and classes that do it.
- */
-
-import type {{ Edge, Link, Node }} from "@/lib/data";
-import {{ rowId }} from "@/lib/data";
-import {{ makeMap }} from "@/lib/tree";
-
-export const RUN = {{
-  command: "understand-slop map .",
-  repo: "snecko",
-  commit: "{COMMIT}",
-  files: {FILES},
-  elapsed: "—",
-}};
-
-const AUTHORED: Node[] = {emit(AUTHORED)};
-
-/** Edges between the surface cards, read top to bottom in the first column. */
-export const E0: Edge[] = {emit(E0)};
-
-/* ── row-level links ─────────────────────────────────────────── */
-
-export const LINKS: Link[] = [
-{links},
-];
-
-export const {{ L0, nodeAt, levelAt, pathTo, edgesOf, allNodes }} = makeMap(AUTHORED, E0);
-'''
-open(OUT, "w").write(out)
-print("nodes:", len(ids), "units:", sum(1 for _ in re.finditer(r"\bunit: \{", out)))
+doc = {
+    "version": 1,
+    "repo": {"name": "snecko", "commit": COMMIT, "files": FILES, "path": "~/projects/snecko"},
+    "index": {"symbols": SYMBOLS, "snippets": SNIPPETS},
+    "nodes": NODES,
+    "edges": EDGES,
+    "links": [
+        {"from": {"node": a, "row": str(k)}, "to": {"node": b, "row": str(r)}, "label": lab, "state": st, **({"alarm": True} if al else {})}
+        for a, k, b, r, lab, st, al in LINKS
+    ],
+}
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+open(OUT, "w").write(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+print("nodes:", len(NODES), "symbols:", len(SYMBOLS), "snippets:", len(SNIPPETS))

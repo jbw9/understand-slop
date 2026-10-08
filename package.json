@@ -1,0 +1,16 @@
+{
+  "name": "understand-slop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Understand a codebase as a map of cards, and edit it from there.",
+  "type": "module",
+  "bin": {
+    "slop": "bin/slop.mjs"
+  },
+  "scripts": {
+    "postinstall": "npm --prefix ui install --no-audit --no-fund"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

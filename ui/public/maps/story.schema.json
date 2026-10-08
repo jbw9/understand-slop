@@ -1,0 +1,725 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "repo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "commit": {
+          "default": "—",
+          "type": "string"
+        },
+        "files": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "journey",
+              "page",
+              "element",
+              "flow",
+              "store",
+              "module",
+              "class",
+              "function"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "sub": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "derived",
+              "partial",
+              "inferred"
+            ]
+          },
+          "alarm": {
+            "type": "boolean"
+          },
+          "ghost": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "anatomy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "code": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "sub": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "derived",
+                        "partial",
+                        "inferred"
+                      ]
+                    },
+                    "alarm": {
+                      "type": "boolean"
+                    },
+                    "methods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "sub": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "derived",
+                              "partial",
+                              "inferred"
+                            ]
+                          },
+                          "alarm": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "symbol"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "symbol"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "parent",
+          "title",
+          "sub",
+          "state"
+        ]
+      }
+    },
+    "edges": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "derived",
+              "partial",
+              "inferred"
+            ]
+          },
+          "alarm": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "parent",
+          "from",
+          "to",
+          "state"
+        ]
+      }
+    },
+    "links": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "object",
+            "properties": {
+              "node": {
+                "type": "string"
+              },
+              "row": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "node",
+              "row"
+            ]
+          },
+          "to": {
+            "type": "object",
+            "properties": {
+              "node": {
+                "type": "string"
+              },
+              "row": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "node",
+              "row"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "derived",
+              "partial",
+              "inferred"
+            ]
+          },
+          "alarm": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "state"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "repo",
+    "nodes"
+  ],
+  "$defs": {
+    "__schema0": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "schema"
+            },
+            "table": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string",
+                    "enum": [
+                      "PK",
+                      "FK",
+                      "UQ"
+                    ]
+                  },
+                  "nullable": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type",
+                  "state"
+                ]
+              }
+            },
+            "rel": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "table",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "routes"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PATCH",
+                      "DELETE"
+                    ]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "auth": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method",
+                  "path",
+                  "auth",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "flow"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "n": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  },
+                  "under": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  }
+                },
+                "required": [
+                  "n",
+                  "title",
+                  "detail",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "facts"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "value",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "bars"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "display": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "value",
+                  "display",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "unit",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "parts"
+            },
+            "total": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number"
+                  },
+                  "display": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string",
+                    "enum": [
+                      "hold",
+                      "vary"
+                    ]
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "weight",
+                  "display",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "total",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "chips"
+            },
+            "caption": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "map"
+            },
+            "caption": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "derived",
+                      "partial",
+                      "inferred"
+                    ]
+                  },
+                  "under": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  }
+                },
+                "required": [
+                  "from",
+                  "to",
+                  "state"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "source"
+            },
+            "snippet": {
+              "type": "string"
+            },
+            "symbol": {
+              "type": "string"
+            },
+            "file": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            },
+            "lines": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "why": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    }
+  },
+  "title": "understand-slop story (.slop/story.json)"
+}

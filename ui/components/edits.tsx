@@ -1,17 +1,25 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useMap } from "@/components/map-context";
 import { cn } from "@/lib/utils";
 import { TOK_CLASS, highlightLines } from "@/lib/highlight";
 import type { CodeUnit } from "@/lib/data";
+import { readSignature, splitHead } from "@/lib/signature";
 
 /**
  * Edits to code units, made in the card.
  *
- * Held in memory, keyed by node id, and never written back: there is no file
- * writer yet, so an edit lives until the page reloads. The authored `CodeUnit`
- * is never mutated — a card shows the edit when there is one and the original
- * otherwise, which is also what makes "revert" a delete rather than a restore.
+ * Held in memory, keyed by node id, until saved. Saving (when `slop` serves a
+ * repo) writes the unit back to its file through /api/save, re-reads the map
+ * so every line number is right again, and drops the edit. The loaded
+ * `CodeUnit` is never mutated — a card shows the edit when there is one and
+ * the original otherwise, which is also what makes "revert" a delete rather
+ * than a restore.
+ *
+ * An edit remembers `base`, the code it started from. A save sends it, and
+ * the server refuses if the file no longer reads that: an edit made against
+ * old code must never quietly overwrite newer code.
  *
  * One rule ties the two fields together: the signature is the body's HEAD —
  * everything up to the first line that ends in `{` — read as one line.
@@ -25,12 +33,21 @@ import type { CodeUnit } from "@/lib/data";
 interface Edit {
   signature: string;
   body: string;
+  /** The unit's body when this edit began. */
+  base: string;
 }
+
+/** Where a save stands, per node id. */
+export type SaveState = { kind: "saving" } | { kind: "failed"; message: string };
 
 interface EditStore {
   edits: Record<string, Edit>;
+  saves: Record<string, SaveState>;
   set: (id: string, edit: Edit) => void;
   revert: (id: string) => void;
+  save: (id: string, unit: CodeUnit) => Promise<void>;
+  /** False in demo mode: there is no file to write to. */
+  canSave: boolean;
 }
 
 const Ctx = createContext<EditStore | null>(null);
@@ -43,7 +60,17 @@ export function EditsProvider({
   onChange?: () => void;
   children: React.ReactNode;
 }) {
+  const { editable, reload } = useMap();
   const [edits, setEdits] = useState<Record<string, Edit>>({});
+  const [saves, setSaves] = useState<Record<string, SaveState>>({});
+  const settle = useCallback((id: string, next: SaveState | null) => {
+    setSaves((cur) => {
+      const out = { ...cur };
+      if (next) out[id] = next;
+      else delete out[id];
+      return out;
+    });
+  }, []);
   const set = useCallback(
     (id: string, edit: Edit) => {
       setEdits((cur) => ({ ...cur, [id]: edit }));
@@ -58,11 +85,55 @@ export function EditsProvider({
         delete next[id];
         return next;
       });
+      // After a refused save the loaded code is known to be stale: re-read,
+      // so reverting shows the file as it is now, not as it was.
+      if (saves[id]?.kind === "failed") void reload();
+      settle(id, null);
       onChange?.();
     },
-    [onChange],
+    [onChange, settle, saves, reload],
   );
-  const store = useMemo(() => ({ edits, set, revert }), [edits, set, revert]);
+
+  const save = useCallback(
+    async (id: string, unit: CodeUnit) => {
+      const edit = edits[id];
+      if (!edit || !unit.symbol || !editable) return;
+      settle(id, { kind: "saving" });
+      try {
+        const r = await fetch("/api/save", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ symbol: unit.symbol, before: edit.base, after: edit.body }),
+        });
+        if (!r.ok) {
+          const { error } = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+          settle(id, { kind: "failed", message: error ?? `HTTP ${r.status}` });
+          return;
+        }
+        // Re-read first, then drop the edit, so the card goes straight from
+        // the edit to the saved code without flashing the old.
+        await reload();
+        revert(id);
+      } catch (e) {
+        settle(id, { kind: "failed", message: String(e) });
+      }
+    },
+    [edits, editable, reload, revert, settle],
+  );
+
+  // Unsaved edits are lost on leaving: say so first.
+  const dirty = editable && Object.keys(edits).length > 0;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const store = useMemo(
+    () => ({ edits, saves, set, revert, save, canSave: editable }),
+    [edits, saves, set, revert, save, editable],
+  );
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
 
@@ -81,11 +152,11 @@ export function useUnit(id: string, unit: CodeUnit) {
     const indent = head.match(/^\s*/)?.[0] ?? "";
     const opens = /\{\s*$/.test(head) ? " {" : "";
     const nextBody = indent + next + opens + (rest ? "\n" + rest : "");
-    store?.set(id, { signature: next, body: nextBody });
+    store?.set(id, { signature: next, body: nextBody, base: edit?.base ?? unit.body });
   };
 
   const setBody = (next: string) => {
-    store?.set(id, { signature: readSignature(next), body: next });
+    store?.set(id, { signature: readSignature(next), body: next, base: edit?.base ?? unit.body });
   };
 
   return {
@@ -96,36 +167,10 @@ export function useUnit(id: string, unit: CodeUnit) {
     setSignature,
     setBody,
     revert: () => store?.revert(id),
+    /** Null when this unit can't be saved (demo mode, or no symbol). */
+    save: store?.canSave && unit.symbol ? () => store.save(id, unit) : null,
+    saving: store?.saves[id] ?? null,
   };
-}
-
-/**
- * Split a unit into its head (through the first line ending in `{`) and the
- * rest. A unit whose head never opens a brace is all head, one line.
- */
-function splitHead(body: string) {
-  const lines = body.split("\n");
-  let k = lines.findIndex((l) => /\{\s*$/.test(l));
-  if (k < 0) k = 0;
-  return { head: lines.slice(0, k + 1).join("\n"), rest: lines.slice(k + 1).join("\n") };
-}
-
-/**
- * Re-read the signature from the body. Always re-read, never "kept if the body
- * still starts with it": typing at the END of the signature leaves that prefix
- * intact, so a prefix test would miss exactly the edit people make most —
- * adding a parameter or a return type.
- *
- * snecko's generator (lib/snecko.ts) runs the same normalisation, so an
- * authored signature always equals what this reads back.
- */
-export function readSignature(body: string) {
-  return splitHead(body)
-    .head.replace(/\{\s*$/, "") // the opening brace belongs to the body
-    .replace(/\s+/g, " ") // a wrapped head reads as one line
-    .replace(/\(\s+/g, "(")
-    .replace(/,\s*\)/g, ")") // a trailing comma before `)` goes with the wrap
-    .trim();
 }
 
 function lineCount(code: string) {
@@ -153,12 +198,15 @@ export function CodeEditor({
   lang,
   start,
   onChange,
+  onSave,
   label,
 }: {
   code: string;
   lang: string;
   start: number;
   onChange: (next: string) => void;
+  /** Ctrl/⌘+S. */
+  onSave?: () => void;
   label: string;
 }) {
   const n = lineCount(code);
@@ -199,6 +247,12 @@ export function CodeEditor({
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.currentTarget.blur();
+                return;
+              }
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+                // Never the browser's "save page", even with nothing to save.
+                e.preventDefault();
+                onSave?.();
                 return;
               }
               if (e.key !== "Tab") return;

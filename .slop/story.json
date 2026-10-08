@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "repo": { "name": "understand-slop" },
+  "nodes": [
+    {
+      "id": "run-slop", "parent": null, "kind": "journey",
+      "title": "Running slop on a repo",
+      "sub": "One command: index, check, serve, open",
+      "state": "derived",
+      "detail": "`slop` in a repo that has a story re-reads the code, checks the story against it, starts the app on 127.0.0.1 and opens the browser. Without a story it stops and points at /slop-map.",
+      "evidence": "bin/slop.mjs"
+    },
+    {
+      "id": "the-map", "parent": null, "kind": "page",
+      "title": "The map",
+      "sub": "The surface cards on an infinite whiteboard",
+      "state": "derived",
+      "detail": "The roots of the story, laid out in one readable line with labelled wires, on a board you can drag and zoom. Clicking a card glides it to the top left and opens its level.",
+      "evidence": "ui/components/explorer.tsx"
+    },
+    {
+      "id": "focus", "parent": null, "kind": "page",
+      "title": "A card, opened",
+      "sub": "The trail, the level below, and the pane",
+      "state": "derived",
+      "detail": "The trail on the left says where you are; under it, the cards one level down; on the right, the detail pane for the open card. Every move is a URL, so the mouse's back button walks back through cards.",
+      "evidence": "ui/components/explorer.tsx"
+    },
+    {
+      "id": "code-pane", "parent": null, "kind": "element",
+      "title": "The code pane",
+      "sub": "Editable code for the open card, drillable by calls",
+      "state": "derived",
+      "detail": "The open card's code units, one after another, each with an editable signature and body. A unit's calls and a class's methods open as a deeper list inside the pane rather than as new levels.",
+      "evidence": "ui/components/detail.tsx"
+    },
+    {
+      "id": "story-file", "parent": null, "kind": "store",
+      "title": ".slop/story.json",
+      "sub": "The narrative, written by Claude",
+      "state": "derived",
+      "detail": "Cards, flows, edges and links. Code is named only by symbol id, never quoted, so the story survives the code moving around. Written by the /slop-map skill and committed.",
+      "evidence": "ui/lib/schema.ts"
+    },
+    {
+      "id": "the-index", "parent": null, "kind": "store",
+      "title": "The index",
+      "sub": "Every function, class and method, read fresh",
+      "state": "derived",
+      "detail": "Rebuilt from the code on every map load, so line numbers and bodies are never stale. `slop index` also writes it to .slop/index.json, which stays out of git.",
+      "evidence": "ui/lib/server/indexer.ts"
+    },
+    {
+      "id": "the-files", "parent": null, "kind": "store",
+      "title": "The repo's files",
+      "sub": "Where a saved card is written",
+      "state": "derived",
+      "evidence": "ui/lib/server/repo.ts"
+    },
+
+    {
+      "id": "run-start", "parent": "run-slop", "kind": "flow",
+      "title": "Starting up",
+      "sub": "Refuses to serve a story with errors",
+      "state": "derived",
+      "anatomy": [ { "kind": "flow", "rows": [
+        { "n": 1, "title": "Needs a story", "detail": "No .slop/story.json: exit, and say to run /slop-map.", "state": "derived" },
+        { "n": 2, "title": "Index the code", "detail": "Writes .slop/index.json, and a .gitignore beside it the first time.", "state": "derived" },
+        { "n": 3, "title": "Check the story", "detail": "Errors stop the run; warnings (drift) are printed and the map still opens.", "state": "derived" },
+        { "n": 4, "title": "Build if stale", "detail": "Rebuilds the Next app when any source under ui/ is newer than the last build.", "state": "derived" },
+        { "n": 5, "title": "Serve on 127.0.0.1", "detail": "next start on a free port from 4747, with SLOP_REPO set; opens the browser once it answers.", "state": "derived" }
+      ] } ],
+      "code": [
+        { "symbol": "bin/slop.mjs#index", "id": "cli-index" },
+        { "symbol": "bin/slop.mjs#check", "id": "cli-check", "sub": "Errors exit 1, warnings don't" },
+        { "symbol": "bin/slop.mjs#buildStale", "id": "cli-stale" },
+        { "symbol": "bin/slop.mjs#serve", "id": "cli-serve" }
+      ]
+    },
+
+    {
+      "id": "map-board", "parent": "the-map", "kind": "flow",
+      "title": "Moving around the board",
+      "sub": "Pans without re-rendering a card",
+      "state": "derived",
+      "detail": "The camera is three motion values written straight to the DOM. React never re-renders while you drag, which is what keeps the cards from lagging behind the pointer.",
+      "anatomy": [ { "kind": "facts", "rows": [
+        { "label": "Drag", "value": "pans; a drag that starts on a card doesn't open it", "state": "derived" },
+        { "label": "Wheel", "value": "pans; ctrl or ⌘ + wheel zooms at the pointer, 25%–250%", "state": "derived" },
+        { "label": "Fit", "value": "until you move, the map refits to the window on resize", "state": "derived" }
+      ] } ],
+      "code": [ { "symbol": "ui/components/explorer.tsx#MapView", "id": "map-view" }, "ui/components/explorer.tsx#zoomAt" ]
+    },
+    {
+      "id": "map-layout", "parent": "the-map", "kind": "flow",
+      "title": "Laying out the roots",
+      "sub": "One line in edge order, stores to the side",
+      "state": "derived",
+      "code": [ { "symbol": "ui/lib/layout.ts#layoutRoots", "id": "layout-roots" } ]
+    },
+
+    {
+      "id": "focus-history", "parent": "focus", "kind": "flow",
+      "title": "Back and forward",
+      "sub": "Every card is a link",
+      "state": "derived",
+      "detail": "The open path lives in the URL (?map=…&at=a/b). A move pushes a history entry and popstate restores one, so browser back, the mouse's side buttons and swipes step through cards. Plain clicks are taken over; middle and ctrl clicks are left to the browser.",
+      "anatomy": [ { "kind": "flow", "rows": [
+        { "n": 1, "title": "Path → URL", "detail": "pushState on every move; the first sync only replaces, so landing leaves no extra step.", "state": "derived" },
+        { "n": 2, "title": "URL → path", "detail": "On popstate, the longest prefix of the URL's path that still resolves.", "state": "derived" }
+      ] } ],
+      "code": [ { "symbol": "ui/components/nav.ts#useMapNav", "id": "map-nav" }, "ui/components/nav.ts#hrefFor", "ui/components/nav.ts#onPlainClick" ]
+    },
+
+    {
+      "id": "pane-drill", "parent": "code-pane", "kind": "flow",
+      "title": "Drilling into calls",
+      "sub": "A stack inside the pane, not new levels",
+      "state": "derived",
+      "code": [ { "symbol": "ui/components/detail.tsx#CodeList", "id": "code-list" }, "ui/components/detail.tsx#UnitPanel" ]
+    },
+    {
+      "id": "pane-save", "parent": "code-pane", "kind": "flow",
+      "title": "Saving an edit",
+      "sub": "Refuses if the file changed underneath",
+      "state": "derived",
+      "detail": "An edit remembers the code it started from. Saving sends that along; the server finds the unit by id in the file as it is now and writes only if it still reads the same. Then the whole map is re-read, so every line number after the edit moves too.",
+      "anatomy": [ { "kind": "flow", "rows": [
+        { "n": 1, "title": "Edit in the card", "detail": "Held in memory per card, with the body it started from.", "state": "derived" },
+        { "n": 2, "title": "Save or Ctrl+S", "detail": "POST /api/save with the symbol id, the starting body and the new one.", "state": "derived" },
+        { "n": 3, "title": "Compare on disk", "detail": "The unit is re-read from its file by id. Different from the starting body: 409, nothing written.", "state": "derived" },
+        { "n": 4, "title": "Write", "detail": "The unit's lines are replaced, through a temp file and a rename.", "state": "derived" },
+        { "n": 5, "title": "Re-read the map", "detail": "The edit is dropped only after the fresh map is in, so the card never flashes the old code.", "state": "derived" }
+      ] },
+      { "kind": "source", "file": "ui/lib/server/repo.ts", "at": "if (now.body !== before) throw new SaveConflict(`${symbol} changed on disk since it was loaded`);", "lines": 1,
+        "why": "The whole conflict rule: compare text, not line numbers, so a shifted function still saves and a changed one never gets overwritten." } ],
+      "code": [
+        { "symbol": "ui/components/edits.tsx#EditsProvider", "id": "edits-provider", "sub": "Holds edits; save and revert" },
+        { "symbol": "ui/app/api/save/route.ts#POST", "id": "save-route" },
+        { "symbol": "ui/lib/server/repo.ts#saveSymbol", "id": "save-symbol", "sub": "Finds the unit by id, compares, writes" },
+        { "symbol": "ui/lib/server/guard.ts#refuse", "id": "guard", "sub": "Only the page this server serves may read or write" }
+      ]
+    },
+
+    {
+      "id": "story-merge", "parent": "story-file", "kind": "flow",
+      "title": "Story + index → the map",
+      "sub": "Missing code is a warning, not a failure",
+      "state": "derived",
+      "detail": "The server merges the story with a fresh index and resolves anchored quotes against the files. The loader then checks it in two passes. Schema and broken references fail with a list of problems; code the story names that no longer exists becomes a partial, alarmed card that says what is gone.",
+      "anatomy": [ { "kind": "flow", "rows": [
+        { "n": 1, "title": "Merge", "detail": "Anchors (file + first line) become snippets; an anchor that matches twice is a warning.", "state": "derived" },
+        { "n": 2, "title": "Schema", "detail": "zod: every field, every block kind.", "state": "derived" },
+        { "n": 3, "title": "References", "detail": "Unique ids, real parents, sibling edges, links to real rows.", "state": "derived" },
+        { "n": 4, "title": "Build the tree", "detail": "Code refs become code cards; a class's methods become its children; calls resolve to cards.", "state": "derived" }
+      ] } ],
+      "code": [
+        { "symbol": "ui/lib/server/repo.ts#repoMap", "id": "repo-map" },
+        { "symbol": "ui/lib/load.ts#parseMap", "id": "parse-map" },
+        { "symbol": "ui/lib/load.ts#checkReferences", "id": "check-refs" },
+        { "symbol": "ui/lib/load.ts#buildMap", "id": "build-map" }
+      ]
+    },
+
+    {
+      "id": "index-read", "parent": "the-index", "kind": "flow",
+      "title": "Reading the code",
+      "sub": "TypeScript's own parser, TS and JS only",
+      "state": "partial",
+      "detail": "Every TS/JS file git knows about is parsed with the TypeScript compiler. Units get ids from their names, never their lines. Calls are resolved through the type checker, falling back to a same-file name match. Rust, Python and the rest are not indexed: a story can still quote them with an anchored source block.",
+      "anatomy": [ { "kind": "chips", "caption": "What counts as a unit", "rows": [
+        { "label": "function declarations", "note": "at any depth", "state": "derived" },
+        { "label": "const f = () => …", "state": "derived" },
+        { "label": "useCallback((e) => { … })", "note": "a call wrapping a block-bodied function", "state": "derived" },
+        { "label": "classes and their methods", "state": "derived" },
+        { "label": "object-literal methods", "note": "not units", "state": "partial" }
+      ] } ],
+      "code": [
+        { "symbol": "ui/lib/server/indexer.ts#indexRepo", "id": "index-repo" },
+        { "symbol": "ui/lib/server/indexer.ts#collect", "id": "index-collect" },
+        { "symbol": "ui/lib/server/indexer.ts#idsFor", "id": "index-ids", "sub": "Short name, else qualified, else numbered" }
+      ]
+    }
+  ],
+  "edges": [
+    { "parent": null, "from": "run-slop", "to": "the-index", "label": "builds", "state": "derived" },
+    { "parent": null, "from": "run-slop", "to": "story-file", "label": "checks", "state": "derived" },
+    { "parent": null, "from": "story-file", "to": "the-map", "label": "drawn as", "state": "derived" },
+    { "parent": null, "from": "the-index", "to": "the-map", "label": "quoted in", "state": "derived" },
+    { "parent": null, "from": "the-map", "to": "focus", "label": "click opens", "state": "derived" },
+    { "parent": null, "from": "focus", "to": "code-pane", "label": "shows", "state": "derived" },
+    { "parent": null, "from": "code-pane", "to": "the-files", "label": "saves to", "state": "derived" },
+    { "parent": "code-pane", "from": "pane-drill", "to": "pane-save", "label": "edit any unit", "state": "derived" }
+  ],
+  "links": [
+    { "from": { "node": "pane-save", "row": "5" }, "to": { "node": "story-merge", "row": "1" }, "label": "re-runs", "state": "derived" },
+    { "from": { "node": "run-start", "row": "3" }, "to": { "node": "story-merge", "row": "3" }, "label": "same checks", "state": "derived" }
+  ]
+}

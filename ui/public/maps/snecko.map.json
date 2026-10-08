@@ -1,0 +1,1670 @@
+{
+  "version": 1,
+  "repo": {
+    "name": "snecko",
+    "commit": "fcea0b6",
+    "files": 93,
+    "path": "~/projects/snecko"
+  },
+  "index": {
+    "symbols": {
+      "src/components/sidebar.tsx#resize": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/components/sidebar.tsx",
+        "start": 27,
+        "end": 35,
+        "signature": "const resize = useCallback((e: MouseEvent) =>",
+        "body": "    const resize = useCallback(\n        (e: MouseEvent) => {\n            if (!isResizing.current) return;\n\n            const newWidth = Math.min(Math.max(e.clientX, minWidth));\n            setWidth(newWidth);\n        },\n        [minWidth],\n    );",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/App.tsx#handleAddVault": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 130,
+        "end": 141,
+        "signature": "async function handleAddVault()",
+        "body": "    async function handleAddVault() {\n        const path = await pickDir();\n\n        if (path == null) {\n            return;\n        }\n\n        const updated_vaults = await addVault(path);\n        setVaults(updated_vaults);\n\n        await openVault(path);\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#pickDir",
+          "src/lib/vault.ts#addVault",
+          "src/App.tsx#openVault"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#pickDir": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 41,
+        "end": 52,
+        "signature": "export async function pickDir()",
+        "body": "export async function pickDir() {\n    const selected = await open({\n        directory: true,\n        multiple: false,\n    });\n\n    if (selected == null) {\n        return;\n    }\n\n    return selected;\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/lib/vault.ts#addVault": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 19,
+        "end": 34,
+        "signature": "export async function addVault(path: string): Promise<Vault[]>",
+        "body": "export async function addVault(path: string): Promise<Vault[]> {\n    const store = await loadStore();\n    const vaults = (await store.get<Vault[]>(\"vaults\")) ?? [];\n\n    if (vaults.some((v) => v.path === path)) {\n        return vaults;\n    }\n\n    // regex for name\n    const name = path.split(/[\\\\/]/).pop() ?? path;\n    const updated_vaults = [...vaults, { path, name }];\n\n    await store.set(\"vaults\", updated_vaults);\n\n    return updated_vaults;\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore"
+        ],
+        "parent": null
+      },
+      "src/App.tsx#openVault": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 102,
+        "end": 111,
+        "signature": "async function openVault(path: string)",
+        "body": "    async function openVault(path: string) {\n        const entries = await readDir(path);\n        setEntries(entries);\n        setActiveVault(path);\n\n        const vault = vaults.find((v) => v.path === path);\n        if (vault) {\n            await setLastVault(vault);\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#readDir",
+          "src/lib/vault.ts#setLastVault"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#readDir": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 18,
+        "end": 39,
+        "signature": "export async function readDir(path: string): Promise<FileEntry[]>",
+        "body": "export async function readDir(path: string): Promise<FileEntry[]> {\n    const entries = await readDirShallow(path);\n\n    const result: FileEntry[] = [];\n\n    for (const entry of entries) {\n        if (entry.name.startsWith(\".\")) {\n            continue;\n        }\n\n        const fullPath = await join(path, entry.name);\n\n        if (entry.isDirectory) {\n            const children = await readDir(fullPath);\n            result.push({ ...entry, path: fullPath, children });\n        } else {\n            result.push({ ...entry, path: fullPath });\n        }\n    }\n\n    return result;\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/lib/vault.ts#removeVault": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 36,
+        "end": 57,
+        "signature": "export async function removeVault(path: string): Promise<Vault[]>",
+        "body": "export async function removeVault(path: string): Promise<Vault[]> {\n    const store = await loadStore();\n    const vaults = (await store.get<Vault[]>(\"vaults\")) ?? [];\n\n    // add all vaults into new array except one that matches path\n    const updated_vaults = vaults.filter((v) => v.path !== path);\n\n    await store.set(\"vaults\", updated_vaults);\n\n    // set last vault to last vault path\n    const lastVault = await store.get<string>(\"lastVault\");\n    if (lastVault === path) {\n        await store.delete(\"lastVault\");\n\n        if (updated_vaults.length > 0) {\n            const lastVault = updated_vaults[updated_vaults.length - 1];\n            await setLastVault(lastVault);\n        }\n    }\n\n    return updated_vaults;\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore",
+          "src/lib/vault.ts#setLastVault"
+        ],
+        "parent": null
+      },
+      "src/App.tsx#handleRemoveVault": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 113,
+        "end": 128,
+        "signature": "async function handleRemoveVault(path: string)",
+        "body": "    async function handleRemoveVault(path: string) {\n        const updated_vaults = await removeVault(path);\n        setVaults(updated_vaults);\n\n        if (activeVault === path) {\n            const nextVault = await getLastVault();\n            if (nextVault) {\n                await openVault(nextVault.path);\n            } else {\n                setActiveVault(null);\n                setEntries([]);\n                setContent(\"\");\n                setFileName(\"\");\n            }\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/vault.ts#removeVault",
+          "src/lib/vault.ts#getLastVault",
+          "src/App.tsx#openVault"
+        ],
+        "parent": null
+      },
+      "src/lib/vault.ts#setLastVault": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 60,
+        "end": 63,
+        "signature": "export async function setLastVault(vault: Vault): Promise<void>",
+        "body": "export async function setLastVault(vault: Vault): Promise<void> {\n    const store = await loadStore();\n    await store.set(\"lastVault\", vault);\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore"
+        ],
+        "parent": null
+      },
+      "src/lib/vault.ts#getLastVault": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 65,
+        "end": 69,
+        "signature": "export async function getLastVault(): Promise<Vault | null>",
+        "body": "export async function getLastVault(): Promise<Vault | null> {\n    const store = await loadStore();\n    const vault = await store.get<Vault>(\"lastVault\");\n    return vault ?? null;\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore"
+        ],
+        "parent": null
+      },
+      "src/lib/vault.ts#getLastFile": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 76,
+        "end": 80,
+        "signature": "export async function getLastFile(): Promise<File | null>",
+        "body": "export async function getLastFile(): Promise<File | null> {\n    const store = await loadStore();\n    const file = await store.get<File>(\"lastFile\");\n    return file ?? null;\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore"
+        ],
+        "parent": null
+      },
+      "src/lib/vault.ts#getVaults": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 13,
+        "end": 17,
+        "signature": "export async function getVaults(): Promise<Vault[]>",
+        "body": "export async function getVaults(): Promise<Vault[]> {\n    const store = await loadStore();\n    const vaults = await store.get<Vault[]>(\"vaults\");\n    return vaults ?? [];\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore"
+        ],
+        "parent": null
+      },
+      "src/components/fileTree.tsx#sortEntries": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/components/fileTree.tsx",
+        "start": 80,
+        "end": 90,
+        "signature": "function sortEntries(entries: FileEntry[])",
+        "body": "    function sortEntries(entries: FileEntry[]) {\n        return [\n            ...entries.sort((a, b) => {\n                if (a.isDirectory !== b.isDirectory) {\n                    // directories have priority\n                    return a.isDirectory ? -1 : 1;\n                }\n                return a.name.localeCompare(b.name);\n            }),\n        ];\n    }",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#splitFileName": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 64,
+        "end": 69,
+        "signature": "export function splitFileName(name: string): { file: string; ext: string }",
+        "body": "export function splitFileName(name: string): { file: string; ext: string } {\n    const match = name.match(/^(.*?)(\\.[^.]+)?$/);\n    const file = match?.[1] ?? name;\n    const ext = match?.[2] ?? \"\";\n    return { file, ext };\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/App.tsx#handleOpenFile": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 143,
+        "end": 161,
+        "signature": "async function handleOpenFile(entry: FileEntry)",
+        "body": "    async function handleOpenFile(entry: FileEntry) {\n        if (entry.path === filePath) return;\n\n        // flush pending saves before loading new file just in case\n        if (saveTimeoutRef.current) {\n            clearTimeout(saveTimeoutRef.current);\n            saveTimeoutRef.current = null;\n\n            if (filePath) {\n                await writeTextFile(filePath, content);\n            }\n        }\n\n        const fileContent = await readTextFile(entry.path);\n        setContent(fileContent);\n        setFileName(entry.name);\n        setFilePath(entry.path);\n        await setLastFile({ name: entry.name, path: entry.path });\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/vault.ts#setLastFile"
+        ],
+        "parent": null
+      },
+      "src/lib/vault.ts#setLastFile": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/vault.ts",
+        "start": 71,
+        "end": 74,
+        "signature": "export async function setLastFile(file: File): Promise<void>",
+        "body": "export async function setLastFile(file: File): Promise<void> {\n    const store = await loadStore();\n    await store.set(\"lastFile\", file);\n}",
+        "complete": true,
+        "calls": [
+          "src/utils/store.ts#loadStore"
+        ],
+        "parent": null
+      },
+      "src/lib/contextMenuHandler.ts#handleFileContextMenu": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/contextMenuHandler.ts",
+        "start": 40,
+        "end": 60,
+        "signature": "function handleFileContextMenu(entry: FileEntry, e: React.MouseEvent)",
+        "body": "    function handleFileContextMenu(entry: FileEntry, e: React.MouseEvent) {\n        openMenu(e, [\n            {\n                label: \"Open in new tab\",\n                icon: FilePlus,\n                onClick: () => {},\n            },\n            {\n                label: \"Rename\",\n                icon: PenLine,\n                onClick: () => {},\n            },\n            {\n                label: \"Delete\",\n                icon: Trash2,\n                onClick: () => {\n                    onDelete(entry);\n                },\n            },\n        ]);\n    }",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/App.tsx#handleDelete": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 197,
+        "end": 215,
+        "signature": "async function handleDelete(entry: FileEntry)",
+        "body": "    async function handleDelete(entry: FileEntry) {\n        if (!confirm(`Delete \"${entry.name}\"? This cannot be undone.`)) return;\n        try {\n            await deleteEntry(entry);\n\n            if (\n                filePath === entry.path ||\n                (entry.isDirectory && filePath?.startsWith(entry.path + \"/\"))\n            ) {\n                setContent(\"\");\n                setFileName(\"\");\n                setFilePath(null);\n            }\n\n            if (activeVault) setEntries(await readDir(activeVault));\n        } catch (err) {\n            alert(String(err));\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#deleteEntry",
+          "src/lib/fileHandler.ts#readDir"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#deleteEntry": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 115,
+        "end": 117,
+        "signature": "export async function deleteEntry(entry: FileEntry): Promise<void>",
+        "body": "export async function deleteEntry(entry: FileEntry): Promise<void> {\n    await remove(entry.path, { recursive: entry.isDirectory });\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/lib/contextMenuHandler.ts#handleSidebarContextMenu": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/contextMenuHandler.ts",
+        "start": 62,
+        "end": 80,
+        "signature": "function handleSidebarContextMenu(e: React.MouseEvent)",
+        "body": "    function handleSidebarContextMenu(e: React.MouseEvent) {\n        if (!activeVault) return;\n        openMenu(e, [\n            {\n                label: \"New Note\",\n                icon: SquarePen,\n                onClick: () => {\n                    onCreateFile(activeVault);\n                },\n            },\n            {\n                label: \"New Folder\",\n                icon: FolderPlus,\n                onClick: () => {\n                    onCreateFolder(activeVault);\n                },\n            },\n        ]);\n    }",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/App.tsx#handleCreateFile": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 178,
+        "end": 186,
+        "signature": "async function handleCreateFile(dir: string)",
+        "body": "    async function handleCreateFile(dir: string) {\n        try {\n            const { name, path } = await newNote(dir);\n            if (activeVault) setEntries(await readDir(activeVault));\n            await handleOpenFile(generateFileEntry(name, path));\n        } catch (err) {\n            alert(String(err));\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#newNote",
+          "src/lib/fileHandler.ts#readDir",
+          "src/App.tsx#handleOpenFile"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#newNote": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 87,
+        "end": 99,
+        "signature": "export async function newNote(dir: string): Promise<{ name: string; path: string }>",
+        "body": "export async function newNote(\n    dir: string,\n): Promise<{ name: string; path: string }> {\n    const name = await getAvailableFileName(dir, \".md\");\n    const path = await join(dir, name);\n\n    if (await exists(path)) {\n        throw new Error(`${name} already exists`);\n    }\n\n    await writeTextFile(path, \"\");\n    return { name, path };\n}",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#getAvailableFileName"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#getAvailableFileName": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 71,
+        "end": 85,
+        "signature": "async function getAvailableFileName(dir: string, ext: string): Promise<string>",
+        "body": "async function getAvailableFileName(dir: string, ext: string): Promise<string> {\n    const siblings = await readDirShallow(dir);\n    const existingNames = new Set(siblings.map((e) => e.name));\n\n    if (!existingNames.has(`Untitled${ext}`)) {\n        return `Untitled${ext}`;\n    }\n\n    let i = 1;\n    while (existingNames.has(`Untitled ${i}${ext}`)) {\n        i++;\n    }\n\n    return `Untitled ${i}${ext}`;\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/App.tsx#handleCreateFolder": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 188,
+        "end": 195,
+        "signature": "async function handleCreateFolder(dir: string)",
+        "body": "    async function handleCreateFolder(dir: string) {\n        try {\n            await newDir(dir);\n            if (activeVault) setEntries(await readDir(activeVault));\n        } catch (err) {\n            alert(String(err));\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#newDir",
+          "src/lib/fileHandler.ts#readDir"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#newDir": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 101,
+        "end": 113,
+        "signature": "export async function newDir(dir: string): Promise<{ name: string; path: string }>",
+        "body": "export async function newDir(\n    dir: string,\n): Promise<{ name: string; path: string }> {\n    const name = await getAvailableFileName(dir, \"\");\n    const path = await join(dir, name);\n\n    if (await exists(path)) {\n        throw new Error(`${path} already exists`);\n    }\n\n    await mkdir(path);\n    return { name, path };\n}",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#getAvailableFileName"
+        ],
+        "parent": null
+      },
+      "src/App.tsx#handleContentChange": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 59,
+        "end": 71,
+        "signature": "function handleContentChange(newContent: string)",
+        "body": "    function handleContentChange(newContent: string) {\n        setContent(newContent);\n\n        if (saveTimeoutRef.current) {\n            clearTimeout(saveTimeoutRef.current);\n        }\n\n        saveTimeoutRef.current = setTimeout(async () => {\n            if (filePath) {\n                await writeTextFile(filePath, newContent);\n            }\n        }, 10);\n    }",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/lib/livePreview.ts#markdownLivePreview": {
+        "kind": "class",
+        "lang": "ts",
+        "file": "src/lib/livePreview.ts",
+        "start": 142,
+        "end": 163,
+        "signature": "export const markdownLivePreview = ViewPlugin.fromClass(class",
+        "body": "export const markdownLivePreview = ViewPlugin.fromClass(\n    class {\n        decorations: DecorationSet;\n\n        constructor(view: EditorView) {\n            this.decorations = buildDecorations(view);\n        }\n\n        update(update: ViewUpdate) {\n            if (\n                update.docChanged ||\n                update.viewportChanged ||\n                update.selectionSet\n            ) {\n                this.decorations = buildDecorations(update.view);\n            }\n        }\n    },\n    {\n        decorations: (v) => v.decorations,\n    },\n);",
+        "complete": true,
+        "calls": [
+          "src/lib/livePreview.ts#buildDecorations"
+        ],
+        "parent": null
+      },
+      "src/lib/livePreview.ts#markdownLivePreview.constructor": {
+        "kind": "method",
+        "lang": "ts",
+        "file": "src/lib/livePreview.ts",
+        "start": 146,
+        "end": 148,
+        "signature": "constructor(view: EditorView)",
+        "body": "        constructor(view: EditorView) {\n            this.decorations = buildDecorations(view);\n        }",
+        "complete": true,
+        "calls": [
+          "src/lib/livePreview.ts#buildDecorations"
+        ],
+        "parent": "src/lib/livePreview.ts#markdownLivePreview"
+      },
+      "src/lib/livePreview.ts#markdownLivePreview.update": {
+        "kind": "method",
+        "lang": "ts",
+        "file": "src/lib/livePreview.ts",
+        "start": 150,
+        "end": 158,
+        "signature": "update(update: ViewUpdate)",
+        "body": "        update(update: ViewUpdate) {\n            if (\n                update.docChanged ||\n                update.viewportChanged ||\n                update.selectionSet\n            ) {\n                this.decorations = buildDecorations(update.view);\n            }\n        }",
+        "complete": true,
+        "calls": [
+          "src/lib/livePreview.ts#buildDecorations"
+        ],
+        "parent": "src/lib/livePreview.ts#markdownLivePreview"
+      },
+      "src/lib/livePreview.ts#buildDecorations": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/livePreview.ts",
+        "start": 41,
+        "end": 140,
+        "signature": "function buildDecorations(view: EditorView): DecorationSet",
+        "body": "function buildDecorations(view: EditorView): DecorationSet {\n    const pending: PendingDecoration[] = [];\n    const cursorLine = view.state.doc.lineAt(\n        view.state.selection.main.head,\n    ).number;\n\n    for (const { from, to } of view.visibleRanges) {\n        syntaxTree(view.state).iterate({\n            from,\n            to,\n            enter: (node) => {\n                const nodeLine = view.state.doc.lineAt(node.from).number;\n                const cursorInLine = nodeLine === cursorLine;\n\n                switch (node.name) {\n                    case \"ATXHeading1\":\n                    case \"ATXHeading2\":\n                    case \"ATXHeading3\":\n                    case \"ATXHeading4\":\n                    case \"ATXHeading5\":\n                    case \"ATXHeading6\": {\n                        const level = Number(node.name.slice(-1));\n                        pending.push({\n                            from: node.from,\n                            to: node.to,\n                            decoration: headingMarks[level],\n                        });\n                        break;\n                    }\n                    case \"HeaderMark\": {\n                        if (!cursorInLine) {\n                            const line = view.state.doc.lineAt(node.from);\n                            const spaceEnd = Math.min(node.to + 1, line.to);\n                            pending.push({\n                                from: node.from,\n                                to: spaceEnd,\n                                decoration: hiddenRange,\n                            });\n                        }\n                        break;\n                    }\n                    case \"StrongEmphasis\": {\n                        pending.push({\n                            from: node.from,\n                            to: node.to,\n                            decoration: boldMark,\n                        });\n                        break;\n                    }\n                    case \"Emphasis\": {\n                        pending.push({\n                            from: node.from,\n                            to: node.to,\n                            decoration: italicMark,\n                        });\n                        break;\n                    }\n                    case \"EmphasisMark\": {\n                        if (!cursorInLine) {\n                            pending.push({\n                                from: node.from,\n                                to: node.to,\n                                decoration: hiddenRange,\n                            });\n                        }\n                        break;\n                    }\n                    case \"InlineCode\": {\n                        pending.push({\n                            from: node.from,\n                            to: node.to,\n                            decoration: codeMark,\n                        });\n                        break;\n                    }\n                    case \"CodeMark\": {\n                        if (!cursorInLine) {\n                            pending.push({\n                                from: node.from,\n                                to: node.to,\n                                decoration: hiddenRange,\n                            });\n                        }\n                        break;\n                    }\n                }\n            },\n        });\n    }\n\n    // sort by ascending order to replace widgets before marks\n    pending.sort((a, b) => a.from - b.from || a.to - a.from - (b.to - b.from));\n\n    const builder = new RangeSetBuilder<Decoration>();\n    for (const { from, to, decoration } of pending) {\n        builder.add(from, to, decoration);\n    }\n\n    return builder.finish();\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/lib/markdownStyle.ts#buildMarkdownTheme": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/markdownStyle.ts",
+        "start": 25,
+        "end": 48,
+        "signature": "export function buildMarkdownTheme(config: MarkdownStyleConfig)",
+        "body": "export function buildMarkdownTheme(config: MarkdownStyleConfig) {\n    const headingStyles: Record<\n        string,\n        { fontWeight: string; fontSize: string }\n    > = {};\n    for (let l = 1; l <= 6; l++) {\n        headingStyles[`.cm-live-heading-${l}`] = {\n            fontWeight: config.headingWeight,\n            fontSize: `${config.headingScales[l - 1]}em`,\n        };\n    }\n\n    return EditorView.theme({\n        ...headingStyles,\n        \".cm-live-bold\": { fontWeight: config.boldWeight },\n        \".cm-live-italic\": { fontStyle: config.italicStyle },\n        \".cm-live-code\": {\n            fontFamily: config.codeFont,\n            backgroundColor: config.codeBackground,\n            borderRadius: config.codeRadius,\n            padding: config.codePadding,\n        },\n    });\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/components/editor.tsx#handleRename": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/components/editor.tsx",
+        "start": 135,
+        "end": 142,
+        "signature": "function handleRename(value: string)",
+        "body": "    function handleRename(value: string) {\n        setRenaming(false);\n        const trimmed = value.trim();\n        if (trimmed && trimmed !== displayName) {\n            const { ext } = splitFileName(filename);\n            onRename(`${trimmed}${ext}`);\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#splitFileName"
+        ],
+        "parent": null
+      },
+      "src/App.tsx#handleRename": {
+        "kind": "function",
+        "lang": "tsx",
+        "file": "src/App.tsx",
+        "start": 163,
+        "end": 176,
+        "signature": "async function handleRename(newName: string)",
+        "body": "    async function handleRename(newName: string) {\n        if (!filePath) return;\n\n        const newPath = await rename(filePath, newName);\n\n        setFilePath(newPath);\n        setFileName(newName);\n        await setLastFile({ name: newName, path: newPath });\n\n        if (activeVault) {\n            const updatedEntries = await readDir(activeVault);\n            setEntries(updatedEntries);\n        }\n    }",
+        "complete": true,
+        "calls": [
+          "src/lib/fileHandler.ts#rename",
+          "src/lib/vault.ts#setLastFile",
+          "src/lib/fileHandler.ts#readDir"
+        ],
+        "parent": null
+      },
+      "src/lib/fileHandler.ts#rename": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/lib/fileHandler.ts",
+        "start": 54,
+        "end": 62,
+        "signature": "export async function rename(oldPath: string, newName: string): Promise<string>",
+        "body": "export async function rename(\n    oldPath: string,\n    newName: string,\n): Promise<string> {\n    const dir = await dirname(oldPath);\n    const newPath = await join(dir, newName);\n    await renameFile(oldPath, newPath);\n    return newPath;\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src/utils/store.ts#loadStore": {
+        "kind": "function",
+        "lang": "ts",
+        "file": "src/utils/store.ts",
+        "start": 9,
+        "end": 17,
+        "signature": "export async function loadStore()",
+        "body": "export async function loadStore() {\n    storePromise ??= (async () => {\n        const exeDir = await invoke<string>(\"get_exe_dir\");\n        const path = await join(exeDir, VAULTS_FILE);\n        return load(path, { autoSave: true });\n    })();\n\n    return storePromise;\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      },
+      "src-tauri/src/lib.rs#get_exe_dir": {
+        "kind": "function",
+        "lang": "rs",
+        "file": "src-tauri/src/lib.rs",
+        "start": 3,
+        "end": 7,
+        "signature": "fn get_exe_dir() -> Result<String, String>",
+        "body": "fn get_exe_dir() -> Result<String, String> {\n    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;\n    let exe_dir = exe_path.parent().ok_or_else(|| \"no parent directory\".to_string())?;\n    Ok(exe_dir.to_string_lossy().to_string())\n}",
+        "complete": true,
+        "calls": [],
+        "parent": null
+      }
+    },
+    "snippets": {
+      "src/components/titlebar.tsx:26-32": {
+        "file": "src/components/titlebar.tsx",
+        "start": 26,
+        "lang": "tsx",
+        "body": "        <div\n            data-tauri-drag-region\n            className=\"flex h-8 w-full flex-none select-none items-center bg-gray-900 text-gray-300\"\n        >\n            <div data-tauri-drag-region className=\"px-3 text-xs\">\n                app\n            </div>"
+      },
+      "src/App.tsx:75-99": {
+        "file": "src/App.tsx",
+        "start": 75,
+        "lang": "tsx",
+        "body": "    // load last active vault\n    useEffect(() => {\n        (async () => {\n            const loadedVaults = await getVaults();\n            setVaults(loadedVaults);\n\n            const lastVault = await getLastVault();\n            if (\n                lastVault &&\n                loadedVaults.some((v) => v.path === lastVault.path)\n            ) {\n                await openVault(lastVault.path);\n\n                const lastFile = await getLastFile();\n\n                // check if lastFile belongs to lastVault\n                if (lastFile && lastFile.path.startsWith(lastVault.path)) {\n                    const fileContent = await readTextFile(lastFile.path);\n                    setContent(fileContent);\n                    setFileName(lastFile.name);\n                    setFilePath(lastFile.path);\n                }\n            }\n        })();\n    }, []);"
+      },
+      "src/main.tsx:5-8": {
+        "file": "src/main.tsx",
+        "start": 5,
+        "lang": "tsx",
+        "body": "// disable default contextmenu\ndocument.addEventListener(\"contextmenu\", (e) => {\n    e.preventDefault();\n});"
+      },
+      "src/components/editor.tsx:119-130": {
+        "file": "src/components/editor.tsx",
+        "start": 119,
+        "lang": "tsx",
+        "body": "    // when content variable changes push into editor instance\n    useEffect(() => {\n        const view = editorViewRef.current;\n        if (!view) return;\n\n        const currentDoc = view.state.doc.toString();\n        if (currentDoc !== content) {\n            view.dispatch({\n                changes: { from: 0, to: currentDoc.length, insert: content },\n            });\n        }\n    }, [content]);"
+      },
+      "src/App.tsx:54-55": {
+        "file": "src/App.tsx",
+        "start": 54,
+        "lang": "tsx",
+        "body": "    const [markdownStyle, setMarkdownStyle] =\n        useState<MarkdownStyleConfig>(defaultMarkdownStyle);"
+      },
+      "src-tauri/capabilities/default.json:21-32": {
+        "file": "src-tauri/capabilities/default.json",
+        "start": 21,
+        "lang": "text",
+        "body": "    {\n      \"identifier\": \"fs:allow-read-dir\",\n      \"allow\": [{ \"path\": \"**\" }]\n    },\n    {\n      \"identifier\": \"fs:allow-read-text-file\",\n      \"allow\": [{ \"path\": \"**\" }]\n    },\n    {\n      \"identifier\": \"fs:allow-write-text-file\",\n      \"allow\": [{ \"path\": \"**\" }]\n    },"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "titlebar",
+      "parent": null,
+      "kind": "element",
+      "title": "The title bar",
+      "sub": "Frameless window, custom controls",
+      "state": "derived",
+      "detail": "The operating system's frame is switched off and replaced by a 32px bar: a drag region with a label, and minimise, maximise and close buttons wired straight to the Tauri window.",
+      "evidence": "src/components/titlebar.tsx",
+      "anatomy": [
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Window frame",
+              "value": "decorations: false",
+              "state": "derived"
+            },
+            {
+              "label": "Dragging",
+              "value": "data-tauri-drag-region",
+              "state": "derived"
+            },
+            {
+              "label": "Label",
+              "value": "\"app\", hard-coded",
+              "state": "partial"
+            },
+            {
+              "label": "Size at launch",
+              "value": "800 × 600",
+              "state": "derived"
+            }
+          ]
+        },
+        {
+          "kind": "source",
+          "snippet": "src/components/titlebar.tsx:26-32",
+          "why": "The label is a placeholder. The product name, snecko, is set in tauri.conf.json but never reaches the window, so every user sees the word 'app'."
+        }
+      ]
+    },
+    {
+      "id": "sidebar",
+      "parent": null,
+      "kind": "element",
+      "title": "The sidebar",
+      "sub": "Resizable · holds the vaults and the tree",
+      "state": "derived",
+      "detail": "A column down the left that holds the vault switcher and the file tree. Its right edge is a 4px handle you can drag, and right-clicking its empty space opens the New Note / New Folder menu.",
+      "evidence": "src/components/sidebar.tsx"
+    },
+    {
+      "id": "sb-resize",
+      "parent": "sidebar",
+      "kind": "flow",
+      "title": "Dragging its edge",
+      "sub": "Width follows the mouse · floor 200px",
+      "state": "partial",
+      "alarm": true,
+      "detail": "The width has a minimum and no maximum: the sidebar can be dragged across the whole window, over the editor.",
+      "evidence": "src/components/sidebar.tsx:27",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Press on the handle",
+              "detail": "A 4px strip on the right edge sets a resizing flag. Nothing moves yet.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "Width follows the pointer",
+              "detail": "Every mousemove on the window sets the width to the pointer's x, but never below 200px.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "No upper bound",
+              "detail": "The clamp is Math.min with a single argument, which returns that argument — so there is no maximum.",
+              "state": "partial"
+            },
+            {
+              "n": 4,
+              "title": "Release anywhere",
+              "detail": "mouseup on the window clears the flag.",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/components/sidebar.tsx#resize",
+          "id": "sb-resize-fn",
+          "sub": "Math.min with one argument",
+          "detail": "`Math.min(Math.max(e.clientX, minWidth))` — the outer Math.min was meant to take a maximum as its second argument, and has none.",
+          "state": "partial",
+          "alarm": true
+        }
+      ]
+    },
+    {
+      "id": "vault-switcher",
+      "parent": null,
+      "kind": "element",
+      "title": "The vault switcher",
+      "sub": "Pick, add or remove a vault",
+      "state": "derived",
+      "detail": "A vault is just a folder. The switcher lists the ones you've added, opens one on click, adds one through a folder picker, and shows a remove button on every vault except the open one.",
+      "evidence": "src/components/vaultSwitcher.tsx"
+    },
+    {
+      "id": "vs-add",
+      "parent": "vault-switcher",
+      "kind": "flow",
+      "title": "Adding a vault",
+      "sub": "Folder picker → vaults.json → open",
+      "state": "partial",
+      "alarm": true,
+      "detail": "The new vault is opened straight away, but it is never remembered as the last vault: restart the app and the previous one opens instead.",
+      "evidence": "src/App.tsx:130",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "A folder picker opens",
+              "detail": "pickDir asks Tauri for one directory. Cancelling returns nothing and nothing happens.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "Added to vaults.json",
+              "detail": "addVault skips a folder that is already listed, and names the vault after the folder's last path segment.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "Opened straight away",
+              "detail": "openVault reads the folder's whole tree and shows it.",
+              "state": "derived"
+            },
+            {
+              "n": 4,
+              "title": "Not remembered as the last vault",
+              "detail": "openVault looks the path up in `vaults` — the React state from before this add, which does not contain it yet — so setLastVault is skipped.",
+              "state": "partial"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/App.tsx#handleAddVault",
+          "id": "app-add-vault",
+          "sub": "Picker, store, open"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#pickDir",
+          "id": "fh-pick-dir",
+          "sub": "One directory, or nothing"
+        },
+        {
+          "symbol": "src/lib/vault.ts#addVault",
+          "id": "vault-add",
+          "sub": "Appends to vaults.json"
+        }
+      ]
+    },
+    {
+      "id": "vs-open",
+      "parent": "vault-switcher",
+      "kind": "flow",
+      "title": "Opening a vault",
+      "sub": "The whole folder tree, read up front",
+      "state": "derived",
+      "detail": "Opening a vault reads every folder and note in it before anything is shown, however deep the tree goes.",
+      "evidence": "src/App.tsx:102",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Every folder is read",
+              "detail": "readDir walks the tree recursively, one directory listing per folder, skipping any name that starts with a dot.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "The tree is replaced",
+              "detail": "The result replaces the file tree in one go; folders start collapsed even though their contents are already loaded.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "Remembered as the last vault",
+              "detail": "Only if the path is found in the vault list held in React state at that moment.",
+              "state": "partial"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/App.tsx#openVault",
+          "id": "app-open-vault",
+          "sub": "Read tree, remember vault",
+          "detail": "`vaults` here is the state captured when this function was created. Called right after setVaults — on add, and at startup — it still sees the old list.",
+          "state": "partial",
+          "alarm": true
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#readDir",
+          "id": "fh-read-dir",
+          "sub": "Recursive, skips dot-names"
+        }
+      ]
+    },
+    {
+      "id": "vs-remove",
+      "parent": "vault-switcher",
+      "kind": "flow",
+      "title": "Removing a vault",
+      "sub": "Never clears the remembered vault",
+      "state": "partial",
+      "alarm": true,
+      "detail": "Removing a vault is meant to forget it if it was the last one opened. It never does: the check compares an object with a string.",
+      "evidence": "src/lib/vault.ts:36",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Only for vaults that aren't open",
+              "detail": "The switcher shows a check mark, not a remove button, on the open vault — so App's branch for removing the open vault can't be reached from the UI.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "Dropped from vaults.json",
+              "detail": "removeVault filters it out of the list.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "Meant to forget it as the last vault",
+              "detail": "It reads lastVault as a string and compares it with the path, but setLastVault stores a {path, name} object. The comparison is never true, so lastVault is never cleared and a new one is never chosen.",
+              "state": "partial"
+            },
+            {
+              "n": 4,
+              "title": "Next launch opens nothing",
+              "detail": "If the removed vault was the remembered one, startup finds it missing from the list and opens no vault at all.",
+              "state": "partial"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/lib/vault.ts#removeVault",
+          "id": "vault-remove",
+          "sub": "Compares an object with a string",
+          "detail": "`store.get<string>(\"lastVault\")` — but lastVault is written by setLastVault as a Vault object. The type argument is a cast, not a check, so `lastVault === path` is always false.",
+          "state": "partial",
+          "alarm": true
+        },
+        {
+          "symbol": "src/App.tsx#handleRemoveVault",
+          "id": "app-remove-vault",
+          "sub": "Unreachable branch for the open vault"
+        },
+        {
+          "symbol": "src/lib/vault.ts#setLastVault",
+          "id": "vault-set-last",
+          "sub": "Stores the whole Vault object"
+        }
+      ]
+    },
+    {
+      "id": "vs-startup",
+      "parent": "vault-switcher",
+      "kind": "flow",
+      "title": "Coming back where you left off",
+      "sub": "Last vault, then last note",
+      "state": "derived",
+      "detail": "On launch the app reopens the last vault, then the last note — but only if the note's path is inside that vault.",
+      "evidence": "src/App.tsx:76",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Vaults and the last vault are read",
+              "detail": "Both come from vaults.json.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "The last vault reopens",
+              "detail": "Only if it is still in the vault list.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "The last note reopens",
+              "detail": "Only if its path starts with the vault's path; otherwise the editor stays empty.",
+              "state": "derived"
+            }
+          ]
+        },
+        {
+          "kind": "source",
+          "snippet": "src/App.tsx:75-99"
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/lib/vault.ts#getLastVault",
+          "id": "vault-get-last",
+          "sub": "Vault or null"
+        },
+        {
+          "symbol": "src/lib/vault.ts#getLastFile",
+          "id": "vault-get-last-file",
+          "sub": "File or null"
+        },
+        {
+          "symbol": "src/lib/vault.ts#getVaults",
+          "id": "vault-get-all",
+          "sub": "Empty list if none"
+        }
+      ]
+    },
+    {
+      "id": "file-tree",
+      "parent": null,
+      "kind": "element",
+      "title": "The file tree",
+      "sub": "Folders first, then A–Z",
+      "state": "derived",
+      "detail": "Every folder and note in the vault except dot-names, folders first and then alphabetical, shown without file extensions. Folders expand on click — but their contents were already read when the vault opened.",
+      "evidence": "src/components/fileTree.tsx"
+    },
+    {
+      "id": "ft-sort",
+      "parent": "file-tree",
+      "kind": "flow",
+      "title": "Ordering and naming",
+      "sub": "Folders first · extensions hidden",
+      "state": "derived",
+      "detail": "Each level is sorted on every render: folders before notes, then by name. Names are shown without their extension.",
+      "evidence": "src/components/fileTree.tsx:80",
+      "anatomy": [
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Order",
+              "value": "folders, then name A–Z (localeCompare)",
+              "state": "derived"
+            },
+            {
+              "label": "Shown name",
+              "value": "extension stripped (splitFileName)",
+              "state": "derived"
+            },
+            {
+              "label": "Sorting",
+              "value": "in place on the array it was given, then copied",
+              "state": "partial"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/components/fileTree.tsx#sortEntries",
+          "id": "ft-sort-fn",
+          "sub": "Sorts its input in place",
+          "detail": "`entries.sort(...)` reorders the array App holds in state before the copy is made. Harmless today, because nothing else reads that order — but it mutates React state outside setState.",
+          "state": "partial"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#splitFileName",
+          "id": "fh-split-name",
+          "sub": "name → {file, ext}"
+        }
+      ]
+    },
+    {
+      "id": "ft-open",
+      "parent": "file-tree",
+      "kind": "flow",
+      "title": "Opening a note",
+      "sub": "Flush, read, show, remember",
+      "state": "derived",
+      "detail": "Clicking a note first writes any save still waiting for the note you're leaving, then loads the new one.",
+      "evidence": "src/App.tsx:143",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "A pending save is flushed",
+              "detail": "If a save timer is still running, it is cancelled and the current note is written immediately.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "The note is read",
+              "detail": "The whole file is read as text.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "It replaces the editor's text",
+              "detail": "The editor swaps its entire document for the new text.",
+              "state": "derived"
+            },
+            {
+              "n": 4,
+              "title": "Remembered as the last note",
+              "detail": "setLastFile writes {name, path} to vaults.json.",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/App.tsx#handleOpenFile",
+          "id": "app-open-file",
+          "sub": "Flush, read, remember"
+        },
+        {
+          "symbol": "src/lib/vault.ts#setLastFile",
+          "id": "vault-set-last-file",
+          "sub": "Writes lastFile"
+        }
+      ]
+    },
+    {
+      "id": "context-menu",
+      "parent": null,
+      "kind": "element",
+      "title": "The right-click menu",
+      "sub": "On a note, or on the sidebar",
+      "state": "derived",
+      "detail": "The browser's own menu is switched off for the whole window, and this one replaces it. Right-click a note for Open in new tab, Rename and Delete; right-click empty sidebar for New Note and New Folder.",
+      "evidence": "src/lib/contextMenuHandler.ts, src/main.tsx:6",
+      "anatomy": [
+        {
+          "kind": "source",
+          "snippet": "src/main.tsx:5-8",
+          "why": "Global and unconditional: no right-click anywhere in the window — the editor included — shows the browser menu, so copy and paste are keyboard-only."
+        }
+      ]
+    },
+    {
+      "id": "cm-file",
+      "parent": "context-menu",
+      "kind": "flow",
+      "title": "On a note",
+      "sub": "Two of three items do nothing",
+      "state": "partial",
+      "alarm": true,
+      "detail": "Open in new tab and Rename are in the menu with empty handlers. Only Delete does anything.",
+      "evidence": "src/lib/contextMenuHandler.ts:40",
+      "anatomy": [
+        {
+          "kind": "map",
+          "caption": "menu item → what happens",
+          "rows": [
+            {
+              "from": "Open in new tab",
+              "to": "nothing — onClick is empty",
+              "state": "partial"
+            },
+            {
+              "from": "Rename",
+              "to": "nothing — onClick is empty, and App passes onRename: () => {}",
+              "state": "partial"
+            },
+            {
+              "from": "Delete",
+              "to": "asks to confirm, then removes it from disk",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/lib/contextMenuHandler.ts#handleFileContextMenu",
+          "id": "cmh-file-menu",
+          "sub": "Three items, one wired",
+          "state": "partial",
+          "alarm": true
+        }
+      ]
+    },
+    {
+      "id": "cm-delete",
+      "parent": "context-menu",
+      "kind": "flow",
+      "title": "Deleting",
+      "sub": "Confirm, remove, re-read",
+      "state": "derived",
+      "detail": "A native confirm, then the file — or the folder and everything in it — is removed from disk. If the open note was inside, the editor is cleared.",
+      "evidence": "src/App.tsx:197",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Confirm",
+              "detail": "A blocking browser confirm: 'This cannot be undone.'",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "Removed from disk",
+              "detail": "Recursively for a folder. There is no trash or undo.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "The editor is cleared",
+              "detail": "If the open note was the one deleted, or lived inside the deleted folder.",
+              "state": "derived"
+            },
+            {
+              "n": 4,
+              "title": "The whole vault is re-read",
+              "detail": "The tree is rebuilt from disk.",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/App.tsx#handleDelete",
+          "id": "app-delete",
+          "sub": "Confirm, remove, clear, re-read"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#deleteEntry",
+          "id": "fh-delete",
+          "sub": "Recursive for folders"
+        }
+      ]
+    },
+    {
+      "id": "cm-sidebar",
+      "parent": "context-menu",
+      "kind": "flow",
+      "title": "On the sidebar",
+      "sub": "New Note · New Folder, at the vault root",
+      "state": "derived",
+      "detail": "Both create at the top of the vault, never inside a folder: the sidebar menu always passes the vault's own path, and the note menu has no 'new here'.",
+      "evidence": "src/lib/contextMenuHandler.ts:62",
+      "anatomy": [
+        {
+          "kind": "map",
+          "caption": "menu item → what it creates",
+          "rows": [
+            {
+              "from": "New Note",
+              "to": "Untitled.md, or Untitled N.md — then opens it",
+              "state": "derived"
+            },
+            {
+              "from": "New Folder",
+              "to": "Untitled, or Untitled N",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/lib/contextMenuHandler.ts#handleSidebarContextMenu",
+          "id": "cmh-sidebar-menu",
+          "sub": "Always the vault root"
+        },
+        {
+          "symbol": "src/App.tsx#handleCreateFile",
+          "id": "app-create-file",
+          "sub": "Create, re-read, open"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#newNote",
+          "id": "fh-new-note",
+          "sub": "An empty .md file"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#getAvailableFileName",
+          "id": "fh-free-name",
+          "sub": "Untitled, Untitled 1, …"
+        },
+        {
+          "symbol": "src/App.tsx#handleCreateFolder",
+          "id": "app-create-folder",
+          "sub": "Create, re-read"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#newDir",
+          "id": "fh-new-dir",
+          "sub": "An empty folder"
+        }
+      ]
+    },
+    {
+      "id": "editor",
+      "parent": null,
+      "kind": "element",
+      "title": "The note editor",
+      "sub": "Markdown with live preview",
+      "state": "derived",
+      "detail": "A CodeMirror editor that hides markdown's marks except on the line you're typing on, saves as you type, and shows the note's name as a button you click to rename it.",
+      "evidence": "src/components/editor.tsx"
+    },
+    {
+      "id": "ed-save",
+      "parent": "editor",
+      "kind": "flow",
+      "title": "Typing and saving",
+      "sub": "Whole file, 10ms after you stop",
+      "state": "derived",
+      "detail": "Every change is written back to disk 10 milliseconds after the last keystroke — in practice, at almost every pause — as a full overwrite of the file.",
+      "evidence": "src/App.tsx:59",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "CodeMirror reports a change",
+              "detail": "Its update listener passes the whole document text up on every edit.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "App takes the text",
+              "detail": "It becomes `content` in App's state.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "A 10ms timer restarts",
+              "detail": "Each keystroke cancels the previous timer, so a write happens 10ms after you stop.",
+              "state": "derived"
+            },
+            {
+              "n": 4,
+              "title": "The whole file is overwritten",
+              "detail": "writeTextFile replaces the note on disk with the full text.",
+              "state": "derived"
+            }
+          ]
+        },
+        {
+          "kind": "source",
+          "snippet": "src/components/editor.tsx:119-130",
+          "why": "The other direction: when App's `content` changes — opening another note — the editor's whole document is replaced. Typing doesn't trigger it, because the text already matches."
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/App.tsx#handleContentChange",
+          "id": "app-content-change",
+          "sub": "Debounced write, 10ms"
+        }
+      ]
+    },
+    {
+      "id": "ed-preview",
+      "parent": "editor",
+      "kind": "flow",
+      "title": "Live preview",
+      "sub": "Marks hidden off the cursor's line",
+      "state": "derived",
+      "detail": "Headings, bold, italic and inline code are styled where they stand; their #, * and ` marks are hidden on every line except the one the cursor is on.",
+      "evidence": "src/lib/livePreview.ts",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Rebuilt on change",
+              "detail": "On every edit, scroll or cursor move.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "Only what's on screen",
+              "detail": "The markdown syntax tree is walked within the visible ranges only.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "Styled in place",
+              "detail": "Headings 1–6, bold, italic and inline code get a class each.",
+              "state": "derived"
+            },
+            {
+              "n": 4,
+              "title": "Marks hidden",
+              "detail": "#, *, _ and ` are replaced with nothing — unless the cursor is on that line.",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/lib/livePreview.ts#markdownLivePreview",
+          "id": "lp-plugin",
+          "sub": "A ViewPlugin class",
+          "detail": "An anonymous class handed to ViewPlugin.fromClass. It holds the current decorations and rebuilds them when the document, viewport or selection changes.",
+          "methods": [
+            {
+              "symbol": "src/lib/livePreview.ts#markdownLivePreview.constructor",
+              "id": "lp-ctor",
+              "sub": "Builds once on mount"
+            },
+            {
+              "symbol": "src/lib/livePreview.ts#markdownLivePreview.update",
+              "id": "lp-update",
+              "sub": "Rebuilds on edit, scroll, cursor"
+            }
+          ]
+        },
+        {
+          "symbol": "src/lib/livePreview.ts#buildDecorations",
+          "id": "lp-build",
+          "sub": "Walks the visible syntax tree"
+        }
+      ]
+    },
+    {
+      "id": "ed-style",
+      "parent": "editor",
+      "kind": "flow",
+      "title": "Markdown styling",
+      "sub": "Configurable in code, not in the app",
+      "state": "partial",
+      "detail": "Heading sizes, weights and code styling come from one config object turned into a CodeMirror theme. The editor can swap it live, but nothing in the app ever changes it.",
+      "evidence": "src/lib/markdownStyle.ts, src/App.tsx:54",
+      "anatomy": [
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Headings",
+              "value": "bold · 2.0 / 1.7 / 1.4 / 1.2 / 1.1 / 1.0 em",
+              "state": "derived"
+            },
+            {
+              "label": "Inline code",
+              "value": "monospace · faint background · 3px radius",
+              "state": "derived"
+            },
+            {
+              "label": "Changed by",
+              "value": "nothing — setMarkdownStyle is never called",
+              "state": "partial"
+            }
+          ]
+        },
+        {
+          "kind": "source",
+          "snippet": "src/App.tsx:54-55"
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/lib/markdownStyle.ts#buildMarkdownTheme",
+          "id": "ms-theme",
+          "sub": "Config → CodeMirror theme"
+        }
+      ]
+    },
+    {
+      "id": "ed-rename",
+      "parent": "editor",
+      "kind": "flow",
+      "title": "Renaming a note",
+      "sub": "Click the name · extension kept",
+      "state": "derived",
+      "detail": "The note's name above the editor is a button. Click it, type, and press Enter or click away; the extension is kept and the file is renamed on disk.",
+      "evidence": "src/components/editor.tsx:135",
+      "anatomy": [
+        {
+          "kind": "flow",
+          "rows": [
+            {
+              "n": 1,
+              "title": "Click the name",
+              "detail": "It turns into a text field with the name, minus its extension.",
+              "state": "derived"
+            },
+            {
+              "n": 2,
+              "title": "Enter or click away",
+              "detail": "Either submits; Escape cancels.",
+              "state": "derived"
+            },
+            {
+              "n": 3,
+              "title": "Extension put back",
+              "detail": "An unchanged or empty name does nothing.",
+              "state": "derived"
+            },
+            {
+              "n": 4,
+              "title": "Renamed on disk",
+              "detail": "Then the whole vault is re-read and lastFile is updated to the new path.",
+              "state": "derived"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/components/editor.tsx#handleRename",
+          "id": "ed-rename-fn",
+          "sub": "Editor: trim, keep extension"
+        },
+        {
+          "symbol": "src/App.tsx#handleRename",
+          "id": "app-rename",
+          "sub": "App: rename, re-read, remember"
+        },
+        {
+          "symbol": "src/lib/fileHandler.ts#rename",
+          "id": "fh-rename",
+          "sub": "Same folder, new name"
+        }
+      ]
+    },
+    {
+      "id": "vault-store",
+      "parent": null,
+      "kind": "store",
+      "title": "vaults.json",
+      "sub": "Beside the executable · 3 keys",
+      "state": "partial",
+      "detail": "Tauri's store plugin, loaded once and shared. The file sits next to the app's executable, which is found by a one-line Rust command because the JavaScript path API didn't work (the comment in lib.rs says so).",
+      "evidence": "src/utils/store.ts, src-tauri/src/lib.rs",
+      "anatomy": [
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "vaults",
+              "value": "Vault[] — {path, name}",
+              "state": "derived"
+            },
+            {
+              "label": "lastVault",
+              "value": "Vault — written as an object, read once as a string",
+              "state": "partial"
+            },
+            {
+              "label": "lastFile",
+              "value": "File — {path, name}",
+              "state": "derived"
+            },
+            {
+              "label": "Saving",
+              "value": "autoSave on every set",
+              "state": "derived"
+            },
+            {
+              "label": "Writable once installed?",
+              "value": "not guaranteed — install folders are often read-only",
+              "state": "inferred"
+            }
+          ]
+        }
+      ],
+      "code": [
+        {
+          "symbol": "src/utils/store.ts#loadStore",
+          "id": "store-load",
+          "sub": "Loaded once, shared"
+        },
+        {
+          "symbol": "src-tauri/src/lib.rs#get_exe_dir",
+          "id": "rs-exe-dir",
+          "sub": "Rust: the executable's folder",
+          "detail": "A #[tauri::command] — the only Rust code the app adds. The comment above it: 'executableDir doesnt work so this is a workaround'."
+        }
+      ]
+    },
+    {
+      "id": "disk",
+      "parent": null,
+      "kind": "store",
+      "title": "Your notes on disk",
+      "sub": "Plain files, read and written in place",
+      "state": "derived",
+      "detail": "Notes are ordinary .md files in the vault folder, read and written whole. The app's file permissions allow reading, writing, renaming, creating and deleting anywhere on disk.",
+      "evidence": "src-tauri/capabilities/default.json",
+      "anatomy": [
+        {
+          "kind": "facts",
+          "rows": [
+            {
+              "label": "Format",
+              "value": ".md text, whole file per save",
+              "state": "derived"
+            },
+            {
+              "label": "Permission scope",
+              "value": "any path (**)",
+              "state": "derived"
+            }
+          ]
+        },
+        {
+          "kind": "source",
+          "snippet": "src-tauri/capabilities/default.json:21-32",
+          "why": "Every file permission is scoped to `**`, not to the vaults you've added. The webview can touch any file the user can."
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "parent": null,
+      "from": "sidebar",
+      "to": "vault-switcher",
+      "state": "derived",
+      "label": "holds"
+    },
+    {
+      "parent": null,
+      "from": "vault-switcher",
+      "to": "file-tree",
+      "state": "derived",
+      "label": "fills"
+    },
+    {
+      "parent": null,
+      "from": "file-tree",
+      "to": "context-menu",
+      "state": "derived",
+      "label": "right-click"
+    },
+    {
+      "parent": null,
+      "from": "sidebar",
+      "to": "context-menu",
+      "state": "derived",
+      "label": "right-click"
+    },
+    {
+      "parent": null,
+      "from": "file-tree",
+      "to": "editor",
+      "state": "derived",
+      "label": "opens in"
+    },
+    {
+      "parent": null,
+      "from": "vault-switcher",
+      "to": "vault-store",
+      "state": "derived",
+      "label": "remembered in"
+    },
+    {
+      "parent": null,
+      "from": "file-tree",
+      "to": "vault-store",
+      "state": "derived",
+      "label": "remembers last note"
+    },
+    {
+      "parent": null,
+      "from": "file-tree",
+      "to": "disk",
+      "state": "derived",
+      "label": "reads"
+    },
+    {
+      "parent": null,
+      "from": "context-menu",
+      "to": "disk",
+      "state": "derived",
+      "label": "creates · deletes"
+    },
+    {
+      "parent": null,
+      "from": "editor",
+      "to": "disk",
+      "state": "derived",
+      "label": "autosaves to"
+    },
+    {
+      "parent": "vault-switcher",
+      "from": "vs-add",
+      "to": "vs-open",
+      "state": "derived",
+      "label": "then opens"
+    },
+    {
+      "parent": "vault-switcher",
+      "from": "vs-startup",
+      "to": "vs-open",
+      "state": "derived",
+      "label": "opens"
+    },
+    {
+      "parent": "vault-switcher",
+      "from": "vs-remove",
+      "to": "vs-startup",
+      "state": "derived",
+      "alarm": true,
+      "label": "breaks"
+    },
+    {
+      "parent": "file-tree",
+      "from": "ft-sort",
+      "to": "ft-open",
+      "state": "derived",
+      "label": "then"
+    },
+    {
+      "parent": "context-menu",
+      "from": "cm-file",
+      "to": "cm-delete",
+      "state": "derived",
+      "label": "Delete"
+    },
+    {
+      "parent": "editor",
+      "from": "ed-save",
+      "to": "ed-preview",
+      "state": "derived",
+      "label": "redraws"
+    }
+  ],
+  "links": [
+    {
+      "from": {
+        "node": "vs-add",
+        "row": "2"
+      },
+      "to": {
+        "node": "vault-store",
+        "row": "vaults"
+      },
+      "label": "writes",
+      "state": "derived"
+    },
+    {
+      "from": {
+        "node": "vs-add",
+        "row": "4"
+      },
+      "to": {
+        "node": "vault-store",
+        "row": "lastVault"
+      },
+      "label": "skips",
+      "state": "partial",
+      "alarm": true
+    },
+    {
+      "from": {
+        "node": "vs-open",
+        "row": "3"
+      },
+      "to": {
+        "node": "vault-store",
+        "row": "lastVault"
+      },
+      "label": "writes",
+      "state": "derived"
+    },
+    {
+      "from": {
+        "node": "vs-remove",
+        "row": "3"
+      },
+      "to": {
+        "node": "vault-store",
+        "row": "lastVault"
+      },
+      "label": "never clears",
+      "state": "partial",
+      "alarm": true
+    },
+    {
+      "from": {
+        "node": "ft-open",
+        "row": "4"
+      },
+      "to": {
+        "node": "vault-store",
+        "row": "lastFile"
+      },
+      "label": "writes",
+      "state": "derived"
+    },
+    {
+      "from": {
+        "node": "ed-save",
+        "row": "4"
+      },
+      "to": {
+        "node": "disk",
+        "row": "Format"
+      },
+      "label": "overwrites",
+      "state": "derived"
+    }
+  ]
+}

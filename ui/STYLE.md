@@ -362,6 +362,13 @@ fourth.
   14px per level up to three. The current one is `border-deep-green` + ring.
   The first trail card shares a `layoutId` with its map card, so the card you
   click is the card that moves (400ms, easeOutQuint).
+- **Every card is a link.** The open path lives in the URL
+  (`?map=<name>&at=<id>/<id>`, each id URI-encoded) and every move pushes a
+  history entry, so the browser's back and forward — mouse side buttons,
+  Alt+←, trackpad swipes — step through cards, and middle- or ctrl/⌘-click
+  opens a card in a new tab. Cards are `<a href>` with a plain-click handler
+  (`onPlainClick` in nav.ts) that keeps the in-page glide; map cards set
+  `draggable={false}` so a link's native drag never fights panning.
 - **Pane code trail:** 9.5px mono — `← back`, `CODE · <card>`, then
   `› <function> calls|methods` per step, and a count. Drill chips under a
   function read `calls n · a, b ›` / `methods n · a, b ›`.

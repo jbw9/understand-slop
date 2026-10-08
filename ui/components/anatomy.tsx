@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { StateChip } from "@/components/state";
 import { rowId, type Anatomy } from "@/lib/data";
+import { TOK_CLASS, highlightLines, langOf } from "@/lib/highlight";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -32,6 +33,41 @@ export interface RowCtx {
   open: string | null;
   /** Drill into the level this row owns. Same gesture as opening a card. */
   onOpenRow: (id: string) => void;
+}
+
+/**
+ * Verbatim code with its real line numbers. Shared by `source` blocks and by
+ * the code card on a `function`/`class` node, so a quote reads the same
+ * wherever it sits.
+ */
+export function CodeLines({ code, start, lang }: { code: string; start: number; lang: string }) {
+  const lines = highlightLines(code.replace(/\n$/, ""), lang);
+  return (
+    // Real line numbers, counting from the file's own offset. A gutter that
+    // restarts at 1 is a quiet lie about where this code lives.
+    //
+    // `data-copy`: the card around this is a drag handle, and these are the
+    // verbatim lines the whole map exists to land you on. A press here has to
+    // select text, not pick the card up.
+    <div data-copy className="overflow-x-auto">
+      <pre className="min-w-full py-1.5 font-mono text-[10px] leading-[1.55]">
+        {lines.map((line, i) => (
+          <div key={i} className="flex">
+            <span className="tnum sticky left-0 shrink-0 select-none bg-pure-white pl-3 pr-2.5 text-right text-faint">
+              {start + i}
+            </span>
+            <code className="whitespace-pre pr-3 text-on-surface">
+              {line.length ? line.map((t, j) => (
+                <span key={j} className={TOK_CLASS[t.tok]}>
+                  {t.text}
+                </span>
+              )) : " "}
+            </code>
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
 }
 
 export function AnatomyView({
@@ -84,11 +120,53 @@ function Caret({ open }: { open: boolean }) {
   );
 }
 
+/**
+ * The mark between two steps of a flow. Sequence chrome, not an affordance.
+ *
+ * Same stroked chevron as the canvas wires (`wires.tsx`), transposed to point
+ * down, so the rail inside a card and the edges between cards say "direction"
+ * the same way. A filled wedge was rejected there for reading as an arrow
+ * bolted onto the line, and the same applies at this size.
+ *
+ * Deliberately NOT `Caret`. That one means "this row opens a level" and is
+ * coloured to invite a click; this one is inert. It also points down, which
+ * `Caret` gave up for good reasons — but those are about a mark at a row's
+ * trailing edge, not one sitting on the rail in the gutter.
+ *
+ * Neutral, never state-tinted: a `Step` carries state for the step, not for the
+ * transition between steps, and colour on a line is a claim about provenance
+ * everywhere else on this canvas.
+ */
+function RailArrow() {
+  return (
+    <svg
+      width="9"
+      height="9"
+      viewBox="0 0 10 10"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0 text-border-gray"
+    >
+      <path
+        d="M 2 2.5 L 5 8 L 8 2.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** Shared row chrome: lit fill, dimmed-when-others-are-lit, click to trace. */
 function rowClass(id: string, ctx: RowCtx, extra?: string) {
   const isLit = ctx.lit.has(id);
   return cn(
-    "w-full text-left transition-all duration-200",
+    // `cursor` inherits, and the card around these rows is a drag handle now.
+    // Rows are the one place on a card where a press does NOT start a drag, so
+    // they have to say so themselves — Tailwind v4's preflight sets no cursor
+    // on a button.
+    "w-full cursor-pointer text-left transition-all duration-200",
     isLit && "bg-mint-success",
     ctx.tracing && !isLit && "opacity-55",
     !ctx.tracing && "hover:bg-surface-container-low",
@@ -234,7 +312,6 @@ function Block({
     // which is quoted verbatim from a real file at a real line, and the `why`,
     // which is synthesized. Commentary gets its own tinted band below the
     // code so it can never be misread as something the file says.
-    const lines = block.code.replace(/\n$/, "").split("\n");
     const id = rowId(owner, "source");
     const isLit = ctx.lit.has(id);
     return (
@@ -267,22 +344,7 @@ function Block({
             :{block.start}
           </span>
         </button>
-        {/* Real line numbers, counting from the file's own offset. A gutter
-            that restarts at 1 is a quiet lie about where this code lives. */}
-        <div className="overflow-x-auto">
-          <pre className="min-w-full py-1.5 font-mono text-[10px] leading-[1.55]">
-            {lines.map((line, i) => (
-              <div key={i} className="flex">
-                <span className="tnum sticky left-0 shrink-0 select-none bg-pure-white pl-3 pr-2.5 text-right text-faint">
-                  {block.start + i}
-                </span>
-                <code className="whitespace-pre pr-3 text-on-surface">
-                  {line || " "}
-                </code>
-              </div>
-            ))}
-          </pre>
-        </div>
+        <CodeLines code={block.code} start={block.start} lang={langOf(block.file)} />
         {block.why ? (
           <div className="flex gap-2 border-t border-border-gray bg-surface-container-low px-3 py-2">
             <span className="mt-[3px] shrink-0 font-mono text-[9px] uppercase tracking-[0.09em] text-faint">
@@ -317,7 +379,7 @@ function Block({
                 onClick={() => ctx.onTrace(id)}
                 title={c.note}
                 className={cn(
-                  "rounded-[6px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
+                  "cursor-pointer rounded-[6px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
                   ctx.tracing && !isLit && "opacity-55",
                   isLit
                     ? "border-deep-green bg-deep-green text-pure-white"
@@ -450,7 +512,7 @@ function Block({
                   // the bar's job is the contrast, not the arithmetic.
                   style={{ width: `${Math.max((p.weight / total) * 100, 6)}%` }}
                   className={cn(
-                    "h-full border-r border-pure-white transition-all duration-200 last:border-r-0",
+                    "h-full cursor-pointer border-r border-pure-white transition-all duration-200 last:border-r-0",
                     ctx.tracing && !isLit && "opacity-45",
                     isLit
                       ? "bg-deep-green"
@@ -592,8 +654,14 @@ function Block({
                 >
                   {s.n}
                 </span>
+                {/* The line keeps `flex-1`, so the arrowhead takes its
+                    height out of the line rather than adding to the rail —
+                    the step pitch is unchanged. */}
                 {i < block.rows.length - 1 ? (
-                  <span className="w-px flex-1 bg-border-gray" />
+                  <>
+                    <span className="w-px flex-1 bg-border-gray" />
+                    <RailArrow />
+                  </>
                 ) : null}
               </div>
               <button

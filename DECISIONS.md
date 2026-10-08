@@ -230,6 +230,9 @@ at y:-28.
 
 **Cost accepted:** the deepest level needs a scroll or a drag to read in full.
 Levels 0-2, which is where most reading happens, frame correctly.
+**Downgraded by D11:** cards are draggable now, so "needs a scroll or a drag"
+is an affordance the product actually offers rather than a workaround it assumed.
+The framing is still wrong; it is merely recoverable by hand.
 **Breaks at scale:** the real fix is probably structural - a subtree that
 overflows the viewport wants its own scroll container, or levels past 2 want to
 replace the view rather than nest inside it. Both are larger than a camera
@@ -296,6 +299,72 @@ panning up, but it is not in view at rest.
 row inside `schema`, `bars`, `chips` or `routes` is silently ignored — it renders
 a caret and opens nothing, which is the worst failure mode available.
 
+## D11 — Cards drag by offset, and only the offset moves
+
+**Chose:** motion's `drag` on a wrapper holding the card *and* its subtree, with
+the resulting offset kept in a ref keyed by node id.
+**Beat:** absolute coordinates for child cards; a hand-rolled pointer hook; a
+bumped `reflowKey`/`version` to make the wires follow; persisting layout.
+
+Root cards have world coordinates from `PLACE`. Children have none — they are
+flex-flowed, and the camera frames a deep level by measuring the column that
+contains them (`canvas.tsx`, the post-commit framing effect). Giving children
+coordinates would have re-opened exactly the maths D8 records twelve failed
+attempts at, so the offset is layered **over** layout and never replaces it.
+
+Three things about the gesture that are not obvious:
+
+**The scale correction is a config, not arithmetic at the call site.** Motion's
+drag adds a raw pointer delta onto the element's own transform, so inside the
+scaled world a card at 0.5x travels twice as far as the cursor — the same
+double-scaling the wire layer corrects when it measures. `transformPagePoint` on
+a `MotionConfig` is the supported hook: PanSession runs every point through it
+before differencing them, and re-runs it per frame, so zooming mid-drag stays
+correct. Only the scale is divided out; pan offsets cancel in the difference.
+
+**`dragListener={false}` costs more than it looks.** Drag is started by hand
+from the card so anatomy rows keep their own press. But framer-motion guards its
+*whole* draggable setup block on that flag — including the `user-select: none`
+it would otherwise apply — so a press on a card title drag-selected across the
+board until that was restored by hand. The `source` block needed the opposite
+treatment: it renders the verbatim lines the map exists to land you on, so it is
+marked `data-copy` and opts out of the drag entirely.
+
+**The re-measure has to stay inside the wire layer.** Dragging writes a
+transform straight to the DOM, so no ref, scroll or resize fires and the wires
+would stay put. Routing that through Canvas state — a bumped `version` or
+`reflowKey` — re-renders every Branch, NodeCard and AnatomyView on the board
+sixty times a second to move one card, and nothing is memoised. `WireLayer`
+hands its own rAF-coalesced schedule out through a ref instead. Panning, for
+comparison, costs zero re-renders: it writes motion values and never touches
+React state.
+
+Two things broke the moment a card could move, both found by reading rather than
+running, and both invisible to `tsc`:
+
+1. `drillInto` frames a root from `PLACE`, which says where layout *put* it, not
+   where it *is*. Drag a domain 400px right, click it, and the camera glided to
+   the empty square it came from. Every deeper level is framed from a live
+   measurement and needed nothing.
+2. An `<svg>` root clips at its viewport, and the wire layer's is sized to the
+   world box. A card dragged past that edge rendered fine — the world div does
+   not clip — while its wires were silently cut. `asking` sits at `x: 0`, so it
+   took 60px to reproduce.
+
+**Cost accepted:** `PLACE`'s own comment says the hand-placed, deliberately
+irregular layout *is* information — "the irregularity is the information." Drag
+lets a user flatten an authored claim about how a request moves through the
+system, and the only way back is `0`. There is deliberately **no per-card undo**:
+double-click is the obvious gesture and it fights the single click that opens a
+level, so one misdrag costs the whole arrangement or nothing.
+**Breaks at scale:** offsets are in memory, keyed by id, for one session. The
+moment layout is meant to persist, or two people are meant to see the same
+board, the offset layer has to become real coordinates — which means `worldPos`,
+`CONTENT` and `WORLD` stop being module constants, and D8's framing maths is
+open again.
+
+---
+
 ## D10 — Push on a green gate, not on a clock
 
 `understand-slop` commits and pushes at each **verified milestone**: `tsc
@@ -322,3 +391,286 @@ deploy watching `main`, the same cadence publishes unreviewed work — the gate
 would need to move into CI before that. Each push also carries whatever `wip:`
 checkpoints accumulated, which is how 11 unpushed commits went up at once on
 15 Sept 2026.
+
+---
+
+## D12 — The flow runs down, and the store gets its wires back
+
+**Chose:** a vertical spine with the dependency tier beside it behind a rule,
+and the store's fan-in restored as one bus.
+**Beat:** the horizontal serpentine, and leaving the tier unwired.
+
+The serpentine was a real fix for a real problem — six steps in one row is
+2520px, which opened at 0.52 scale and was unreadable — and it charged a
+reversal for it: you read →→→, then ←←←, then dropped. The one thing a sequence
+has to communicate is which way it goes, and the layout said it twice in
+opposite directions. A spine spends height instead, and a single column is
+narrow enough to have height to spare: **1400×597 closed, opening at 0.89**
+against the serpentine's 0.96. Width still binds; height has 12% slack.
+
+`watching` came off the spine because the data says it is not on it.
+`generating` has two edges out — it streams to the screen AND it saves — and
+only the saving continues. In the column it would have sat between `generating`
+and `keeping` with their wire crossing it.
+
+**Reversing the fan-in deletion (820fc5c).** That commit removed five write
+edges and `tables → infra` on the grounds that a process sequence and a
+dependency fan-in in one flat edge set is a mixture no convention makes, and
+that five arrowheads on one box is five relationships fighting over one landing
+strip. Both true. What it missed is what a card with no wires actually looks
+like: not "a different kind of thing", just unfinished — and the store and the
+dashboard are the two cards a reader asks about first. So the edges are back and
+the clutter is solved in the routing instead, where it belongs. Four writers
+arrive as one lane with one arrowhead, which is the fact the prose was standing
+in for. The subtitle that carried it is now trimmed, because a label restating
+the drawing beside it is duplication.
+
+**Vertical is a property of the level, not a house style.** A level lays out
+downward when its edges form a chain — each child to the next, in declared
+order, once. That test, rather than "has edges", is load-bearing: `generating`
+fans two children into a third, and stacked, whichever order you pick, one edge
+points back up the column and skips a card. A fan-in is a convergence, and the
+row already draws convergences well. Five levels stack; `generating` stays a
+row.
+
+**Three bugs the screenshots found and the typecheck did not.**
+1. The bus was hard-coded to a horizontal lane. On a vertical board every
+   writer shares an x, so all of them dropped at the same place and the drops
+   stacked into one line running down the spine, directly over the sequence
+   wires. The lane now picks its axis from the writers' centroid, and stands off
+   the *column* rather than the target — off the target is the obvious
+   transposition and makes four parallel lines cross the tier rule where one
+   should.
+2. A run whose endpoints share an axis short-circuited to a single straight
+   segment, discarding the corridor the obstacle loop had just settled. In a
+   column that draws straight through whatever card is between the ends.
+3. **Faded roots were still obstacles.** Out-of-scope cards stay mounted so
+   their anchors survive — and on a vertical board they sit in exactly the
+   column an open level unfolds into, so every wire in that level detoured
+   around a card nobody could see. This one only exists because the board went
+   vertical; horizontally the invisible cards were never in the way.
+
+**Cost accepted:** two expanded cards fit side by side in an 860px viewport;
+stacked they are 910px plus the parent card and the gap. **D8's framing
+limitation therefore moves from level 3 to level 1** — five level-1 drills now
+need a pan where they previously fit. The mitigation is the one D8 already
+reached for: a stacked level is top-anchored, so it frames from the card you
+clicked and reads downward. The trade is deliberate — a row shows both cards at
+once and says nothing about order; a column says "and then this" and costs a
+scroll.
+**Breaks at scale:** the chain test needs the declared child order to BE the
+sequence, so a level whose edges are a chain in a different order than its
+children are listed falls back to a row without saying why. And a vertical level
+with two sibling foreign keys would draw them on top of each other: stacked
+cards share a left edge, so the relation router takes its `self:` left-margin
+branch, which has one lane and no offset. One FK exists today (`keep-msg:PK →
+keep-conv:SK`), so it has not come up.
+
+---
+
+## D13 — Roots are the surface; kind sets the card, not the depth
+
+**Chose:** the roots are what a person sees — pages, UI elements, the journey
+between them. One click down is the data flow behind that surface. Below that,
+as deep as a branch needs, is the code that does it, down to functions and
+classes. Every node carries a `kind` (`journey | page | element`, `flow |
+store`, `module | class | function`), and `layerOf(kind)` in `lib/data.ts` is
+the one place a kind maps to its layer.
+**Beat:** (a) a fixed four-level ladder (surface → flow → file → symbol), and
+(b) the product-step cut it replaces, where "Asking", "Gate" and "Generating"
+were roots.
+
+A fixed ladder was rejected for the same reason the tree never had a level cap:
+`getUserTier` is a whole finding in four lines two levels under the gate, while
+the animation call is an excerpt four levels under the chat box. A ladder would
+either pad the short branches with a file level that says nothing, or cut the
+long ones off. So kind decides how a card reads — a mono kind label above every
+title, and for code units a signature header, `file:start–end`, and numbered
+lines — while depth stays whatever the branch earns.
+
+The product-step cut was true and read well, but it is a cut by *what the
+server does*. The direction this is heading — the card view as a second way to
+edit a codebase — needs the top of the map to be what a person would point at
+on screen, so they can follow it down to the code behind it.
+
+**This revises D1.** D1 chose question-answering over a map. The board has been
+a drill-down map since D9; this makes it one deliberately, and makes the code
+layer the place where editing happens: the signature and body of a code unit
+are edited in the card (`components/edits.tsx`). Edits live in memory, keyed
+by node id, and are never written to disk — there is no file writer yet — and
+the authored `CodeUnit` is never mutated, so "revert" just drops the edit. A
+whole-file editor mode is deliberately not planned.
+
+**Cost accepted:**
+- Everything moved one level deeper, so "Generating the answer" now reaches
+  level 4. D8 applies further down than it used to.
+- The surface roots are mostly `inferred`. The VisuLearn source was not on
+  hand, and only `ChatInput.tsx` and `AnimationBlock.tsx` were read; the history
+  list and the share sheet are guesses at a UI the data layer proves exists.
+- Only one quote in the dataset is a complete unit (`getUserTier`, usage.ts
+  329–333), so the code layer has a single real card. The other excerpts stay
+  as `source` blocks: promoting them would mean writing signatures nobody read.
+
+**Breaks at scale:** the kind label is the only cue to which layer a card is in
+apart from the layer trail. A parser emitting hundreds of `function` nodes per
+module needs the `module` kind used for real, as a grouping level, or a flow
+card will open onto a wall of functions. That is the next layer to build.
+
+---
+
+## D14 — Columns, not a camera
+
+**Chose:** Finder-style columns as the main view (`ui/components/columns.tsx`).
+The surface is on the left, the data flow behind your pick to its right, the
+code behind that, and the full card for the deepest pick in a pane at the end.
+**Beat:** the zoom canvas, kept in the repo (`ui/components/canvas.tsx`) but no
+longer rendered by the page; and nested frames on that canvas, tried and
+removed.
+
+Three complaints from using it, and one cause. On the canvas you could not tell
+where you were, the arrows looked wrong, and moving between layers did not feel
+good. Every level opened *beneath* its parent and the camera flew to it, so:
+- the ancestors left the screen;
+- the wires routed around cards that were still growing;
+- every step down was a pan and a zoom.
+
+Frames were tried as a fix for the first problem. They added tint, not
+orientation, because the card that named each frame was off-screen above it.
+
+Columns remove the cause instead:
+- **The path is the layout.** Every ancestor stays on screen, selected in its
+  own column.
+- **A step down is one column to the right.** Nothing zooms.
+- **Relations are drawn inline.** An edge between two cards that sit one above
+  the other is the gap between them, a connector carrying the edge's label
+  ("checked by", "allows") — labels the canvas never drew. Any other edge is a
+  chip in the footer of the card it leaves, and clicking it jumps there.
+- **Row links are a list, not wires.** Clicking a row lists its `LINKS` under
+  the anatomy, and each entry jumps to the row it names.
+
+**Cost accepted:**
+- No spatial overview and no dragging. The hand-placed spine, the side tier
+  and the store's bus (D12) are not on screen any more; the surface column says
+  the same thing as order plus a "behind the surface" rule.
+- D7, D8 and D11 (camera, deep framing, drag) no longer apply to the main view.
+- A deep path scrolls the left columns out of view. That is the Finder trade,
+  and the column headers ("in The daily quota") carry the context.
+
+**Breaks at scale:** a level with dozens of members becomes a long column, and
+non-adjacent edges become a wall of chips. A real parser will need the `module`
+kind as a grouping level (D13) and a filter in each column header. If a spatial
+overview is wanted again, the canvas is still there to become a "map" toggle.
+
+---
+
+## D15 — One switch for the repo, and quotes the map cannot retype
+
+**Chose:** every dataset module (`ui/lib/visulearn.ts`, `ui/lib/snecko.ts`)
+exports the same `RUN`, `L0`, `E0`, `LINKS` and lookups, built by `makeMap` in
+`ui/lib/tree.ts`. The app shows whatever `ui/lib/current.ts` re-exports. That is
+one line to switch repos. The snecko map is generated by
+`scripts/gen_snecko.py`: the narrative is written by hand in the script, but
+every code body, line range and signature is read from `~/projects/snecko`
+when it runs.
+**Beat:** pasting quotes into a TypeScript file by hand, as VisuLearn's were.
+That is how VisuLearn's quotes went wrong once already: they were mangled by a
+re-indent and caught only by diffing against a saved copy.
+
+**Cost accepted:** the map still describes snecko by hand, so it goes stale
+when snecko changes. Re-running the generator refreshes every quote, and it
+stops with an error if a range no longer starts at the declaration it names
+(rather than quoting the wrong code). The narrative has to be updated by
+hand. A parser replaces the script; the dataset shape stays.
+
+---
+
+## D16 — The map first, one level in focus, code depth in the pane
+
+**Chose:** `ui/components/explorer.tsx` as the main view.
+- **Map:** the whole surface at once, laid out from the data (`ui/lib/layout.ts`) and drawn with its relationships.
+- **Focus:** clicking a card glides it into the top-left, where it heads a trail of everything opened. Under the trail is one level: the cards inside the deepest thing opened. On the right is the pane with that thing's description and every function behind it, editable.
+- **Code depth:** "calls ›" and "methods ›" drill inside the pane, behind a small trail of their own.
+
+**Beat:** the columns (D14), which kept orientation but lost the overview; and a map whose deeper levels open on the map itself (the canvas), which lost orientation.
+
+**Why the pieces are where they are:**
+- **One level at a time.** Going deeper adds a card to the trail and swaps the level, so depth never piles up on screen. The trail indents one step per level, capped at three, and the order says the rest.
+- **Code is never a level.** Functions are read and edited together in the pane. If they were levels, every function would be a click, and deep call chains would push everything else out of the trail.
+- **The map's wires are plain curves.** They are computed from the layout, not routed around measured DOM. Each edge leaves the side of its card that faces the other end. Ports on a shared side are spread out, and wires sit under the cards. Labels finally get drawn: each goes at the first clear spot along its curve. The canvas router (D12) was tuned to one hand-placed board and drew nonsense on a generated one.
+- **Layout is computed, and linear.** Surface roots form one column in topological order over the root edges, ties broken by authored order, so the map reads like a list and most arrows point to the next card. An edge that skips cards is an arc in the left gutter, in its own lane (short spans inner). Stores sit in a right column, level with the cards that touch them. No ids are hard-coded, so VisuLearn and snecko both lay themselves out. (A first, ranked version placed cards side by side within a rank; it read as a web, not a sequence, and was replaced.)
+
+**`calls` are matched by name.** `scripts/gen_snecko.py` looks for `name(` in each unit's verbatim body, against the other units in the map:
+- a unit's own name is skipped;
+- a name two units share is skipped as ambiguous;
+- a class's methods are never call targets — they are reached through the class.
+
+That is exact for snecko and wrong in general (shadowing, method calls on objects, dynamic dispatch). A parser replaces it.
+
+**Cost accepted:**
+- A class's methods can be edited both in the class body and on their own, as two independent in-memory edits.
+- A wire that skips a rank passes behind the cards between its ends.
+- The canvas and the columns view stay in the repo, unrendered.
+
+---
+
+## D17 — The map follows the repo while it is edited (proposed, not built)
+
+**Proposed:** a watcher that re-runs `scripts/gen_snecko.py` whenever
+`~/projects/snecko` changes. `next dev` already hot-reloads a rewritten
+`ui/lib/snecko.ts`. `explorer.tsx` exports only a component, so Fast Refresh
+should keep the focus trail and the pane.
+**Beats:** re-running the generator by hand after each change (D15).
+
+**The watcher alone is not enough: line ranges break on almost every edit.**
+All 36 `unit(...)` calls and the ~6 `src(...)` quotes hard-code their line
+ranges. One line added near the top of `App.tsx` shifts every later function,
+and the asserts in `unit()` then stop the whole run. So the real change is to
+anchor quotes by name:
+
+- **`locate(file, name, hint)`.** It finds the declaration lines for `name`
+  (`function`, `const … =`, `class`, a method at class indentation) and keeps
+  the one nearest `hint`, the old start line. It ends the quote by matching
+  brackets, skipping strings and comments.
+- **`unit()` keeps its signature.** The line numbers become hints, and the
+  first-line and last-line asserts stay as sanity checks.
+- **`src()` quotes a range, not a declaration.** It gets an anchor instead:
+  `src(f, at="<first-line text>", n=<lines>, why=…)`.
+- **Failure is per unit, not per run.** A name that is gone or ambiguous
+  becomes a `partial`, `alarm` node that says "`pickDir` no longer found in
+  src/lib/fileHandler.ts". The rest of the map still updates. Duplicate ids and
+  a broken emit still fail hard.
+- **Writes are atomic and only on change.** The generator renders to a string,
+  writes only if it differs, and uses a temp file plus `os.replace`. Next never
+  reads a half-written file, and an unchanged map causes no HMR churn.
+- **`RUN` gains `dirty` and `generatedAt`.** The header can then say
+  "fcea0b6 · uncommitted changes · updated 12:04:31".
+- **The watcher is `scripts/watch_snecko.py`.** It is plain Python and polls the
+  mtimes of `git ls-files -co --exclude-standard` (about 93 files) and of the
+  generator itself. It debounces for 300ms, runs the generator, and keeps the
+  last good file if the generator crashes. It runs as `npm run watch:snecko`
+  beside `npm run dev`, with no `concurrently` dependency.
+
+**The UI has to tolerate a map that changes underneath it:**
+- A focus path naming a vanished node is cut back to its longest prefix that
+  still resolves.
+- An in-memory edit (`edits.tsx`) remembers the body it was based on. If the
+  source changes under it, the card says so and offers revert.
+- Optionally: compare unit bodies with the previous map, kept on `globalThis` so
+  it survives HMR, and briefly highlight the cards that changed.
+
+**Cost accepted:** only the quotes stay live. The narrative (titles, `detail`,
+`why`, flows) is still hand-written and goes stale (D15). A missing unit now
+says so on screen, which is the honest version of that cost.
+**Breaks at scale:** name matching shares the limits of the `calls` matching
+(D16): overloads, shadowing, generated code. A parser replaces `locate`, and
+the watcher and the UI tolerance stay.
+
+**Verify when built:**
+1. Regenerating with no snecko changes gives the same `snecko.ts` apart from
+   `RUN`.
+2. With 5 blank lines added at the top of `App.tsx`, every `App.tsx` start
+   shifts by 5 and every body is identical.
+3. After renaming `pickDir`, only `fh-pick-dir` turns partial and the run exits
+   0.
+4. With dev and the watcher both running, editing the focused function updates
+   the pane within ~1s, and the trail is kept.

@@ -15,8 +15,8 @@
   --color-ink: #1a1a2e;
   --color-on-surface: #1a1c1b;
   --color-on-surface-variant: #404945;
-  --color-muted-slate: #6b7280;
-  --color-faint: #9aa0a6;
+  --color-muted-slate: #5b6270;
+  --color-faint: #6e747b;
 
   /* ── green family — derived, compiler-resolved ─────────── */
   --color-deep-green: #1f5c4d;
@@ -36,9 +36,19 @@
   --color-clay-line: #e0b3a5;
 
   /* ── lines ─────────────────────────────────────────────── */
-  --color-border-gray: #e7e5e0;
-  --color-border-strong: #d6d3cc;
-  --color-wire: #b9b6ae;
+  --color-border-gray: #dad6ce;
+  --color-border-strong: #c4bfb5;
+  --color-wire: #8f8a80;
+
+  /* ── code ──────────────────────────────────────────────────
+     Syntax colours, used ONLY inside code blocks. Kept off amber and clay,
+     which mean state everywhere else; green marks types, the one accent. */
+  --color-code-keyword: #7a3e9d;
+  --color-code-string: #2d6a8c;
+  --color-code-number: #3d58a8;
+  --color-code-comment: #6e747b;
+  --color-code-type: #1f5c4d;
+  --color-code-fn: #1a1a2e;
 
   /* ── shape ─────────────────────────────────────────────── */
   --radius-panel: 20px;

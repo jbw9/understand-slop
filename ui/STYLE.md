@@ -17,7 +17,10 @@ relationship does most of the work: a white card on cream reads as an object on
 a surface, where a white card on white needs a shadow to exist at all.
 
 Consequence: **shadows are nearly absent.** `--shadow-panel` is
-`0 1px 2px rgba(26,26,46,0.04)` — barely a shadow, used on hover only.
+`0 1px 2px rgba(26,26,46,0.04)` — barely a shadow, used on hover only. The one
+real shadow is `--shadow-lift`, on a card held under the pointer mid-drag: that
+card *is* off the paper, so the depth is describing something true rather than
+faking separation the cream/white contrast already provides.
 Separation comes from the cream/white contrast and a 1px border. If you find
 yourself reaching for a heavier shadow, the contrast is doing something wrong.
 
@@ -42,12 +45,14 @@ yourself reaching for a heavier shadow, the contrast is doing something wrong.
 --color-ink                #1a1a2e   titles, primary text
 --color-on-surface         #1a1c1b   body inside cards
 --color-on-surface-variant #404945   secondary prose, evidence rows
---color-muted-slate        #6b7280   labels, legend text
---color-faint              #9aa0a6   mono subtitles, eyebrows, line numbers
+--color-muted-slate        #5b6270   labels, legend text
+--color-faint              #6e747b   mono subtitles, eyebrows, line numbers
 ```
 
 Mono subtitles are always `--color-faint`. That's what keeps a card's second
-line from competing with its title.
+line from competing with its title — through size and weight, not paleness:
+faint is held at 4.5:1 on cream (WCAG AA for small text), because most of it
+is set at 9–11px. It was #9aa0a6 (2.5:1) and read as disabled.
 
 ### The three state families — this is the product, not decoration
 
@@ -59,7 +64,7 @@ card edge and stay recognisably itself.
 | **derived** | Compiler-resolved. Trustworthy. | `#1f5c4d` | `#e8f5e9` | `#cfe6d4` |
 | **partial** | Found, known incomplete. | `#8a6416` | `#fdf6e3` | `#e2c77e` |
 | **alarm** | Partial *and* worth acting on. | `#8e3320` | `#fbede9` | `#e0b3a5` |
-| **inferred** | Not derivable. A guess. | `#6b7280` | `#f4f4f2` | `#d6d3cc` |
+| **inferred** | Not derivable. A guess. | `#5b6270` | `#f4f4f2` | `#c4bfb5` |
 
 **`derived` carries no badge.** Marking certainty creates a two-tier read where
 everything unmarked looks like a failure. Only the exceptions are marked — see
@@ -71,8 +76,9 @@ and never appear except to mean "incomplete" and "look at this."
 ### Lines
 
 ```
---color-border-gray   #e7e5e0   every default border and divider
---color-border-strong #d6d3cc   hover, ghost edges, dashed borders
+--color-border-gray   #dad6ce   every default border and divider
+--color-border-strong #c4bfb5   hover, ghost edges, dashed borders
+--color-wire          #8f8a80   list connectors (3.3:1 on cream)
 ```
 
 `* { border-color: var(--color-border-gray) }` in `@layer base` means a bare
@@ -173,6 +179,14 @@ lag. Direct input must stay 1:1; only *commanded* movement is animated.
 
 `stiffness` is the main dial. Higher is snappier.
 
+**Dragging a card is raw input, so it is 1:1 and unsprung** — the same rule as
+wheel and pan. Two consequences. `transform` stays out of the card's
+`transition-[…]` list, because a transition on it would lag the card behind the
+pointer. And because cards live inside the scaled world, the pointer delta has
+to be divided by scale before it becomes movement — done once as
+`transformPagePoint` on a `MotionConfig`, not at the call site. Sending a card
+home (`0`) is a *commanded* move and does ride the spring.
+
 ### Frame where the content will be, not where it is
 
 `drillInto` computes the target box as the subsystem card **plus the height of
@@ -247,6 +261,21 @@ Re-measure is rAF-coalesced and listens for `scroll` in the **capture** phase
 
 ---
 
+### The three marks that mean direction
+
+They are not interchangeable and the difference is not decorative:
+
+| Mark | Where | Means |
+|---|---|---|
+| Stroked chevron, `M 2.5 2 L 8 5 L 2.5 8` | wire marker | this edge runs that way |
+| The same chevron, pointing down | `flow` step rail | and then |
+| `→` glyph | `map` rows | this becomes that |
+
+The first two share a shape because both are sequence. The `map` arrow is a
+rewrite rule, not a step, which is why it stays a different mark — if that
+distinction ever stops being worth drawing, unify it rather than adding a
+fourth.
+
 ## 8. Card anatomy
 
 ```
@@ -266,7 +295,76 @@ Re-measure is rAF-coalesced and listens for `scroll` in the **capture** phase
   because it is.** This is the one case where a weaker-looking element is the
   correct output.
 - Dimmed (out of focus): `opacity-40`. Hover: `border-border-strong` +
-  `shadow-panel`.
+  `shadow-panel`. Held: `shadow-lift`.
+- **The card face is a drag handle**, so everything on it that owns a press has
+  to say so. Anatomy rows carry `data-row` and set their own `cursor-pointer`
+  (Tailwind v4's preflight gives a `button` no cursor, and `cursor` inherits, so
+  a row left alone would advertise `grab` and refuse it). The `source` block's
+  code carries `data-copy` for the same reason in reverse: it is text you are
+  meant to select, so it opts out of the gesture rather than the cursor.
+- **Kind label** above the title: 9px mono, uppercase, `tracking-[0.09em]`,
+  `text-faint`. No colour — green, amber and clay already mean state.
+
+---
+
+## 8b. Columns (the main view)
+
+- List columns are 300px, separated by a 1px `border-border-gray` rule; the
+  detail pane is 480px and white. Columns scroll vertically; the row of
+  columns scrolls horizontally and slides to the end when the path changes.
+- Column header: the layer name in the kind-label style (9px mono, uppercase),
+  then `in <parent title>` at 11.5px with the title in `font-semibold text-ink`.
+- List cards are the node card at 13px titles, selected as `border-deep-green`
+  plus `ring-1`; a `›` marks a card with children.
+- An edge between vertically adjacent cards is a connector: a 16px `border-wire`
+  line with a 5px arrowhead and the edge label in 9.5px mono `text-faint`.
+  Dashed when `inferred`, clay when `alarm` — the same encoding as wires.
+- Any other edge is a relation chip in the card's footer: rounded-full,
+  9.5px mono, `→ label · target`, dashed border when `inferred`.
+- A new column slides in from x −8 at opacity 0 (easeOutQuint, 280ms); its
+  cards follow at a 35ms stagger.
+- **Code is never a column.** A card's function and class children are listed
+  in the detail pane under `CODE · n`, each as its own editable card, and the
+  pane scrolls as one list. The list card shows `n fn` in place of `›` when
+  code is all it has. A class's methods are not listed again — they are in its
+  body, and two editors over the same lines would drift.
+
+---
+
+## 8c. Explorer (the main view)
+
+- **Code is syntax-coloured** from the `--color-code-*` tokens in globals.css,
+  and ONLY in code: keyword purple, string steel blue, number indigo, type
+  deep green, call ink semibold, comment faint italic. Amber and clay stay
+  reserved for state. The editor draws the colour under a transparent-text
+  textarea; both are as wide as the longest line so they never scroll apart.
+
+- **Map cards** are a fixed 280×84 (world units), so wires are computed from
+  the layout. The map opens fitted to the window and is then an infinite
+  whiteboard: drag (anywhere, cards included — a press that moves more than
+  4px pans and does not open the card) or scroll to pan; pinch or ctrl/⌘ +
+  scroll to zoom at the pointer, 25%–250%; a corner control zooms and fits.
+  The dot grid moves and scales with the board. No divider line: the store
+  column is separated by distance and its STORE labels alone.
+- **The view lives in motion values written straight to the DOM**, never in
+  React state. Map cards carry the trail's shared `layoutId`, and a re-render
+  that moves them is eased as a layout change — state-driven panning made the
+  cards lag the pointer by ~50px.
+- **The map is one column**, top to bottom in dependency order, stores in a
+  column to the right. Three wire shapes: a straight arrow to the next card
+  down; an arc in the left gutter (one lane per overlapping span, 26px apart)
+  for an edge that skips cards; a horizontal curve across to a store.
+  1.5px at 0.9 opacity, coloured and dashed by state like every wire
+  (`STROKE`, `DASHED` in wires.tsx), drawn under the cards. Labels are 11px
+  mono `text-faint` with a cream halo, at the first candidate spot that
+  clears every card and label.
+- **Trail:** a "← map" link, then one compact card per opened level, indented
+  14px per level up to three. The current one is `border-deep-green` + ring.
+  The first trail card shares a `layoutId` with its map card, so the card you
+  click is the card that moves (400ms, easeOutQuint).
+- **Pane code trail:** 9.5px mono — `← back`, `CODE · <card>`, then
+  `› <function> calls|methods` per step, and a count. Drill chips under a
+  function read `calls n · a, b ›` / `methods n · a, b ›`.
 
 ---
 

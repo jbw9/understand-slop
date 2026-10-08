@@ -64,14 +64,14 @@ interface Path {
  * resolved by the compiler, a dashed one was not, so an unproven edge can
  * never be mistaken for a proven one at a glance.
  */
-const STROKE: Record<WireKind, string> = {
+export const STROKE: Record<WireKind, string> = {
   derived: "var(--color-deep-green)",
   partial: "var(--color-amber-ink)",
   alarm: "var(--color-clay-ink)",
   inferred: "var(--color-muted-slate)",
 };
 
-const DASHED: Record<WireKind, string | undefined> = {
+export const DASHED: Record<WireKind, string | undefined> = {
   derived: undefined,
   partial: "5 4",
   alarm: "5 4",
@@ -105,6 +105,106 @@ function assignLanes(keys: string[]): number[] {
     const n = total.get(keys[at]) ?? 1;
     return i - (n - 1) / 2;
   });
+}
+
+/** A card the wires have to route around, in world coordinates. */
+interface Obstacle {
+  el: HTMLElement;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * A rounded orthogonal path through a list of corners.
+ *
+ * The three-segment wires build their own strings inline, which is readable
+ * because each has exactly one corner pair and a tip to place. A detour has
+ * four corners, and that is where a hand-written path string stops being
+ * something anyone can check by eye.
+ *
+ * The radius shrinks to fit the shorter of the two segments meeting at a
+ * corner, so a tight jog rounds as much as it can rather than drawing its
+ * curve past the turn.
+ */
+function roundedPath(pts: { x: number; y: number }[], r: number) {
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const a = pts[i - 1];
+    const b = pts[i + 1];
+    // Which way the path ARRIVES at this corner decides which coordinate the
+    // approach backs off along, and which one the departure advances along.
+    const arrivesH = Math.abs(p.y - a.y) < 0.5;
+    const inLen = arrivesH ? Math.abs(p.x - a.x) : Math.abs(p.y - a.y);
+    const outLen = arrivesH ? Math.abs(b.y - p.y) : Math.abs(b.x - p.x);
+    const rr = Math.min(r, inLen / 2, outLen / 2);
+    const sx = arrivesH ? p.x - Math.sign(p.x - a.x) * rr : p.x;
+    const sy = arrivesH ? p.y : p.y - Math.sign(p.y - a.y) * rr;
+    const ex = arrivesH ? p.x : p.x + Math.sign(b.x - p.x) * rr;
+    const ey = arrivesH ? p.y + Math.sign(b.y - p.y) * rr : p.y;
+    d += ` L ${sx} ${sy} Q ${p.x} ${p.y} ${ex} ${ey}`;
+  }
+  const end = pts[pts.length - 1];
+  return `${d} L ${end.x} ${end.y}`;
+}
+
+/**
+ * Where a dead-straight run has to step aside, or null if it is clear.
+ *
+ * Two endpoints that share an axis used to short-circuit to one segment, which
+ * is right only when nothing stands between them. In a level that STACKS, that
+ * is precisely when something does: a sequence whose edge skips a card —
+ * `gen-prompt -> gen-parallel` over `gen-cache` — shares the column's centre
+ * line with the card it has to miss, so the straight run is drawn through it.
+ *
+ * The corridor-settling loops above cannot catch this. They move the turn
+ * along the routing axis, and a run with no turn has nothing for them to move.
+ *
+ * Returns the offset axis to detour onto and the span to hold it over, chosen
+ * from the UNION of everything blocking — one detour around all of them, not a
+ * weave between them.
+ */
+function blockedRun(
+  axis: number,
+  from: number,
+  to: number,
+  boxes: Obstacle[],
+  vertical: boolean,
+  clear: number,
+) {
+  const lo = Math.min(from, to);
+  const hi = Math.max(from, to);
+  let ahead = Infinity;
+  let behind = -Infinity;
+  let nearSide = Infinity;
+  let farSide = -Infinity;
+  for (const box of boxes) {
+    const alongLo = vertical ? box.top : box.left;
+    const alongHi = vertical ? box.bottom : box.right;
+    const acrossLo = vertical ? box.left : box.top;
+    const acrossHi = vertical ? box.right : box.bottom;
+    // Not in the span, or not on the line: not in the way.
+    if (alongHi < lo + 1 || alongLo > hi - 1) continue;
+    if (axis <= acrossLo - clear || axis >= acrossHi + clear) continue;
+    ahead = Math.min(ahead, alongLo - clear);
+    behind = Math.max(behind, alongHi + clear);
+    nearSide = Math.min(nearSide, acrossLo - clear);
+    farSide = Math.max(farSide, acrossHi + clear);
+  }
+  if (behind === -Infinity) return null;
+  // Round whichever side is the shorter way past the blockage.
+  const side = Math.abs(axis - nearSide) <= Math.abs(axis - farSide) ? nearSide : farSide;
+  // In TRAVEL order, which is not span order: a run going up meets the
+  // blocker's lower edge first. And never step aside before the run starts or
+  // rejoin after it ends, or the detour draws a stub out of a card's far side.
+  const dir = to >= from ? 1 : -1;
+  return {
+    side,
+    leave: dir > 0 ? Math.max(ahead, from) : Math.min(behind, from),
+    rejoin: dir > 0 ? Math.min(behind, to) : Math.max(ahead, to),
+  };
 }
 
 export function useWireAnchors() {
@@ -152,6 +252,7 @@ export function WireLayer({
   version,
   scale = 1,
   reflowKey,
+  measureRef,
 }: {
   canvasRef: RefObject<HTMLDivElement | null>;
   nodes: RefObject<Map<string, HTMLElement>>;
@@ -166,6 +267,11 @@ export function WireLayer({
   scale?: number;
   /** Any value that changes when the layout shifts — forces a re-measure. */
   reflowKey?: string | null;
+  /**
+   * Filled with this layer's own rAF-coalesced re-measure, for a caller that
+   * moves a node without remounting it. See the assignment below.
+   */
+  measureRef?: RefObject<(() => void) | null>;
 }) {
   const [paths, setPaths] = useState<Path[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -194,6 +300,44 @@ export function WireLayer({
     const fanLane = assignLanes(fanKey);
     const fanSize = new Map<string, number>();
     for (const k of fanKey) if (k) fanSize.set(k, (fanSize.get(k) ?? 0) + 1);
+
+    // Where each fan's writers sit, as a GROUP.
+    //
+    // A bus has to pick an axis, and one wire's own geometry is the wrong
+    // thing to ask. Four writers stacked in a column with the target off to
+    // their side are a sideways convergence, including the one writer that
+    // happens to sit level with the target — asked individually, that one
+    // would answer "below me" and route itself out of the bundle.
+    const fanHub = new Map<
+      string,
+      { x: number; y: number; n: number; minX: number; maxX: number; left: number; right: number }
+    >();
+    for (const [i, wire] of wires.entries()) {
+      const key = fanKey[i];
+      if (!key) continue;
+      const el = nodes.current?.get(wire.from);
+      if (!el) continue;
+      const r = cardOf(el).getBoundingClientRect();
+      const cx = ((r.left + r.right) / 2 - base.left) / k;
+      const cy = ((r.top + r.bottom) / 2 - base.top) / k;
+      const at = fanHub.get(key) ?? {
+        x: 0,
+        y: 0,
+        n: 0,
+        minX: Infinity,
+        maxX: -Infinity,
+        left: Infinity,
+        right: -Infinity,
+      };
+      at.x += cx;
+      at.y += cy;
+      at.n += 1;
+      at.minX = Math.min(at.minX, cx);
+      at.maxX = Math.max(at.maxX, cx);
+      at.left = Math.min(at.left, (r.left - base.left) / k);
+      at.right = Math.max(at.right, (r.right - base.left) / k);
+      fanHub.set(key, at);
+    }
 
     const corridorKey: string[] = wires.map((wire) => {
       if (!wire.relation) return "";
@@ -225,8 +369,14 @@ export function WireLayer({
     // silently made every wire dodge its own source and target, and since the
     // last matching blocker wins, the target routinely undid the avoidance
     // that a genuine obstacle had just applied.
-    const obstacles = [...(nodes.current?.values() ?? [])].map((el) => {
+    const obstacles = [...(nodes.current?.values() ?? [])].flatMap((el) => {
       const rc = (el.closest("[data-node]") as HTMLElement | null) ?? el;
+      // A card that has faded out is not on the screen, so it is not in the
+      // way. It is still mounted — that is what keeps its anchor registered —
+      // and on a vertical board it sits in precisely the column an open level
+      // unfolds into, so leaving it here made every wire in that level detour
+      // around a card nobody can see.
+      if (rc.hasAttribute("data-away")) return [];
       const box = rc.getBoundingClientRect();
       return {
         el: rc,
@@ -433,6 +583,68 @@ export function WireLayer({
       // one shared lane above the target and the lane enters it once. Five
       // edges then read as one convergence, which is what it actually is.
       if (fk && n >= 3) {
+        const busR = 7;
+        const hub = fanHub.get(fk);
+        const cx = hub ? hub.x / hub.n : ax;
+        const cy = hub ? hub.y / hub.n : ay;
+        // WHICH WAY THE LANE RUNS.
+        //
+        // The bus was written when the writers lay across a row and the store
+        // sat under them, so the lane was always horizontal. Turn the board on
+        // its side and that breaks in a way worth naming: with every writer in
+        // one column they share an x, so every one of them drops at the SAME
+        // place and the drops stack into a single line running down the spine
+        // — directly over the spine's own sequence wires.
+        //
+        // So the axis is chosen, not assumed, and it is asked of the GROUP.
+        // One wire's own geometry is the wrong thing to ask: the writer that
+        // happens to sit level with the target would answer "beside me" and
+        // route itself out of the bundle.
+        //
+        // Both conditions have to hold. The target has to be off to one side,
+        // AND the writers have to be a column — otherwise the lane would sit
+        // past the rightmost of a spread-out group and the ones behind it would
+        // run their stubs across each other to reach it. A spread group with a
+        // target below it is what the horizontal lane below is already for.
+        const column = hub ? hub.maxX - hub.minX < 40 : false;
+        const laneDown = column && Math.abs(bx - cx) >= Math.abs(by - cy);
+
+        if (laneDown && hub) {
+          const rightward = bx >= cx;
+          // Stands 26px off the COLUMN, not off the target — the same 26px the
+          // horizontal lane keeps above the box it enters, measured from the
+          // other end.
+          //
+          // Off the target instead would be the obvious transposition and is
+          // wrong: it makes every writer's stub as long as the whole gutter, so
+          // four parallel lines cross the tier rule where one line should.
+          const laneX = rightward ? hub.right + 26 : hub.left - 26;
+          const enterY = (B.top + B.bottom) / 2;
+          // A writer clear of the lane leaves through its facing side edge. One
+          // that overlaps it has no room to run sideways, so it leaves through
+          // its nearest horizontal edge — the transpose of the allowance the
+          // horizontal lane makes for a writer sharing the target's row.
+          const clear = rightward ? A.right <= laneX : A.left >= laneX;
+          const startX = clear ? (rightward ? A.right : A.left) : ax;
+          const startY = clear ? ay : enterY >= ay ? A.bottom : A.top;
+          const outward = laneX >= startX ? 1 : -1;
+          const alongDown = enterY >= startY ? 1 : -1;
+          const inward = rightward ? 1 : -1;
+          const tipX = rightward ? B.left - 3 : B.right + 3;
+          const canRound =
+            Math.abs(enterY - startY) > busR * 2 + 2 && Math.abs(laneX - startX) > busR * 2 + 2;
+          const dd = canRound
+            ? `M ${startX} ${startY}` +
+              ` H ${laneX - outward * busR}` +
+              ` Q ${laneX} ${startY} ${laneX} ${startY + alongDown * busR}` +
+              ` V ${enterY - alongDown * busR}` +
+              ` Q ${laneX} ${enterY} ${laneX + inward * busR} ${enterY}` +
+              ` H ${tipX}`
+            : `M ${startX} ${startY} H ${laneX} V ${enterY} H ${tipX}`;
+          next.push({ d: dd, kind: wire.kind, depth: wire.depth, x1: startX, y1: startY });
+          continue;
+        }
+
         const laneY = B.top - 26;
         const enterX = (B.left + B.right) / 2;
         // Leave the source from whichever vertical edge faces the target, drop
@@ -445,7 +657,6 @@ export function WireLayer({
         const above = A.bottom <= laneY;
         const startY = above ? A.bottom : A.top;
         const dropX = above ? ax : A.left <= B.right ? A.left : A.right;
-        const busR = 7;
         const alongRight = enterX >= dropX ? 1 : -1;
         const canRound = Math.abs(enterX - dropX) > busR * 2 + 2 && Math.abs(laneY - startY) > busR * 2 + 2;
         const dd = canRound
@@ -476,6 +687,52 @@ export function WireLayer({
       // both wire systems read as one language.
       const r = 7;
       const clear = 18; // how far a detour stands off a card it routes around
+
+      /**
+       * A run whose endpoints share an axis, drawn straight if it can be and
+       * stepped around whatever is in it if it cannot.
+       *
+       * Closes over this wire's obstacles and its own two cards, because the
+       * one thing a wire must never dodge is itself.
+       */
+      const straightOrDetour = (
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        vertical: boolean,
+      ) => {
+        const others = obstacles.filter((box) => box.el !== cardA && box.el !== cardB);
+        const hit = blockedRun(
+          vertical ? start.x : start.y,
+          vertical ? start.y : start.x,
+          vertical ? end.y : end.x,
+          others,
+          vertical,
+          clear,
+        );
+        if (!hit) {
+          return vertical
+            ? `M ${start.x} ${start.y} V ${end.y}`
+            : `M ${start.x} ${start.y} H ${end.x}`;
+        }
+        const pts = vertical
+          ? [
+              start,
+              { x: start.x, y: hit.leave },
+              { x: hit.side, y: hit.leave },
+              { x: hit.side, y: hit.rejoin },
+              { x: end.x, y: hit.rejoin },
+              end,
+            ]
+          : [
+              start,
+              { x: hit.leave, y: start.y },
+              { x: hit.leave, y: hit.side },
+              { x: hit.rejoin, y: hit.side },
+              { x: hit.rejoin, y: end.y },
+              end,
+            ];
+        return roundedPath(pts, r);
+      };
 
       if (horizontal) {
         const rightward = bx > ax;
@@ -523,7 +780,7 @@ export function WireLayer({
             ` Q ${mid} ${y2} ${mid + dir * r} ${y2}` +
             ` H ${tip}`
           : Math.abs(y2 - y1) < 1
-            ? `M ${x1} ${y1} H ${tip}`
+            ? straightOrDetour({ x: x1, y: y1 }, { x: tip, y: y2 }, false)
             : `M ${x1} ${y1} H ${mid} V ${y2} H ${tip}`;
       } else {
         const downward = by > ay;
@@ -563,7 +820,7 @@ export function WireLayer({
             ` Q ${x2} ${mid} ${x2} ${mid + dir * r}` +
             ` V ${tip}`
           : Math.abs(x2 - x1) < 1
-            ? `M ${x1} ${y1} V ${tip}`
+            ? straightOrDetour({ x: x1, y: y1 }, { x: x2, y: tip }, true)
             : `M ${x1} ${y1} V ${mid} H ${x2} V ${tip}`;
       }
 
@@ -596,19 +853,35 @@ export function WireLayer({
     window.addEventListener("resize", schedule);
     const ro = new ResizeObserver(schedule);
     ro.observe(canvas);
+
+    // A card dragged by hand moves without remounting: no ref fires, no
+    // scroll, no resize, so nothing above hears it. Handing the caller this
+    // same schedule keeps the re-measure INSIDE this component — only
+    // WireLayer re-renders. Routing it through Canvas state instead (a bumped
+    // `version`, or `reflowKey`) re-renders every Branch, NodeCard and
+    // AnatomyView on the board sixty times a second to move one card, and
+    // nothing here is memoised. Panning costs nothing by comparison: it writes
+    // motion values and never touches React state at all.
+    if (measureRef) measureRef.current = schedule;
+
     return () => {
+      if (measureRef) measureRef.current = null;
       if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
       ro.disconnect();
     };
-  }, [canvasRef, measure]);
+  }, [canvasRef, measure, measureRef]);
 
   if (paths.length === 0) return null;
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-10 hidden md:block"
+      // `overflow-visible` because an <svg> root clips at its viewport by
+      // default, and this one is sized to the world box. A card dragged past
+      // that edge renders fine — the world div does not clip — while its wires
+      // are silently cut, which is the confusing half of the failure.
+      className="pointer-events-none absolute inset-0 z-10 hidden overflow-visible md:block"
       width={size.w}
       height={size.h}
       aria-hidden="true"

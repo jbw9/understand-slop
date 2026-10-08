@@ -6,21 +6,25 @@
  * rather than being filled in plausibly. Code at the leaves is quoted verbatim
  * with real line numbers.
  *
- * Cut by PRODUCT STEP: what a learner does, in order. The layer cut for this
- * repo would be "app / api / lib / db / cdk", which is true of the directory
- * tree and says nothing about a product whose entire premise is "ask a
- * question, get an animation instead of a text wall".
+ * Cut by SURFACE first: the roots are what a learner sees — the chat box, the
+ * animated answer, the history, the share sheet — read in journey order. One
+ * click down is the data flow behind that surface, and below that, as deep as
+ * a branch needs, the code that does it (see `NodeKind` in data.ts). The
+ * directory cut, "app / api / lib / db / cdk", is true of the tree and says
+ * nothing about a product whose entire premise is "ask a question, get an
+ * animation instead of a text wall".
  *
  * DEPTH IS NOT UNIFORM. A branch goes as deep as it has genuinely different
  * things to say. "Generating the answer" runs four levels because a sequence,
  * a model call, a cache strategy and a source file are four different kinds of
- * thing. "Sharing and exporting" stops at two because nothing below it is
+ * thing. "Share and export" stops at two because nothing below it is
  * different from what the card already shows. A third level added everywhere
  * would just be the same repetition one click further down.
  */
 
 import type { Anatomy, Edge, Link, Node, Source, State } from "@/lib/data";
 import { rowId } from "@/lib/data";
+import { makeMap } from "@/lib/tree";
 
 export type { State, Anatomy, Node, Edge, Link, Source };
 
@@ -38,738 +42,766 @@ export const RUN = {
 
 /** The tree as authored. `L0` below is this, plus a node per deep row. */
 const AUTHORED: Node[] = [
+  // THE CHAT BOX. Three flows hang off the one element a learner types into:
+  // what they can send, whether they may, and how the answer is made. They
+  // were roots when the map was cut by product step; cut by surface they are
+  // what the box does, one click down.
   {
-    id: "asking",
-    title: "Asking a question",
-    sub: "Type it, attach a file, pick a subject",
+    id: "chat-box",
+    kind: "element",
+    title: "The chat box",
+    sub: "Type, attach a file, pick a subject",
     state: "inferred",
     col: 0,
     row: 0,
     detail:
-      "One chat surface. A question can carry images, a PDF, a Word document or plain text, and the learner can pin a subject and a mode (auto, visualize, or test) before sending.",
-    evidence: "src/components/ChatInput.tsx, src/app/api/chat/route.ts:41",
-    edges: [{ from: "ask-input", to: "ask-mode", state: "derived" }],
+      "Everything a question goes through before an answer appears: what you can send, whether you may, and how the answer is made.",
+    evidence: "src/components/ChatInput.tsx",
+    edges: [
+      { from: "asking", to: "gate", state: "derived", label: "checked by" },
+      { from: "gate", to: "generating", state: "derived", label: "allows" },
+    ],
     children: [
       {
-        id: "ask-input",
-        title: "What you can send",
-        sub: "Text · image · PDF · Word · plain text",
-        state: "derived",
+        id: "asking",
+        title: "Asking a question",
+        sub: "Text, files, subject and mode",
+        state: "inferred",
         col: 0,
         row: 0,
-        evidence: "src/app/api/chat/route.ts:41",
-        // An earlier pass stopped this card here, reasoning that buildContent
-        // is one if/else and drilling in would show four near-identical push()
-        // calls. That was right about buildContent and wrong about the
-        // question: "what happens when I send an image" is not a question
-        // about buildContent. The real path crosses a client-side gate, a wire
-        // type, the dispatch, and storage — four files, of which the card
-        // named one. Each row now opens its own path.
-        anatomy: [
-          {
-            kind: "map",
-            caption: "attachment → how it reaches the model",
-            rows: [
-              {
-                from: "image",
-                to: "base64 image block",
-                state: "derived",
-                under: [
-                  {
-                    kind: "flow",
-                    rows: [
-                      {
-                        n: 1,
-                        title: "Still a file on your disk",
-                        detail: "Nothing has been sent. The browser checks the OS-reported type against five allowed image formats and the size against 10MB, and refuses here — so a file that is going to be rejected is rejected before it is ever read.",
-                        state: "derived",
-                      },
-                      {
-                        n: 2,
-                        title: "Now text, roughly a third bigger",
-                        detail: "FileReader re-encodes the bytes as base64 — an image becomes a very long string of letters. That is the form it travels and is stored in for the rest of its life; it is never a file again.",
-                        state: "derived",
-                      },
-                      {
-                        n: 3,
-                        title: "One item in a list, beside your words",
-                        detail: "Your message stops being a string and becomes a list of blocks. Each attachment is one block, your typed text is another, and the text is appended last — so the model reads the picture before the question about it.",
-                        state: "derived",
-                      },
-                      {
-                        n: 4,
-                        title: "Read by the model as part of the question",
-                        detail: "The block carries the original format tag so the model knows how to decode it. Nothing describes or summarises the image first — the model sees the picture itself.",
-                        state: "derived",
-                      },
-                      {
-                        n: 5,
-                        title: "Kept forever inside the message row",
-                        detail: "The whole base64 string is written into the conversation row in DynamoDB rather than to file storage, so the picture and the sentence live in the same record.",
-                        state: "partial",
-                      },
-                    ],
-                  },
-                  {
-                    kind: "source",
-                    file: "src/components/ChatInput.tsx",
-                    start: 158,
-                    // Re-indented to the card's width. The 340px column scrolls
-                    // horizontally rather than wrapping, and a quote you have to
-                    // drag sideways to finish is one nobody reads.
-                    code: "const base64 = e.target?.result as string;\nconst base64Data = base64.split(',')[1];",
-                    why: "readAsDataURL returns `data:<mime>;base64,<payload>` and the API wants only the payload, so the prefix is cut by splitting on the first comma. It reads as a throwaway line and is the one place the client and the Bedrock content-block format actually meet — `source.data` is exactly this string.",
-                  },
-                ],
-              },
-              {
-                from: "pdf",
-                to: "native document block",
-                state: "derived",
-                under: [
-                  {
-                    kind: "facts",
-                    rows: [
-                      { label: "Branch", value: "fileType 'document' + mimeType === 'application/pdf'", state: "derived" },
-                      { label: "Block", value: "type 'document' · base64 · media_type application/pdf", state: "derived" },
-                      { label: "title", value: "The original filename, passed to the model", state: "derived" },
-                      { label: "Not extracted", value: "No text parsing — the model reads the PDF itself", state: "derived" },
-                    ],
-                  },
-                ],
-              },
-              {
-                from: ".docx",
-                to: "text via mammoth",
-                state: "derived",
-                under: [
-                  {
-                    kind: "source",
-                    file: "src/app/api/chat/route.ts",
-                    start: 59,
-                    code: "        // Extract text from Word doc using mammoth\n        try {\n          const buffer = Buffer.from(attachment.data, 'base64');\n          const { value: docText } = await mammoth.extractRawText({ buffer });\n          contentBlocks.push({\n            type: 'text',\n            text: `[Content from Word document \"${attachment.name}\":\\n${docText.trim()}\\n]`,\n          });\n        } catch {\n          contentBlocks.push({\n            type: 'text',\n            text: `[Could not extract text from \"${attachment.name}\"]`,\n          });\n        }",
-                    why: "Word is the only attachment the server parses rather than forwards — mammoth pulls raw text and it is wrapped in a bracketed label so the model can tell document content from the user's own words. The catch is the honest part: extraction failure becomes a sentence saying so, sent to the model as if it were the document. The learner is never told; they get an answer about a file nothing could read.",
-                  },
-                ],
-              },
-              {
-                from: "text",
-                to: "decoded, inlined",
-                state: "derived",
-                under: [
-                  {
-                    kind: "flow",
-                    rows: [
-                      { n: 1, title: "Base64 → utf-8", detail: "Buffer.from(data, 'base64').toString('utf-8'). The browser encoded it; the server immediately undoes that.", state: "derived" },
-                      { n: 2, title: "Wrapped and labelled", detail: "[Content from text file \"name\": … ] — same bracket convention as the Word branch.", state: "derived" },
-                      { n: 3, title: "No size guard on this side", detail: "The 10MB cap lives in the browser only. A direct POST inlines the whole file into the prompt.", state: "partial" },
-                    ],
-                  },
-                ],
-              },
-              {
-                from: "anything else",
-                to: "silently dropped",
-                state: "partial",
-                under: [
-                  {
-                    kind: "source",
-                    file: "src/app/api/chat/route.ts",
-                    start: 50,
-                    code: "    if (attachment.fileType === 'document') {\n      if (attachment.mimeType === 'application/pdf') {\n        …\n      } else if (WORD_MIME_TYPES.has(attachment.mimeType)) {\n        …\n      } else if (attachment.mimeType === 'text/plain') {\n        …\n      }\n    } else {",
-                    why: "Three inner branches and no else. A document whose MIME matches none of them pushes no block at all — the attachment reaches the server, is counted, and vanishes before the model sees anything. Today the two lists agree, so it never fires: the client accepts exactly pdf, two Word types and text/plain. It is one entry in ACCEPTED_DOCUMENT_TYPES away from a file that uploads cleanly, shows a chip in the composer, and is not there.",
-                  },
-                  {
-                    kind: "map",
-                    caption: "the two lists that have to stay in step",
-                    rows: [
-                      { from: "client", to: "ACCEPTED_DOCUMENT_TYPES — 4 entries · ChatInput.tsx:22", state: "derived" },
-                      { from: "server", to: "3 branches — pdf · WORD_MIME_TYPES · text/plain", state: "derived" },
-                      { from: "linked by", to: "nothing — no shared constant, no test", state: "partial" },
-                    ],
-                  },
-                ],
-              },
-              {
-                from: "url",
-                to: "fetched server-side · falls back to training data",
-                state: "partial",
-                under: [
-                  {
-                    kind: "flow",
-                    rows: [
-                      { n: 1, title: "Found by regex, not by the composer", detail: "A URL is never attached — it is matched out of the message text with /https?:\\/\\/[^\\s<>\"{}|\\\\^`[\\]]+/g. Pasting a link into a sentence is the whole interaction.", state: "derived" },
-                      { n: 2, title: "First two only", detail: "detectedUrls.slice(0, 2). A message with five links silently fetches two.", state: "partial" },
-                      { n: 3, title: "Fetched with a 5s timeout", detail: "AbortSignal.timeout(5000), under a spoofed Mozilla User-Agent. Each URL is awaited in series, so two slow hosts cost 10s before the model is called.", state: "derived" },
-                      { n: 4, title: "HTML stripped by six regexes", detail: "script and style blocks dropped, then all tags, then entities, then whitespace collapsed — no parser involved.", state: "partial" },
-                      { n: 5, title: "Truncated to 8,000 chars", detail: "Appended to the message as [Web page content from <url>: …]. Anything past 8k is gone with no marker.", state: "derived" },
-                      { n: 6, title: "Any failure is invisible", detail: "Timeout, 403, or a JS-rendered page all hit an empty catch. The model answers from training data and nothing says the page was never read.", state: "partial" },
-                    ],
-                  },
-                  {
-                    kind: "source",
-                    file: "src/app/api/chat/route.ts",
-                    start: 190,
-                    code: "      } catch {\n        // Fetch failed (timeout, blocked, JS-rendered) — Claude falls back to training data\n      }",
-                    why: "The comment states the design and the design is the risk. A silent fallback means a learner who pastes a link gets a confident answer about what the model already believed was at that URL, which for a page behind auth or rendered client-side is the common case. This is the same failure shape as the subject classifier's catch and the animation cache's — three places where an outage and a normal result are indistinguishable downstream.",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: "ask-mode",
-        title: "Subject and mode",
-        sub: "3 modes → 4 prompt paths · 11 subjects",
-        state: "derived",
-        col: 0,
-        row: 1,
         detail:
-          "Two independent choices that together select which prompt text gets appended. Mode is picked by the learner; subject is either pinned or classified by a separate model call.",
-        evidence: "src/lib/subject-router.ts:26, src/app/api/chat/route.ts:210",
-        anatomy: [
-          {
-            kind: "map",
-            caption: "mode → what gets appended as block 2",
-            rows: [
-              { from: "auto · 1st", to: "SUBJECT_PROMPTS[s] + AUTO_MODE_FIRST_MESSAGE_PROMPT", state: "derived" },
-              { from: "auto · later", to: "SUBJECT_PROMPTS[s] + AUTO_MODE_FOLLOW_UP_PROMPT", state: "derived" },
-              { from: "visualize", to: "SUBJECT_PROMPTS[s] + VISUALIZE_MODE_PROMPT", state: "derived" },
-              { from: "test", to: "TEST_MODE_PROMPT + SUBJECT_TEST_HINTS[s] — no subject prompt", state: "derived" },
-            ],
-          },
-        ],
+          "One chat surface. A question can carry images, a PDF, a Word document or plain text, and the learner can pin a subject and a mode (auto, visualize, or test) before sending.",
+        evidence: "src/components/ChatInput.tsx, src/app/api/chat/route.ts:41",
+        edges: [{ from: "ask-input", to: "ask-mode", state: "derived" }],
         children: [
           {
-            id: "ask-classify",
-            title: "How the subject is decided",
-            sub: "One Haiku call · 11 labels · never throws",
+            id: "ask-input",
+            title: "What you can send",
+            sub: "Text · image · PDF · Word · plain text",
             state: "derived",
             col: 0,
             row: 0,
-            detail:
-              "If the learner pins a subject chip it is used directly, after being checked against VALID_SUBJECTS so a client cannot inject an arbitrary string. Otherwise one cheap model call classifies the first message.",
-            evidence: "src/lib/subject-router.ts:36",
+            evidence: "src/app/api/chat/route.ts:41",
+            // An earlier pass stopped this card here, reasoning that buildContent
+            // is one if/else and drilling in would show four near-identical push()
+            // calls. That was right about buildContent and wrong about the
+            // question: "what happens when I send an image" is not a question
+            // about buildContent. The real path crosses a client-side gate, a wire
+            // type, the dispatch, and storage — four files, of which the card
+            // named one. Each row now opens its own path.
             anatomy: [
               {
-                kind: "flow",
+                kind: "map",
+                caption: "attachment → how it reaches the model",
                 rows: [
-                  { n: 1, title: "Env var checked first", detail: "No BEDROCK_CLASSIFIER_MODEL_ID → returns 'general' without calling anything.", state: "derived" },
-                  { n: 2, title: "Message truncated to 500 chars", detail: "Only the opening of the first message is classified; the rest is never sent.", state: "derived" },
-                  { n: 3, title: "Haiku, max 10 output tokens", detail: "The reply is one word, so the budget is one word. ~150ms.", state: "derived" },
-                  { n: 4, title: "3s AbortController", detail: "A slow classifier is abandoned rather than delaying the answer.", state: "derived" },
-                  { n: 5, title: "Reply checked against VALID_SUBJECTS", detail: "An unrecognised word is discarded, not passed through.", state: "derived" },
-                  { n: 6, title: "Every failure path → 'general'", detail: "catch {} with no rethrow. A misclassification and an outage look identical downstream.", state: "partial" },
+                  {
+                    from: "image",
+                    to: "base64 image block",
+                    state: "derived",
+                    under: [
+                      {
+                        kind: "flow",
+                        rows: [
+                          {
+                            n: 1,
+                            title: "Still a file on your disk",
+                            detail: "Nothing has been sent. The browser checks the OS-reported type against five allowed image formats and the size against 10MB, and refuses here — so a file that is going to be rejected is rejected before it is ever read.",
+                            state: "derived",
+                          },
+                          {
+                            n: 2,
+                            title: "Now text, roughly a third bigger",
+                            detail: "FileReader re-encodes the bytes as base64 — an image becomes a very long string of letters. That is the form it travels and is stored in for the rest of its life; it is never a file again.",
+                            state: "derived",
+                          },
+                          {
+                            n: 3,
+                            title: "One item in a list, beside your words",
+                            detail: "Your message stops being a string and becomes a list of blocks. Each attachment is one block, your typed text is another, and the text is appended last — so the model reads the picture before the question about it.",
+                            state: "derived",
+                          },
+                          {
+                            n: 4,
+                            title: "Read by the model as part of the question",
+                            detail: "The block carries the original format tag so the model knows how to decode it. Nothing describes or summarises the image first — the model sees the picture itself.",
+                            state: "derived",
+                          },
+                          {
+                            n: 5,
+                            title: "Kept forever inside the message row",
+                            detail: "The whole base64 string is written into the conversation row in DynamoDB rather than to file storage, so the picture and the sentence live in the same record.",
+                            state: "partial",
+                          },
+                        ],
+                      },
+                      {
+                        kind: "source",
+                        file: "src/components/ChatInput.tsx",
+                        start: 158,
+                        // Re-indented to the card's width. The 340px column scrolls
+                        // horizontally rather than wrapping, and a quote you have to
+                        // drag sideways to finish is one nobody reads.
+                        code: "const base64 = e.target?.result as string;\nconst base64Data = base64.split(',')[1];",
+                        why: "readAsDataURL returns `data:<mime>;base64,<payload>` and the API wants only the payload, so the prefix is cut by splitting on the first comma. It reads as a throwaway line and is the one place the client and the Bedrock content-block format actually meet — `source.data` is exactly this string.",
+                      },
+                    ],
+                  },
+                  {
+                    from: "pdf",
+                    to: "native document block",
+                    state: "derived",
+                    under: [
+                      {
+                        kind: "facts",
+                        rows: [
+                          { label: "Branch", value: "fileType 'document' + mimeType === 'application/pdf'", state: "derived" },
+                          { label: "Block", value: "type 'document' · base64 · media_type application/pdf", state: "derived" },
+                          { label: "title", value: "The original filename, passed to the model", state: "derived" },
+                          { label: "Not extracted", value: "No text parsing — the model reads the PDF itself", state: "derived" },
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    from: ".docx",
+                    to: "text via mammoth",
+                    state: "derived",
+                    under: [
+                      {
+                        kind: "source",
+                        file: "src/app/api/chat/route.ts",
+                        start: 59,
+                        code: "        // Extract text from Word doc using mammoth\n        try {\n          const buffer = Buffer.from(attachment.data, 'base64');\n          const { value: docText } = await mammoth.extractRawText({ buffer });\n          contentBlocks.push({\n            type: 'text',\n            text: `[Content from Word document \"${attachment.name}\":\\n${docText.trim()}\\n]`,\n          });\n        } catch {\n          contentBlocks.push({\n            type: 'text',\n            text: `[Could not extract text from \"${attachment.name}\"]`,\n          });\n        }",
+                        why: "Word is the only attachment the server parses rather than forwards — mammoth pulls raw text and it is wrapped in a bracketed label so the model can tell document content from the user's own words. The catch is the honest part: extraction failure becomes a sentence saying so, sent to the model as if it were the document. The learner is never told; they get an answer about a file nothing could read.",
+                      },
+                    ],
+                  },
+                  {
+                    from: "text",
+                    to: "decoded, inlined",
+                    state: "derived",
+                    under: [
+                      {
+                        kind: "flow",
+                        rows: [
+                          { n: 1, title: "Base64 → utf-8", detail: "Buffer.from(data, 'base64').toString('utf-8'). The browser encoded it; the server immediately undoes that.", state: "derived" },
+                          { n: 2, title: "Wrapped and labelled", detail: "[Content from text file \"name\": … ] — same bracket convention as the Word branch.", state: "derived" },
+                          { n: 3, title: "No size guard on this side", detail: "The 10MB cap lives in the browser only. A direct POST inlines the whole file into the prompt.", state: "partial" },
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    from: "anything else",
+                    to: "silently dropped",
+                    state: "partial",
+                    under: [
+                      {
+                        kind: "source",
+                        file: "src/app/api/chat/route.ts",
+                        start: 50,
+                        code: "    if (attachment.fileType === 'document') {\n      if (attachment.mimeType === 'application/pdf') {\n        …\n      } else if (WORD_MIME_TYPES.has(attachment.mimeType)) {\n        …\n      } else if (attachment.mimeType === 'text/plain') {\n        …\n      }\n    } else {",
+                        why: "Three inner branches and no else. A document whose MIME matches none of them pushes no block at all — the attachment reaches the server, is counted, and vanishes before the model sees anything. Today the two lists agree, so it never fires: the client accepts exactly pdf, two Word types and text/plain. It is one entry in ACCEPTED_DOCUMENT_TYPES away from a file that uploads cleanly, shows a chip in the composer, and is not there.",
+                      },
+                      {
+                        kind: "map",
+                        caption: "the two lists that have to stay in step",
+                        rows: [
+                          { from: "client", to: "ACCEPTED_DOCUMENT_TYPES — 4 entries · ChatInput.tsx:22", state: "derived" },
+                          { from: "server", to: "3 branches — pdf · WORD_MIME_TYPES · text/plain", state: "derived" },
+                          { from: "linked by", to: "nothing — no shared constant, no test", state: "partial" },
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    from: "url",
+                    to: "fetched server-side · falls back to training data",
+                    state: "partial",
+                    under: [
+                      {
+                        kind: "flow",
+                        rows: [
+                          { n: 1, title: "Found by regex, not by the composer", detail: "A URL is never attached — it is matched out of the message text with /https?:\\/\\/[^\\s<>\"{}|\\\\^`[\\]]+/g. Pasting a link into a sentence is the whole interaction.", state: "derived" },
+                          { n: 2, title: "First two only", detail: "detectedUrls.slice(0, 2). A message with five links silently fetches two.", state: "partial" },
+                          { n: 3, title: "Fetched with a 5s timeout", detail: "AbortSignal.timeout(5000), under a spoofed Mozilla User-Agent. Each URL is awaited in series, so two slow hosts cost 10s before the model is called.", state: "derived" },
+                          { n: 4, title: "HTML stripped by six regexes", detail: "script and style blocks dropped, then all tags, then entities, then whitespace collapsed — no parser involved.", state: "partial" },
+                          { n: 5, title: "Truncated to 8,000 chars", detail: "Appended to the message as [Web page content from <url>: …]. Anything past 8k is gone with no marker.", state: "derived" },
+                          { n: 6, title: "Any failure is invisible", detail: "Timeout, 403, or a JS-rendered page all hit an empty catch. The model answers from training data and nothing says the page was never read.", state: "partial" },
+                        ],
+                      },
+                      {
+                        kind: "source",
+                        file: "src/app/api/chat/route.ts",
+                        start: 190,
+                        code: "      } catch {\n        // Fetch failed (timeout, blocked, JS-rendered) — Claude falls back to training data\n      }",
+                        why: "The comment states the design and the design is the risk. A silent fallback means a learner who pastes a link gets a confident answer about what the model already believed was at that URL, which for a page behind auth or rendered client-side is the common case. This is the same failure shape as the subject classifier's catch and the animation cache's — three places where an outage and a normal result are indistinguishable downstream.",
+                      },
+                    ],
+                  },
                 ],
-              },
-              {
-                kind: "source",
-                file: "src/lib/subject-router.ts",
-                start: 56,
-                code: "  } catch {\n    return 'general';\n  } finally {\n    clearTimeout(timeout);\n  }",
-                why: "This is why the subject can silently be wrong. A timeout, a throttle, a bad model id and a genuinely general question all produce the same 'general', and nothing records which one happened. The learner sees a slightly worse answer and no error.",
               },
             ],
           },
           {
-            id: "ask-disambig",
-            title: "Why this subject, not that one",
-            sub: "4 rules written into the classifier prompt",
+            id: "ask-mode",
+            title: "Subject and mode",
+            sub: "3 modes → 4 prompt paths · 11 subjects",
             state: "derived",
             col: 0,
             row: 1,
             detail:
-              "The subjects overlap, so the prompt spends most of its length drawing borders between the pairs that collide rather than defining each subject.",
-            evidence: "src/lib/subject-router.ts:17",
+              "Two independent choices that together select which prompt text gets appended. Mode is picked by the learner; subject is either pinned or classified by a separate model call.",
+            evidence: "src/lib/subject-router.ts:26, src/app/api/chat/route.ts:210",
             anatomy: [
               {
                 kind: "map",
-                caption: "the boundary, verbatim from the prompt",
+                caption: "mode → what gets appended as block 2",
                 rows: [
-                  { from: "a cell", to: "biology", state: "derived" },
-                  { from: "a molecule", to: "chemistry", state: "derived" },
-                  { from: "recording a transaction", to: "accounting", state: "derived" },
-                  { from: "market forces and theory", to: "economics", state: "derived" },
-                  { from: "running an organization", to: "business", state: "derived" },
-                  { from: "how language works", to: "language", state: "derived" },
+                  { from: "auto · 1st", to: "SUBJECT_PROMPTS[s] + AUTO_MODE_FIRST_MESSAGE_PROMPT", state: "derived" },
+                  { from: "auto · later", to: "SUBJECT_PROMPTS[s] + AUTO_MODE_FOLLOW_UP_PROMPT", state: "derived" },
+                  { from: "visualize", to: "SUBJECT_PROMPTS[s] + VISUALIZE_MODE_PROMPT", state: "derived" },
+                  { from: "test", to: "TEST_MODE_PROMPT + SUBJECT_TEST_HINTS[s] — no subject prompt", state: "derived" },
+                ],
+              },
+            ],
+            children: [
+              {
+                id: "ask-classify",
+                title: "How the subject is decided",
+                sub: "One Haiku call · 11 labels · never throws",
+                state: "derived",
+                col: 0,
+                row: 0,
+                detail:
+                  "If the learner pins a subject chip it is used directly, after being checked against VALID_SUBJECTS so a client cannot inject an arbitrary string. Otherwise one cheap model call classifies the first message.",
+                evidence: "src/lib/subject-router.ts:36",
+                anatomy: [
+                  {
+                    kind: "flow",
+                    rows: [
+                      { n: 1, title: "Env var checked first", detail: "No BEDROCK_CLASSIFIER_MODEL_ID → returns 'general' without calling anything.", state: "derived" },
+                      { n: 2, title: "Message truncated to 500 chars", detail: "Only the opening of the first message is classified; the rest is never sent.", state: "derived" },
+                      { n: 3, title: "Haiku, max 10 output tokens", detail: "The reply is one word, so the budget is one word. ~150ms.", state: "derived" },
+                      { n: 4, title: "3s AbortController", detail: "A slow classifier is abandoned rather than delaying the answer.", state: "derived" },
+                      { n: 5, title: "Reply checked against VALID_SUBJECTS", detail: "An unrecognised word is discarded, not passed through.", state: "derived" },
+                      { n: 6, title: "Every failure path → 'general'", detail: "catch {} with no rethrow. A misclassification and an outage look identical downstream.", state: "partial" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/lib/subject-router.ts",
+                    start: 56,
+                    code: "  } catch {\n    return 'general';\n  } finally {\n    clearTimeout(timeout);\n  }",
+                    why: "This is why the subject can silently be wrong. A timeout, a throttle, a bad model id and a genuinely general question all produce the same 'general', and nothing records which one happened. The learner sees a slightly worse answer and no error.",
+                  },
                 ],
               },
               {
-                kind: "source",
-                file: "src/lib/subject-router.ts",
-                start: 20,
-                code: "- Biology is living systems; chemistry is molecules and reactions (a cell = biology; a molecule = chemistry)",
-                why: "Written as an instruction to the model, which means the taxonomy exists only in prose. Nothing verifies that a message about mitochondria lands on biology — there is no test, and the only feedback is the answer being subtly off-domain.",
+                id: "ask-disambig",
+                title: "Why this subject, not that one",
+                sub: "4 rules written into the classifier prompt",
+                state: "derived",
+                col: 0,
+                row: 1,
+                detail:
+                  "The subjects overlap, so the prompt spends most of its length drawing borders between the pairs that collide rather than defining each subject.",
+                evidence: "src/lib/subject-router.ts:17",
+                anatomy: [
+                  {
+                    kind: "map",
+                    caption: "the boundary, verbatim from the prompt",
+                    rows: [
+                      { from: "a cell", to: "biology", state: "derived" },
+                      { from: "a molecule", to: "chemistry", state: "derived" },
+                      { from: "recording a transaction", to: "accounting", state: "derived" },
+                      { from: "market forces and theory", to: "economics", state: "derived" },
+                      { from: "running an organization", to: "business", state: "derived" },
+                      { from: "how language works", to: "language", state: "derived" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/lib/subject-router.ts",
+                    start: 20,
+                    code: "- Biology is living systems; chemistry is molecules and reactions (a cell = biology; a molecule = chemistry)",
+                    why: "Written as an instruction to the model, which means the taxonomy exists only in prose. Nothing verifies that a message about mitochondria lands on biology — there is no test, and the only feedback is the answer being subtly off-domain.",
+                  },
+                ],
+              },
+              {
+                id: "ask-cs-gap",
+                title: "The subject with no prompt",
+                sub: "8 subject prompts · 9 test hints · 11 subjects",
+                state: "partial",
+                col: 0,
+                row: 2,
+                detail:
+                  "SUBJECT_PROMPTS is a Partial<Record>, and three of the eleven classifiable subjects have no entry. The lookup is a guarded `if`, so a missing subject is not an error — block 2 simply carries less.",
+                evidence: "src/lib/system-prompt.ts:5018",
+                anatomy: [
+                  {
+                    kind: "chips",
+                    caption: "has a subject prompt",
+                    rows: [
+                      { label: "math", note: "5.0KB", state: "derived" },
+                      { label: "physics", note: "8.6KB", state: "derived" },
+                      { label: "chemistry", note: "19.5KB", state: "derived" },
+                      { label: "biology", note: "14.3KB", state: "derived" },
+                      { label: "language", note: "11.9KB", state: "derived" },
+                      { label: "business", note: "12.7KB", state: "derived" },
+                      { label: "accounting", note: "16.2KB", state: "derived" },
+                      { label: "economics", note: "17.4KB", state: "derived" },
+                    ],
+                  },
+                  {
+                    kind: "chips",
+                    caption: "classifiable, but no subject prompt",
+                    rows: [
+                      { label: "cs", note: "test hint only", state: "partial" },
+                      { label: "general", note: "nothing", state: "partial" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/app/api/chat/route.ts",
+                    start: 217,
+                    code: "    if (resolvedSubject && mode !== 'test' && SUBJECT_PROMPTS[resolvedSubject]) {\n      subjectModePrompt += SUBJECT_PROMPTS[resolvedSubject];\n    }",
+                    why: "A computer-science question in auto or visualize mode gets no subject guidance at all — the `&&` chain simply falls through. In test mode the same question does get CS guidance, because that comes from SUBJECT_TEST_HINTS, which does have a cs key. Same subject, opposite treatment, decided by mode.",
+                  },
+                ],
+              },
+              {
+                id: "ask-questions",
+                title: "When it asks instead of answering",
+                sub: "Ambiguous → options block, not a guess",
+                state: "derived",
+                col: 0,
+                row: 3,
+                detail:
+                  "The rule is written into the base prompt as four triggers and four exclusions, with three worked examples. It is prose instruction only — nothing validates that the model obeys it.",
+                evidence: "src/lib/system-prompt.ts:55",
+                anatomy: [
+                  {
+                    kind: "map",
+                    caption: "ask · the prompt's own examples",
+                    rows: [
+                      { from: "\"explain sorting\"", to: "bubble / merge / quick / compare all three", state: "derived" },
+                      { from: "\"visualize recursion\"", to: "factorial / fibonacci / binary search", state: "derived" },
+                      { from: "\"show me data structures\"", to: "array / tree / graph", state: "derived" },
+                    ],
+                  },
+                  {
+                    kind: "map",
+                    caption: "don't ask",
+                    rows: [
+                      { from: "already specific", to: "\"show me bubble sort\" → just build it", state: "derived" },
+                      { from: "context makes it clear", to: "earlier turns already narrowed it", state: "derived" },
+                      { from: "an obvious best choice exists", to: "pick it", state: "derived" },
+                      { from: "user stated a preference", to: "honour it", state: "derived" },
+                    ],
+                  },
+                ],
+              },
+              {
+                id: "ask-budget",
+                title: "The three-question budget",
+                sub: "Counted from stored messages, injected as a sentence",
+                state: "derived",
+                col: 0,
+                row: 4,
+                detail:
+                  "The cap is not enforced by rejecting anything. It is counted server-side each turn and stated to the model in block 3, which is the reason block 3 exists at all.",
+                evidence: "src/app/api/chat/route.ts:239",
+                anatomy: [
+                  {
+                    kind: "flow",
+                    rows: [
+                      { n: 1, title: "Counted, not tracked", detail: "history.filter(m => m.questionData !== undefined).length — derived from stored messages each turn, so there is no counter to drift.", state: "derived" },
+                      { n: 2, title: "0 asked → nothing injected", detail: "The prompt's own 'max 3' line is the only limit in play.", state: "derived" },
+                      { n: 3, title: "1–2 asked → allowance stated", detail: "\"You can ask up to N more if needed.\"", state: "derived" },
+                      { n: 4, title: "3+ asked → hard stop", detail: "\"DO NOT ask any more questions. Proceed directly with creating a visualization.\"", state: "derived" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/app/api/chat/route.ts",
+                    start: 245,
+                    code: "      if (questionCount >= 3) {\n        dynamicContext += `\\n\\n**IMPORTANT CONTEXT: You have already asked ${questionCount} clarifying questions in this conversation. DO NOT ask any more questions.**`;",
+                    why: "This is the entire reason the prompt is split into three cached blocks. The sentence changes on almost every turn, and if it lived inside block 1 or 2 the whole cached prefix would be invalidated each time — so ~102KB would be re-sent to buy one sentence of state.",
+                  },
+                ],
               },
             ],
           },
+        ],
+      },
+
+      {
+        id: "gate",
+        title: "Who's asking, and may they",
+        sub: "Sign-in, and the daily quota",
+        state: "partial",
+        col: 0,
+        row: 1,
+        detail:
+          "Identity comes from the server session, never from the request body. Everyone gets a quota — anonymous users are tracked by IP, signed-in users by id, and both are counted before a single token is generated.",
+        evidence: "src/lib/auth.ts, src/lib/db/usage.ts:158",
+        edges: [{ from: "gate-auth", to: "gate-quota", state: "derived", label: "sets tier" }],
+        children: [
           {
-            id: "ask-cs-gap",
-            title: "The subject with no prompt",
-            sub: "8 subject prompts · 9 test hints · 11 subjects",
-            state: "partial",
-            col: 0,
-            row: 2,
-            detail:
-              "SUBJECT_PROMPTS is a Partial<Record>, and three of the eleven classifiable subjects have no entry. The lookup is a guarded `if`, so a missing subject is not an error — block 2 simply carries less.",
-            evidence: "src/lib/system-prompt.ts:5018",
-            anatomy: [
-              {
-                kind: "chips",
-                caption: "has a subject prompt",
-                rows: [
-                  { label: "math", note: "5.0KB", state: "derived" },
-                  { label: "physics", note: "8.6KB", state: "derived" },
-                  { label: "chemistry", note: "19.5KB", state: "derived" },
-                  { label: "biology", note: "14.3KB", state: "derived" },
-                  { label: "language", note: "11.9KB", state: "derived" },
-                  { label: "business", note: "12.7KB", state: "derived" },
-                  { label: "accounting", note: "16.2KB", state: "derived" },
-                  { label: "economics", note: "17.4KB", state: "derived" },
-                ],
-              },
-              {
-                kind: "chips",
-                caption: "classifiable, but no subject prompt",
-                rows: [
-                  { label: "cs", note: "test hint only", state: "partial" },
-                  { label: "general", note: "nothing", state: "partial" },
-                ],
-              },
-              {
-                kind: "source",
-                file: "src/app/api/chat/route.ts",
-                start: 217,
-                code: "    if (resolvedSubject && mode !== 'test' && SUBJECT_PROMPTS[resolvedSubject]) {\n      subjectModePrompt += SUBJECT_PROMPTS[resolvedSubject];\n    }",
-                why: "A computer-science question in auto or visualize mode gets no subject guidance at all — the `&&` chain simply falls through. In test mode the same question does get CS guidance, because that comes from SUBJECT_TEST_HINTS, which does have a cs key. Same subject, opposite treatment, decided by mode.",
-              },
-            ],
-          },
-          {
-            id: "ask-questions",
-            title: "When it asks instead of answering",
-            sub: "Ambiguous → options block, not a guess",
+            id: "gate-auth",
+            title: "Signing in",
+            sub: "Google OAuth · email + password",
             state: "derived",
             col: 0,
-            row: 3,
-            detail:
-              "The rule is written into the base prompt as four triggers and four exclusions, with three worked examples. It is prose instruction only — nothing validates that the model obeys it.",
-            evidence: "src/lib/system-prompt.ts:55",
-            anatomy: [
-              {
-                kind: "map",
-                caption: "ask · the prompt's own examples",
-                rows: [
-                  { from: "\"explain sorting\"", to: "bubble / merge / quick / compare all three", state: "derived" },
-                  { from: "\"visualize recursion\"", to: "factorial / fibonacci / binary search", state: "derived" },
-                  { from: "\"show me data structures\"", to: "array / tree / graph", state: "derived" },
-                ],
-              },
-              {
-                kind: "map",
-                caption: "don't ask",
-                rows: [
-                  { from: "already specific", to: "\"show me bubble sort\" → just build it", state: "derived" },
-                  { from: "context makes it clear", to: "earlier turns already narrowed it", state: "derived" },
-                  { from: "an obvious best choice exists", to: "pick it", state: "derived" },
-                  { from: "user stated a preference", to: "honour it", state: "derived" },
-                ],
-              },
-            ],
-          },
-          {
-            id: "ask-budget",
-            title: "The three-question budget",
-            sub: "Counted from stored messages, injected as a sentence",
-            state: "derived",
-            col: 0,
-            row: 4,
-            detail:
-              "The cap is not enforced by rejecting anything. It is counted server-side each turn and stated to the model in block 3, which is the reason block 3 exists at all.",
-            evidence: "src/app/api/chat/route.ts:239",
+            row: 0,
+            evidence: "src/lib/auth.ts:8",
             anatomy: [
               {
                 kind: "flow",
                 rows: [
-                  { n: 1, title: "Counted, not tracked", detail: "history.filter(m => m.questionData !== undefined).length — derived from stored messages each turn, so there is no counter to drift.", state: "derived" },
-                  { n: 2, title: "0 asked → nothing injected", detail: "The prompt's own 'max 3' line is the only limit in play.", state: "derived" },
-                  { n: 3, title: "1–2 asked → allowance stated", detail: "\"You can ask up to N more if needed.\"", state: "derived" },
-                  { n: 4, title: "3+ asked → hard stop", detail: "\"DO NOT ask any more questions. Proceed directly with creating a visualization.\"", state: "derived" },
+                  { n: 1, title: "POST /api/auth/signup", detail: "Password hashed with bcrypt. No user row is created yet.", state: "derived" },
+                  { n: 2, title: "Held as a pending registration", detail: "PENDING#{email} / REGISTRATION, with a 10 minute DynamoDB TTL.", state: "derived" },
+                  { n: 3, title: "One-time code emailed", detail: "Sent through Resend. Five wrong attempts invalidates the registration.", state: "derived" },
+                  { n: 4, title: "POST /api/auth/verify-otp", detail: "Only now is the real user row written — this is the first time they enter the users table.", state: "derived" },
+                  { n: 5, title: "Session issued as a JWT", detail: "The token carries our DynamoDB ULID, not Google's subject id.", state: "derived" },
                 ],
               },
-              {
-                kind: "source",
-                file: "src/app/api/chat/route.ts",
-                start: 245,
-                code: "      if (questionCount >= 3) {\n        dynamicContext += `\\n\\n**IMPORTANT CONTEXT: You have already asked ${questionCount} clarifying questions in this conversation. DO NOT ask any more questions.**`;",
-                why: "This is the entire reason the prompt is split into three cached blocks. The sentence changes on almost every turn, and if it lived inside block 1 or 2 the whole cached prefix would be invalidated each time — so ~102KB would be re-sent to buy one sentence of state.",
-              },
             ],
           },
-        ],
-      },
-    ],
-  },
-
-  {
-    id: "gate",
-    title: "Who's asking, and may they",
-    sub: "Sign-in, and the daily quota",
-    state: "partial",
-    col: 0,
-    row: 1,
-    detail:
-      "Identity comes from the server session, never from the request body. Everyone gets a quota — anonymous users are tracked by IP, signed-in users by id, and both are counted before a single token is generated.",
-    evidence: "src/lib/auth.ts, src/lib/db/usage.ts:158",
-    edges: [{ from: "gate-auth", to: "gate-quota", state: "derived", label: "sets tier" }],
-    children: [
-      {
-        id: "gate-auth",
-        title: "Signing in",
-        sub: "Google OAuth · email + password",
-        state: "derived",
-        col: 0,
-        row: 0,
-        evidence: "src/lib/auth.ts:8",
-        anatomy: [
           {
-            kind: "flow",
-            rows: [
-              { n: 1, title: "POST /api/auth/signup", detail: "Password hashed with bcrypt. No user row is created yet.", state: "derived" },
-              { n: 2, title: "Held as a pending registration", detail: "PENDING#{email} / REGISTRATION, with a 10 minute DynamoDB TTL.", state: "derived" },
-              { n: 3, title: "One-time code emailed", detail: "Sent through Resend. Five wrong attempts invalidates the registration.", state: "derived" },
-              { n: 4, title: "POST /api/auth/verify-otp", detail: "Only now is the real user row written — this is the first time they enter the users table.", state: "derived" },
-              { n: 5, title: "Session issued as a JWT", detail: "The token carries our DynamoDB ULID, not Google's subject id.", state: "derived" },
-            ],
-          },
-        ],
-      },
-      {
-        id: "gate-quota",
-        title: "The daily quota",
-        sub: "Counted before any token is spent",
-        state: "partial",
-        alarm: true,
-        col: 0,
-        row: 1,
-        detail:
-          "A third tier is fully configured but unreachable — nothing can ever be assigned to it.",
-        evidence: "src/lib/db/usage.ts:14",
-        anatomy: [
-          {
-            kind: "bars",
-            unit: "messages per day",
-            rows: [
-              { label: "Anonymous", value: 2, display: "2 · by IP", state: "derived" },
-              { label: "Authenticated", value: 40, display: "40 · 10/hr", state: "derived" },
-              { label: "PREMIUM", value: 500, display: "500 · configured", state: "partial", note: "Configured, but see below" },
-            ],
-          },
-        ],
-        // Three levels here, and only because the third one settles the
-        // question the second one raises. Four lines of code is the whole
-        // proof that a configured tier is unreachable.
-        children: [
-          {
-            id: "gate-tier-fn",
-            title: "Why PREMIUM never happens",
-            sub: "getUserTier — 4 lines",
+            id: "gate-quota",
+            title: "The daily quota",
+            sub: "Counted before any token is spent",
             state: "partial",
             alarm: true,
             col: 0,
-            row: 0,
-            evidence: "src/lib/db/usage.ts:329",
+            row: 1,
+            detail:
+              "A third tier is fully configured but unreachable — nothing can ever be assigned to it.",
+            evidence: "src/lib/db/usage.ts:14",
             anatomy: [
               {
-                kind: "source",
-                file: "src/lib/db/usage.ts",
-                start: 329,
-                code: `export function getUserTier(userId?: string): UserTier {
+                kind: "bars",
+                unit: "messages per day",
+                rows: [
+                  { label: "Anonymous", value: 2, display: "2 · by IP", state: "derived" },
+                  { label: "Authenticated", value: 40, display: "40 · 10/hr", state: "derived" },
+                  { label: "PREMIUM", value: 500, display: "500 · configured", state: "partial", note: "Configured, but see below" },
+                ],
+              },
+            ],
+            // Three levels here, and only because the third one settles the
+            // question the second one raises. Four lines of code is the whole
+            // proof that a configured tier is unreachable.
+            children: [
+              {
+                // The one quote in this map that is a whole unit, opening line to
+                // closing brace, so it is the one that can be a `function` node
+                // rather than an excerpt on a flow card.
+                id: "gate-tier-fn",
+                kind: "function",
+                title: "getUserTier",
+                sub: "Why PREMIUM never happens",
+                state: "partial",
+                alarm: true,
+                col: 0,
+                row: 0,
+                detail:
+                  "A ternary with two outcomes. PREMIUM exists in the UserTier union and has full limits configured in both RATE_LIMITS and PDF_RATE_LIMITS, but no code path assigns it — so those numbers have never applied to anyone. The comment says the intent was to check a subscription later; nothing does yet.",
+                evidence: "src/lib/db/usage.ts:329",
+                unit: {
+                  lang: "ts",
+                  file: "src/lib/db/usage.ts",
+                  start: 329,
+                  end: 333,
+                  signature: "export function getUserTier(userId?: string): UserTier",
+                  body: `export function getUserTier(userId?: string): UserTier {
   // For now, all authenticated users are AUTHENTICATED tier
   // In the future, you could check a user's subscription status
   return userId ? 'AUTHENTICATED' : 'ANONYMOUS';
 }`,
-                why: "A ternary with two outcomes. PREMIUM exists in the UserTier union and has full limits configured in both RATE_LIMITS and PDF_RATE_LIMITS, but no code path assigns it — so those numbers have never applied to anyone. The comment says the intent was to check a subscription later; nothing does yet.",
+                  complete: true,
+                },
               },
             ],
           },
         ],
       },
-    ],
-  },
 
-  {
-    id: "generating",
-    title: "Generating the answer",
-    sub: "Two models, in parallel",
-    state: "partial",
-    col: 1,
-    row: 0,
-    detail:
-      "The interesting part. A fast model writes the explanation while a stronger one writes the animation code, both streaming into one response. A semantic cache can skip the slow half.",
-    evidence: "src/app/api/chat/route.ts:325",
-    edges: [
-      { from: "gen-cache", to: "gen-parallel", state: "derived", label: "can skip" },
-      { from: "gen-prompt", to: "gen-parallel", state: "derived", label: "feeds" },
-    ],
-    children: [
       {
-        id: "gen-parallel",
-        title: "Two calls at once",
-        sub: "Haiku explains while Sonnet draws",
-        state: "derived",
+        id: "generating",
+        title: "Generating the answer",
+        sub: "Two models, in parallel",
+        state: "partial",
         col: 0,
-        row: 0,
+        row: 2,
         detail:
-          "The single most consequential design choice in the repo: the learner reads an explanation within seconds while the animation is still being written.",
+          "The interesting part. A fast model writes the explanation while a stronger one writes the animation code, both streaming into one response. A semantic cache can skip the slow half.",
         evidence: "src/app/api/chat/route.ts:325",
-        anatomy: [
-          {
-            kind: "flow",
-            rows: [
-              { n: 1, title: "Check the cache first", detail: "A semantically similar past question can return its animation and skip call B entirely.", state: "derived" },
-              { n: 2, title: "Call A — Haiku", detail: "Explanation plus subject detection. Hard-capped at 500 tokens so reasoning cannot leak into the answer.", state: "derived" },
-              { n: 3, title: "Call B — Sonnet, or Opus", detail: "Animation code only. A complexity check routes 3D, WebGL, fractal and fluid requests to Opus.", state: "derived" },
-              { n: 4, title: "Merged into one stream", detail: "Both run in parallel and their events are interleaved into a single SSE response.", state: "derived" },
-              { n: 5, title: "Predict the next question", detail: "Likely follow-ups are pre-warmed into the cache after the response completes.", state: "derived" },
-            ],
-          },
+        edges: [
+          { from: "gen-cache", to: "gen-parallel", state: "derived", label: "can skip" },
+          { from: "gen-prompt", to: "gen-parallel", state: "derived", label: "feeds" },
         ],
-        // Level 3: the call that does the expensive work, on its own.
         children: [
           {
-            id: "gen-callb",
-            title: "Call B — the animation",
-            sub: "Model chosen per question, cancellable",
+            id: "gen-parallel",
+            title: "Two calls at once",
+            sub: "Haiku explains while Sonnet draws",
             state: "derived",
             col: 0,
             row: 0,
             detail:
-              "Routed to a stronger model only when the question looks hard, and abortable the moment the cache answers first.",
-            evidence: "src/app/api/chat/route.ts:334",
+              "The single most consequential design choice in the repo: the learner reads an explanation within seconds while the animation is still being written.",
+            evidence: "src/app/api/chat/route.ts:325",
             anatomy: [
               {
-                kind: "source",
-                file: "src/app/api/chat/route.ts",
-                start: 331,
-                code: `          // Route complex animation requests (3D, WebGL, fractals, particle/fluid
+                kind: "flow",
+                rows: [
+                  { n: 1, title: "Check the cache first", detail: "A semantically similar past question can return its animation and skip call B entirely.", state: "derived" },
+                  { n: 2, title: "Call A — Haiku", detail: "Explanation plus subject detection. Hard-capped at 500 tokens so reasoning cannot leak into the answer.", state: "derived" },
+                  { n: 3, title: "Call B — Sonnet, or Opus", detail: "Animation code only. A complexity check routes 3D, WebGL, fractal and fluid requests to Opus.", state: "derived" },
+                  { n: 4, title: "Merged into one stream", detail: "Both run in parallel and their events are interleaved into a single SSE response.", state: "derived" },
+                  { n: 5, title: "Predict the next question", detail: "Likely follow-ups are pre-warmed into the cache after the response completes.", state: "derived" },
+                ],
+              },
+            ],
+            // Level 3: the call that does the expensive work, on its own.
+            children: [
+              {
+                id: "gen-callb",
+                title: "Call B — the animation",
+                sub: "Model chosen per question, cancellable",
+                state: "derived",
+                col: 0,
+                row: 0,
+                detail:
+                  "Routed to a stronger model only when the question looks hard, and abortable the moment the cache answers first.",
+                evidence: "src/app/api/chat/route.ts:334",
+                anatomy: [
+                  {
+                    kind: "source",
+                    file: "src/app/api/chat/route.ts",
+                    start: 331,
+                    code: `          // Route complex animation requests (3D, WebGL, fractals, particle/fluid
           // simulations) to Opus for higher-quality generation. Falls back to the
           // default Sonnet model if BEDROCK_OPUS_MODEL_ID is not configured.
           const animationModelId =
             detectComplexity(message) === 'complex'
               ? (process.env.BEDROCK_OPUS_MODEL_ID ?? undefined)
               : undefined;`,
-                why: "undefined is meaningful here — it means 'use the default model', so an unset BEDROCK_OPUS_MODEL_ID degrades to Sonnet silently rather than failing. Cost control: Opus is only reached by questions a keyword check thinks are hard.",
-              },
-              {
-                kind: "source",
-                file: "src/app/api/chat/route.ts",
-                start: 417,
-                code: `          // Call B: Sonnet animation stream (animation-only mode, cached prompt)
-          // Uses AbortController so it can be cancelled on semantic cache hit.
-          const callBAbort = new AbortController();`,
-                why: "Call B is the expensive half. If the cache resolves the question while Call B is already streaming, this aborts it mid-flight rather than paying for tokens nobody will see.",
-              },
-            ],
-            // Level 4: how the prompt that feeds this call is assembled.
-            children: [
-              {
-                id: "gen-blocks",
-                title: "Why it is three blocks",
-                sub: "Cache survives a subject switch",
-                state: "derived",
-                col: 0,
-                row: 0,
-                detail:
-                  "The prompt is split so the expensive part stays cached across turns that change only small things.",
-                evidence: "src/app/api/chat/route.ts:214",
-                anatomy: [
-                  {
-                    kind: "parts",
-                    // Largest real request: chemistry in test mode. Measured from
-                    // the constants, not from the route's comment, which is wrong.
-                    total: "~125KB · chemistry + test, the heaviest combination",
-                    rows: [
-                      { label: "Block 1 · base", weight: 102450, display: "102KB · cached", tone: "hold", state: "derived" },
-                      { label: "Block 2 · subject+mode", weight: 22609, display: "5–23KB · cached", tone: "hold", state: "derived" },
-                      { label: "Block 3 · per-message", weight: 400, display: "a sentence · uncached", tone: "vary", state: "derived" },
-                    ],
+                    why: "undefined is meaningful here — it means 'use the default model', so an unset BEDROCK_OPUS_MODEL_ID degrades to Sonnet silently rather than failing. Cost control: Opus is only reached by questions a keyword check thinks are hard.",
                   },
                   {
                     kind: "source",
                     file: "src/app/api/chat/route.ts",
-                    start: 232,
-                    code: `    // Block 3 (uncached): Dynamic per-message context — tiny, changes every turn.
+                    start: 417,
+                    code: `          // Call B: Sonnet animation stream (animation-only mode, cached prompt)
+          // Uses AbortController so it can be cancelled on semantic cache hit.
+          const callBAbort = new AbortController();`,
+                    why: "Call B is the expensive half. If the cache resolves the question while Call B is already streaming, this aborts it mid-flight rather than paying for tokens nobody will see.",
+                  },
+                ],
+                // Level 4: how the prompt that feeds this call is assembled.
+                children: [
+                  {
+                    id: "gen-blocks",
+                    title: "Why it is three blocks",
+                    sub: "Cache survives a subject switch",
+                    state: "derived",
+                    col: 0,
+                    row: 0,
+                    detail:
+                      "The prompt is split so the expensive part stays cached across turns that change only small things.",
+                    evidence: "src/app/api/chat/route.ts:214",
+                    anatomy: [
+                      {
+                        kind: "parts",
+                        // Largest real request: chemistry in test mode. Measured from
+                        // the constants, not from the route's comment, which is wrong.
+                        total: "~125KB · chemistry + test, the heaviest combination",
+                        rows: [
+                          { label: "Block 1 · base", weight: 102450, display: "102KB · cached", tone: "hold", state: "derived" },
+                          { label: "Block 2 · subject+mode", weight: 22609, display: "5–23KB · cached", tone: "hold", state: "derived" },
+                          { label: "Block 3 · per-message", weight: 400, display: "a sentence · uncached", tone: "vary", state: "derived" },
+                        ],
+                      },
+                      {
+                        kind: "source",
+                        file: "src/app/api/chat/route.ts",
+                        start: 232,
+                        code: `    // Block 3 (uncached): Dynamic per-message context — tiny, changes every turn.
     // Kept outside cached blocks so it doesn't invalidate the 149KB+ cache.
     let dynamicContext = '';`,
-                    why: "The whole three-block split exists for this line. Question count and difficulty change on nearly every turn; if they lived inside the cached blocks, the entire ~102KB prefix would be re-sent each time to buy one sentence of state. Note the comment's own figure: the base literal measures 102,450 bytes, so the 149KB it claims here — and in three other places in this file — is not a number anything in the repository produces.",
+                        why: "The whole three-block split exists for this line. Question count and difficulty change on nearly every turn; if they lived inside the cached blocks, the entire ~102KB prefix would be re-sent each time to buy one sentence of state. Note the comment's own figure: the base literal measures 102,450 bytes, so the 149KB it claims here — and in three other places in this file — is not a number anything in the repository produces.",
+                      },
+                    ],
                   },
                 ],
               },
             ],
           },
-        ],
-      },
-      {
-        id: "gen-cache",
-        title: "The semantic cache",
-        sub: "Titan embeddings · cosine ≥ 0.90",
-        state: "derived",
-        col: 0,
-        row: 1,
-        evidence: "src/lib/animation-cache.ts:17",
-        anatomy: [
           {
-            kind: "facts",
-            rows: [
-              // Trimmed, not charted. "256 dimensions" and "30 days" are not
-              // quantities anyone compares — a bar here would be decoration.
-              // The problem was length: these wrapped to five and eight lines
-              // in a 195px column, which is the clutter, not the facts.
-              { label: "Model", value: "titan-embed-text-v2 · 256d", state: "derived" },
-              { label: "Match", value: "cosine ≥ 0.90, same subject", state: "derived" },
-              { label: "Partition", value: "CACHE#{subject}#v1", state: "derived" },
-              { label: "TTL", value: "30 days", state: "derived" },
-              { label: "No table", value: "Skipped — fails open", state: "partial" },
-            ],
-          },
-        ],
-        children: [
-          {
-            id: "gen-cache-lookup",
-            title: "The lookup, and how it fails",
-            sub: "In-memory cosine, errors swallowed",
-            state: "partial",
+            id: "gen-cache",
+            title: "The semantic cache",
+            sub: "Titan embeddings · cosine ≥ 0.90",
+            state: "derived",
             col: 0,
-            row: 0,
-            evidence: "src/lib/animation-cache.ts:111",
+            row: 1,
+            evidence: "src/lib/animation-cache.ts:17",
             anatomy: [
               {
-                kind: "source",
-                file: "src/lib/animation-cache.ts",
-                start: 123,
-                code: `    let best: { entry: CacheEntry; score: number } | null = null;
+                kind: "facts",
+                rows: [
+                  // Trimmed, not charted. "256 dimensions" and "30 days" are not
+                  // quantities anyone compares — a bar here would be decoration.
+                  // The problem was length: these wrapped to five and eight lines
+                  // in a 195px column, which is the clutter, not the facts.
+                  { label: "Model", value: "titan-embed-text-v2 · 256d", state: "derived" },
+                  { label: "Match", value: "cosine ≥ 0.90, same subject", state: "derived" },
+                  { label: "Partition", value: "CACHE#{subject}#v1", state: "derived" },
+                  { label: "TTL", value: "30 days", state: "derived" },
+                  { label: "No table", value: "Skipped — fails open", state: "partial" },
+                ],
+              },
+            ],
+            children: [
+              {
+                id: "gen-cache-lookup",
+                title: "The lookup, and how it fails",
+                sub: "In-memory cosine, errors swallowed",
+                state: "partial",
+                col: 0,
+                row: 0,
+                evidence: "src/lib/animation-cache.ts:111",
+                anatomy: [
+                  {
+                    kind: "source",
+                    file: "src/lib/animation-cache.ts",
+                    start: 123,
+                    code: `    let best: { entry: CacheEntry; score: number } | null = null;
     for (const entry of subjectEntries) {
       const score = cosineSimilarity(queryEmbedding, entry.embedding);
       if (score >= SIMILARITY_THRESHOLD && (!best || score > best.score)) {
         best = { entry, score };
       }
     }`,
-                why: "A linear scan over every cached entry for the subject, in memory, on each request. Fine at current volume; the cost grows with the cache, and 0.90 is strict enough that near-misses regenerate rather than return a wrong animation.",
-              },
-              {
-                kind: "source",
-                file: "src/lib/animation-cache.ts",
-                start: 142,
-                code: `  } catch (err) {
+                    why: "A linear scan over every cached entry for the subject, in memory, on each request. Fine at current volume; the cost grows with the cache, and 0.90 is strict enough that near-misses regenerate rather than return a wrong animation.",
+                  },
+                  {
+                    kind: "source",
+                    file: "src/lib/animation-cache.ts",
+                    start: 142,
+                    code: `  } catch (err) {
     console.error('[animation-cache] lookup error:', err);
   }
   return null;`,
-                why: "Every failure path returns null, which is indistinguishable from a cache miss. That makes the feature safe — a broken cache never breaks a question — but it also means an outage looks exactly like a cold cache, and nothing alerts.",
+                    why: "Every failure path returns null, which is indistinguishable from a cache miss. That makes the feature safe — a broken cache never breaks a question — but it also means an outage looks exactly like a cold cache, and nothing alerts.",
+                  },
+                ],
               },
             ],
           },
-        ],
-      },
-      {
-        id: "gen-prompt",
-        title: "The system prompt",
-        sub: "5,098 lines · 234KB file · one export per mode",
-        state: "partial",
-        col: 0,
-        row: 2,
-        detail:
-          "By far the largest file in the repository — larger than every React component combined. It defines the product's entire behaviour and no test references it.",
-        evidence: "src/lib/system-prompt.ts",
-        anatomy: [
           {
-            kind: "parts",
-            // Charts the 15 named prompt literals, measured one by one. Not the
-            // file on disk, which is ~25KB larger once imports, comments and the
-            // declarations themselves are counted — none of that is ever sent.
-            // SUBJECT_TEST_HINTS is deliberately absent: it lives inside an
-            // object literal rather than its own const, so it is not measured
-            // the same way and would not reconcile against this total.
-            //
-            // The three slices sum to 213,273 of 214,546. The missing 1,273 is
-            // HAIKU_EXPLANATION_PROMPT and ANIMATION_ONLY_SUFFIX. No fourth
-            // slice for them: at 0.6% the 6% floor would draw them ten times
-            // their real size, which is worse than leaving them named here.
-            total: "210KB across 15 named prompt literals",
-            rows: [
-              { label: "SYSTEM_PROMPT · block 1", weight: 102450, display: "102KB · every request", tone: "hold", state: "derived" },
-              { label: "8 subject prompts · block 2", weight: 105637, display: "106KB · one is chosen", tone: "hold", state: "derived" },
-              { label: "4 mode prompts · block 2", weight: 5186, display: "5KB · one is chosen", tone: "vary", state: "derived" },
-            ],
-          },
-          {
-            kind: "source",
-            file: "src/app/api/chat/route.ts",
-            start: 161,
-            code: "    // Block 1: SYSTEM_PROMPT (149KB, cached, same for ALL requests)\n    // Block 2: Subject + mode prompt (20-30KB, cached per subject+mode combo)",
-            why: "Measured, the base literal is 102,450 bytes, not 149KB — the comment appears four times in this file and is wrong in all four. The 234KB figure people reach for is the file on disk, which also counts the subject prompts that are block 2, plus ~17KB of imports and comments that are never sent anywhere. Block 2's '20-30KB' flattens a 4x spread: chemistry is 19.5KB, math is 5.0KB.",
-          },
-        ],
-        children: [
-          {
-            id: "gen-prompt-what",
-            title: "What is in the base block",
-            sub: "2,349 lines sent with every single request",
-            state: "derived",
+            id: "gen-prompt",
+            title: "The system prompt",
+            sub: "5,098 lines · 234KB file · one export per mode",
+            state: "partial",
             col: 0,
-            row: 0,
+            row: 2,
             detail:
-              "Block 1 is one template literal. It is identical for every user, every subject and every mode, which is what makes it worth caching — and what makes it the single largest fixed cost per request.",
-            evidence: "src/lib/system-prompt.ts:3",
+              "By far the largest file in the repository — larger than every React component combined. It defines the product's entire behaviour and no test references it.",
+            evidence: "src/lib/system-prompt.ts",
             anatomy: [
               {
-                kind: "map",
-                caption: "the sections that take up the space",
+                kind: "parts",
+                // Charts the 15 named prompt literals, measured one by one. Not the
+                // file on disk, which is ~25KB larger once imports, comments and the
+                // declarations themselves are counted — none of that is ever sent.
+                // SUBJECT_TEST_HINTS is deliberately absent: it lives inside an
+                // object literal rather than its own const, so it is not measured
+                // the same way and would not reconcile against this total.
+                //
+                // The three slices sum to 213,273 of 214,546. The missing 1,273 is
+                // HAIKU_EXPLANATION_PROMPT and ANIMATION_ONLY_SUFFIX. No fourth
+                // slice for them: at 0.6% the 6% floor would draw them ten times
+                // their real size, which is worse than leaving them named here.
+                total: "210KB across 15 named prompt literals",
                 rows: [
-                  { from: "response format", to: "explanation text + ```animation fenced block", state: "derived" },
-                  { from: "asking clarifying questions", to: "when to, when not to, 3 worked examples", state: "derived" },
-                  { from: "animation templates", to: "step players, canvas loops, physics scaffolds", state: "derived" },
-                  { from: "quiz format", to: "```options JSON, grading, questionId rules", state: "derived" },
+                  { label: "SYSTEM_PROMPT · block 1", weight: 102450, display: "102KB · every request", tone: "hold", state: "derived" },
+                  { label: "8 subject prompts · block 2", weight: 105637, display: "106KB · one is chosen", tone: "hold", state: "derived" },
+                  { label: "4 mode prompts · block 2", weight: 5186, display: "5KB · one is chosen", tone: "vary", state: "derived" },
                 ],
               },
               {
                 kind: "source",
-                file: "src/lib/system-prompt.ts",
-                start: 47,
-                code: "CRITICAL: Always use the `animation` fence tag. Never use `html` or `javascript`. The frontend uses this tag to detect animation blocks.",
-                why: "The parser downstream keys on this exact fence. It is the contract between the prompt and stream-parser.ts, written in prose in one file and as a regex in another, with nothing linking them — rename the fence in one place and the product stops rendering animations.",
+                file: "src/app/api/chat/route.ts",
+                start: 161,
+                code: "    // Block 1: SYSTEM_PROMPT (149KB, cached, same for ALL requests)\n    // Block 2: Subject + mode prompt (20-30KB, cached per subject+mode combo)",
+                why: "Measured, the base literal is 102,450 bytes, not 149KB — the comment appears four times in this file and is wrong in all four. The 234KB figure people reach for is the file on disk, which also counts the subject prompts that are block 2, plus ~17KB of imports and comments that are never sent anywhere. Block 2's '20-30KB' flattens a 4x spread: chemistry is 19.5KB, math is 5.0KB.",
               },
             ],
-          },
-          {
-            id: "gen-prompt-modes",
-            title: "The mode prompts are tiny",
-            sub: "218 bytes to 3KB · the subject prompt is the weight",
-            state: "derived",
-            col: 0,
-            row: 1,
-            detail:
-              "Block 2 is assembled from a subject prompt plus a mode prompt. The mode half is almost nothing; nearly all of block 2's size is the subject.",
-            evidence: "src/lib/system-prompt.ts:2354",
-            anatomy: [
+            children: [
               {
-                kind: "bars",
-                unit: "bytes",
-                rows: [
-                  { label: "TEST_MODE_PROMPT", value: 3088, display: "3,088 B", state: "derived", note: "quiz JSON, grading, difficulty" },
-                  { label: "AUTO_MODE_FOLLOW_UP", value: 1451, display: "1,451 B", state: "derived", note: "refine / text / new / ask" },
-                  { label: "AUTO_MODE_FIRST_MESSAGE", value: 429, display: "429 B", state: "derived" },
-                  { label: "VISUALIZE_MODE_PROMPT", value: 218, display: "218 B", state: "derived" },
+                id: "gen-prompt-what",
+                title: "What is in the base block",
+                sub: "2,349 lines sent with every single request",
+                state: "derived",
+                col: 0,
+                row: 0,
+                detail:
+                  "Block 1 is one template literal. It is identical for every user, every subject and every mode, which is what makes it worth caching — and what makes it the single largest fixed cost per request.",
+                evidence: "src/lib/system-prompt.ts:3",
+                anatomy: [
+                  {
+                    kind: "map",
+                    caption: "the sections that take up the space",
+                    rows: [
+                      { from: "response format", to: "explanation text + ```animation fenced block", state: "derived" },
+                      { from: "asking clarifying questions", to: "when to, when not to, 3 worked examples", state: "derived" },
+                      { from: "animation templates", to: "step players, canvas loops, physics scaffolds", state: "derived" },
+                      { from: "quiz format", to: "```options JSON, grading, questionId rules", state: "derived" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/lib/system-prompt.ts",
+                    start: 47,
+                    code: "CRITICAL: Always use the `animation` fence tag. Never use `html` or `javascript`. The frontend uses this tag to detect animation blocks.",
+                    why: "The parser downstream keys on this exact fence. It is the contract between the prompt and stream-parser.ts, written in prose in one file and as a regex in another, with nothing linking them — rename the fence in one place and the product stops rendering animations.",
+                  },
                 ],
               },
               {
-                kind: "source",
-                file: "src/lib/system-prompt.ts",
-                start: 5079,
-                code: "**IMPORTANT OVERRIDE: The rule above that says \"Every response MUST contain animation code\" applies to FIRST messages only.**",
-                why: "Auto mode is two prompts, not one. The first message is forced to animate; the follow-up explicitly revokes that rule so a one-word clarification does not trigger a full animation rebuild. This is why the same mode behaves differently on turn 1 and turn 2.",
+                id: "gen-prompt-modes",
+                title: "The mode prompts are tiny",
+                sub: "218 bytes to 3KB · the subject prompt is the weight",
+                state: "derived",
+                col: 0,
+                row: 1,
+                detail:
+                  "Block 2 is assembled from a subject prompt plus a mode prompt. The mode half is almost nothing; nearly all of block 2's size is the subject.",
+                evidence: "src/lib/system-prompt.ts:2354",
+                anatomy: [
+                  {
+                    kind: "bars",
+                    unit: "bytes",
+                    rows: [
+                      { label: "TEST_MODE_PROMPT", value: 3088, display: "3,088 B", state: "derived", note: "quiz JSON, grading, difficulty" },
+                      { label: "AUTO_MODE_FOLLOW_UP", value: 1451, display: "1,451 B", state: "derived", note: "refine / text / new / ask" },
+                      { label: "AUTO_MODE_FIRST_MESSAGE", value: 429, display: "429 B", state: "derived" },
+                      { label: "VISUALIZE_MODE_PROMPT", value: 218, display: "218 B", state: "derived" },
+                    ],
+                  },
+                  {
+                    kind: "source",
+                    file: "src/lib/system-prompt.ts",
+                    start: 5079,
+                    code: "**IMPORTANT OVERRIDE: The rule above that says \"Every response MUST contain animation code\" applies to FIRST messages only.**",
+                    why: "Auto mode is two prompts, not one. The first message is forced to animate; the follow-up explicitly revokes that rule so a one-word clarification does not trigger a full animation rebuild. This is why the same mode behaves differently on turn 1 and turn 2.",
+                  },
+                ],
               },
             ],
           },
@@ -780,8 +812,9 @@ const AUTHORED: Node[] = [
 
   {
     id: "watching",
-    title: "Watching it run",
-    sub: "Generated code in a sandbox",
+    kind: "element",
+    title: "The animated answer",
+    sub: "Generated code, run in a sandbox",
     state: "partial",
     col: 1,
     row: 1,
@@ -891,9 +924,12 @@ const AUTHORED: Node[] = [
 
   {
     id: "keeping",
-    title: "Keeping the conversation",
-    sub: "History, for signed-in and anonymous alike",
-    state: "derived",
+    kind: "element",
+    title: "Your conversation history",
+    sub: "Kept for signed-in and anonymous alike",
+    // The history is in the data layer for certain; the component that lists
+    // it was not among the files read, so the surface itself is a guess.
+    state: "inferred",
     col: 2,
     row: 0,
     detail:
@@ -963,8 +999,9 @@ const AUTHORED: Node[] = [
 
   {
     id: "sharing",
-    title: "Sharing and exporting",
-    sub: "A public link, or a PDF",
+    kind: "element",
+    title: "Share and export",
+    sub: "A public link, or a PDF worksheet",
     state: "partial",
     col: 2,
     row: 1,
@@ -1121,10 +1158,52 @@ const AUTHORED: Node[] = [
   },
 
   {
+    id: "admin",
+    kind: "page",
+    title: "The admin dashboard",
+    sub: "6 routes · read-only but one",
+    state: "derived",
+    col: 3,
+    row: 1,
+    detail:
+      "A separate admin surface reading conversations, messages, users, referrals, geography and access grants. Read-only except access, which can grant and revoke.",
+    evidence: "src/app/api/admin/",
+    children: [
+      {
+        id: "admin-routes",
+        title: "Admin endpoints",
+        sub: "6 routes · read-only but one",
+        state: "derived",
+        col: 0,
+        row: 0,
+        evidence: "src/app/api/admin/",
+        anatomy: [
+          {
+            kind: "routes",
+            rows: [
+              { method: "GET", path: "/api/admin/conversations", auth: "admin", state: "derived" },
+              { method: "GET", path: "/api/admin/messages", auth: "admin", state: "derived" },
+              { method: "GET", path: "/api/admin/users", auth: "admin", state: "derived" },
+              { method: "GET", path: "/api/admin/referrals", auth: "admin", state: "derived" },
+              { method: "GET", path: "/api/admin/geo", auth: "admin", state: "derived", note: "Feeds the world map on the dashboard" },
+              { method: "POST", path: "/api/admin/access", auth: "admin", state: "derived", note: "The only admin write — grants and revokes access" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  {
     id: "tables",
-    // Carries what the five deleted write-edges used to say. See E0.
+    kind: "store",
     title: "Where it all lands",
-    sub: "DynamoDB — 4 tables · written by everything above, read by admin",
+    // "written by everything above, read by admin" used to live on the end of
+    // this line, standing in for edges that had been deleted. The bus draws
+    // that now, and a subtitle restating the picture beside it is the kind of
+    // duplication this map exists to remove — it was also long enough to
+    // truncate on the card.
+    sub: "DynamoDB — 4 tables",
     state: "partial",
     col: 3,
     row: 0,
@@ -1233,43 +1312,8 @@ const AUTHORED: Node[] = [
   },
 
   {
-    id: "admin",
-    title: "Watching the product",
-    sub: "Admin dashboard · 6 routes",
-    state: "derived",
-    col: 3,
-    row: 1,
-    detail:
-      "A separate admin surface reading conversations, messages, users, referrals, geography and access grants. Read-only except access, which can grant and revoke.",
-    evidence: "src/app/api/admin/",
-    children: [
-      {
-        id: "admin-routes",
-        title: "Admin endpoints",
-        sub: "6 routes · read-only but one",
-        state: "derived",
-        col: 0,
-        row: 0,
-        evidence: "src/app/api/admin/",
-        anatomy: [
-          {
-            kind: "routes",
-            rows: [
-              { method: "GET", path: "/api/admin/conversations", auth: "admin", state: "derived" },
-              { method: "GET", path: "/api/admin/messages", auth: "admin", state: "derived" },
-              { method: "GET", path: "/api/admin/users", auth: "admin", state: "derived" },
-              { method: "GET", path: "/api/admin/referrals", auth: "admin", state: "derived" },
-              { method: "GET", path: "/api/admin/geo", auth: "admin", state: "derived", note: "Feeds the world map on the dashboard" },
-              { method: "POST", path: "/api/admin/access", auth: "admin", state: "derived", note: "The only admin write — grants and revokes access" },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-
-  {
     id: "infra",
+    kind: "store",
     title: "Where the tables came from",
     sub: "Not in this repo",
     state: "inferred",
@@ -1285,118 +1329,57 @@ const AUTHORED: Node[] = [
 
 /** Edges between the roots.
  *
- *  Request sequence only. Five write-edges into `tables` used to live here and
- *  were the reason this layer read as clutter: a process sequence and a
- *  dependency fan-in drawn in one edge set, which no architectural convention
- *  does. "Everything writes to the store" is one fact about what the store is,
- *  not five edges — it moved into the node's own line. The `tables → infra`
- *  edge went the same way: `infra` is already a ghost node marked `inferred`
- *  and titled "Not in this repo", which states the uncertainty better than an
- *  arrow labelled with a question could. */
-export const E0: Edge[] = [
-  { from: "asking", to: "gate", state: "derived", label: "checked by" },
-  { from: "gate", to: "generating", state: "derived", label: "allows" },
-  { from: "generating", to: "watching", state: "derived", label: "streams into" },
-  { from: "generating", to: "keeping", state: "derived", label: "saves" },
-  { from: "keeping", to: "sharing", state: "derived", label: "can publish" },
-];
-
-/* ── tree helpers ─────────────────────────────────────────────
-   The canvas walks by path, so these are the only two ways it needs to look
-   a node up. Neither assumes a depth. */
-
-/* ── rows that go deeper ──────────────────────────────────────
-   A row carrying `under` becomes a REAL child node, spliced in beside whatever
-   children its owner already had.
-
-   The alternative — a bespoke "detail card" with its own state, its own
-   position and its own wire — was built first and was wrong. It gave the
-   product two ways to go deeper: cards drilled, rows did something else that
-   looked similar and behaved differently. Everything the drill already does
-   (camera, Escape, drillOut, the depth rule, out-of-scope fading) had to be
-   re-implemented or went missing. As a node, a row inherits all of it and the
-   special case disappears.
-
-   The synthesized id is `rowId(owner, key)` — the SAME id the row's anchor
-   registers under. That is deliberate: the wire layer resolves an endpoint by
-   walking up to the nearest [data-node], so the row and the card it opens
-   share an identity and connect without a special-cased wire. */
-
-/** The rows of one anatomy block that carry `under`, as {key, label, blocks}. */
-function deepRows(blocks: Anatomy[]) {
-  const out: { key: string; label: string; under: Anatomy[] }[] = [];
-  for (const b of blocks) {
-    if (b.kind === "map") {
-      for (const r of b.rows) {
-        if (r.under) out.push({ key: r.from, label: r.from, under: r.under });
-      }
-    } else if (b.kind === "flow") {
-      for (const r of b.rows) {
-        if (r.under) out.push({ key: String(r.n), label: r.title, under: r.under });
-      }
-    }
-  }
-  return out;
-}
-
-/**
- * Walk the tree and give every `under`-carrying row a child node.
+ *  TWO KINDS, and the board keeps them apart by geometry rather than by
+ *  leaving one of them undrawn.
  *
- * Runs once at module load over the authored tree, so `nodeAt`, `levelAt`,
- * `allNodes` and the canvas all see one uniform structure and none of them
- * needs to know a row was involved.
- */
-function withRowChildren(nodes: Node[]): Node[] {
-  return nodes.map((n) => {
-    const authored = n.children ? withRowChildren(n.children) : [];
-    const fromRows = n.anatomy
-      ? deepRows(n.anatomy).map((r, i): Node => ({
-          id: rowId(n.id, r.key),
-          title: r.label,
-          // What this level answers, not a restatement of the row.
-          sub: "what happens to it",
-          state: "derived",
-          col: 0,
-          row: authored.length + i,
-          anatomy: r.under,
-          evidence: n.evidence,
-          // Only the one you clicked is ever rendered. See Node.fromRow.
-          fromRow: true,
-        }))
-      : [];
-    const children = [...authored, ...fromRows];
-    return children.length ? { ...n, children } : { ...n, children: undefined };
-  });
-}
+ *  The first three are the journey across the surface: the spine, read top
+ *  to bottom. (The request sequence that used to be the spine — ask, gate,
+ *  generate — is now one level down, inside the chat box.)
+ *
+ *  The rest are the dependency tier off to the right, behind the rule. These
+ *  were deleted once, and the reason was sound as far as it went — a process
+ *  sequence and a dependency fan-in drawn in one flat edge set is a mixture no
+ *  architectural convention makes, and five arrowheads converging on one box is
+ *  five relationships fighting over one landing strip. "Everything writes to
+ *  the store" became a line of prose on the node instead.
+ *
+ *  What that missed is what a card with no wires actually looks like. It does
+ *  not read as "a different kind of thing"; it reads as unfinished, which is
+ *  the one impression this tool cannot afford to give by accident. The store
+ *  and the dashboard are the two cards a reader asks about first, and the map
+ *  answered by saying nothing.
+ *
+ *  So the edges are back and the clutter is solved where it belongs, in the
+ *  routing: the wire layer collects a fan of three or more onto one bus, so the
+ *  three writers arrive as a single convergence with one arrowhead. That is the
+ *  fact the prose was standing in for, drawn.
+ *
+ *  `tables → infra` stays `inferred` and points at a ghost node, which is the
+ *  same admission the card already makes, made twice — deliberately, because
+ *  the one thing on this board that is a hole should be hard to miss.
+ *
+ *  The labels below are NOT drawn. `Edge.label` reaches the wire layer only as
+ *  a `=== "FK"` test; nothing renders the text. They are here for the next
+ *  person to read this file, and putting them on the canvas would be its own
+ *  piece of work — a `<text>` on a `textPath`, and a decision about what a
+ *  board this dense does with a dozen more words on it. */
+export const E0: Edge[] = [
+  /* the journey */
+  { from: "chat-box", to: "watching", state: "derived", label: "streams into" },
+  { from: "chat-box", to: "keeping", state: "derived", label: "saves" },
+  { from: "keeping", to: "sharing", state: "derived", label: "can publish" },
 
-/**
- * The tree everything else reads: authored nodes, plus one node for every row
- * that carries `under`. Built once, so no consumer knows a row was involved.
- */
-export const L0: Node[] = withRowChildren(AUTHORED);
+  /* into the store — drawn as one bus, never three arrowheads */
+  { from: "chat-box", to: "tables", state: "derived" },
+  { from: "keeping", to: "tables", state: "derived" },
+  { from: "sharing", to: "tables", state: "derived" },
 
-/** Resolve a path of ids to the node it names. */
-export function nodeAt(path: string[]): Node | null {
-  let level: Node[] = L0;
-  let found: Node | null = null;
-  for (const id of path) {
-    found = level.find((n) => n.id === id) ?? null;
-    if (!found) return null;
-    level = found.children ?? [];
-  }
-  return found;
-}
-
-/** The nodes shown at a given path's level — roots when the path is empty. */
-export function levelAt(path: string[]): Node[] {
-  if (path.length === 0) return L0;
-  return nodeAt(path)?.children ?? [];
-}
-
-/** Every node in the tree, flattened. Used for id lookups and audits. */
-export function allNodes(nodes: Node[] = L0): Node[] {
-  return nodes.flatMap((n) => [n, ...allNodes(n.children ?? [])]);
-}
+  /* Pointed OUT of the store, not into it. The dashboard only reads, and the
+     bus groups by target — an inbound edge here would be swept in with the
+     writers and drawn as if admin wrote to the store. */
+  { from: "tables", to: "admin", state: "derived", label: "read by" },
+  { from: "tables", to: "infra", state: "inferred", label: "defined where?" },
+];
 
 /** What the analysis could not settle. Surfaced, never hidden. */
 export const OPEN = [
@@ -1463,3 +1446,9 @@ export const LINKS: Link[] = [
 export function linksFor(id: string) {
   return LINKS.filter((l) => l.from === id || l.to === id);
 }
+
+/* ── the map ───────────────────────────────────────────────────
+   The tree every view reads, and the lookups over it. Built by the shared
+   helpers in tree.ts, so every repo's map behaves the same way. */
+
+export const { L0, nodeAt, levelAt, pathTo, edgesOf, allNodes } = makeMap(AUTHORED, E0);

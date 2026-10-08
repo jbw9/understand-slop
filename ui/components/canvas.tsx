@@ -1,13 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import {
+  AnimatePresence,
+  MotionConfig,
+  animate,
+  motion,
+  useDragControls,
+  useMotionValue,
+  useTransform,
+} from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { StateChip } from "@/components/state";
+import { EditsProvider } from "@/components/edits";
+import { KindLabel, UnitBody, UnitHead } from "@/components/card";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { E0, L0, LINKS, allNodes, levelAt, nodeAt } from "@/lib/visulearn";
-import type { Edge, Node } from "@/lib/data";
+import { isFlowLevel, layerOf, type Edge, type Node } from "@/lib/data";
 
 /**
  * The whole screen. A pan/zoom surface holding the diagram — no chrome, no
@@ -58,15 +76,26 @@ const CHILD_W = 340;
  * by, plus clearance at each card edge. Users can zoom, so width is cheap.
  */
 const CHILD_GAP = 140;
+/**
+ * The same corridor, turned on its side, for a level that lays out as a flow.
+ *
+ * Smaller than CHILD_GAP on purpose. 140px horizontally buys several parallel
+ * lanes, because the FK wires between two cards in a level all cross the same
+ * gutter and each needs its own vertical track. Stacked vertically the edges
+ * are a sequence — one per gap — so the space only has to clear the card, the
+ * arrowhead and a label.
+ */
+const CHILD_VGAP = 90;
 const CHILD_PL = 24;
 const CARD_H = 57;
 /** Tallest expanded capability card, measured from the rendered DB domain. */
 const OPEN_CHILD_H = 410;
 
 /**
- * Hand-placed layout, read left-to-right as a request flows through the system:
- * the client enters, the API fans out to the domains that do the work, and
- * those land on the stores that persist it.
+ * Hand-placed layout, read top-to-bottom as a learner moves across the
+ * surface: they type into the chat box, watch the answer, and the conversation
+ * is kept and can be shared. What the surface writes lands in the store off to
+ * the side.
  *
  * Deliberately NOT a uniform grid. An even col*W, row*H lattice reads as a
  * spreadsheet — every card the same size at the same pitch says nothing about
@@ -74,38 +103,87 @@ const OPEN_CHILD_H = 410;
  * width, stagger cards off each other's baseline, and give the busy tiers more
  * room. The irregularity is the information.
  */
-const PLACE: Record<string, { x: number; y: number; w?: number }> = {
-  // The path SERPENTINES rather than running flat. Six steps in one row is
-  // 2520px wide, and since the overview fits the whole board to the viewport,
-  // that opened at 0.52 scale on a laptop — every card half size and
-  // unreadable. Wrapping to two rows brings the board to 1280x697, which
-  // opens at 1.00. Width is not free here: it is paid for in legibility.
-  //
-  // Row 1, left to right.
-  asking: { x: 0, y: 80, w: 360 },
-  gate: { x: 460, y: 80, w: 360 },
-  generating: { x: 920, y: 80, w: 360 },
-  // Row 2 reads RIGHT TO LEFT, continuing the spine: generating drops to
-  // watching directly below it, then the flow runs back leftward. The order
-  // here is what keeps the sequence unbroken across the wrap — the enlarged
-  // arrowheads are what keep the reversal readable.
-  watching: { x: 920, y: 310, w: 360 },
-  keeping: { x: 460, y: 310, w: 360 },
-  sharing: { x: 0, y: 310, w: 360 },
+/**
+ * Where the rule between the spine and the tier stands: the middle of the
+ * 160px gutter between the spine's right edge (800) and the tier's left (960).
+ */
+const TIER_RULE_X = 880;
 
-  // BOTTOM TIER — not steps. Five edges converge on the store, and when it
-  // sat at the END of the path those edges had to span the whole board and
-  // cut through whatever card was in the way. Underneath the path instead,
-  // every writer drops a short distance into it: same edges, same meaning,
-  // no crossings to route around.
-  tables: { x: 230, y: 540, w: 440 },
-  // The dashboard reads the store, so it sits beside it on the same tier.
-  admin: { x: 770, y: 540, w: 360 },
-  // The hole sits directly under the store it would define. Widened because
-  // "Where the tables came from" was truncating at 310px — a card whose own
-  // title does not fit is the wrong way to show an absence.
-  infra: { x: 230, y: 720, w: 440 },
+const PLACE: Record<string, { x: number; y: number; w?: number }> = {
+  // The journey runs DOWN, one column, read top to bottom — a spine spends
+  // height instead of width, and width is what binds when the overview fits
+  // the board to the viewport. The ask → gate → generate sequence that used to
+  // fill this column now lives inside the chat box, one level down.
+  "chat-box": { x: 440, y: 0, w: 360 },
+  // THE FORK, and it is in the data: the chat box has two edges out, not one
+  // next step. The answer streams to the screen AND is saved, and only the
+  // saving continues to sharing. Drawn in the column, `watching` would sit
+  // between the chat box and `keeping` and their wire would have to cross it.
+  watching: { x: 0, y: 150, w: 360 },
+  keeping: { x: 440, y: 150, w: 360 },
+  sharing: { x: 440, y: 280, w: 360 },
+
+  // THE SIDE TIER — not surface you walk through, and separated by the rule
+  // at x=880 so that reads as a statement rather than as missing wires.
+  //
+  // Order inside the column is forced by the edges. `infra` is the hole under
+  // the store it would define, so it sits directly beneath `tables`; anything
+  // between them would turn a short ghost edge into a wire crossing a card.
+  // That puts the dashboard above the store, which is where a thing that reads
+  // one belongs anyway.
+  // Starts below the rule's caption, which stands at the top of the column.
+  admin: { x: 960, y: 140, w: 440 },
+  // Every writer on the spine drops into this from the side, collected into
+  // one lane.
+  tables: { x: 960, y: 310, w: 440 },
+  // Widened to match the store above it: "Where the tables came from" truncates
+  // at 310px, and a card whose own title does not fit is the wrong way to show
+  // an absence.
+  infra: { x: 960, y: 480, w: 440 },
 };
+
+/**
+ * Everything a Branch needs to be draggable, bundled the way `RowCtx` is — one
+ * prop threaded down a recursive component rather than four.
+ */
+interface DragCtx {
+  /**
+   * Where each card has been dragged to, in WORLD units, keyed by node id.
+   *
+   * A ref, not state: it is written on every frame of a drag, and that in
+   * state would re-render the board sixty times a second. Keyed by id rather
+   * than held on the element because a child card unmounts when you collapse
+   * its level — an offset living on the element would go with it, so reopening
+   * a level would snap every card you moved back to where layout put it.
+   */
+  offsets: RefObject<Map<string, { x: number; y: number }>>;
+  /** Re-measure the wires. Called once per frame while a card is dragged. */
+  onMove: () => void;
+  /** Names the root whose branch is being dragged, so it can lift clear. */
+  onLift: (rootId: string | null) => void;
+  /** Bumped when `0` sends every card home. */
+  homeGen: number;
+}
+
+/**
+ * Suppress text selection for the life of one press.
+ *
+ * Motion does this for a draggable itself — but only when it owns the pointer
+ * listener, and `dragListener={false}`, which is what keeps the anatomy rows
+ * working, opts out of it along with everything else (framer-motion's
+ * `useHTMLProps` guards the whole block on it). Without this, a press on a
+ * card title drag-selects straight across the board.
+ */
+function suppressSelection() {
+  const restore = () => {
+    document.body.style.userSelect = "";
+    window.removeEventListener("pointerup", restore);
+    window.removeEventListener("pointercancel", restore);
+  };
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointerup", restore);
+  window.addEventListener("pointercancel", restore);
+}
 
 function worldPos(node: Node) {
   return PLACE[node.id] ?? { x: 0, y: 0 };
@@ -135,12 +213,34 @@ const WIDEST_OPEN = Math.max(
   0,
   ...allNodes().map((n) => {
     const k = n.children?.length ?? 0;
-    return k ? CHILD_PL + k * CHILD_W + (k - 1) * CHILD_GAP : 0;
+    return k && !isFlowLevel(n) ? CHILD_PL + k * CHILD_W + (k - 1) * CHILD_GAP : 0;
+  }),
+);
+/**
+ * The same bound on the other axis, for the levels that stack.
+ *
+ * A flow level is several expanded cards tall where a row is one, so the old
+ * single `OPEN_CHILD_H` term undersized the box by about 650px — and an
+ * undersized world box is not a cosmetic problem: the SVG is measured from it,
+ * so every wire past the edge is clipped away while still being computed
+ * perfectly correctly. That is the failure mode the comment above describes,
+ * arriving from the other direction.
+ */
+const TALLEST_OPEN = Math.max(
+  0,
+  ...allNodes().map((n) => {
+    const k = n.children?.length ?? 0;
+    return k && isFlowLevel(n) ? k * OPEN_CHILD_H + (k - 1) * CHILD_VGAP : 0;
   }),
 );
 const WORLD = {
-  w: Math.max(...L0.map((n) => worldPos(n).x)) + WIDEST_OPEN + 160,
-  h: Math.max(...L0.map((n) => worldPos(n).y)) + CARD_H + OPEN_CHILD_H + 160,
+  w: Math.max(...L0.map((n) => worldPos(n).x)) + Math.max(WIDEST_OPEN, CHILD_PL + CHILD_W) + 160,
+  h:
+    Math.max(...L0.map((n) => worldPos(n).y)) +
+    CARD_H +
+    CHILD_VGAP +
+    Math.max(TALLEST_OPEN, OPEN_CHILD_H) +
+    160,
 };
 
 /**
@@ -189,9 +289,23 @@ export function Canvas() {
   const worldRef = useRef<HTMLDivElement>(null);
   const { nodes, anchor, version } = useWireAnchors();
 
+  /** The wire layer's own re-measure, handed over on mount. See WireLayer. */
+  const remeasure = useRef<(() => void) | null>(null);
+  const onEdit = useCallback(() => remeasure.current?.(), []);
+
+  const offsets = useRef(new Map<string, { x: number; y: number }>());
   /**
-   * The open path, root-first. `[]` is the overview, `["generating"]` has one
-   * subsystem open, `["generating","gen-parallel","gen-callb"]` is three deep.
+   * Bumped by `0` to send every mounted card home. The offsets live in a ref,
+   * so something has to tell the cards to read it again — and this is the one
+   * moment layout resets, so a single re-render is the whole cost.
+   */
+  const [homeGen, setHomeGen] = useState(0);
+  /** The root whose branch is being dragged, lifted clear of its neighbours. */
+  const [lifted, setLifted] = useState<string | null>(null);
+
+  /**
+   * The open path, root-first. `[]` is the overview, `["chat-box"]` has one
+   * surface open, `["chat-box","generating","gen-parallel"]` is three deep.
    *
    * Depth is the LENGTH of this array, never a separate counter. That is the
    * whole change that removes the ceiling: nothing here knows how deep the
@@ -241,6 +355,29 @@ export function Canvas() {
     ([x, y, s]: number[]) => `translate3d(${x}px, ${y}px, 0) scale(${s})`,
   );
   const dots = useTransform([sx, sy], ([x, y]: number[]) => `${x}px ${y}px`);
+
+  /**
+   * Card drag happens INSIDE the scaled world, so motion has to be told what a
+   * screen pixel is worth here.
+   *
+   * Motion's drag adds a raw pointer delta straight onto the element's own
+   * transform (`VisualElementDragControls.updateAxis`), so at 0.5x a card would
+   * travel twice as far as the cursor — the same double-scaling the wire layer
+   * corrects for when it measures. `transformPagePoint` is the supported hook:
+   * PanSession runs every point through it before differencing them into
+   * `offset`, and re-runs it each frame, so zooming mid-drag stays correct.
+   *
+   * Only the SCALE is divided out. `offset` is a difference of two transformed
+   * points, so the viewport origin and the pan offsets cancel anyway — leaving
+   * them out keeps the drag immune to `sx`/`sy` moving under it.
+   */
+  const transformPagePoint = useCallback(
+    (point: { x: number; y: number }) => {
+      const s = ss.get() || 1;
+      return { x: point.x / s, y: point.y / s };
+    },
+    [ss],
+  );
 
   /* ── tracing a row-level chain ────────────────────────────── */
 
@@ -395,18 +532,38 @@ export function Canvas() {
       const rootNode = nodeAt([next[0]]);
       if (!rootNode) return;
       const p = worldPos(rootNode);
+      // PLACE says where layout PUT the root, which stops being where the root
+      // IS the moment it can be dragged: drag a domain 400px right, click it,
+      // and the camera glides to the empty square it came from. Every deeper
+      // level is framed from a live measurement after commit (the effect
+      // below) and needs no correction — this is the one frame in the file
+      // computed from a constant, so it is the one that has to be adjusted.
+      const off = offsets.current.get(next[0]) ?? { x: 0, y: 0 };
       // Frame the card AND the level it is about to spawn. Centring on the
       // title card alone parked the camera on a 304px box while ~1200px of
       // content unfolded to its right.
       // Clamped at one column: a node opened from a row has no children, and
       // the fan-out formula with members=0 yields -116px — a negative box the
       // camera would aim at the wrong place entirely.
-      const w =
-        CHILD_PL + Math.max(1, members) * CHILD_W + Math.max(0, members - 1) * CHILD_GAP;
+      const k = Math.max(1, members);
+      // A flow level stacks, so the box it will occupy is one column wide and
+      // several cards tall — the transpose of the row's. Aiming the row's box
+      // at a stacked level frames a wide strip of empty canvas beside content
+      // that runs off the bottom.
+      const stacked = isFlowLevel(node);
+      const w = stacked
+        ? CHILD_PL + CHILD_W
+        : CHILD_PL + k * CHILD_W + Math.max(0, members - 1) * CHILD_GAP;
       // Real opened height, not a per-member estimate: an expanded schema card
       // runs ~410px, so a 84 + n*62 guess centred well above the content.
-      const h = CARD_H + CHILD_GAP + OPEN_CHILD_H;
-      frame({ x: p.x, y: p.y, w, h });
+      const h = stacked
+        ? CARD_H + CHILD_VGAP + k * OPEN_CHILD_H + Math.max(0, members - 1) * CHILD_VGAP
+        : CARD_H + CHILD_GAP + OPEN_CHILD_H;
+      // A stack is read from the top down, so it is anchored there rather than
+      // centred. Centring a box taller than the viewport is the failure D8
+      // records: half the level ends up above the fold, including the card you
+      // just clicked. Same answer the deep-level effect below already reached.
+      frame({ x: p.x + off.x, y: p.y + off.y, w, h }, stacked ? "top" : "centre");
     },
     [frame],
   );
@@ -461,6 +618,16 @@ export function Canvas() {
     [anchor, lit, traced, rowOpen, onOpenRow],
   );
 
+  const dragCtx = useMemo<DragCtx>(
+    () => ({
+      offsets,
+      onMove: () => remeasure.current?.(),
+      onLift: setLifted,
+      homeGen,
+    }),
+    [homeGen],
+  );
+
   /**
    * Back out ONE level, not all the way. With unbounded depth, a single
    * Escape that dumps you at the overview from four levels down throws away
@@ -481,6 +648,27 @@ export function Canvas() {
       return next;
     });
   }, [glideTo]);
+
+  /**
+   * Jump straight to a level on the open path, from the layer trail. `i` is
+   * the index of the node to land on; -1 is the overview. Goes through
+   * `drillInto` so the camera frames it exactly as a click would have.
+   */
+  const jumpTo = useCallback(
+    (i: number) => {
+      setTraced(null);
+      if (i < 0) {
+        setPath([]);
+        const vp = viewportRef.current;
+        const v = vp ? overviewView(vp.getBoundingClientRect()) : OVERVIEW;
+        glideTo(v.x, v.y, v.scale);
+        return;
+      }
+      const node = nodeAt(path.slice(0, i + 1));
+      if (node) drillInto(node, path.slice(0, i));
+    },
+    [path, drillInto, glideTo],
+  );
 
   /**
    * Frame the level that just opened — after React has committed it.
@@ -631,6 +819,10 @@ export function Canvas() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Typing in a card's code is typing, not a shortcut: "0" must not reset
+      // the board under the caret, nor Escape pop a level mid-edit.
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input,textarea,[contenteditable]")) return;
       const vp = viewportRef.current;
       if (!vp) return;
       const r = vp.getBoundingClientRect();
@@ -642,6 +834,10 @@ export function Canvas() {
         // All the way out, however deep you are.
         setTraced(null);
         setPath([]);
+        // Layout too. Clearing the record covers cards that are unmounted
+        // right now; the generation bump is what eases the mounted ones home.
+        offsets.current.clear();
+        setHomeGen((g) => g + 1);
         const v = overviewView(r);
         glideTo(v.x, v.y, v.scale);
       } else if (e.key === "Escape") {
@@ -655,78 +851,224 @@ export function Canvas() {
   }, [zoomAt, drillOut, traced, glideTo]);
 
   return (
-    <motion.div
-      ref={viewportRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      className={cn(
-        "dotfield relative h-dvh w-screen touch-none overflow-hidden bg-warm-cream",
-        dragging ? "cursor-grabbing" : "cursor-grab",
-      )}
-      style={{ backgroundPosition: dots }}
+    // Scoped to the whole viewport rather than the world, so the correction is
+    // in place no matter where a draggable ends up. Nothing else in here uses a
+    // motion gesture — the canvas pans with plain pointer handlers — so this
+    // only ever reaches the cards.
+    <MotionConfig transformPagePoint={transformPagePoint}>
+      {/* An edit can grow a card by a line, and nothing else tells the wires
+          a card changed size, so every edit re-measures them. */}
+      <EditsProvider onChange={onEdit}>
+        <motion.div
+          ref={viewportRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          className={cn(
+            "dotfield relative h-dvh w-screen touch-none overflow-hidden bg-warm-cream",
+            dragging ? "cursor-grabbing" : "cursor-grab",
+          )}
+          style={{ backgroundPosition: dots }}
+        >
+          <motion.div
+            ref={worldRef}
+            className="absolute left-0 top-0 origin-top-left"
+            style={{ transform, width: WORLD.w, height: WORLD.h }}
+          >
+            {/* Inside the transformed world, so the wires scale with the nodes
+                rather than being measured in screen px and drifting. */}
+            <WireLayer
+              canvasRef={worldRef}
+              nodes={nodes}
+              wires={wires}
+              version={version}
+              scale={liveScale}
+              reflowKey={path.join("/")}
+              measureRef={remeasure}
+            />
+
+            {/* The rule between the spine and the tier beside it.
+                Not a node, and it must never become one: obstacles are built
+                from the anchor registry, so anything that registers there gets
+                routed around. This is chrome the wires are meant to cross. */}
+            <TierRule away={depth > 0} />
+
+            {L0.map((node) => {
+              const p = worldPos(node);
+              // Out of scope: while one branch is open, the other roots leave
+              // rather than lingering at low opacity. A dimmed card is still a card
+              // competing for the eye — and its wires still cross the one you are
+              // reading.
+              const outOfScope = depth > 0 && path[0] !== node.id;
+              return (
+                <motion.div
+                  key={node.id}
+                  className="absolute"
+                  // Kept mounted while out of scope: the anchor stays registered
+                  // and nothing reflows, so coming back is a pure fade. Pointer
+                  // events go away so an invisible card can't be clicked.
+                  style={{
+                    left: p.x,
+                    top: p.y,
+                    // The root card keeps its tier width whether open or not.
+                    // Letting it stretch to its children made a one-line title card
+                    // span 1100px, which read as a banner rather than a node.
+                    width: cardWidth(node),
+                    pointerEvents: outOfScope ? "none" : "auto",
+                    // Set HERE rather than on the branch wrapper inside: this
+                    // element carries `animate={{ scale }}`, and a transform
+                    // makes it a stacking context, which would trap any z-index
+                    // set below it. Roots are siblings, so without this a card
+                    // dragged rightward slides UNDER the one it crosses.
+                    zIndex: lifted === node.id ? 30 : undefined,
+                  }}
+                  animate={{
+                    opacity: outOfScope ? 0 : 1,
+                    scale: outOfScope ? 0.94 : 1,
+                  }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <Branch
+                    node={node}
+                    at={[]}
+                    path={path}
+                    anchor={anchor}
+                    rowCtx={rowCtx}
+                    inert={outOfScope}
+                    onOpen={drillInto}
+                    onClose={drillOut}
+                    dragCtx={dragCtx}
+                  />
+                </motion.div>
+              );
+            })}
+
+          </motion.div>
+        </motion.div>
+      </EditsProvider>
+      {/* Outside the viewport, so a press on it never starts a pan. */}
+      <LayerTrail path={path} onJump={jumpTo} />
+    </MotionConfig>
+  );
+}
+
+const LAYER_NAME = { surface: "surface", flow: "data flow", code: "code" } as const;
+
+/**
+ * Where you are, said in layers: the surface you started from, the flow you
+ * opened under it, the code under that. The map's depth is not uniform, so
+ * the trail is the one place that tells you which kind of level you are on —
+ * and every step back up it is one click, rather than one Escape per level.
+ */
+function LayerTrail({
+  path,
+  onJump,
+}: {
+  path: string[];
+  onJump: (i: number) => void;
+}) {
+  const steps = path.map((_, i) => nodeAt(path.slice(0, i + 1)));
+  return (
+    <nav
+      aria-label="Layers"
+      className="fixed left-4 top-4 z-40 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-x-1.5 gap-y-1 rounded-[12px] border border-border-gray bg-pure-white px-3 py-2"
     >
-      <motion.div
-        ref={worldRef}
-        className="absolute left-0 top-0 origin-top-left"
-        style={{ transform, width: WORLD.w, height: WORLD.h }}
+      <Crumb
+        layer={path.length ? null : LAYER_NAME.surface}
+        title="Overview"
+        current={path.length === 0}
+        onClick={() => onJump(-1)}
+      />
+      {steps.map((node, i) =>
+        node ? (
+          <span key={node.id} className="flex items-center gap-1.5">
+            <span aria-hidden className="text-[11px] text-faint">›</span>
+            <Crumb
+              layer={LAYER_NAME[layerOf(node.kind)]}
+              title={node.title}
+              mono={!!node.unit}
+              current={i === steps.length - 1}
+              onClick={() => onJump(i)}
+            />
+          </span>
+        ) : null,
+      )}
+    </nav>
+  );
+}
+
+function Crumb({
+  layer,
+  title,
+  mono,
+  current,
+  onClick,
+}: {
+  layer: string | null;
+  title: string;
+  mono?: boolean;
+  current: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={current}
+      aria-current={current ? "location" : undefined}
+      className={cn(
+        "flex max-w-[220px] items-baseline gap-1.5 rounded-[6px] px-1 py-0.5 text-left transition-[background-color,color] duration-150",
+        current ? "cursor-default" : "cursor-pointer hover:bg-surface",
+      )}
+    >
+      {layer ? (
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.09em] text-faint">
+          {layer}
+        </span>
+      ) : null}
+      <span
+        className={cn(
+          "truncate text-[11.5px]",
+          mono && "font-mono",
+          current ? "font-semibold text-ink" : "text-on-surface-variant",
+        )}
       >
-        {/* Inside the transformed world, so the wires scale with the nodes
-            rather than being measured in screen px and drifting. */}
-        <WireLayer
-          canvasRef={worldRef}
-          nodes={nodes}
-          wires={wires}
-          version={version}
-          scale={liveScale}
-          reflowKey={path.join("/")}
-        />
+        {title}
+      </span>
+    </button>
+  );
+}
 
-        {L0.map((node) => {
-          const p = worldPos(node);
-          // Out of scope: while one branch is open, the other roots leave
-          // rather than lingering at low opacity. A dimmed card is still a card
-          // competing for the eye — and its wires still cross the one you are
-          // reading.
-          const outOfScope = depth > 0 && path[0] !== node.id;
-          return (
-            <motion.div
-              key={node.id}
-              className="absolute flex flex-col gap-2"
-              // Kept mounted while out of scope: the anchor stays registered
-              // and nothing reflows, so coming back is a pure fade. Pointer
-              // events go away so an invisible card can't be clicked.
-              style={{
-                left: p.x,
-                top: p.y,
-                // The root card keeps its tier width whether open or not.
-                // Letting it stretch to its children made a one-line title card
-                // span 1100px, which read as a banner rather than a node.
-                width: cardWidth(node),
-                pointerEvents: outOfScope ? "none" : "auto",
-              }}
-              animate={{
-                opacity: outOfScope ? 0 : 1,
-                scale: outOfScope ? 0.94 : 1,
-              }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <Branch
-                node={node}
-                at={[]}
-                path={path}
-                anchor={anchor}
-                rowCtx={rowCtx}
-                inert={outOfScope}
-                onOpen={drillInto}
-                onClose={drillOut}
-              />
-            </motion.div>
-          );
-        })}
-
-      </motion.div>
+/**
+ * The line between the spine and the tier beside it.
+ *
+ * The cards to its right are not surface you walk through: a store, the
+ * dashboard that reads it, and the hole where the store's definition should
+ * be. They were left unwired
+ * once to say exactly that, and it did not say it — a card with no wires reads
+ * as unfinished, not as a different kind of thing. A rule and a label say it in
+ * the register the rest of the canvas uses, which frees the wires to go back to
+ * meaning what they mean everywhere else.
+ *
+ * Deliberately not a card and not a node. It registers no anchor, so the wire
+ * router never sees it — which is right, because the bus is supposed to cross
+ * it. That crossing is the point: the tier is separate, and things still flow
+ * into it.
+ */
+function TierRule({ away }: { away: boolean }) {
+  return (
+    <motion.div
+      className="pointer-events-none absolute"
+      style={{ left: TIER_RULE_X, top: 76 }}
+      animate={{ opacity: away ? 0 : 1 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      aria-hidden
+    >
+      <p className="whitespace-nowrap pl-4 font-mono text-[11.5px] text-faint">
+        behind the surface — where it lands, and who watches it
+      </p>
+      <div className="mt-2 h-[460px] border-l border-dashed border-border-gray" />
     </motion.div>
   );
 }
@@ -749,6 +1091,7 @@ function Branch({
   inert,
   onOpen,
   onClose,
+  dragCtx,
 }: {
   node: Node;
   at: string[];
@@ -758,7 +1101,52 @@ function Branch({
   inert?: boolean;
   onOpen: (node: Node, parentPath: string[]) => void;
   onClose: () => void;
+  dragCtx: DragCtx;
 }) {
+  /**
+   * Drag is started by hand from the card, never by the wrapper's own listener
+   * — `dragListener={false}` below. Anatomy rows are buttons with their own
+   * gestures, and a wrapper-wide listener would fight them for every press.
+   */
+  const controls = useDragControls();
+  /**
+   * Did this press turn into a drag? Same question the canvas asks itself about
+   * panning, and the same answer: a press that moved is not a click. Motion
+   * only fires onDragStart past PanSession's 3px threshold, which is the figure
+   * the canvas already uses, so neither has to restate it.
+   */
+  const dragged = useRef(false);
+  /** Held under the pointer, so the card lifts off the paper. */
+  const [lifted, setLifted] = useState(false);
+
+  /**
+   * This branch's drag offset, seeded from the record so a card that was
+   * dragged, collapsed and reopened comes back where you left it.
+   *
+   * Explicit motion values rather than letting drag keep its own: they are the
+   * only handle on the offset afterwards, and `0` has to be able to ease it
+   * back to zero.
+   */
+  const saved = dragCtx.offsets.current.get(node.id);
+  const ox = useMotionValue(saved?.x ?? 0);
+  const oy = useMotionValue(saved?.y ?? 0);
+
+  const { offsets, onMove, onLift, homeGen } = dragCtx;
+  useEffect(() => {
+    if (homeGen === 0) return;
+    if (ox.get() === 0 && oy.get() === 0) return;
+    // Eased, not snapped. Going home is a COMMANDED move, and commanded moves
+    // on this canvas ride the spring — the same rule that separates a drill
+    // transition from raw wheel input.
+    const back = [
+      animate(ox, 0, { ...GLIDE, onUpdate: onMove }),
+      animate(oy, 0, GLIDE),
+    ];
+    return () => {
+      for (const c of back) c.stop();
+    };
+  }, [homeGen, ox, oy, onMove]);
+
   const here = [...at, node.id];
   // Am I on the open path at all?
   const onPath = here.every((id, i) => path[i] === id);
@@ -790,14 +1178,60 @@ function Branch({
   // I am the deepest open node — the one being read.
   const isLeafOfPath = onPath && path.length === here.length;
   const root = at.length === 0;
+  // My children are a sequence, so the level below me reads downward.
+  const isFlow = isFlowLevel(node);
 
   return (
-    <>
+    /**
+     * The drag surface. It wraps the card AND the level below it, so moving a
+     * card takes its subtree with it — which is what "move this thing" means
+     * when the thing has children hanging off it.
+     *
+     * It has to be its own element rather than the wrappers at either call
+     * site. A child level's entrance variant animates `y` (-6 -> 0), and `y` is
+     * exactly what drag writes: sharing an element would have the level's own
+     * arrival animation yank a dragged card back to where layout put it.
+     *
+     * `flex flex-col gap-2` moves here with it, because this is now the element
+     * standing between the card and its children column.
+     */
+    <motion.div
+      className="flex flex-col gap-2"
+      drag
+      // Direct input is 1:1 and stops when you stop. Momentum would keep the
+      // card moving after release, which is the one thing the motion rules on
+      // this canvas rule out.
+      dragMomentum={false}
+      dragListener={false}
+      dragControls={controls}
+      style={{ x: ox, y: oy, zIndex: lifted ? 30 : undefined }}
+      onDragStart={() => {
+        dragged.current = true;
+        setLifted(true);
+        // Roots are siblings of each other and so are the cards in a level;
+        // either way the one under the pointer belongs on top. The root's own
+        // wrapper is a stacking context, so it has to be told.
+        onLift(at[0] ?? node.id);
+      }}
+      // Dragging writes a transform straight to the DOM, so nothing that the
+      // wire layer listens for fires. Both ends of this are already throttled
+      // to one call per frame — motion's onDrag, and bump's rAF — so this costs
+      // one re-measure per frame, the same as panning already does.
+      onDrag={() => {
+        offsets.current.set(node.id, { x: ox.get(), y: oy.get() });
+        onMove();
+      }}
+      onDragEnd={() => {
+        setLifted(false);
+        onLift(null);
+      }}
+    >
       <NodeCard
         node={node}
         ref={anchor(node.id)}
         compact={!root}
         inert={inert}
+        lifted={lifted}
         selected={isLeafOfPath}
         // Anatomy shows on the node you have actually opened to, and on the
         // cards of the level you are looking at — not on every ancestor, which
@@ -815,20 +1249,53 @@ function Branch({
         // you could open it and then not close it again.
         onClick={
           (node.children?.length ?? 0) > 0
-            ? () => (showChildren ? onClose() : onOpen(node, at))
+            ? () => {
+                // A press that turned into a drag is not a click. Without this
+                // every drag would also toggle the level it landed on.
+                if (dragged.current) return;
+                if (showChildren) onClose();
+                else onOpen(node, at);
+              }
             : undefined
         }
+        // Not on the wrapper: a wrapper-wide listener would start a drag from
+        // anywhere inside the card, including the anatomy rows, which own their
+        // own press. Childless cards get this too — they still drag.
+        onPointerDown={(e) => {
+          // Cleared for EVERY press, including one that lands on a row and
+          // starts no drag. Left set, a stale flag from the last drag would
+          // swallow the next genuine click on this card.
+          dragged.current = false;
+          // Rows own their press — and so does a code block. `source` renders
+          // verbatim lines you are meant to be able to select and copy, and a
+          // drag starting there would take the card instead of the text.
+          if ((e.target as HTMLElement).closest("[data-row],[data-copy]")) return;
+          suppressSelection();
+          controls.start(e);
+        }}
       />
 
       <AnimatePresence>
         {showChildren ? (
           <motion.div
-            // A level lays out in columns, not one stack. A single 380px column
-            // runs off the bottom of the viewport and wastes the whole width of
-            // the canvas; side-by-side keeps a level readable in one screenful.
-            // The gutter is also where the FK wires run, and it has to be wide
-            // enough that every wire crossing it gets its own vertical track.
-            className="flex items-start gap-[140px] pl-6"
+            // A level lays out one of two ways, and which one is a fact about
+            // the level rather than a house style. A level that carries `edges`
+            // is a SEQUENCE, so it reads downward, the same direction as the
+            // spine it hangs off. A level without them is a set you are meant
+            // to compare — "What you can send" beside "Subject and mode" — and
+            // those sit side by side, where the eye can hold both at once.
+            //
+            // The row is still the default and still the common case: five of
+            // the nine levels in this tree declare no edges. Its gutter is also
+            // where the FK wires run, which is why it is as wide as it is.
+            //
+            // The gap is an inline style, not a Tailwind class: it has to come
+            // from the same constant the camera and the world box size
+            // themselves from, and `gap-[${CHILD_GAP}px]` would not survive the
+            // class scanner — Tailwind reads source text, so a computed class
+            // name produces no CSS at all.
+            className={cn("items-start pl-6", isFlow ? "flex flex-col" : "flex")}
+            style={{ gap: isFlow ? CHILD_VGAP : CHILD_GAP }}
             initial="out"
             animate="in"
             exit="out"
@@ -840,7 +1307,6 @@ function Branch({
             {members.map((child) => (
               <motion.div
                 key={child.id}
-                className="flex flex-col gap-2"
                 variants={{
                   // Rises and settles rather than appearing. Scale stays subtle
                   // — this reads as the card arriving, not as the camera
@@ -859,13 +1325,14 @@ function Branch({
                   rowCtx={rowCtx}
                   onOpen={onOpen}
                   onClose={onClose}
+                  dragCtx={dragCtx}
                 />
               </motion.div>
             ))}
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </>
+    </motion.div>
   );
 }
 
@@ -874,21 +1341,27 @@ function NodeCard({
   ref,
   compact,
   inert,
+  lifted,
   selected,
   detail,
   ctx,
   onClick,
+  onPointerDown,
 }: {
   node: Node;
   ref: (el: HTMLElement | null) => void;
   compact?: boolean;
   /** Out of scope: the wrapper fades it, so the card just drops its affordances. */
   inert?: boolean;
+  /** Held under the pointer right now. */
+  lifted?: boolean;
   selected?: boolean;
   detail?: boolean;
   /** Row anchoring and trace state, threaded down to the anatomy rows. */
   ctx?: RowCtx;
   onClick?: () => void;
+  /** Hands the press to the drag controls, unless it landed on a row. */
+  onPointerDown?: (e: React.PointerEvent) => void;
 }) {
   // Always a div, never a button. Anatomy rows are themselves buttons, and the
   // HTML parser refuses to nest interactive elements — it reparents the inner
@@ -899,7 +1372,14 @@ function NodeCard({
       ref={ref as never}
       data-node
       data-node-id={node.id}
+      // Out of scope, and the wire layer needs to know. A faded root stays
+      // mounted so its anchor survives, but it is not on the screen any more
+      // and must not push wires around: the spine's roots sit in exactly the
+      // column an open level unfolds into, so routing around them sends every
+      // wire in that level on a detour around something nobody can see.
+      data-away={inert ? "" : undefined}
       onClick={onClick}
+      onPointerDown={inert ? undefined : onPointerDown}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={
@@ -915,6 +1395,16 @@ function NodeCard({
       }
       className={cn(
         "w-full rounded-[14px] border bg-pure-white px-4 text-left transition-[border-color,opacity,box-shadow] duration-200",
+        // The card itself is the handle. Transform is deliberately absent from
+        // the transition list above and must stay that way: the drag writes one
+        // every frame, and animating it would lag the card behind the pointer.
+        !inert && "cursor-grab active:cursor-grabbing",
+        // The one place this canvas earns a real shadow. Everything else sits
+        // ON the paper and is separated by cream against white; a card held
+        // under the pointer is literally off it, which is what `--shadow-lift`
+        // was defined for and never used on. `box-shadow` is already in the
+        // transition list above, so it eases in.
+        lifted && "shadow-lift",
         compact ? "py-2" : "py-3.5",
         // A hole in the analysis is drawn as a hole: dashed edge, no fill
         // weight. It should look unfinished, because it is.
@@ -926,10 +1416,14 @@ function NodeCard({
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
       )}
     >
+      <KindLabel kind={node.kind} />
       <div className="flex items-center gap-2">
         <span
           className={cn(
             "min-w-0 flex-1 truncate font-semibold tracking-[-0.01em] text-ink",
+            // A code unit is named by its identifier, so it reads in mono like
+            // every other thing on the board that names code.
+            node.unit && "font-mono",
             compact ? "text-[12.5px]" : "text-[15px]",
           )}
         >
@@ -937,16 +1431,23 @@ function NodeCard({
         </span>
         <StateChip state={node.state} alarm={node.alarm} />
       </div>
-      <p
-        className={cn(
-          "mt-0.5 truncate font-mono text-faint",
-          compact ? "text-[10px]" : "text-[11.5px]",
-        )}
-      >
-        {node.sub}
-      </p>
+      {node.unit ? (
+        // The signature stands where the sub line would. It is the part of a
+        // function a caller depends on, so it is edited where it reads; the
+        // body is edited below, in the expanded card.
+        <UnitHead id={node.id} unit={node.unit} />
+      ) : (
+        <p
+          className={cn(
+            "mt-0.5 truncate font-mono text-faint",
+            compact ? "text-[10px]" : "text-[11.5px]",
+          )}
+        >
+          {node.sub}
+        </p>
+      )}
       <AnimatePresence initial={false}>
-        {detail && (node.detail || node.anatomy) ? (
+        {detail && (node.detail || node.anatomy || node.unit) ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -960,14 +1461,20 @@ function NodeCard({
                   {node.detail}
                 </p>
               ) : null}
-              {node.anatomy && ctx ? (
+              {node.unit ? (
                 <div className={cn(node.detail && "mt-2.5")}>
+                  <UnitBody id={node.id} unit={node.unit} />
+                </div>
+              ) : null}
+              {node.anatomy && ctx ? (
+                <div className={cn((node.detail || node.unit) && "mt-2.5")}>
                   <AnatomyView owner={node.id} blocks={node.anatomy} ctx={ctx} />
                 </div>
               ) : null}
               {/* Provenance, always. A claim with no location is the failure
                   mode this tool exists to avoid. */}
-              {node.evidence ? (
+              {/* A code unit's location is already in its header. */}
+              {node.evidence && !node.unit ? (
                 <p className="mt-2 font-mono text-[9.5px] text-faint">
                   {node.evidence}
                 </p>

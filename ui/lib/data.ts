@@ -142,8 +142,67 @@ export type Anatomy =
   | { kind: "map"; caption?: string; rows: Mapping[] }
   | Source;
 
+/* ── kinds: what a node IS, which sets how its card reads ─────
+   Three layers, top to bottom: the SURFACE a person sees (journey, pages, UI
+   elements), the FLOW of data behind it, and the CODE that does it. Kind sets
+   presentation only. It does not set depth: a branch still goes as deep as it
+   has different things to say, and a function can sit at level 2 or level 5. */
+export type NodeKind =
+  | "journey" | "page" | "element"
+  | "flow" | "store"
+  | "module" | "class" | "function";
+
+export type Layer = "surface" | "flow" | "code";
+
+/** The one place a kind maps to its layer. */
+export function layerOf(kind: NodeKind | undefined): Layer {
+  switch (kind) {
+    case "journey":
+    case "page":
+    case "element":
+      return "surface";
+    case "module":
+    case "class":
+    case "function":
+      return "code";
+    default:
+      return "flow";
+  }
+}
+
+/**
+ * A function or class as a unit of code. Signature and body are separate so
+ * the card can later edit the signature and body in place, and an editor mode
+ * can open the whole file at `file` around `start`–`end`.
+ */
+export interface CodeUnit {
+  lang: "ts" | "tsx" | "rs";
+  file: string;
+  start: number;
+  /** Last line of `body`, inclusive. */
+  end: number;
+  /** As it reads in the source: `export async function POST(req: Request)`. */
+  signature: string;
+  /** Verbatim from `start`, the signature line included. */
+  body: string;
+  /**
+   * False when we hold an excerpt rather than the whole unit. Never pad an
+   * excerpt to look complete — the card says "excerpt" instead.
+   */
+  complete: boolean;
+  /**
+   * Other code units in the map this one calls, by node id, in the order they
+   * first appear in the body. What the code pane drills into.
+   */
+  calls?: string[];
+}
+
 export interface Node {
   id: string;
+  /** Unset on a row-derived node, which reads as `flow`. */
+  kind?: NodeKind;
+  /** Set on `function` and `class` nodes. */
+  unit?: CodeUnit;
   title: string;
   /** One line, plain English. What this IS — never a file path. */
   sub: string;
@@ -177,6 +236,37 @@ export interface Node {
    * exists to remove. `Branch` shows only the row child on the open path.
    */
   fromRow?: boolean;
+}
+
+/**
+ * Does this node's level lay out as a flow?
+ *
+ * Not "does it have edges" — "are those edges ONE RUN". A column can only say
+ * "and then this" when the edges visit the children in the order they are
+ * declared, each exactly once.
+ *
+ * `generating` is why the looser test is wrong. It fans two children into a
+ * third: `gen-cache -> gen-parallel` and `gen-prompt -> gen-parallel`. Stacked,
+ * both of its arrows point back UP the column, and whichever order the children
+ * are given, one edge has to skip the card between its ends. That is not a
+ * layout accident to be routed around — a fan-in is a convergence, and a row is
+ * the shape that already draws convergences well.
+ *
+ * It is also what keeps the vertical runs honest. In a chain every edge joins
+ * two adjacent cards, so nothing is ever between the endpoints of a run down
+ * the column's centre line.
+ */
+export function isFlowLevel(node: Node) {
+  // Authored children only. A row child appears and disappears as rows are
+  // clicked, and a level that changed direction under the pointer would be a
+  // layout jump nobody asked for.
+  const members = (node.children ?? []).filter((c) => !c.fromRow);
+  const edges = node.edges ?? [];
+  if (edges.length === 0 || members.length < 2) return false;
+  // The chain the declared order implies, then check the edges ARE it.
+  const chain = new Set(members.slice(1).map((m, i) => `${members[i].id}>${m.id}`));
+  // `delete` returning false catches a stray edge and a repeated one alike.
+  return edges.length === chain.size && edges.every((e) => chain.delete(`${e.from}>${e.to}`));
 }
 
 export interface Edge {

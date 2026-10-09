@@ -369,6 +369,7 @@ fourth.
   opens a card in a new tab. Cards are `<a href>` with a plain-click handler
   (`onPlainClick` in nav.ts) that keeps the in-page glide; map cards set
   `draggable={false}` so a link's native drag never fights panning.
+- **Function blocks fold.** In the code pane, the ▸ beside a unit's name hides its detail and body, and "hide all / show all" on the code line does the whole list. The head never folds: the signature, `file:range` and any unsaved edit's save/revert stay visible, so a folded block can't hide work. Folds last for the page's life, across drilling and moving between cards, and a unit you deep-link to unfolds itself.
 - **Pane code trail:** 9.5px mono — `← back`, `CODE · <card>`, then
   `› <function> calls|methods` per step, and a count. Drill chips under a
   function read `calls n · a, b ›` / `methods n · a, b ›`.

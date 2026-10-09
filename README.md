@@ -7,14 +7,39 @@ See a codebase as a map of cards, and edit it from there:
 - one click down is the data flow behind it;
 - below that is the code, which you edit in the card and save straight to the file.
 
-## Install (once)
+## Install
+
+You need Node.js 20 or newer, git, and [Claude Code](https://claude.com/claude-code).
+
+```sh
+git clone https://github.com/hindra2/understand-slop.git ~/projects/understand-slop
+cd ~/projects/understand-slop
+npm install           # installs the app's dependencies (in ui/)
+npm link              # puts `slop` on your PATH
+slop install-skill    # adds /slop-map to Claude Code (~/.claude/skills/slop-map)
+```
+
+Check it worked:
+
+```sh
+slop help             # lists the commands
+slop demo             # opens the bundled example maps in your browser
+```
+
+`slop demo` (or the first `slop` on a repo) builds the app once, which takes about a minute.
+
+## Update
 
 ```sh
 cd ~/projects/understand-slop
-npm install           # installs the app's deps (in ui/)
-npm link              # puts `slop` on your PATH
-slop install-skill    # adds /slop-map to Claude Code (~/.claude/skills)
+git pull
+npm install           # picks up any new dependencies
+slop install-skill    # the skill is a copy, so refresh it too
 ```
+
+`npm link` doesn't need re-running: the `slop` command points at this folder, so it picks up the new code straight away. The next `slop` notices the app changed and rebuilds it (about a minute) before opening.
+
+To remove it: `npm unlink -g understand-slop` and `rm -r ~/.claude/skills/slop-map`.
 
 ## Use it on a repo
 
@@ -24,12 +49,13 @@ claude                # then: /slop-map   — Claude reads the repo and writes .
 slop                  # indexes the code, checks the story, opens the map in your browser
 ```
 
-The first `slop` builds the app, which takes about a minute. After that it starts in a couple of seconds.
-
 In the browser:
 - Click a card to go down a layer, and use back (or the mouse's back button) to come up again.
+- In the code pane, ▸ next to a function hides or shows its code; "hide all" folds the whole list into an outline.
 - In the code pane, edit a function's signature or body in place. **save** (or Ctrl+S) writes it to the file.
 - If the file changed on disk since the map loaded, the save is refused rather than overwriting it.
+
+### Keeping a repo's map up to date
 
 When the code moves on, just run `slop` again. The code side is re-read every time, so line numbers and bodies are never stale. A card whose function was renamed or deleted turns red and says so. Run `/slop-map` again to update the story; it keeps the existing card ids, so links still work.
 

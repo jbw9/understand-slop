@@ -11,7 +11,7 @@ import {
 } from "motion/react";
 import { cn } from "@/lib/utils";
 import { KindLabel } from "@/components/card";
-import { Detail } from "@/components/detail";
+import { Detail, FoldsProvider } from "@/components/detail";
 import { EditsProvider } from "@/components/edits";
 import { EASE, LAYER_NAME, LevelList, membersAt, opensLevel } from "@/components/level";
 import { onPlainClick, useMapNav } from "@/components/nav";
@@ -103,93 +103,95 @@ export function Explorer() {
 
   return (
     <EditsProvider>
-      <LayoutGroup>
-        <div className="flex h-dvh flex-col bg-warm-cream">
-          <header className="flex shrink-0 items-baseline gap-3 border-b border-border-gray px-5 py-3">
-            {map.maps.length > 1 ? (
-              // Which codebase: every map in /maps/index.json.
-              <select
-                aria-label="Codebase"
-                value={map.name}
-                onChange={(e) => map.switchTo(e.target.value)}
-                className="cursor-pointer rounded-[6px] border border-transparent bg-transparent py-0.5 pr-1 text-[13px] font-semibold tracking-[-0.01em] text-ink transition-[border-color] duration-150 hover:border-border-gray"
-              >
-                {map.maps.map((m) => (
-                  <option key={m.name} value={m.name}>
-                    {m.title ?? m.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-[13px] font-semibold tracking-[-0.01em] text-ink">{RUN.repo}</span>
-            )}
-            <span className="font-mono text-[10.5px] text-faint">
-              {RUN.commit} · {RUN.files} files
-            </span>
-            {map.warnings.length ? (
-              // Drift: code the story names that the repo no longer has. The
-              // cards say so too; this is the count, with the list on hover.
-              <span
-                title={map.warnings.join("\n")}
-                className="cursor-help font-mono text-[10.5px] font-semibold text-clay-ink"
-              >
-                {map.warnings.length} warning{map.warnings.length === 1 ? "" : "s"}
-              </span>
-            ) : null}
-            {map.editable ? null : <span className="font-mono text-[10.5px] text-faint">· demo, read-only</span>}
-            <span className="ml-auto hidden font-mono text-[10px] text-faint md:inline">
-              {at.length ? "↑ ↓ move · → open · ← back · 0 map" : "click a card to open it"}
-            </span>
-          </header>
-
-          <div className="relative min-h-0 flex-1">
-            <AnimatePresence initial={false} mode="popLayout">
-              {at.length === 0 ? (
-                <MapView key="map" onOpen={(id) => go([id])} hrefOf={(id) => href([id])} />
-              ) : (
-                <motion.div
-                  key="focus"
-                  className="absolute inset-0 flex"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: EASE }}
+      <FoldsProvider>
+        <LayoutGroup>
+          <div className="flex h-dvh flex-col bg-warm-cream">
+            <header className="flex shrink-0 items-baseline gap-3 border-b border-border-gray px-5 py-3">
+              {map.maps.length > 1 ? (
+                // Which codebase: every map in /maps/index.json.
+                <select
+                  aria-label="Codebase"
+                  value={map.name}
+                  onChange={(e) => map.switchTo(e.target.value)}
+                  className="cursor-pointer rounded-[6px] border border-transparent bg-transparent py-0.5 pr-1 text-[13px] font-semibold tracking-[-0.01em] text-ink transition-[border-color] duration-150 hover:border-border-gray"
                 >
-                  <div className="flex w-[380px] shrink-0 flex-col border-r border-border-gray">
-                    <Trail at={at} onGo={go} href={href} />
-                    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-                      {members.length ? (
-                        <>
-                          <LevelHeader members={members} parent={listParent} />
-                          <LevelList
-                            members={members}
-                            edges={edgesOf(listAt)}
-                            selected={selected}
-                            pointed={pointed}
-                            ruleStores={listAt.length === 0}
-                            hrefOf={(id) => href([...listAt, id])}
-                            onPick={(id) => {
-                              setPointed(null);
-                              go([...listAt, id]);
-                            }}
-                            onJump={(id) => jump(id)}
-                            onPoint={setPointed}
-                          />
-                        </>
-                      ) : (
-                        <p className="mt-4 text-[11px] leading-relaxed text-faint">
-                          Nothing below this card — everything it holds is in the pane.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <Detail node={open} focusUnit={focusUnit} ctx={rowCtx} traced={traced} onJump={jump} />
-                </motion.div>
+                  {map.maps.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.title ?? m.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-[13px] font-semibold tracking-[-0.01em] text-ink">{RUN.repo}</span>
               )}
-            </AnimatePresence>
+              <span className="font-mono text-[10.5px] text-faint">
+                {RUN.commit} · {RUN.files} files
+              </span>
+              {map.warnings.length ? (
+                // Drift: code the story names that the repo no longer has. The
+                // cards say so too; this is the count, with the list on hover.
+                <span
+                  title={map.warnings.join("\n")}
+                  className="cursor-help font-mono text-[10.5px] font-semibold text-clay-ink"
+                >
+                  {map.warnings.length} warning{map.warnings.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
+              {map.editable ? null : <span className="font-mono text-[10.5px] text-faint">· demo, read-only</span>}
+              <span className="ml-auto hidden font-mono text-[10px] text-faint md:inline">
+                {at.length ? "↑ ↓ move · → open · ← back · 0 map" : "click a card to open it"}
+              </span>
+            </header>
+
+            <div className="relative min-h-0 flex-1">
+              <AnimatePresence initial={false} mode="popLayout">
+                {at.length === 0 ? (
+                  <MapView key="map" onOpen={(id) => go([id])} hrefOf={(id) => href([id])} />
+                ) : (
+                  <motion.div
+                    key="focus"
+                    className="absolute inset-0 flex"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2, ease: EASE }}
+                  >
+                    <div className="flex w-[380px] shrink-0 flex-col border-r border-border-gray">
+                      <Trail at={at} onGo={go} href={href} />
+                      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+                        {members.length ? (
+                          <>
+                            <LevelHeader members={members} parent={listParent} />
+                            <LevelList
+                              members={members}
+                              edges={edgesOf(listAt)}
+                              selected={selected}
+                              pointed={pointed}
+                              ruleStores={listAt.length === 0}
+                              hrefOf={(id) => href([...listAt, id])}
+                              onPick={(id) => {
+                                setPointed(null);
+                                go([...listAt, id]);
+                              }}
+                              onJump={(id) => jump(id)}
+                              onPoint={setPointed}
+                            />
+                          </>
+                        ) : (
+                          <p className="mt-4 text-[11px] leading-relaxed text-faint">
+                            Nothing below this card — everything it holds is in the pane.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Detail node={open} focusUnit={focusUnit} ctx={rowCtx} traced={traced} onJump={jump} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
-      </LayoutGroup>
+        </LayoutGroup>
+      </FoldsProvider>
     </EditsProvider>
   );
 }

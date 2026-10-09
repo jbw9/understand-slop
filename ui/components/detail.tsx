@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { KindLabel, UnitBody, UnitHead } from "@/components/card";
@@ -11,6 +11,45 @@ import { useMap } from "@/components/map-context";
 import type { Node } from "@/lib/data";
 
 const codeUnder = (n: Node | undefined) => (n?.children ?? []).filter((c) => c.unit);
+
+/* ── folds: which function blocks are hidden ─────────────────────
+   Kept above the pane (FoldsProvider wraps the explorer), so a fold
+   survives drilling into calls, leaving the card and coming back. Only
+   for this page's life: a reload shows everything again. */
+
+interface Folds {
+  hidden: Set<string>;
+  toggle: (id: string) => void;
+  setAll: (ids: string[], hide: boolean) => void;
+}
+
+const FoldsCtx = createContext<Folds | null>(null);
+
+export function FoldsProvider({ children }: { children: React.ReactNode }) {
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const toggle = useCallback((id: string) => {
+    setHidden((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+  const setAll = useCallback((ids: string[], hide: boolean) => {
+    setHidden((cur) => {
+      const next = new Set(cur);
+      for (const id of ids) {
+        if (hide) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, []);
+  const value = useMemo(() => ({ hidden, toggle, setAll }), [hidden, toggle, setAll]);
+  return <FoldsCtx.Provider value={value}>{children}</FoldsCtx.Provider>;
+}
+
+const NO_FOLDS: Folds = { hidden: new Set(), toggle: () => {}, setAll: () => {} };
+const useFolds = () => useContext(FoldsCtx) ?? NO_FOLDS;
 
 /** How the pane got to the list it shows: whose calls, or whose methods. */
 interface Step {
@@ -30,6 +69,7 @@ interface Step {
  */
 function CodeList({ node }: { node: Node }) {
   const { byId: BY_ID, titleOf } = useMap();
+  const folds = useFolds();
   const [stack, setStack] = useState<Step[]>([]);
   const top = stack[stack.length - 1];
   const list = useMemo(() => {
@@ -75,6 +115,21 @@ function CodeList({ node }: { node: Node }) {
           </span>
         ))}
         <span className="ml-1">· {list.length}</span>
+        {list.length > 1 ? (
+          (() => {
+            const allHidden = list.every((u) => folds.hidden.has(u.id));
+            return (
+              <button
+                type="button"
+                data-row
+                onClick={() => folds.setAll(list.map((u) => u.id), !allHidden)}
+                className="ml-auto cursor-pointer rounded-[4px] px-1 text-on-surface-variant transition-[background-color,color] duration-150 hover:bg-surface hover:text-ink"
+              >
+                {allHidden ? "show all" : "hide all"}
+              </button>
+            );
+          })()
+        ) : null}
       </nav>
       <div className="mt-2 flex flex-col gap-4">
         {list.map((u) => (
@@ -116,7 +171,10 @@ function UnitPanel({
   onDrill: (via: Step["via"]) => void;
 }) {
   const { byId: BY_ID } = useMap();
+  const { hidden, toggle } = useFolds();
   if (!node.unit) return null;
+  const shown = !hidden.has(node.id);
+  const bodyId = `unit-body-${node.id}`;
   const methods = codeUnder(node);
   const calls = (node.unit.calls ?? []).flatMap((id) => BY_ID.get(id) ?? []);
   return (
@@ -126,20 +184,55 @@ function UnitPanel({
     >
       <KindLabel kind={node.kind} />
       <div className="flex items-center gap-2">
-        <h2 className="min-w-0 flex-1 truncate font-mono text-[14px] font-semibold text-ink">
-          {node.title}
-        </h2>
+        {/* The fold: hides the detail and the body, never the head — the
+            signature and any unsaved edit's save/revert stay in view. */}
+        <button
+          type="button"
+          data-row
+          aria-expanded={shown}
+          aria-controls={bodyId}
+          aria-label={shown ? `Hide ${node.title}` : `Show ${node.title}`}
+          onClick={() => toggle(node.id)}
+          className="-ml-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-[4px] px-1 text-left transition-[background-color] duration-150 hover:bg-surface"
+        >
+          <span
+            aria-hidden
+            className={cn(
+              "shrink-0 font-mono text-[10px] text-faint transition-transform duration-150",
+              shown && "rotate-90",
+            )}
+          >
+            ▸
+          </span>
+          <h2 className="min-w-0 flex-1 truncate font-mono text-[14px] font-semibold text-ink">
+            {node.title}
+          </h2>
+        </button>
         <StateChip state={node.state} alarm={node.alarm} />
       </div>
       <UnitHead id={node.id} unit={node.unit} />
-      {node.detail ? (
-        <p className="mt-2.5 text-[11px] leading-relaxed text-on-surface-variant">
-          {node.detail}
-        </p>
-      ) : null}
-      <div className="mt-2.5">
-        <UnitBody id={node.id} unit={node.unit} />
-      </div>
+      <AnimatePresence initial={false}>
+        {shown ? (
+          <motion.div
+            id={bodyId}
+            key="body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: EASE }}
+            className="overflow-hidden"
+          >
+            {node.detail ? (
+              <p className="mt-2.5 text-[11px] leading-relaxed text-on-surface-variant">
+                {node.detail}
+              </p>
+            ) : null}
+            <div className="mt-2.5">
+              <UnitBody id={node.id} unit={node.unit} />
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       {methods.length || calls.length ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {methods.length ? (
@@ -190,13 +283,16 @@ export function Detail({
     ? LINKS.filter((l) => l.from === traced || l.to === traced)
     : [];
   const pane = useRef<HTMLElement>(null);
+  const { setAll } = useFolds();
 
   useEffect(() => {
     if (!focusUnit) return;
+    // A unit you were sent to is one you want to read: unfold it first.
+    setAll([focusUnit], false);
     pane.current
       ?.querySelector(`[data-unit="${CSS.escape(focusUnit)}"]`)
       ?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [focusUnit]);
+  }, [focusUnit, setAll]);
 
   return (
     // Takes the rest of the width: it is where code is read and edited, and

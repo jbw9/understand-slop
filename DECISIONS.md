@@ -986,3 +986,13 @@ space and is not fluid"; and the user's alternative of keeping the rail but
 dropping its border, which still spends the column.
 **Cost accepted:** the per-stop dot-and-line descent is gone; depth reads from
 left to right instead. **At scale:** past ~8 stops it wraps to two lines.
+
+## D36 — File paths only near the bottom of a branch
+
+**Chose:** a level's header and a part's card show file paths only when that
+node is at most one level above the bottom of its branch (`nearBottom`).
+**Beat:** paths on every card and header (D31), which the user said were not
+needed "till the 2nd to last layer". Higher up, a path answers a question
+nobody has asked yet; the code drawer still lists every file on every level.
+**Cost accepted:** a root no longer says at a glance which directories it
+spans. **At scale:** unchanged — it is a per-node height check.

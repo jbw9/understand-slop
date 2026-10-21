@@ -928,3 +928,27 @@ would mean two copies of D13/D27's hard-won row-child rules drifting apart.
 picker.
 **At scale:** the selector should become a route segment or a query param so
 several mapped repos can be open at once.
+
+## D33 — The path forks into lanes where the code does
+
+**Chose:** `Edge.lane` names a branch. The overview draws the ordered, lane-less
+edges as the shared path (Sign Up, Launch Routing), then one numbered column
+per lane side by side (Students: Event Feed, RSVP · Organisations: Create Event,
+Check-In). Numbering continues into each lane; a lane step's eyebrow reads
+"Organisations · Step 4 of 4". Edges with no `order` are hand-offs between
+lanes ("↗ publishes into Event Feed · Students"), written under the step they
+leave, not counted as steps.
+**Beat:** the single chain of round 2, which interleaved two apps
+(create-event → feed → rsvp → check-in) so that every other step changed who
+was using the app.
+
+The fork is a fact, not a layout choice: `app/_layout.tsx:56-73` routes an id
+found in `individual` to `app/individual` and one found in `organizations` to
+`app/org`. Check-In follows Create Event in the org app via
+`eventdetails.tsx:200`.
+
+**Cost accepted:** `lib/data.ts` (a contract) gained an optional field, changed
+in the main thread. One fork only — the overview renders lanes after the first
+fork node; nested forks would need the lanes to recurse.
+**At scale:** past ~3 lanes the side-by-side columns get too narrow; they would
+stack, losing the at-a-glance comparison.

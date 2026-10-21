@@ -29,19 +29,40 @@ import { BLURB_LINES, type Shape } from "@/lib/view";
  */
 
 
+const byOrder = (a: Edge, b: Edge) => (a.order ?? 0) - (b.order ?? 0);
+
 /**
- * The filer's path, in the order E0 chains it. E0 is one chain in
- * ONBOARDING_STEPS order, so walking it from its first `from` IS the sequence.
+ * The path everyone walks, in the order E0 chains it: the ordered edges with
+ * no lane. Walking them from the first `from` IS the sequence.
  */
-const CHAIN = (() => {
-  const sorted = [...E0].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+const SPINE = (() => {
+  const sorted = E0.filter((e) => e.order !== undefined && !e.lane).sort(byOrder);
   return sorted.length ? [sorted[0].from, ...sorted.map((e) => e.to)] : [];
 })();
 
-/** 1-indexed position on the filer's path, for roots that are on it. */
-function stepOf(id: string) {
-  const i = CHAIN.indexOf(id);
-  return i === -1 ? undefined : i + 1;
+/** Where the path splits, one ordered branch per lane. Empty if it never does. */
+const LANES = [...new Set(E0.flatMap((e) => (e.lane ? [e.lane] : [])))].map((name) => {
+  const sorted = E0.filter((e) => e.lane === name).sort(byOrder);
+  return { name, from: sorted[0].from, ids: sorted.map((e) => e.to) };
+});
+
+/** Edges with no order: one branch handing something to another. */
+const HANDOFFS = E0.filter((e) => e.order === undefined);
+
+const ON_PATH = new Set([...SPINE, ...LANES.flatMap((l) => l.ids)]);
+
+function roots(ids: string[]) {
+  return ids.map((id) => L0.find((n) => n.id === id)).filter((n): n is Node => n !== undefined);
+}
+
+/** 1-indexed position on the path, counting the shared steps into a lane. */
+function stepOf(id: string): { n: number; of: number; lane?: string } | undefined {
+  const i = SPINE.indexOf(id);
+  if (i !== -1) return { n: i + 1, of: SPINE.length };
+  for (const l of LANES) {
+    const j = l.ids.indexOf(id);
+    if (j !== -1) return { n: SPINE.length + j + 1, of: SPINE.length + l.ids.length, lane: l.name };
+  }
 }
 
 function authored(node: Node) {
@@ -221,7 +242,7 @@ export function Canvas() {
   const crumbs = path
     .map((_, i) => nodeAt(path.slice(0, i + 1)))
     .filter((n): n is Node => n !== null)
-    .map((n) => ({ id: n.id, title: n.title, step: stepOf(n.id) }));
+    .map((n) => ({ id: n.id, title: n.title, step: stepOf(n.id)?.n }));
 
   const open = (next: string[]) => go(next);
 
@@ -273,15 +294,14 @@ export function Canvas() {
 /* ── levels ──────────────────────────────────────────────────── */
 
 /**
- * The repo itself, drawn as a level like any other: the filer's path as a
- * numbered line, and the roots E0 never touches grouped under their own
- * heading.
+ * The repo itself, drawn as a level like any other: the shared path as a
+ * numbered line, then — where it splits — one numbered line per lane side by
+ * side, and the roots E0 never touches grouped under their own heading.
  */
 function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
-  const chain = CHAIN.map((id) => L0.find((n) => n.id === id)).filter(
-    (n): n is Node => n !== undefined,
-  );
-  const outside = L0.filter((n) => !CHAIN.includes(n.id));
+  const chain = roots(SPINE);
+  const outside = L0.filter((n) => !ON_PATH.has(n.id));
+  const fork = LANES.length ? L0.find((n) => n.id === LANES[0].from) : undefined;
 
   return (
     <>
@@ -291,8 +311,36 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
         sub={RUN.about}
         meta={`${RUN.files} files · commit ${RUN.commit}`}
       />
-      <Caption count={chain.length} what="steps" how="in order" />
+      <Caption
+        count={chain.length}
+        what="steps"
+        how={LANES.length ? "in order, for everyone" : "in order"}
+      />
       <Steps nodes={chain} edges={E0} at={[]} onOpen={onOpen} />
+
+      {fork ? (
+        <section className="mt-10">
+          <Caption count={LANES.length} what="paths" how={`after ${fork.title}`} />
+          <Note>{fork.title} sends each account down one of these. They meet where noted.</Note>
+          <div className="grid max-w-[1180px] grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-2">
+            {LANES.map((l) => (
+              <div key={l.name} className="min-w-0">
+                <h3 className="mb-3 border-b border-border-strong pb-2 text-[15px] font-semibold text-ink">
+                  {l.name}
+                </h3>
+                <Steps
+                  nodes={roots(l.ids)}
+                  edges={E0}
+                  start={SPINE.length + 1}
+                  handoffs={HANDOFFS}
+                  at={[]}
+                  onOpen={onOpen}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {outside.length ? (
         <section className="mt-12">
@@ -343,7 +391,7 @@ function Level({
           parent
             ? `Inside ${parent.title}`
             : step
-              ? `Step ${step} of ${CHAIN.length}`
+              ? `${step.lane ? `${step.lane} · ` : ""}Step ${step.n} of ${step.of}`
               : "Outside the path"
         }
         title={node.title}
@@ -400,11 +448,17 @@ function Level({
 function Steps({
   nodes,
   edges,
+  start = 1,
+  handoffs = [],
   at,
   onOpen,
 }: {
   nodes: Node[];
   edges: Edge[];
+  /** The first dot's number — a lane continues the shared path's count. */
+  start?: number;
+  /** Hand-offs into another lane, written under the step they leave. */
+  handoffs?: Edge[];
   at: string[];
   onOpen: (p: string[]) => void;
 }) {
@@ -419,7 +473,7 @@ function Steps({
         return (
           <li key={n.id} className="flex gap-4">
             <div className="flex w-[22px] shrink-0 flex-col items-center pt-[15px]">
-              <StepDot n={i + 1} state={n.state} />
+              <StepDot n={start + i} state={n.state} />
               {last ? null : (
                 <span
                   className={cn(
@@ -441,6 +495,17 @@ function Steps({
                   {edge.label} {nodes[i + 1].title}
                 </p>
               ) : null}
+              {handoffs
+                .filter((h) => h.from === n.id)
+                .map((h) => (
+                  <p key={h.to} className="mt-1.5 pl-1 text-[11.5px] italic text-faint">
+                    ↗ {h.label}{" "}
+                    <span className="font-medium not-italic text-muted-slate">
+                      {L0.find((r) => r.id === h.to)?.title}
+                    </span>
+                    {stepOf(h.to)?.lane ? ` · ${stepOf(h.to)?.lane}` : ""}
+                  </p>
+                ))}
             </div>
           </li>
         );

@@ -66,6 +66,20 @@ function stepOf(id: string): { n: number; of: number; lane?: string } | undefine
   }
 }
 
+/** Levels below this node: 0 for a leaf. */
+function height(node: Node): number {
+  return node.children?.length ? 1 + Math.max(...node.children.map(height)) : 0;
+}
+
+/**
+ * File paths only near the bottom — the second-to-last level and the last.
+ * Higher up a path answers a question nobody is asking yet; the code drawer
+ * still names every file on every level.
+ */
+function nearBottom(node: Node) {
+  return height(node) <= 1;
+}
+
 function authored(node: Node) {
   return (node.children ?? []).filter((c) => !c.fromRow);
 }
@@ -410,9 +424,11 @@ function Level({
         detail={node.detail}
         unsure={node.state === "derived" ? undefined : node.unsure}
         meta={
-          node.footprint
-            ? `${node.footprint.dirs.join("  ")}  ·  ${node.footprint.files} files`
-            : node.evidence
+          !nearBottom(node)
+            ? undefined
+            : node.footprint
+              ? `${node.footprint.dirs.join("  ")}  ·  ${node.footprint.files} files`
+              : node.evidence
         }
         shape={figure ? undefined : node.shape}
         onCode={
@@ -734,7 +750,7 @@ function inside(node: Node): string {
  */
 function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: string[]) => void }) {
   const go = openable(node) ? () => onOpen([...at, node.id]) : undefined;
-  const where = node.evidence ?? node.footprint?.dirs.join("  ");
+  const where = nearBottom(node) ? (node.evidence ?? node.footprint?.dirs.join("  ")) : undefined;
   const peek = inside(node);
   const count = node.shape?.kind === "count" ? `${node.shape.value} ${node.shape.unit}` : null;
 

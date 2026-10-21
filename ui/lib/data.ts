@@ -128,7 +128,90 @@ export interface Mapping {
   under?: Anatomy[];
 }
 
+/** One message in a `sequence`: who asks whom for what, in order. */
+export interface Message {
+  /** Must be one of the block's `actors`. */
+  from: string;
+  to: string;
+  /** Plain words: "sends the email and a made-up password". */
+  label: string;
+  note?: string;
+  state: State;
+}
+
+/**
+ * One thing on a screen, top to bottom, read out of the JSX. Not a mock-up: a
+ * list of what is there, so a reader knows what the user sees and taps.
+ */
+export interface ScreenItem {
+  type: "heading" | "text" | "field" | "choice" | "button" | "list" | "image";
+  label: string;
+  /** What happens or what it holds: "must be 8+ characters", "opens RSVP". */
+  note?: string;
+}
+
+/**
+ * A place in the repository behind a node. Read live from disk when the reader
+ * opens the code — never pasted — so it is available on EVERY level without
+ * the fixture carrying a copy that can drift.
+ */
+export interface CodeRef {
+  file: string;
+  /** 1-indexed, inclusive. */
+  start: number;
+  end: number;
+  /** Plain words: what these lines do. */
+  label: string;
+}
+
+/** Something a developer should know before they touch this. */
+export interface Issue {
+  /** Plain words, a few: "Anyone can delete any account". */
+  title: string;
+  /** What goes wrong, for whom, and when. One to three sentences. */
+  detail: string;
+  /** file:line where it happens. */
+  where?: string;
+}
+
+/**
+ * A box in a `diagram`, placed on a grid: `col` left to right, `row` top to
+ * bottom, both from 0. The renderer does the geometry, so a figure is authored
+ * as WHAT connects to what, never as coordinates.
+ */
+export interface DiagramBox {
+  id: string;
+  /** 1-4 words. */
+  label: string;
+  /** A few words under the label: "row with this id". */
+  sub?: string;
+  col: number;
+  row: number;
+  /** `good` = where things end up fine; `warn` = a problem or dead end. */
+  tone?: "plain" | "good" | "warn";
+}
+
+export interface DiagramArrow {
+  from: string;
+  to: string;
+  /** A few words on the line: "not found", "publishes". */
+  label?: string;
+  tone?: "plain" | "good" | "warn";
+}
+
 export type Anatomy =
+  // How the pieces connect — the main picture of a level. Every arrow is a
+  // real path in the code (D19); a dead end is drawn `warn`, not left out.
+  | { kind: "diagram"; caption: string; boxes: DiagramBox[]; arrows: DiagramArrow[] }
+  // The real values, as a table: the categories themselves, the 61 campuses,
+  // the fields a form sends. One column is a list.
+  | { kind: "table"; caption?: string; columns: string[]; rows: string[][]; state: State }
+  // Who talks to whom, in order — phone, Supabase, email, a table.
+  | { kind: "sequence"; caption?: string; actors: string[]; rows: Message[] }
+  // What the user sees on one screen.
+  | { kind: "screen"; title: string; caption?: string; items: ScreenItem[] }
+  // What a stored value looks like. Synthesized and labelled as an example.
+  | { kind: "example"; caption: string; value: string; notes?: Pair[] }
   | { kind: "schema"; table: string; rows: Column[]; rel?: string[] }
   | { kind: "routes"; rows: Route[] }
   | { kind: "flow"; rows: Step[] }
@@ -186,8 +269,21 @@ export interface Node {
   ghost?: boolean;
   col: number;
   row: number;
-  /** Sentence shown when the node is focused, before you go deeper. */
+  /**
+   * The explanation, shown when this node is the open level: what it is, how
+   * it works, why it is this way. Plain English; paragraphs split on a blank
+   * line. Never shown on the card that links here.
+   */
   detail?: string;
+  /** Where this lives in the code. Every authored node has at least one. */
+  code?: CodeRef[];
+  /** Known problems, shown as "Watch out" on this level. */
+  issues?: Issue[];
+  /**
+   * Why this is not certain, in plain words. Required when `state` is not
+   * `derived` — a mark with no reason is the "what does partial mean" defect.
+   */
+  unsure?: string;
   /** Where the claim came from. Always a real location. */
   evidence?: string;
   anatomy?: Anatomy[];

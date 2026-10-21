@@ -5,10 +5,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
+import { CodeDrawer, ExplainedBlock, WatchOut, isExplained } from "@/components/blocks";
 import { ShapeView } from "@/components/shapes";
-import { Eyebrow, StateChip } from "@/components/state";
+import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { Trail } from "@/components/chrome";
+import { Crumbs } from "@/components/chrome";
 import { E0, L0, LINKS, RUN, levelAt, nodeAt } from "@/lib/map";
 import type { Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
@@ -248,14 +249,9 @@ export function Canvas() {
 
   return (
     <div className="flex h-dvh w-screen overflow-hidden bg-warm-cream">
-      <Trail
-        repo={RUN.repo}
-        meta={`${RUN.files} files · ${RUN.commit}`}
-        crumbs={crumbs}
-        onJump={(d) => go(path.slice(0, d))}
-      />
       <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
-        <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-9">
+        <Crumbs repo={RUN.repo} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
           <WireLayer
             canvasRef={contentRef}
             nodes={nodes}
@@ -354,14 +350,14 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
 }
 
 /**
- * One open node. Its own picture and paragraph are the header; below, either
- * its parts — named, not opened — or, at the bottom of a branch, its own rows
- * at full width, down to the code.
+ * One open node, explained. Top to bottom: what it is (header), the picture of
+ * how it fits together, its own data — tables, screens, who talks to whom —
+ * then its parts to go deeper, what to watch out for, and last, folded, the
+ * code (D34).
  *
- * A level shows ONE step of depth. Cards used to carry their own diagram,
- * steps and facts, so opening a node put two levels on screen and the next
- * click felt like a jump. Now nothing appears before you have opened the level
- * it belongs to.
+ * A level still shows ONE step of depth: a part below is named, never opened
+ * in place (D31). What changed is that the open level itself now carries
+ * enough to be understood without reading the code.
  */
 function Level({
   node,
@@ -379,6 +375,17 @@ function Level({
   const step = path.length === 1 ? stepOf(node.id) : undefined;
   const note = setNote(node);
   const sequence = node.group?.ordering === "sequence";
+  const figure = node.shape?.kind === "figure" ? node.shape : undefined;
+  const blocks = node.anatomy ?? [];
+  // A row-built level has no refs of its own; the code of the nearest level
+  // above it is still the code behind it.
+  const code =
+    node.code ??
+    path
+      .map((_, i) => nodeAt(path.slice(0, path.length - 1 - i))?.code)
+      .find((c) => c?.length) ??
+    [];
+  const [codeOpen, setCodeOpen] = useState(false);
 
   return (
     <>
@@ -401,37 +408,82 @@ function Level({
         // eyebrow already says.
         sub={node.sub === `Inside ${parent?.title}` ? undefined : node.sub}
         detail={node.detail}
+        unsure={node.state === "derived" ? undefined : node.unsure}
         meta={
           node.footprint
             ? `${node.footprint.dirs.join("  ")}  ·  ${node.footprint.files} files`
             : node.evidence
         }
-        shape={node.shape}
+        shape={figure ? undefined : node.shape}
+        onCode={
+          code.length
+            ? () => {
+                setCodeOpen(true);
+                requestAnimationFrame(() =>
+                  document.getElementById("code")?.scrollIntoView({ behavior: "smooth" }),
+                );
+              }
+            : undefined
+        }
       />
 
-      {kids.length ? (
-        <>
-          <Caption
-            count={kids.length}
-            what="parts"
-            how={sequence ? "in order" : "no order between them"}
-          />
-          {note ? <Note>{note}</Note> : null}
-          {sequence ? (
-            <Steps nodes={kids} edges={siblingEdges(node, kids)} at={path} onOpen={onOpen} />
+      <div className="flex flex-col gap-12">
+        {/* The picture is the main thing on the level, not a thumbnail in
+            the header's corner. */}
+        {figure ? (
+          <div className="max-w-[620px]">
+            <ShapeView shape={figure} />
+          </div>
+        ) : null}
+
+        {blocks.map((b, i) =>
+          isExplained(b) ? (
+            <div key={i} className="max-w-[1000px]">
+              <ExplainedBlock block={b} />
+            </div>
           ) : (
-            <Grid nodes={kids} at={path} onOpen={onOpen} />
-          )}
-        </>
-      ) : node.anatomy?.length ? (
-        // Full width at last: the rows get their answers here, and a `source`
-        // block gets room to be read and edited. Anatomy is typeset for a
-        // 340px card (11px rows); zoom lifts it to reading size under a 28px
-        // title without forking every block's type scale.
-        <div className="max-w-[900px] [zoom:1.18]">
-          <AnatomyView owner={node.id} blocks={node.anatomy} ctx={ctx} opened />
-        </div>
-      ) : null}
+            // The older blocks are typeset for a 340px card (11px rows); zoom
+            // lifts them to reading size without forking their type scale.
+            <div key={i} className="max-w-[900px] [zoom:1.18]">
+              <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
+            </div>
+          ),
+        )}
+
+        {kids.length ? (
+          <section>
+            <Caption
+              count={kids.length}
+              what={kids.length === 1 ? "part" : "parts"}
+              how={sequence ? "in order — open one to go deeper" : "open one to go deeper"}
+            />
+            {note ? <Note>{note}</Note> : null}
+            {sequence ? (
+              <Steps nodes={kids} edges={siblingEdges(node, kids)} at={path} onOpen={onOpen} />
+            ) : (
+              <Grid nodes={kids} at={path} onOpen={onOpen} />
+            )}
+          </section>
+        ) : null}
+
+        {node.issues?.length ? (
+          <div className="max-w-[820px]">
+            <WatchOut issues={node.issues} />
+          </div>
+        ) : null}
+
+        {code.length ? (
+          <div className="max-w-[1000px]">
+            <CodeDrawer
+              owner={node.id}
+              refs={code}
+              ctx={ctx}
+              open={codeOpen}
+              onToggle={() => setCodeOpen((v) => !v)}
+            />
+          </div>
+        ) : null}
+      </div>
     </>
   );
 }
@@ -558,8 +610,10 @@ function Header({
   alarm,
   sub,
   detail,
+  unsure,
   meta,
   shape,
+  onCode,
 }: {
   /** The level above, named — so "back" says where it goes. */
   back?: { label: string; onClick: () => void };
@@ -569,8 +623,11 @@ function Header({
   alarm?: boolean;
   sub?: string;
   detail?: string;
+  /** Why this level is not certain, shown with the mark it explains. */
+  unsure?: string;
   meta?: string;
   shape?: Shape;
+  onCode?: () => void;
 }) {
   return (
     <header className="mb-8 flex items-start gap-10 border-b border-border-gray pb-7">
@@ -594,17 +651,37 @@ function Header({
         {sub ? (
           <p className="mt-1.5 text-[15px] leading-snug text-on-surface-variant">{sub}</p>
         ) : null}
-        {/* The one paragraph on the screen: this is the node you opened, so
-            its prose has been asked for (D24). */}
-        {detail ? (
-          <p className="mt-4 text-[13.5px] leading-relaxed text-on-surface">{detail}</p>
+        {detail
+          ? detail.split(/\n\s*\n/).map((para, i) => (
+              <p key={i} className="mt-4 text-[14.5px] leading-relaxed text-on-surface">
+                <Prose text={para} />
+              </p>
+            ))
+          : null}
+        {unsure ? (
+          <p className="mt-4 rounded-[10px] border border-dashed border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] leading-snug text-amber-ink">
+            <span className="font-semibold">Not certain: </span>
+            <Prose text={unsure} />
+          </p>
         ) : null}
-        {meta ? (
-          <p className="mt-4 whitespace-pre-wrap font-mono text-[11px] text-faint">{meta}</p>
+        {meta || onCode ? (
+          <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            {meta ? (
+              <p className="whitespace-pre-wrap font-mono text-[11px] text-faint">{meta}</p>
+            ) : null}
+            {onCode ? (
+              <button
+                onClick={onCode}
+                className="font-mono text-[11px] text-deep-green hover:underline"
+              >
+                {"</>"} view code
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
-      {/* The picture of how this level's parts fit together. It lives here,
-          not on the cards below, because it is about all of them. */}
+      {/* Something to recognise: brand marks or one number. A figure is not
+          drawn here — it is the main picture of the level, below (D34). */}
       {shape ? (
         <div className="w-[300px] shrink-0 self-center">
           <ShapeView shape={shape} />
@@ -625,6 +702,8 @@ const BLOCK_NOUN: Record<string, string> = {
   chips: "kinds",
   bars: "measures",
   parts: "parts",
+  table: "rows",
+  sequence: "steps",
 };
 
 /**
@@ -636,14 +715,17 @@ function inside(node: Node): string {
   if (node.summary) return node.summary;
   const kids = authored(node);
   if (kids.length) return kids.map((k) => k.title).join(" · ");
-  const bits: string[] = [];
-  let code = 0;
-  for (const b of node.anatomy ?? []) {
-    if (b.kind === "source") code++;
-    else bits.push(`${b.rows.length} ${BLOCK_NOUN[b.kind]}`);
-  }
-  if (code) bits.push(code === 1 ? "code" : `${code} code excerpts`);
-  return bits.join(" · ");
+  // Code is not listed: it is behind every level now, not a destination.
+  return (node.anatomy ?? [])
+    .map((b) =>
+      b.kind === "diagram" ? "diagram"
+      : b.kind === "screen" ? `the ${b.title} screen`
+      : b.kind === "example" ? "an example"
+      : b.kind === "source" ? null
+      : `${b.rows.length} ${BLOCK_NOUN[b.kind]}`,
+    )
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**
@@ -674,6 +756,11 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
             {node.title}
           </span>
           <StateChip state={node.state} alarm={node.alarm} />
+          {node.issues?.length ? (
+            <span className="shrink-0 rounded-full border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
+              ⚠ {node.issues.length} {node.issues.length === 1 ? "problem" : "problems"}
+            </span>
+          ) : null}
         </span>
         <span
           className="mt-0.5 block text-[13px] leading-snug text-on-surface-variant [display:-webkit-box] [overflow:hidden] [-webkit-box-orient:vertical]"

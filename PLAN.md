@@ -93,3 +93,32 @@ main thread flips it at fan-in).
 Main thread owns `components/canvas.tsx`, `components/chrome.tsx`, `lib/map.ts`.
 Fan-in check: `check-map.mts` (every `source` block verbatim at its line,
 unique ids, E0/LINKS resolve), tsc, eslint, and the app driven level by level.
+
+## Round 3 (2026-10-21) — understand it without reading the code
+
+The user: "barely any info … it just dives straight into the code. The goal is
+not to inspect the code directly, that should be the last resort that's always
+available … when i click category list it should list the categories." Plus:
+plain names (no "Org Wizard"), diagrams as the main content, any depth, and no
+sidebar.
+
+A level now explains itself, top to bottom: header (1-3 plain paragraphs) →
+the picture (`diagram`, or a `figure` shape drawn full width) → its own data
+(`table`, `sequence`, `screen`, `example`, `schema`, `flow`…) → parts to go
+deeper → Watch out (`issues`) → the code, folded (`code` refs, read live).
+Depth is whatever the explanation needs. Exemplar: `su-cats` in
+`ui/lib/explorify/signup.ts`.
+
+Contracts (frozen this round, main thread only): `ui/lib/data.ts`,
+`ui/lib/view.ts`, `ui/lib/explorify/index.ts` (RUN, E0, LINKS — root ids are
+fixed), `ui/scripts/check-map.mts`, all of `ui/components/`.
+
+| ID | Owns | Agent |
+|---|---|---|
+| F1 - sign up, launch, account | `ui/lib/explorify/{signup,launch,account}.ts` | builder |
+| F2 - organisation side + server | `ui/lib/explorify/{create-event,check-in,server}.ts` | builder |
+| F3 - student side + backend | `ui/lib/explorify/{feed,rsvp,supabase}.ts` | builder |
+
+Fan-in: `npx -y tsx --tsconfig tsconfig.json scripts/check-map.mts @/lib/explorify
+~/Desktop/Code/explorify` with 0 problems, tsc, eslint, every root driven in the
+browser, LINKS repaired in index.ts.

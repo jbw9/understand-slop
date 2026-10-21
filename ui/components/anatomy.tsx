@@ -7,6 +7,7 @@ import { ShapeView } from "@/components/shapes";
 import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX, type Shape } from "@/lib/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Slice, WriteResult } from "@/lib/repo";
+import { ExplainedBlock, isExplained } from "@/components/blocks";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -343,6 +344,8 @@ function Block({
   if (block.kind === "source") {
     return <SourceView owner={owner} block={block} ctx={ctx} />;
   }
+
+  if (isExplained(block)) return <ExplainedBlock block={block} />;
 
   if (block.kind === "chips") {
     return (
@@ -833,7 +836,7 @@ function Facts({
  * Silently swapping fresh code under a stale explanation is the exact failure
  * this project exists to study, so it is the one thing that cannot happen here.
  */
-function SourceView({
+export function SourceView({
   owner,
   block,
   ctx,

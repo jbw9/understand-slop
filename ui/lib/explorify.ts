@@ -2607,10 +2607,16 @@ if __name__ == "__main__":
    `account`, `supabase` and `server` are not steps and get no edge. */
 export const E0: Edge[] = [
   { from: "signup", to: "launch", state: "derived", label: "every later open goes through", order: 1 },
-  { from: "launch", to: "create-event", state: "derived", label: "routes organisations to", order: 2 },
-  { from: "create-event", to: "feed", state: "derived", label: "publishes into", order: 3 },
-  { from: "feed", to: "rsvp", state: "derived", label: "opens", order: 4 },
-  { from: "rsvp", to: "check-in", state: "derived", label: "fills the list for", order: 5 },
+  // app/_layout.tsx sends an id found in `individual` to app/individual and
+  // one found in `organizations` to app/org: two apps from here on.
+  { from: "launch", to: "feed", state: "derived", label: "routes students to", order: 2, lane: "Students" },
+  { from: "feed", to: "rsvp", state: "derived", label: "opens", order: 3, lane: "Students" },
+  { from: "launch", to: "create-event", state: "derived", label: "routes organisations to", order: 2, lane: "Organisations" },
+  // ongoing.tsx → eventdetails.tsx:200 → attendees.tsx
+  { from: "create-event", to: "check-in", state: "derived", label: "lists the event, whose details open", order: 3, lane: "Organisations" },
+  // Where the two apps meet: one writes a row the other reads.
+  { from: "create-event", to: "feed", state: "derived", label: "publishes into" },
+  { from: "rsvp", to: "check-in", state: "derived", label: "fills the list for" },
 ];
 
 /* ── row-level links ──────────────────────────────────────────

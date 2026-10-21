@@ -161,6 +161,55 @@ const MARKS: Record<string, { name: string; draw: React.ReactNode }> = {
       </>
     ),
   },
+
+  /* explorify — every id below is a real dependency of that repo: `expo` in
+     package.json, `react-native-google-places-autocomplete` in package.json,
+     Flask in api/requirements.txt, and Deno as the runtime the two
+     supabase/functions/ files import from deno.land and esm.sh. */
+  expo: {
+    name: "Expo",
+    // The chevron, open at the base.
+    draw: (
+      <path
+        d="M8 2.6l5.6 10.4h-2.3L8 6.9 4.7 13H2.4z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    ),
+  },
+  googlemaps: {
+    name: "Google Places",
+    // A map pin: the address field is Places autocomplete.
+    draw: (
+      <>
+        <path d="M8 14.4s4.6-4.7 4.6-8.1a4.6 4.6 0 00-9.2 0c0 3.4 4.6 8.1 4.6 8.1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+        <circle cx="8" cy="6.3" r="1.6" stroke="currentColor" strokeWidth="1.1" fill="none" />
+      </>
+    ),
+  },
+  flask: {
+    name: "Flask",
+    // A lab flask — the Python API.
+    draw: (
+      <>
+        <path d="M6.4 2.2v4.3L2.9 12.7a.9.9 0 00.8 1.3h8.6a.9.9 0 00.8-1.3L9.6 6.5V2.2" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+        <path d="M5.4 2.2h5.2M4.6 10.4h6.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+      </>
+    ),
+  },
+  deno: {
+    name: "Deno",
+    // A circle with an eye: the edge functions' runtime.
+    draw: (
+      <>
+        <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        <circle cx="9.6" cy="5.8" r="0.9" fill="currentColor" />
+        <path d="M6.2 9.2c.8 1.6 1.3 3 1.4 4.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" fill="none" />
+      </>
+    ),
+  },
 };
 
 /** One glyph + name, or just the name when we have no mark for the id. */
@@ -487,6 +536,123 @@ const FIGURES: Record<string, { title: string; draw: React.ReactNode }> = {
         </text>
         <text x={120} y={110} textAnchor="middle" fontSize="6.5" fill={FAINT}>
           legal question the repo cannot answer
+        </text>
+      </>
+    ),
+  },
+
+  /**
+   * explorify's launch routing. There is no role column: the app asks
+   * `individual` first, then `organizations`, and the table that answers IS
+   * the role. The third exit — an id in neither table — has no branch in
+   * app/_layout.tsx, so it is drawn amber rather than left out.
+   */
+  "role-by-table": {
+    title:
+      "A signed-in id is looked up in individual, then organizations; the table that answers decides the home screen, and an id in neither gets no route",
+    draw: (
+      <>
+        <Box x={2} y={44} w={56} h={30} label="signed in" sub="user id" />
+        <Arrow d="M58 54h10V19h11" />
+
+        <Box x={82} y={6} w={72} h={26} label="individual?" sub="row with this id" />
+        <Arrow d="M154 19h21" tone="green" />
+        <Box x={178} y={6} w={60} h={26} label="/individual" tone="green" />
+
+        <Arrow d="M118 32v13" />
+        <text x={122} y={42} fontSize="6.5" fill={FAINT}>
+          not found
+        </text>
+
+        <Box x={82} y={48} w={72} h={26} label="organizations?" sub="row with this id" />
+        <Arrow d="M154 61h21" tone="green" />
+        <Box x={178} y={48} w={60} h={26} label="/org" tone="green" />
+
+        {/* No else-branch exists for this exit; it is the finding. */}
+        <Arrow d="M118 74v27h57" tone="amber" />
+        <Box x={178} y={88} w={60} h={26} label="no route" sub="in neither" tone="amber" />
+
+        <text x={40} y={100} textAnchor="middle" fontSize="6.5" fill={FAINT}>
+          no role column:
+        </text>
+        <text x={40} y={110} textAnchor="middle" fontSize="6.5" fill={FAINT}>
+          the table is the role
+        </text>
+      </>
+    ),
+  },
+
+  /**
+   * Every writer of explorify's `events.rsvp`. It is one JSON string, and each
+   * writer reads it, edits it in memory, and writes the whole string back —
+   * with no lock, so two writers in flight lose one. The Saved-tab cancel
+   * treats the object as an array and throws, and check-in writes from a copy
+   * loaded on an earlier screen; both are amber because both are broken.
+   */
+  "rsvp-writers": {
+    title:
+      "Four writers rewrite events.rsvp, one JSON string: join, cancel, a Saved-tab cancel that throws, and an org check-in that writes a stale copy",
+    draw: (
+      <>
+        <Box x={2} y={4} w={96} h={22} label="Join" sub="adds a key" />
+        <Box x={2} y={32} w={96} h={22} label="Cancel" sub="button, details page" />
+        <Box x={2} y={60} w={96} h={22} label="Cancel (Saved tab)" sub="expects an array, throws" tone="amber" />
+        <Box x={2} y={88} w={96} h={22} label="Check-in" sub="org, stale copy" tone="amber" />
+
+        <Arrow d="M98 15H124V48H147" />
+        <Arrow d="M98 43H130V54H147" />
+        <Arrow d="M98 71H130V62H147" tone="amber" />
+        <Arrow d="M98 99H124V70H147" tone="amber" />
+
+        <Box x={150} y={40} w={88} h={36} label="events.rsvp" sub="one JSON string" />
+
+        <text x={194} y={14} textAnchor="middle" fontSize="6.5" fill={FAINT}>
+          read · edit · write
+        </text>
+        <text x={194} y={24} textAnchor="middle" fontSize="6.5" fill={FAINT}>
+          the whole string
+        </text>
+        <text x={194} y={96} textAnchor="middle" fontSize="7" fontWeight="600" fill={AMBER}>
+          no lock
+        </text>
+        <text x={194} y={106} textAnchor="middle" fontSize="6.5" fill={AMBER}>
+          last write wins
+        </text>
+      </>
+    ),
+  },
+
+  /**
+   * explorify's event lifecycle as the code has it. Draft and Published are a
+   * real boolean; Archive is not a state at all, only a date comparison on the
+   * dashboard. The `archive-event` edge function sits beside it unconnected,
+   * because nothing calls it and it is still Supabase's hello-world template.
+   */
+  "event-states": {
+    title:
+      "Form to draft (published false) to published (true); Archive is only a date filter, and the archive-event function is an uncalled template",
+    draw: (
+      <>
+        <Box x={2} y={12} w={44} h={28} label="Form" />
+        <Arrow d="M46 26h13" />
+        <Box x={62} y={8} w={72} h={36} label="Draft" sub="published = false" />
+        <text x={146} y={5} textAnchor="middle" fontSize="6.5" fill={FAINT}>
+          publish
+        </text>
+        <Arrow d="M134 26h21" tone="green" />
+        <Box x={158} y={8} w={80} h={36} label="Published" sub="published = true" tone="green" />
+
+        <Arrow d="M198 44v23" tone="amber" />
+        <text x={194} y={58} textAnchor="end" fontSize="6.5" fill={FAINT}>
+          date passes
+        </text>
+        <Box x={158} y={70} w={80} h={30} label="Archive" sub="a date filter" tone="amber" />
+
+        {/* Deliberately unconnected: nothing invokes it. */}
+        <Box x={62} y={70} w={72} h={30} label="archive-event" sub="template, never called" tone="amber" />
+
+        <text x={120} y={114} textAnchor="middle" fontSize="6.5" fill={FAINT}>
+          no code ever writes an archived state
         </text>
       </>
     ),

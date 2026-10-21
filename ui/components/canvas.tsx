@@ -9,7 +9,7 @@ import { ShapeView } from "@/components/shapes";
 import { Eyebrow, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Trail } from "@/components/chrome";
-import { E0, L0, LINKS, RUN, levelAt, nodeAt } from "@/lib/taxbuddy";
+import { E0, L0, LINKS, RUN, levelAt, nodeAt } from "@/lib/map";
 import type { Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
@@ -28,10 +28,6 @@ import { BLURB_LINES, type Shape } from "@/lib/view";
  * one, and the bottom of every branch is the code itself.
  */
 
-/** Three steps and two arrows fit the content column on a laptop. */
-const CARD_W = 340;
-/** Room for the arrow between two steps of a sequence. */
-const CONNECTOR_W = 44;
 
 /**
  * The filer's path, in the order E0 chains it. E0 is one chain in
@@ -263,7 +259,7 @@ export function Canvas() {
               {focus ? (
                 <Level node={focus} path={path} ctx={ctx} onOpen={open} />
               ) : (
-                <Overview ctx={ctx} onOpen={open} />
+                <Overview onOpen={open} />
               )}
             </motion.div>
           </AnimatePresence>
@@ -273,41 +269,36 @@ export function Canvas() {
   );
 }
 
+
 /* ── levels ──────────────────────────────────────────────────── */
 
 /**
- * The repo itself, drawn as a level like any other. The roots split in two:
- * the filer's path, numbered in its real order, and everything E0 never
- * touches, grouped under its own heading rather than parked wherever the
- * serpentine left a gap.
+ * The repo itself, drawn as a level like any other: the filer's path as a
+ * numbered line, and the roots E0 never touches grouped under their own
+ * heading.
  */
-function Overview({ ctx, onOpen }: { ctx: RowCtx; onOpen: (p: string[]) => void }) {
+function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
   const chain = CHAIN.map((id) => L0.find((n) => n.id === id)).filter(
     (n): n is Node => n !== undefined,
   );
   const outside = L0.filter((n) => !CHAIN.includes(n.id));
-  const card = (n: Node, step?: number) => (
-    <Card node={n} at={[]} step={step} ctx={ctx} onOpen={onOpen} />
-  );
 
   return (
     <>
       <Header
         eyebrow="Repository"
         title={RUN.repo}
-        sub="Cut by what a filer does, in the order the product's own ONBOARDING_STEPS declares."
+        sub={RUN.about}
         meta={`${RUN.files} files · commit ${RUN.commit}`}
       />
       <Caption count={chain.length} what="steps" how="in order" />
-      <Sequence nodes={chain} edges={E0} render={card} even />
+      <Steps nodes={chain} edges={E0} at={[]} onOpen={onOpen} />
 
       {outside.length ? (
-        <section className="mt-14">
+        <section className="mt-12">
           <Caption count={outside.length} what="more" how="outside the path" />
-          <p className="-mt-2 mb-4 text-[12px] italic text-faint">
-            No step leads to these — a side door, the store underneath, and two stages nothing reaches.
-          </p>
-          <SetGrid nodes={outside} render={(n) => <Card node={n} at={[]} ctx={ctx} onOpen={onOpen} fill />} />
+          <Note>No step leads to these.</Note>
+          <Grid nodes={outside} at={[]} onOpen={onOpen} />
         </section>
       ) : null}
     </>
@@ -315,9 +306,14 @@ function Overview({ ctx, onOpen }: { ctx: RowCtx; onOpen: (p: string[]) => void 
 }
 
 /**
- * One open node: itself as the header, then either its children as cards or —
- * at the bottom of a branch — its own rows at full width, down to the code.
- * No node in the fixture has both, so the two never compete for the body.
+ * One open node. Its own picture and paragraph are the header; below, either
+ * its parts — named, not opened — or, at the bottom of a branch, its own rows
+ * at full width, down to the code.
+ *
+ * A level shows ONE step of depth. Cards used to carry their own diagram,
+ * steps and facts, so opening a node put two levels on screen and the next
+ * click felt like a jump. Now nothing appears before you have opened the level
+ * it belongs to.
  */
 function Level({
   node,
@@ -333,9 +329,6 @@ function Level({
   const kids = authored(node);
   const parent = path.length > 1 ? nodeAt(path.slice(0, -1)) : null;
   const step = path.length === 1 ? stepOf(node.id) : undefined;
-  const card = (n: Node, s?: number) => (
-    <Card node={n} at={path} step={s} ctx={ctx} onOpen={onOpen} />
-  );
   const note = setNote(node);
   const sequence = node.group?.ordering === "sequence";
 
@@ -375,18 +368,19 @@ function Level({
             what="parts"
             how={sequence ? "in order" : "no order between them"}
           />
-          {note ? <p className="-mt-2 mb-4 text-[12px] italic text-faint">{note}</p> : null}
+          {note ? <Note>{note}</Note> : null}
           {sequence ? (
-            <Sequence nodes={kids} edges={siblingEdges(node, kids)} render={card} />
+            <Steps nodes={kids} edges={siblingEdges(node, kids)} at={path} onOpen={onOpen} />
           ) : (
-            <SetGrid nodes={kids} render={(n) => <Card node={n} at={path} ctx={ctx} onOpen={onOpen} fill />} />
+            <Grid nodes={kids} at={path} onOpen={onOpen} />
           )}
         </>
       ) : node.anatomy?.length ? (
-        // Full width at last: the rows a card could only list as titles get
-        // their answers here, and a `source` block gets room to be read and
-        // edited.
-        <div className="max-w-[820px]">
+        // Full width at last: the rows get their answers here, and a `source`
+        // block gets room to be read and edited. Anatomy is typeset for a
+        // 340px card (11px rows); zoom lifts it to reading size under a 28px
+        // title without forking every block's type scale.
+        <div className="max-w-[900px] [zoom:1.18]">
           <AnatomyView owner={node.id} blocks={node.anatomy} ctx={ctx} opened />
         </div>
       ) : null}
@@ -397,36 +391,57 @@ function Level({
 /* ── layout ──────────────────────────────────────────────────── */
 
 /**
- * Steps that wrap like text, left to right, every row. The arrow sits on the
- * left of each step after the first, so a row that wraps opens with the arrow
- * coming in — "continued" — instead of ending on one pointing at nothing.
+ * Real order, drawn as one numbered line down the left — the same rail the
+ * steps inside a flow use. It never wraps, so there is no row-end arrow
+ * pointing at nothing. Where the data names the hand-off ("uploads to") it is
+ * written on the line; where the hand-off is only partly established the line
+ * is dashed.
  */
-function Sequence({
+function Steps({
   nodes,
   edges,
-  render,
-  even,
+  at,
+  onOpen,
 }: {
   nodes: Node[];
   edges: Edge[];
-  render: (n: Node, step: number) => React.ReactNode;
-  /**
-   * Cards in a row share a height. Only where they are close to begin with —
-   * on a deep level one card can be 4x its neighbour, and stretching would
-   * just move the gap inside the short card.
-   */
-  even?: boolean;
+  at: string[];
+  onOpen: (p: string[]) => void;
 }) {
   return (
-    <ol className={cn("flex flex-wrap gap-y-8", even ? "items-stretch" : "items-start")}>
+    <ol className="flex max-w-[880px] flex-col">
       {nodes.map((n, i) => {
-        const edge = i
-          ? edges.find((e) => e.from === nodes[i - 1].id && e.to === n.id)
-          : undefined;
+        const last = i === nodes.length - 1;
+        const edge = last
+          ? undefined
+          : edges.find((e) => e.from === n.id && e.to === nodes[i + 1].id);
+        const partial = edge && edge.state !== "derived";
         return (
-          <li key={n.id} className={cn("flex", even ? "items-stretch" : "items-start")}>
-            {i ? <Connector edge={edge} /> : null}
-            {render(n, i + 1)}
+          <li key={n.id} className="flex gap-4">
+            <div className="flex w-[22px] shrink-0 flex-col items-center pt-[15px]">
+              <StepDot n={i + 1} state={n.state} />
+              {last ? null : (
+                <span
+                  className={cn(
+                    "mt-1.5 w-0 flex-1 border-l",
+                    partial ? "border-dashed border-amber-line" : "border-border-strong",
+                  )}
+                />
+              )}
+            </div>
+            <div className={cn("min-w-0 flex-1", last ? "" : "pb-3")}>
+              <Row node={n} at={at} onOpen={onOpen} />
+              {edge?.label ? (
+                <p
+                  className={cn(
+                    "mt-2.5 pl-1 text-[11.5px] italic",
+                    partial ? "text-amber-ink" : "text-faint",
+                  )}
+                >
+                  {edge.label} {nodes[i + 1].title}
+                </p>
+              ) : null}
+            </div>
           </li>
         );
       })}
@@ -434,57 +449,38 @@ function Sequence({
   );
 }
 
-/** A set has no order to preserve, so it packs into columns with no holes. */
-function SetGrid({ nodes, render }: { nodes: Node[]; render: (n: Node) => React.ReactNode }) {
+/** A set has no order, so it gets no numbers and no line — a grid. */
+function Grid({
+  nodes,
+  at,
+  onOpen,
+}: {
+  nodes: Node[];
+  at: string[];
+  onOpen: (p: string[]) => void;
+}) {
   return (
-    <div className="columns-[340px] gap-7">
+    <div className="grid max-w-[1100px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
       {nodes.map((n) => (
-        <div key={n.id} className="mb-7 break-inside-avoid">
-          {render(n)}
-        </div>
+        <Row key={n.id} node={n} at={at} onOpen={onOpen} />
       ))}
     </div>
   );
 }
 
-/**
- * The arrow between two steps. Dashed and amber where the hand-off itself is
- * only partly established — "should gate" is not "gates". No edge, no arrow:
- * the gap stays, the claim does not.
- */
-function Connector({ edge }: { edge?: Edge }) {
-  const partial = edge && edge.state !== "derived";
-  return (
-    <span
-      className="flex shrink-0 justify-center pt-[19px]"
-      style={{ width: CONNECTOR_W }}
-      title={edge?.label}
-    >
-      {edge ? (
-        <svg width="30" height="10" viewBox="0 0 30 10" fill="none" aria-hidden="true">
-          <path
-            d="M1 5h26M23 1.5 27 5l-4 3.5"
-            stroke={partial ? "var(--color-amber-ink)" : "var(--color-deep-green)"}
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={partial ? "3 3" : undefined}
-          />
-        </svg>
-      ) : null}
-    </span>
-  );
-}
-
 function Caption({ count, what, how }: { count: number; what: string; how: string }) {
   return (
-    <div className="mb-4 flex items-baseline gap-2">
+    <div className="mb-3 flex items-baseline gap-2">
       <Eyebrow className="text-muted-slate">
         {count} {what}
       </Eyebrow>
       <span className="font-mono text-[10.5px] text-faint">· {how}</span>
     </div>
   );
+}
+
+function Note({ children }: { children: React.ReactNode }) {
+  return <p className="-mt-1 mb-4 text-[12px] italic text-faint">{children}</p>;
 }
 
 /* ── the node you are in ─────────────────────────────────────── */
@@ -512,7 +508,7 @@ function Header({
   shape?: Shape;
 }) {
   return (
-    <header className="mb-9 flex items-start gap-10 border-b border-border-gray pb-8">
+    <header className="mb-8 flex items-start gap-10 border-b border-border-gray pb-7">
       <div className="min-w-0 max-w-[660px] flex-1">
         {back ? (
           <button
@@ -534,7 +530,7 @@ function Header({
           <p className="mt-1.5 text-[15px] leading-snug text-on-surface-variant">{sub}</p>
         ) : null}
         {/* The one paragraph on the screen: this is the node you opened, so
-            its prose has been asked for. Cards below stay menus (D24). */}
+            its prose has been asked for (D24). */}
         {detail ? (
           <p className="mt-4 text-[13.5px] leading-relaxed text-on-surface">{detail}</p>
         ) : null}
@@ -542,6 +538,8 @@ function Header({
           <p className="mt-4 whitespace-pre-wrap font-mono text-[11px] text-faint">{meta}</p>
         ) : null}
       </div>
+      {/* The picture of how this level's parts fit together. It lives here,
+          not on the cards below, because it is about all of them. */}
       {shape ? (
         <div className="w-[300px] shrink-0 self-center">
           <ShapeView shape={shape} />
@@ -551,146 +549,99 @@ function Header({
   );
 }
 
-/* ── a card: what something contains, not the contents ───────── */
+/* ── a part: named, not opened ───────────────────────────────── */
 
-function Card({
-  node,
-  at,
-  step,
-  ctx,
-  onOpen,
-  fill,
-}: {
-  node: Node;
-  /** The path of the level this card sits on. */
-  at: string[];
-  step?: number;
-  /** Take the column's width (a set's grid) rather than the fixed step width. */
-  fill?: boolean;
-  ctx: RowCtx;
-  onOpen: (p: string[]) => void;
-}) {
-  const here = [...at, node.id];
+const BLOCK_NOUN: Record<string, string> = {
+  flow: "steps",
+  facts: "facts",
+  map: "entries",
+  schema: "columns",
+  routes: "routes",
+  chips: "kinds",
+  bars: "measures",
+  parts: "parts",
+};
+
+/**
+ * What is behind the click, in a few words: the author's own `summary` when
+ * there is one, else the names of the parts, else a count of what kind of
+ * thing is inside — and whether real code is at the bottom of it.
+ */
+function inside(node: Node): string {
+  if (node.summary) return node.summary;
   const kids = authored(node);
-  const sequence = node.group?.ordering === "sequence";
-  const go = openable(node) ? () => onOpen(here) : undefined;
-  const meta = node.evidence ?? node.footprint?.dirs.join("  ");
-  // A figure on the repo level made one step three times its neighbour's
-  // height. It is drawn in the header once the step is opened; marks and
-  // counts are a line tall and stay.
-  const shape = at.length === 0 && node.shape?.kind === "figure" ? undefined : node.shape;
-
-  // Always a div, never a button: anatomy rows are buttons, and the parser
-  // reparents nested interactive elements out of the card, detaching every
-  // wire anchor inside it.
-  return (
-    <div
-      ref={ctx.anchor(node.id) as never}
-      data-node
-      data-node-id={node.id}
-      role={go ? "button" : undefined}
-      tabIndex={go ? 0 : undefined}
-      onClick={(e) => {
-        // A row inside the card has its own job (trace, or open its level).
-        if ((e.target as HTMLElement).closest("[data-row]")) return;
-        go?.();
-      }}
-      onKeyDown={(e) => {
-        if (go && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          go();
-        }
-      }}
-      style={{ width: fill ? "100%" : CARD_W }}
-      className={cn(
-        "flex max-w-full flex-col rounded-[14px] border bg-pure-white px-4 py-3.5 text-left transition-[border-color,box-shadow] duration-200",
-        node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
-        go && "cursor-pointer hover:border-border-strong hover:shadow-panel",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {step ? <StepDot n={step} state={node.state} /> : null}
-        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] text-ink">
-          {node.title}
-        </span>
-        <StateChip state={node.state} alarm={node.alarm} />
-      </div>
-      {/* Wraps to BLURB_LINES, never truncated (lib/view.ts). */}
-      <p
-        className="mt-1 font-mono text-[11.5px] leading-[1.4] text-faint [display:-webkit-box] [overflow:hidden] [-webkit-box-orient:vertical]"
-        style={{ WebkitLineClamp: BLURB_LINES }}
-      >
-        {node.sub}
-      </p>
-
-      {shape || node.anatomy?.length || kids.length ? (
-        <div className="mt-3 flex flex-col gap-3 border-t border-border-gray pt-3">
-          {shape ? <ShapeView shape={shape} /> : null}
-          {node.anatomy?.length ? (
-            <AnatomyView owner={node.id} blocks={node.anatomy} ctx={ctx} />
-          ) : kids.length ? (
-            <Menu
-              kids={kids}
-              numbered={sequence}
-              onPick={(id) => onOpen([...here, id])}
-            />
-          ) : null}
-        </div>
-      ) : null}
-
-      {meta ? <p className="mt-auto truncate pt-3 font-mono text-[10px] text-faint">{meta}</p> : null}
-    </div>
-  );
+  if (kids.length) return kids.map((k) => k.title).join(" · ");
+  const bits: string[] = [];
+  let code = 0;
+  for (const b of node.anatomy ?? []) {
+    if (b.kind === "source") code++;
+    else bits.push(`${b.rows.length} ${BLOCK_NOUN[b.kind]}`);
+  }
+  if (code) bits.push(code === 1 ? "code" : `${code} code excerpts`);
+  return bits.join(" · ");
 }
 
 /**
- * What a branch card holds: its children by name, each one a door straight to
- * that child. Titles only — their own content is the level behind the click.
+ * One part of the level: what it is, in a line, and what you will find if you
+ * open it. Never its contents — those are the next step down.
  */
-function Menu({
-  kids,
-  numbered,
-  onPick,
-}: {
-  kids: Node[];
-  numbered: boolean;
-  onPick: (id: string) => void;
-}) {
+function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: string[]) => void }) {
+  const go = openable(node) ? () => onOpen([...at, node.id]) : undefined;
+  const where = node.evidence ?? node.footprint?.dirs.join("  ");
+  const peek = inside(node);
+  const count = node.shape?.kind === "count" ? `${node.shape.value} ${node.shape.unit}` : null;
+
   return (
-    <ul className="-mx-1.5 flex flex-col">
-      {kids.map((k, i) => (
-        <li key={k.id}>
-          <button
-            data-row
-            onClick={() => (openable(k) ? onPick(k.id) : undefined)}
-            className="flex w-full items-center gap-2 rounded-[6px] px-1.5 py-[5px] text-left transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
-          >
-            {numbered ? (
-              <StepDot n={i + 1} state={k.state} small />
-            ) : (
-              <span aria-hidden className="size-[5px] shrink-0 rounded-full bg-border-strong" />
-            )}
-            <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
-              {k.title}
-            </span>
-            <StateChip state={k.state} alarm={k.alarm} />
-            {openable(k) ? (
-              <span aria-hidden className="text-[11px] text-faint">›</span>
-            ) : null}
-          </button>
-        </li>
-      ))}
-    </ul>
+    <button
+      data-node-id={node.id}
+      onClick={go}
+      disabled={!go}
+      className={cn(
+        "group flex w-full items-start gap-3 rounded-[12px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
+        node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
+        go && "hover:border-border-strong hover:shadow-panel",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
+      )}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink">
+            {node.title}
+          </span>
+          <StateChip state={node.state} alarm={node.alarm} />
+        </span>
+        <span
+          className="mt-0.5 block text-[13px] leading-snug text-on-surface-variant [display:-webkit-box] [overflow:hidden] [-webkit-box-orient:vertical]"
+          style={{ WebkitLineClamp: BLURB_LINES }}
+        >
+          {node.sub}
+        </span>
+        {count || peek ? (
+          <span className="mt-1.5 block truncate text-[11.5px] text-muted-slate">
+            {[count, peek].filter(Boolean).join(" · ")}
+          </span>
+        ) : null}
+        {where ? (
+          <span className="mt-1 block truncate font-mono text-[10.5px] text-faint">{where}</span>
+        ) : null}
+      </span>
+      {go ? (
+        <span
+          aria-hidden
+          className="pt-0.5 text-[15px] text-faint transition-colors group-hover:text-deep-green"
+        >
+          ›
+        </span>
+      ) : null}
+    </button>
   );
 }
 
-function StepDot({ n, state, small }: { n: number; state: Node["state"]; small?: boolean }) {
+function StepDot({ n, state }: { n: number; state: Node["state"] }) {
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full border font-mono font-semibold",
-        small ? "size-[16px] text-[8.5px]" : "size-[20px] text-[10px]",
+        "flex size-[22px] shrink-0 items-center justify-center rounded-full border font-mono text-[10.5px] font-semibold",
         state === "derived"
           ? "border-mint-line bg-mint-success text-deep-green"
           : "border-amber-line bg-amber-surface text-amber-ink",

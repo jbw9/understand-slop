@@ -886,3 +886,45 @@ never live here. Containment is unchanged: `../../../etc/passwd` still refuses.
 overrides it.
 **At scale:** one repo per server. A second repo needs the root chosen per
 map, not per process.
+
+## D31 — A level names its parts; it never shows their contents
+
+**Chose:** children render as compact rows — title, one sentence, a peek at
+what is behind the click (`summary`, else child names, else "5 steps · code"),
+and the file. Order is a numbered rail down the left; a set is a grid with no
+numbers. The level's picture lives in its header.
+**Beat:** cards carrying their own figure, steps and facts with arrows between
+them (round 2's first cut), which the user called "jumping through a lot".
+
+Two findings, both from the user's screenshots. The arrows between wrapped
+cards said nothing: a row of three cards with an arrow at each gap claims
+adjacency, not sequence, and on a set level there was no sequence at all. And
+each card painting its own contents put two levels on one screen — open
+Extraction and you were already reading BDA Parse's pipeline, its five steps
+and four facts — so the next click revealed little and the one after felt
+like a leap. D24 deferred prose; this defers everything.
+
+Numbers on a rail now mean order and a grid means none, so no arrow is needed
+to make the claim. The hand-off verbs E0 already carried ("uploads to",
+"should gate") are written on the rail, dashed where the hand-off is partial.
+
+**Cost accepted:** a level is less rich at a glance — nothing of a part is
+visible until you open it. More clicks to reach the same fact.
+**At scale:** fine to ~12 parts; past that the rail is a long scroll, and the
+peek line is the only thing distinguishing similar rows.
+
+## D32 — Facts in the fixture, plumbing in `lib/map.ts`
+
+**Chose:** a fixture exports `RUN`, `AUTHORED`, `E0`, `LINKS`; `lib/map.ts`
+derives the row nodes and `nodeAt`/`levelAt`/`allNodes`, and picks the active
+fixture in one import. `REPO_ROOT` defaults to `~/Desktop/Code/<RUN.repo>`.
+**Beat:** copying taxbuddy.ts's 100 lines of tree helpers into explorify.ts.
+
+The second repo arrived (explorify), and D11 had already measured a fixture as
+a day of reading. The helpers are not facts about any repo; duplicating them
+would mean two copies of D13/D27's hard-won row-child rules drifting apart.
+
+**Cost accepted:** one fixture active per build — switching is an edit, not a
+picker.
+**At scale:** the selector should become a route segment or a query param so
+several mapped repos can be open at once.

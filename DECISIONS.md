@@ -821,3 +821,68 @@ a `map` row can restate the same fact twice if an author writes both.
 the same hazard — suppression and re-rendering live in different files
 (`anatomy.tsx` decides, `taxbuddy.ts` carries), and nothing checks that what
 one hides the other shows.
+
+## D28 — One level at a time, not a canvas that grows
+
+**Chose:** the open node is the header, its children are the body, and the
+path back is a rail on the left. The repo itself is a level drawn the same way.
+**Beat:** keeping the pan/zoom canvas and fixing it in place (wrap siblings
+into a grid, redraw the overview), and Finder-style columns.
+
+The canvas failed the user's three screenshots for one structural reason:
+every drill added a row of cards beside the last, so depth was paid for in
+width. A root wrapper was 360px and its children were flex items that could
+shrink, so five 400px cards were squeezed to their min-content — `Formulas`
+rendered one word per line, `Engine Flags` one word per line over twenty lines.
+The top level was a hand-placed serpentine whose second row read
+right-to-left, with the three off-path roots parked wherever there was room.
+
+Now every level is the same template, which is what makes "a lot of layers"
+cheap: level six looks like level one, and the bottom of every branch is the
+`source` block at full width, read from disk and editable. A sequence wraps
+like text, numbered, with the arrow on the LEFT of each step so a wrapped row
+opens with an arrow coming in rather than ending on one pointing at nothing.
+A set packs into columns. Figures are kept off the overview's cards (one made
+Consent 3x its neighbour's height) and drawn in the header once opened.
+
+Supersedes the camera decisions D7, D8, D12 and D22 — there is no camera.
+Sibling arrows are no longer wires; FK and trace wires still are.
+
+**Cost accepted:** no spatial overview of the whole tree at once, and the
+board no longer looks like a diagram. You cannot see two branches side by side.
+**At scale:** a level with 30 children is a long scroll of cards; the budget
+(~7 per level) is authored, not enforced. A generated map would need to group
+or page wide levels.
+
+## D29 — The open level lives in the URL; empty space does nothing
+
+**Chose:** the path is `?at=a&at=b`, pushed with native `pushState`, read
+with `useSearchParams`. Back is the browser's back, the trackpad swipe, Esc,
+the named "← parent" link above the title, or any stop on the rail.
+**Beat:** clicking empty space to go back (shipped), and component state with
+our own `history.state` (tried first).
+
+Clicking the background is the most common accidental click there is, and it
+threw away where you were. The first history attempt stored the path in
+`history.state`; Next's App Router owns that object, and back from three
+levels deep landed on the repo. Measured after the switch: back steps
+`Sign the request by hand → BDA Parse → Extraction`, one level each.
+
+**Cost accepted:** `<Suspense>` around the page; history fills with one entry
+per drill, so Esc after a trail jump is "up", not "back".
+**At scale:** row ids go into the URL verbatim. Deep paths make long URLs, and
+a renamed node id breaks old links — they fall back to the repo level.
+
+## D30 — REPO_ROOT resolves from the home directory
+
+**Chose:** `resolve(homedir(), "Desktop/Code/taxBuddy")` as the fallback.
+**Beat:** the literal `/Users/jonathanmacmini/...` it shipped with.
+
+On any other machine every `source` block failed to read and silently showed
+the pasted quote with "Could not read the repository" — the code level was
+never live here. Containment is unchanged: `../../../etc/passwd` still refuses.
+
+**Cost accepted:** still assumes `~/Desktop/Code/taxBuddy`; `SLOP_REPO_ROOT`
+overrides it.
+**At scale:** one repo per server. A second repo needs the root chosen per
+map, not per process.

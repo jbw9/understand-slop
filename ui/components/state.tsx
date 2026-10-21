@@ -76,7 +76,14 @@ export function Ident({ children }: { children: React.ReactNode }) {
 export function Prose({ text }: { text: string }) {
   return (
     <>
-      {text.split(/`([^`]+)`/).map((part, i) => (i % 2 ? <Ident key={i}>{part}</Ident> : part))}
+      {text.split(/`([^`]+)`/).map((part, i) =>
+        i % 2 ? (
+          <Ident key={i}>{part}</Ident>
+        ) : (
+          // *word* is emphasis, as authors write it in plain text.
+          part.split(/\*([^*\n]+)\*/).map((bit, j) => (j % 2 ? <em key={`${i}.${j}`}>{bit}</em> : bit))
+        ),
+      )}
     </>
   );
 }

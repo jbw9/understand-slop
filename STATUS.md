@@ -43,8 +43,25 @@ their contents; order is a numbered rail, a set is a grid; no arrows between
 boxes. Fixture plumbing moved to `lib/map.ts` (D32) — switching repos is one
 import. Driven in headless Chrome: every root descends to readable code.
 
-Known: row-built level titles come from map keys and are sometimes lowercase
-("the request body", "required") — against lib/view.ts's Title Case rule.
+~~Known: row-built level titles lowercase~~ — gone in round 3: no node uses
+`under` rows any more, and check-map enforces capitalised titles.
+
+## Round 3 landed (2026-10-21)
+
+Every level explains itself; the code is a folded drawer on every level, never
+the bottom (D34). The path forks into Students / Organisations after Opening
+The App (D33); the sidebar is a top breadcrumb (D35); file paths show only on
+the last two levels of a branch (D36). WS F1-F3 re-authored all 9 roots from
+the source: 63 nodes, 281 code refs, 0 check-map problems, 0 `source` blocks,
+plain titles. All 63 levels driven in headless Chrome: correct title, no
+console errors, no horizontal scroll.
+
+explorify moved to **304a512** mid-round — the owner's fix for delete-user
+(now takes the user from the caller's token). The map describes the fixed code.
+
+Known: LINKS (row-to-row trace wires) only render when both rows are on one
+level, which one-level-at-a-time makes rare; 4 remain, none verified on screen.
+The code drawer's edit/save path is still untested end to end.
 
 ## Contracts (frozen, no builder edits these)
 

@@ -447,14 +447,14 @@ function Level({
         {/* The picture is the main thing on the level, not a thumbnail in
             the header's corner. */}
         {figure ? (
-          <div className="max-w-[620px]">
+          <div className="max-w-[540px]">
             <ShapeView shape={figure} />
           </div>
         ) : null}
 
         {blocks.map((b, i) =>
           isExplained(b) ? (
-            <div key={i} className="max-w-[1000px]">
+            <div key={i} className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
               <ExplainedBlock block={b} />
             </div>
           ) : (

@@ -1,5 +1,6 @@
 /**
- * explorify — a real repository, read at ~/Desktop/Code/explorify, commit 59a89b3.
+ * explorify — a real repository, read at ~/Desktop/Code/explorify, commit 304a512
+ * (59a89b3 plus the owner's delete-user fix; code refs are read live).
  *
  * An Expo / React Native app for campus events. Two kinds of account share one
  * binary: students (app/individual) find and join events, organisations
@@ -54,7 +55,7 @@ export const RUN: Run = {
   repo: "explorify",
   about:
     "Cut by the life of one event — an organisation creates it, a student finds and joins it, the organisation checks them in — after the two steps every account passes first.",
-  commit: "59a89b3",
+  commit: "304a512",
   files: 181,
   elapsed: "—",
 };
@@ -91,16 +92,14 @@ export const E0: Edge[] = [
    step number, `facts` on the label, `source` on "source". */
 
 export const LINKS: Link[] = [
-  // The campus string an organisation (fails to) set is the feed's only filter.
-  { from: rowId("ce-form", "campus"), to: rowId("fd-fetch", 1), state: "partial", alarm: true, label: "must match exactly" },
   // Joining writes the string that the feed then caches on every phone.
   { from: rowId("rv-column", "events.rsvp"), to: rowId("fd-fetch", 3), state: "partial", alarm: true, label: "cached by every student" },
   // Check-in rewrites the same string from a stale copy.
   { from: rowId("ci-tap", 3), to: rowId("rv-column", "events.rsvp"), state: "partial", alarm: true, label: "overwrites" },
-  // The student's delete button and the function it trusts.
-  { from: rowId("ac-delete", "student"), to: rowId("sv-delete", 2), state: "derived", label: "sends the id to" },
+  // The student's delete button and the function it calls.
+  { from: rowId("ac-delete", "student"), to: rowId("sv-delete", 2), state: "derived", label: "calls, with the caller's sign-in token" },
   // Sign-up's final insert creates the row the launch lookup asks for.
-  { from: rowId("su-stages", 5), to: rowId("ln-lookup", 2), state: "derived", label: "creates the row found by" },
+  { from: rowId("su-finish", 2), to: rowId("ln-lookup", 2), state: "derived", label: "creates the row found by" },
 ];
 
 export function linksFor(id: string) {

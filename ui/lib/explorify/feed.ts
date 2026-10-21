@@ -339,7 +339,7 @@ A copy is only as fresh as its last download. The \`user\` copy is refreshed at 
         { file: "lib/localStorage.ts", start: 5, end: 30, label: "Saving and reading a key" },
         { file: "lib/localStorage.ts", start: 108, end: 136, label: "Downloading your profile into \"user\"" },
         { file: "lib/supabase.ts", start: 9, end: 16, label: "The login session lives in the same store" },
-        { file: "app/individual/account/index.tsx", start: 68, end: 78, label: "Signing out clears everything" },
+        { file: "app/individual/account/index.tsx", start: 69, end: 79, label: "Signing out clears everything" },
         { file: "app/individual/account/index.tsx", start: 51, end: 59, label: "After editing interests: reads the old copy" },
       ],
       anatomy: [

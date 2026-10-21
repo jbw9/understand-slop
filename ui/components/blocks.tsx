@@ -85,10 +85,20 @@ function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
     ]),
   );
 
+  const lanes = laneOffsets(block.arrows, at);
+
   return (
     <figure className="min-w-0">
       <div className="overflow-x-auto rounded-[14px] border border-border-gray bg-pure-white/80">
-        <svg width={W} height={H} role="img" aria-label={block.caption} className="block">
+        {/* Scales down to fit the page — but never below 70%, where the
+            labels stop being readable; past that the frame scrolls. */}
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label={block.caption}
+          className="block h-auto"
+          style={{ width: "100%", maxWidth: W, minWidth: W * 0.7 }}
+        >
           <defs>
             {(["plain", "good", "warn"] as const).map((t) => (
               <marker
@@ -110,7 +120,7 @@ function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
             const t = at.get(a.to);
             if (!f || !t) return null;
             const tone = a.tone ?? "plain";
-            const { d, lx, ly, anchor } = route(f, t);
+            const { d, lx, ly, anchor } = route(f, t, lanes.get(i) ?? 0);
             return (
               <g key={i}>
                 <path
@@ -171,12 +181,43 @@ function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
 
 type Placed = { x: number; y: number; w: number };
 
+const LANE_GAP = 12;
+
+/**
+ * Elbow arrows that run down the same gap between columns would draw on top
+ * of each other. A fan-out from one box, or a fan-in to one box, SHOULD share
+ * its trunk — that is what makes it read as one bundle — so arrows are
+ * grouped into bundles per gap and each bundle gets its own lane.
+ */
+function laneOffsets(arrows: { from: string; to: string }[], at: Map<string, Placed>) {
+  const gaps = new Map<string, { i: number; from: string; to: string }[]>();
+  arrows.forEach((a, i) => {
+    const f = at.get(a.from);
+    const t = at.get(a.to);
+    if (!f || !t || f.x === t.x || f.y === t.y) return;
+    const key = t.x > f.x ? `r${f.x + f.w}` : `l${f.x}`;
+    gaps.set(key, [...(gaps.get(key) ?? []), { i, from: a.from, to: a.to }]);
+  });
+  const out = new Map<number, number>();
+  for (const list of gaps.values()) {
+    const count = (k: "from" | "to", v: string) => list.filter((x) => x[k] === v).length;
+    const bundleOf = (x: { from: string; to: string }) =>
+      count("from", x.from) > 1 ? `f:${x.from}` : count("to", x.to) > 1 ? `t:${x.to}` : `a:${x.from}>${x.to}`;
+    const bundles = [...new Set(list.map(bundleOf))];
+    for (const x of list) {
+      const b = bundles.indexOf(bundleOf(x));
+      out.set(x.i, (b - (bundles.length - 1) / 2) * LANE_GAP);
+    }
+  }
+  return out;
+}
+
 /**
  * Right-angled paths between two boxes. Same column: straight down (or up).
  * Otherwise out of the facing side, along the gap between columns, and in —
  * so lines never cut through a box in the columns they connect.
  */
-function route(f: Placed, t: Placed) {
+function route(f: Placed, t: Placed, lane = 0) {
   const fy = f.y + BOX_H / 2;
   const ty = t.y + BOX_H / 2;
   if (f.x === t.x) {
@@ -192,7 +233,7 @@ function route(f: Placed, t: Placed) {
   if (fy === ty) {
     return { d: `M${x1} ${fy}H${x2}`, lx: (x1 + x2) / 2, ly: fy - 8, anchor: "middle" as const };
   }
-  const mx = right ? x1 + COL_GAP / 2 : x1 - COL_GAP / 2;
+  const mx = (right ? x1 + COL_GAP / 2 : x1 - COL_GAP / 2) + lane;
   return {
     d: `M${x1} ${fy}H${mx}V${ty}H${x2}`,
     lx: mx + (right ? 8 : -8),
@@ -295,8 +336,8 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
               const width = Math.abs(b - a);
               const warn = m.state !== "derived";
               return (
-                <li key={i} className="relative h-[64px]">
-                  <span className="absolute left-0 top-[14px] font-mono text-[10.5px] text-faint">{i + 1}</span>
+                <li key={i} className="relative h-[76px]">
+                  <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">{i + 1}</span>
                   {self ? (
                     <div
                       className="absolute top-[8px] -translate-x-1/2 rounded-[8px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
@@ -306,8 +347,8 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
                       {m.note ? <span className="block text-[11.5px] text-faint">{m.note}</span> : null}
                     </div>
                   ) : (
-                    <div className="absolute top-[4px]" style={{ left: `${left}%`, width: `${width}%` }}>
-                      <p className="truncate px-3 text-center text-[12.5px] leading-tight text-on-surface" title={m.label}>
+                    <div className="absolute bottom-[18px]" style={{ left: `${left}%`, width: `${width}%` }}>
+                      <p className="line-clamp-2 px-3 text-center text-[12.5px] leading-tight text-on-surface" title={m.label}>
                         {m.label}
                       </p>
                       <div className={cn("relative mt-1.5 h-0 border-t-[1.5px]", warn ? "border-dashed border-amber-ink" : "border-deep-green/70")}>

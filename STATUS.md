@@ -23,6 +23,16 @@ Verified at fan-in, by me, in the running app:
   traversal, and an escape into this repo. A stale write returns 409.
 - 0 of 10 subtitles clip, down from 7 of 10.
 
+## Since round 1 (2026-10-21)
+
+Navigation rebuilt as one level at a time (D28): header = open node, body =
+its children, rail on the left, code at the bottom. The open level is in the
+URL, so back/swipe/Esc/"← parent" all work and clicking empty space does
+nothing (D29). The code level now actually reads taxBuddy on this machine
+(D30). Verified in headless Chrome at 1512 and 1280: overview, Extraction,
+BDA Parse, a row level, a source level reading the real file, Tax Engine,
+Formulas; back steps one level at a time. tsc and eslint clean.
+
 ## Contracts (frozen, no builder edits these)
 
 - `ui/lib/data.ts` — added `Edge.order`, `interface Group`, `Node.footprint`,

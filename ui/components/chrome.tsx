@@ -12,73 +12,93 @@ import { Eyebrow } from "@/components/state";
  * breadcrumb, no legend and no back control — nothing but cards on a dot grid.
  * There was no way to answer "where am I" except from memory, which is exactly
  * the failure this project exists to fix. Everything here is fixed-position
- * overlay; none of it lives in the camera transform, so it never pans away.
+ * outside the scrolling level, so it never moves away.
  */
 
 /**
- * Where you are, and the way back.
+ * Where you are, and the way back — a rail down the left edge.
  *
  * This is the sentence you say out loud when someone asks what you are looking
  * at — "taxBuddy, eligibility, the five-year rule". Reconstructing that from
  * memory under questioning is the thing that went wrong at the interview this
- * project came out of, so it is on screen permanently rather than implied by
- * the camera position.
+ * project came out of, so it is on screen permanently.
  *
- * Every crumb is clickable and goes to that depth. The last one is where you
- * are and is not a button.
+ * A rail rather than a one-line breadcrumb because the levels go deep: a
+ * stacked path never has to elide the middle, and each stop keeps its step
+ * number, so "4 Extraction" still says where on the filer's path you went in.
  */
-export function Breadcrumb({
+export function Trail({
   repo,
-  trail,
+  meta,
+  crumbs,
   onJump,
 }: {
   repo: string;
-  /** One entry per level below the root, outermost first. */
-  trail: { id: string; title: string }[];
-  /** Jump to depth `n` — 0 is the overview. */
+  meta: string;
+  /** One entry per level below the repo, outermost first. */
+  crumbs: { id: string; title: string; step?: number }[];
+  /** Jump to depth `n` — 0 is the repo. */
   onJump: (depth: number) => void;
 }) {
+  const stops = [{ id: "", title: repo, step: undefined as number | undefined }, ...crumbs];
   return (
     <nav
       aria-label="Location"
-      className="pointer-events-auto fixed left-5 top-4 z-30 flex max-w-[min(680px,60vw)] items-center gap-1.5 rounded-full border border-border-gray bg-pure-white/92 px-3 py-1.5 shadow-panel backdrop-blur"
+      className="flex w-[232px] shrink-0 flex-col border-r border-border-gray bg-pure-white/70 px-3 pb-4 pt-6"
     >
-      <button
-        onClick={() => onJump(0)}
-        className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[11.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green"
-      >
-        {repo}
-      </button>
-      {trail.map((c, i) => {
-        const last = i === trail.length - 1;
-        return (
-          <span key={c.id} className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden className="shrink-0 text-[11px] text-faint">
-              ›
-            </span>
-            {last ? (
-              <span
-                aria-current="page"
-                className="truncate text-[12.5px] font-semibold text-ink"
-              >
-                {c.title}
-              </span>
-            ) : (
+      <ol className="flex flex-col">
+        {stops.map((c, i) => {
+          const here = i === stops.length - 1;
+          return (
+            <li key={c.id || "repo"} className="flex gap-2.5">
+              {/* The rail: a dot per level and a line to the next, so the
+                  path reads as one descent rather than a list. */}
+              <div className="flex w-[14px] shrink-0 flex-col items-center pt-[9px]">
+                <span
+                  className={cn(
+                    "size-[7px] shrink-0 rounded-full",
+                    here ? "bg-deep-green" : "bg-border-strong",
+                  )}
+                />
+                {i < stops.length - 1 ? <span className="mt-1 w-px flex-1 bg-border-gray" /> : null}
+              </div>
               <button
-                onClick={() => onJump(i + 1)}
-                className="max-w-[160px] truncate rounded-full px-2 py-0.5 text-[12.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green"
+                onClick={() => onJump(i)}
+                disabled={here}
+                aria-current={here ? "page" : undefined}
+                className={cn(
+                  "mb-1 min-w-0 flex-1 rounded-[8px] px-2 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+                  here ? "bg-mint-success/60" : "hover:bg-surface-container-low",
+                )}
               >
-                {c.title}
+                <span
+                  className={cn(
+                    "block truncate",
+                    i === 0 ? "font-mono text-[12px]" : "text-[13px]",
+                    here ? "font-semibold text-deep-green" : "text-muted-slate",
+                  )}
+                >
+                  {c.step ? <span className="mr-1.5 font-mono text-[10.5px] text-faint">{c.step}</span> : null}
+                  {c.title}
+                </span>
+                {i === 0 ? (
+                  <span className="mt-0.5 block font-mono text-[10px] text-faint">{meta}</span>
+                ) : null}
               </button>
-            )}
-          </span>
-        );
-      })}
-      {trail.length > 0 ? (
-        <kbd className="ml-1 shrink-0 rounded border border-border-gray bg-surface px-1.5 py-0.5 font-mono text-[10px] text-faint">
-          esc
-        </kbd>
-      ) : null}
+            </li>
+          );
+        })}
+      </ol>
+
+      {/* Bottom padding clears Next's dev badge, which sits in this corner. */}
+      <div className="mt-auto flex flex-col gap-3 pb-12">
+        <Legend />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2 font-mono text-[10.5px] text-faint">
+          <Hint k="esc">back</Hint>
+          <Hint k="0">top</Hint>
+          <span>or swipe back</span>
+        </div>
+      </div>
     </nav>
   );
 }
@@ -98,7 +118,7 @@ export function Legend() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="pointer-events-auto fixed bottom-4 right-5 z-30">
+    <div>
       <div className="overflow-hidden rounded-[14px] border border-border-gray bg-pure-white/92 shadow-panel backdrop-blur">
         <button
           onClick={() => setOpen((v) => !v)}
@@ -123,7 +143,7 @@ export function Legend() {
                 <dt className="shrink-0 pt-[3px]">
                   <Swatch kind={k} labelled />
                 </dt>
-                <dd className="max-w-[260px] text-[11.5px] leading-snug text-muted-slate">
+                <dd className="text-[11.5px] leading-snug text-muted-slate">
                   {STATE_MEANING[k]}
                 </dd>
               </div>
@@ -162,24 +182,6 @@ function Swatch({
         {kind}
       </span>
     </span>
-  );
-}
-
-/**
- * The keys that already worked and nothing advertised.
- *
- * Escape, `0`, `+` and `-` were all wired in the canvas and entirely
- * undiscoverable — a reader three levels deep had no way to know Escape would
- * bring them back.
- */
-export function KeyHints() {
-  return (
-    <div className="pointer-events-none fixed bottom-4 left-5 z-30 flex items-center gap-2.5 rounded-full border border-border-gray bg-pure-white/80 px-3 py-1.5 font-mono text-[10.5px] text-faint shadow-panel backdrop-blur">
-      <Hint k="esc">back</Hint>
-      <Hint k="0">fit</Hint>
-      <Hint k="+ −">zoom</Hint>
-      <span>drag to pan</span>
-    </div>
   );
 }
 

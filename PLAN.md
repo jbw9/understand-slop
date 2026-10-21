@@ -69,3 +69,27 @@ edits them.
 ## Time
 
 Round 1 dispatched 2026-09-28.
+
+## Round 2 (2026-10-21) — step-by-step levels, and a second repo
+
+Navigation is one level at a time (D28, D29). A level answers one question:
+its header is the open node (paragraph, diagram), its body is its parts named
+in compact rows — never their contents — or, at the bottom, the code.
+
+The mapped repo moves from taxBuddy to **explorify**
+(`https://github.com/jbw9/explorify`, cloned to `~/Desktop/Code/explorify`,
+commit `59a89b3`). Expo / React Native campus-events app: students
+(`app/individual`) and organisations (`app/org`), Supabase, two edge
+functions, a small Python API.
+
+Contracts (frozen this round): `ui/lib/data.ts` (now with `Run`),
+`ui/lib/view.ts`, `ui/lib/map.ts` (the one-line switch between fixtures —
+main thread flips it at fan-in).
+
+| ID | Owns | Agent |
+|---|---|---|
+| E - explorify fixture | `ui/lib/explorify.ts` (new); `ui/components/shapes.tsx` (append marks/figures only) | builder |
+
+Main thread owns `components/canvas.tsx`, `components/chrome.tsx`, `lib/map.ts`.
+Fan-in check: `check-map.mts` (every `source` block verbatim at its line,
+unique ids, E0/LINKS resolve), tsc, eslint, and the app driven level by level.

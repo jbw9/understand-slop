@@ -911,6 +911,18 @@ export interface Link {
   label?: string;
 }
 
+/** One mapping run: which repository, at which commit, and how it is cut. */
+export interface Run {
+  command: string;
+  /** Directory name under ~/Desktop/Code — also where the code level reads. */
+  repo: string;
+  /** One sentence: what the top level is cut by, and why that order. */
+  about: string;
+  commit: string;
+  files: number;
+  elapsed: string;
+}
+
 /** Stable id for an anatomy row, so a wire can anchor to it. */
 export function rowId(owner: string, key: string | number) {
   return `${owner}:${key}`;

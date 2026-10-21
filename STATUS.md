@@ -33,6 +33,19 @@ nothing (D29). The code level now actually reads taxBuddy on this machine
 BDA Parse, a row level, a source level reading the real file, Tax Engine,
 Formulas; back steps one level at a time. tsc and eslint clean.
 
+## Round 2 landed (2026-10-21)
+
+The map is now **explorify** (`~/Desktop/Code/explorify` @ 59a89b3), authored
+by WS-E. 9 roots, every one 5 deep and ending in live source; 55/55 source
+blocks verbatim (check-map.mts); 6 roots on the path, 3 outside it. Levels are
+step by step (D31): a level names its parts in compact rows and never shows
+their contents; order is a numbered rail, a set is a grid; no arrows between
+boxes. Fixture plumbing moved to `lib/map.ts` (D32) — switching repos is one
+import. Driven in headless Chrome: every root descends to readable code.
+
+Known: row-built level titles come from map keys and are sometimes lowercase
+("the request body", "required") — against lib/view.ts's Title Case rule.
+
 ## Contracts (frozen, no builder edits these)
 
 - `ui/lib/data.ts` — added `Edge.order`, `interface Group`, `Node.footprint`,

@@ -14,12 +14,13 @@
 /**
  * Where the mapped repository lives. Absolute, from env, one repo per run.
  *
- * The fallback is resolved from the home directory, not written out: a literal
- * `/Users/<name>/…` is true on one machine, and on every other one the code
- * level silently fell back to the pasted quote it exists to replace.
+ * The fallback is the mapped repo's own directory under the home directory,
+ * not written out: a literal `/Users/<name>/…` is true on one machine, and on
+ * every other one the code level silently fell back to the pasted quote it
+ * exists to replace.
  */
 export const REPO_ROOT =
-  process.env.SLOP_REPO_ROOT ?? resolve(homedir(), "Desktop/Code/taxBuddy");
+  process.env.SLOP_REPO_ROOT ?? resolve(homedir(), "Desktop/Code", RUN.repo);
 
 export interface SliceRequest {
   /** Repo-relative path. Must stay inside REPO_ROOT once resolved. */
@@ -95,6 +96,7 @@ export type WriteSlice = (req: WriteRequest) => Promise<WriteResult>;
 import { readFile, writeFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { homedir } from "node:os";
+import { RUN } from "@/lib/map";
 
 /**
  * The entire security model, in one function.

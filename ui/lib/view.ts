@@ -173,3 +173,68 @@ export type Shape =
   | { kind: "marks"; ids: string[]; note?: string }
   | { kind: "figure"; id: string; note?: string }
   | { kind: "count"; value: string; unit: string };
+
+/* ────────────────────────────────────────────────────────────────────
+   ROUND 3 — understand the repo without reading the code.
+   "the description is very simple then it just dives straight into the
+   code … the goal is not to inspect the code directly, that should be the
+   last resort that's always available."
+   ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * Names a newcomer would use, not names the analysis invented.
+ *
+ * Shipped: "Org Wizard", "Five Stages", "Role Lookup", "Three Copies". Each is
+ * a nickname for something the reader has not met yet, so it has to be decoded
+ * before it can be read. A title says what the thing is in everyday words.
+ *
+ * Good:  "Organisation Sign-Up", "Interest Categories", "Choosing The Home Screen"
+ * Bad:   "Org Wizard", "Five Stages", "Role Lookup"
+ *
+ * Code identifiers (`rsvp`, `fetchAllEvents`) belong in `detail`, set in
+ * backticks, never in a title.
+ */
+export const PLAIN_TITLE_EXAMPLES = {
+  good: ["Organisation Sign-Up", "Interest Categories", "Choosing The Home Screen"],
+  bad: ["Org Wizard", "Five Stages", "Role Lookup"],
+} as const;
+
+/**
+ * Show the thing itself, not a pointer to the code that holds it.
+ *
+ * Shipped: opening "Categories" showed "social, cultural, stem … and four
+ * more" and then a code excerpt. The categories ARE the content. Real values
+ * are drawn as data — `table` for lists and lookups, `schema` for rows,
+ * `example` for what a stored value looks like, `screen` for what the user
+ * sees, `sequence` for who talks to whom, `flow` for steps.
+ *
+ * A level's own content is no longer capped by LEVEL_WORD_BUDGET: that budget
+ * measured one level painting the NEXT level's content onto its cards, and
+ * that rule (a card names, never shows, what is behind it) still holds. The
+ * open level itself may explain as much as it needs, in blocks, not walls.
+ */
+export const DETAIL_PARAGRAPHS_MAX = 3;
+
+/**
+ * Code is the last resort, always one click away — never the bottom layer.
+ *
+ * Every authored node carries `code` refs, read live in a drawer on its level.
+ * A branch ends when there is nothing more to EXPLAIN, at whatever depth that
+ * is — one level or seven. No branch is made deeper to reach code, and none is
+ * cut short because it got there.
+ */
+export const CODE_IS_A_DRAWER = true;
+
+/**
+ * Two marks, in words, replace "partial" and "inferred" on screen.
+ *
+ *  - "Problem"      the node has `issues`; the count is shown on its card.
+ *  - "Not certain"  `state` is not `derived`; `unsure` says why, on the level.
+ *
+ * "partial" meant two different things in the explorify map — "the answer is
+ * not all in this repo" and "this has a bug" — and said neither.
+ */
+export const MARKS = {
+  problem: "Has a known problem — listed under Watch out.",
+  unsure: "Not certain — the reason is given on the level.",
+} as const;

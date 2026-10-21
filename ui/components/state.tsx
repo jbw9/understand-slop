@@ -21,7 +21,8 @@ export function StateChip({
 }) {
   if (state === "derived") return null;
 
-  const label = state === "partial" ? "partial" : "inferred";
+  // Words, not analysis jargon: "partial" was read as "half-built" (D34).
+  const label = "not certain";
 
   return (
     <span
@@ -65,5 +66,17 @@ export function Ident({ children }: { children: React.ReactNode }) {
     <code className="rounded-[5px] bg-surface-container px-[5px] py-[1px] font-mono text-[0.86em] text-on-surface-variant">
       {children}
     </code>
+  );
+}
+
+/**
+ * Prose with `backticked` code identifiers set as `Ident`. Fixture prose names
+ * columns and functions in backticks; printed raw they read as stray marks.
+ */
+export function Prose({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/`([^`]+)`/).map((part, i) => (i % 2 ? <Ident key={i}>{part}</Ident> : part))}
+    </>
   );
 }

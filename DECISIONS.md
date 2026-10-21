@@ -952,3 +952,37 @@ in the main thread. One fork only — the overview renders lanes after the first
 fork node; nested forks would need the lanes to recurse.
 **At scale:** past ~3 lanes the side-by-side columns get too narrow; they would
 stack, losing the at-a-glance comparison.
+
+## D34 — A level explains; the code is a drawer, not the bottom
+
+**Chose:** every authored node carries `code` refs (file + line range, read live
+in a folded drawer on its level) and explains itself in blocks drawn as the
+thing they describe: `diagram` (boxes on a grid, arrows routed by the
+renderer), `table` (the real values), `sequence` (who talks to whom),
+`screen` (what the user sees), `example` (a stored value). Problems move out
+of prose into `issues` ("Watch out"). `partial`/`inferred` render as "not
+certain" with a required `unsure` reason. Figures render full width as the
+level's main picture.
+**Beat:** branches that bottom out in a verbatim `source` block — the user
+"dives straight into the code" — and a `partial` chip with no reason, which the
+user asked to have explained.
+
+Exemplar: opening Interest Categories now shows the eight categories, where
+they are picked/stored/compared, every screen that shows them, a stored value,
+and one problem; the code is five labelled places, one click away.
+
+**Cost accepted:** `code` refs are line ranges, not quotes, so they can drift
+silently when the repo changes — check-map catches out-of-range, not
+shifted-by-ten. Every node now needs a person (or agent) to write a real
+explanation; the fixture roughly doubles.
+**At scale:** a generated map would need these blocks emitted by analysis, and
+`diagram` layout by col/row stops working past ~5 columns.
+
+## D35 — The path is a breadcrumb across the top, not a rail
+
+**Chose:** a sticky one-line breadcrumb on the page's own background that wraps
+when deep. **Beat:** the 232px left rail (D29), which the user said "wastes
+space and is not fluid"; and the user's alternative of keeping the rail but
+dropping its border, which still spends the column.
+**Cost accepted:** the per-stop dot-and-line descent is gone; depth reads from
+left to right instead. **At scale:** past ~8 stops it wraps to two lines.

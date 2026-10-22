@@ -1,0 +1,4389 @@
+{
+ "RUN": {
+  "command": "understand-slop map node-express-realworld-example-app",
+  "repo": "node-express-realworld-example-app",
+  "about": "Cut by the API consumer's journey through a blogging platform — the server boots and mounts routes, then a user authenticates, explores profiles, works with articles, and discovers tags — with the Prisma database as shared infrastructure off the path.",
+  "commit": "30b68e1",
+  "files": 62,
+  "elapsed": "13 min",
+  "root": "/Users/jonathanmacmini/Desktop/Code/slop-eval/node-express-realworld-example-app",
+  "models": {
+   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+   "cut": "global.anthropic.claude-opus-4-6-v1",
+   "author": "global.anthropic.claude-opus-4-6-v1",
+   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+ },
+ "AUTHORED": [
+  {
+   "id": "starting-server",
+   "title": "Starting The Server",
+   "sub": "Express bootstrap, middleware wiring, route mounting, and error handling",
+   "state": "derived",
+   "col": 0,
+   "row": 0,
+   "footprint": {
+    "dirs": [
+     "src/",
+     "src/app/routes/",
+     "src/app/models/"
+    ],
+    "files": 3
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Aspects of the Express server configured during bootstrap"
+   },
+   "detail": "Creates an Express app, wires CORS and body parsing, mounts all feature routes under `/api`, attaches a global error handler, and listens on `process.env.PORT` (default 3000).",
+   "code": [
+    {
+     "file": "src/main.ts",
+     "start": 7,
+     "end": 16,
+     "label": "App creation and middleware wiring"
+    },
+    {
+     "file": "src/main.ts",
+     "start": 53,
+     "end": 57,
+     "label": "Server listener on PORT"
+    },
+    {
+     "file": "src/app/routes/routes.ts",
+     "start": 7,
+     "end": 13,
+     "label": "Route composition under /api"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Request pipeline from arrival to response",
+     "boxes": [
+      {
+       "id": "req",
+       "label": "Incoming Request",
+       "sub": "any HTTP method",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "mw",
+       "label": "Middleware",
+       "sub": "CORS, body-parser",
+       "col": 1,
+       "row": 0,
+       "opens": "sv-middleware"
+      },
+      {
+       "id": "router",
+       "label": "/api Router",
+       "sub": "four controllers",
+       "col": 2,
+       "row": 0,
+       "opens": "sv-route-mount"
+      },
+      {
+       "id": "auth",
+       "label": "Auth Gate",
+       "sub": "express-jwt per route",
+       "col": 2,
+       "row": 1,
+       "opens": "sv-auth-gate"
+      },
+      {
+       "id": "errh",
+       "label": "Error Handler",
+       "sub": "global catch-all",
+       "col": 3,
+       "row": 1,
+       "opens": "sv-error-handler"
+      },
+      {
+       "id": "resp",
+       "label": "Response",
+       "sub": "JSON to client",
+       "col": 3,
+       "row": 0
+      }
+     ],
+     "arrows": [
+      {
+       "from": "req",
+       "to": "mw",
+       "label": "every request",
+       "at": "src/main.ts:13"
+      },
+      {
+       "from": "mw",
+       "to": "router",
+       "label": "parsed body",
+       "at": "src/main.ts:16"
+      },
+      {
+       "from": "router",
+       "to": "auth",
+       "label": "per route",
+       "at": "src/app/routes/article/article.controller.ts:30"
+      },
+      {
+       "from": "auth",
+       "to": "resp",
+       "label": "handler result",
+       "tone": "good",
+       "at": "src/app/routes/article/article.controller.ts:33"
+      },
+      {
+       "from": "auth",
+       "to": "errh",
+       "label": "next(error)",
+       "tone": "warn",
+       "at": "src/app/routes/article/article.controller.ts:35"
+      },
+      {
+       "from": "errh",
+       "to": "resp",
+       "label": "status + JSON",
+       "tone": "warn",
+       "at": "src/main.ts:42"
+      }
+     ]
+    },
+    {
+     "kind": "facts",
+     "rows": [
+      {
+       "label": "Port",
+       "value": "process.env.PORT || 3000",
+       "state": "derived"
+      },
+      {
+       "label": "Root endpoint",
+       "value": "GET / returns { status: 'API is running on /api' }",
+       "state": "derived"
+      },
+      {
+       "label": "Static files",
+       "value": "Served from __dirname + '/assets'",
+       "state": "derived"
+      }
+     ]
+    }
+   ],
+   "children": [
+    {
+     "id": "sv-middleware",
+     "title": "Request Middleware",
+     "sub": "CORS and body parsing applied to every incoming request",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Three middleware applied in order: `cors()` allows all origins, `bodyParser.json()` parses JSON bodies, and `bodyParser.urlencoded({ extended: true })` parses form data. Static files are served from `/assets`.",
+     "code": [
+      {
+       "file": "src/main.ts",
+       "start": 13,
+       "end": 15,
+       "label": "CORS and body-parser middleware in order"
+      },
+      {
+       "file": "src/main.ts",
+       "start": 19,
+       "end": 19,
+       "label": "Static file serving from /assets"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "CORS",
+         "detail": "cors() with default settings allows all origins, methods, and headers.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "JSON Parser",
+         "detail": "bodyParser.json() populates req.body from application/json payloads.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "URL-Encoded Parser",
+         "detail": "bodyParser.urlencoded({ extended: true }) handles form-encoded bodies.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Static Files",
+         "detail": "express.static(__dirname + '/assets') serves images and other assets.",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "sv-route-mount",
+     "title": "Route Assembly",
+     "sub": "Four feature controllers composed into a single /api prefix",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "A `Router` chains tag, article, profile, and auth controllers. A wrapper mounts that chain at `/api`, giving the server 19 endpoints across the four domains.",
+     "code": [
+      {
+       "file": "src/app/routes/routes.ts",
+       "start": 1,
+       "end": 13,
+       "label": "Route composition and /api mount"
+      },
+      {
+       "file": "src/main.ts",
+       "start": 16,
+       "end": 16,
+       "label": "Routes wired into Express app"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Four controllers chained under /api",
+       "boxes": [
+        {
+         "id": "api-prefix",
+         "label": "/api Prefix",
+         "sub": "Router wrapper",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "tags-ctrl",
+         "label": "Tags Controller",
+         "sub": "1 route",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "articles-ctrl",
+         "label": "Article Controller",
+         "sub": "11 routes",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "profiles-ctrl",
+         "label": "Profile Controller",
+         "sub": "3 routes",
+         "col": 1,
+         "row": 2
+        },
+        {
+         "id": "auth-ctrl",
+         "label": "Auth Controller",
+         "sub": "4 routes",
+         "col": 1,
+         "row": 3
+        }
+       ],
+       "arrows": [
+        {
+         "from": "api-prefix",
+         "to": "tags-ctrl",
+         "label": ".use()",
+         "at": "src/app/routes/routes.ts:8"
+        },
+        {
+         "from": "api-prefix",
+         "to": "articles-ctrl",
+         "label": ".use()",
+         "at": "src/app/routes/routes.ts:9"
+        },
+        {
+         "from": "api-prefix",
+         "to": "profiles-ctrl",
+         "label": ".use()",
+         "at": "src/app/routes/routes.ts:10"
+        },
+        {
+         "from": "api-prefix",
+         "to": "auth-ctrl",
+         "label": ".use()",
+         "at": "src/app/routes/routes.ts:11"
+        }
+       ]
+      },
+      {
+       "kind": "routes",
+       "rows": [
+        {
+         "method": "GET",
+         "path": "/api/tags",
+         "auth": "optional",
+         "state": "derived"
+        },
+        {
+         "method": "GET",
+         "path": "/api/articles",
+         "auth": "optional",
+         "state": "derived"
+        },
+        {
+         "method": "GET",
+         "path": "/api/articles/feed",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "POST",
+         "path": "/api/articles",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "GET",
+         "path": "/api/articles/:slug",
+         "auth": "optional",
+         "state": "derived"
+        },
+        {
+         "method": "PUT",
+         "path": "/api/articles/:slug",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "DELETE",
+         "path": "/api/articles/:slug",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "GET",
+         "path": "/api/articles/:slug/comments",
+         "auth": "optional",
+         "state": "derived"
+        },
+        {
+         "method": "POST",
+         "path": "/api/articles/:slug/comments",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "DELETE",
+         "path": "/api/articles/:slug/comments/:id",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "POST",
+         "path": "/api/articles/:slug/favorite",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "DELETE",
+         "path": "/api/articles/:slug/favorite",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "GET",
+         "path": "/api/profiles/:username",
+         "auth": "optional",
+         "state": "derived"
+        },
+        {
+         "method": "POST",
+         "path": "/api/profiles/:username/follow",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "DELETE",
+         "path": "/api/profiles/:username/follow",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "POST",
+         "path": "/api/users",
+         "auth": "none",
+         "state": "derived"
+        },
+        {
+         "method": "POST",
+         "path": "/api/users/login",
+         "auth": "none",
+         "state": "derived"
+        },
+        {
+         "method": "GET",
+         "path": "/api/user",
+         "auth": "required",
+         "state": "derived"
+        },
+        {
+         "method": "PUT",
+         "path": "/api/user",
+         "auth": "required",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "sv-auth-gate",
+     "title": "Auth Middleware",
+     "sub": "JWT token extraction and validation via express-jwt",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Exports `auth.required` and `auth.optional`, both using express-jwt with HS256. Tokens are extracted from the `Authorization` header accepting either `Token` or `Bearer` prefix.",
+     "code": [
+      {
+       "file": "src/app/routes/auth/auth.ts",
+       "start": 1,
+       "end": 28,
+       "label": "Auth middleware definition: required and optional modes"
+      },
+      {
+       "file": "src/app/routes/auth/auth.ts",
+       "start": 4,
+       "end": 12,
+       "label": "Token extraction from Authorization header"
+      },
+      {
+       "file": "src/app/routes/auth/token.utils.ts",
+       "start": 1,
+       "end": 9,
+       "label": "Token generation with jwt.sign, 60-day expiry"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "map",
+       "caption": "Two auth modes applied per route",
+       "rows": [
+        {
+         "from": "auth.required",
+         "to": "Rejects with UnauthorizedError if token is missing or invalid",
+         "state": "derived"
+        },
+        {
+         "from": "auth.optional",
+         "to": "Passes through; attaches req.auth if token is valid, skips silently if absent",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Algorithm",
+         "value": "HS256",
+         "state": "derived"
+        },
+        {
+         "label": "Token expiry",
+         "value": "60 days (set at signing)",
+         "state": "derived"
+        },
+        {
+         "label": "Header format",
+         "value": "Authorization: Token|Bearer <jwt>",
+         "state": "derived"
+        },
+        {
+         "label": "JWT payload",
+         "value": "{ user: { id } }",
+         "state": "derived"
+        },
+        {
+         "label": "Secret source",
+         "value": "process.env.JWT_SECRET || 'superSecret'",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "JWT secret falls back to hardcoded value",
+       "detail": "If JWT_SECRET is not set, both verification and signing silently use the string 'superSecret', accepting and issuing tokens signed with a guessable key. No code warns about the missing variable. The same fallback appears in token.utils.ts:4.",
+       "where": "src/app/routes/auth/auth.ts:16"
+      }
+     ]
+    },
+    {
+     "id": "sv-error-handler",
+     "title": "Error Handling",
+     "sub": "Global Express error middleware and the HttpException model",
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "A terminal error middleware handles three branches: `UnauthorizedError` from express-jwt → 401, `HttpException` with a numeric `errorCode` → that code, and any other `Error` → 500.",
+     "code": [
+      {
+       "file": "src/main.ts",
+       "start": 26,
+       "end": 47,
+       "label": "Global error handler with three branches"
+      },
+      {
+       "file": "src/app/models/http-exception.model.ts",
+       "start": 1,
+       "end": 10,
+       "label": "HttpException class: errorCode + message"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "map",
+       "caption": "Error type to HTTP response",
+       "rows": [
+        {
+         "from": "UnauthorizedError (express-jwt)",
+         "to": "401 { status: 'error', message: 'missing authorization credentials' }",
+         "state": "derived"
+        },
+        {
+         "from": "HttpException (has errorCode)",
+         "to": "err.errorCode status with err.message as JSON body",
+         "state": "derived"
+        },
+        {
+         "from": "Any other Error",
+         "to": "500 with err.message as JSON body",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Typical HttpException thrown by a service",
+       "value": "throw new HttpException(422, {\n  errors: { title: [\"can't be blank\"] }\n});",
+       "notes": [
+        {
+         "label": "errorCode",
+         "value": "Becomes the HTTP status code (e.g. 422, 404, 403)",
+         "state": "derived"
+        },
+        {
+         "label": "message",
+         "value": "Typed string | any — objects are passed directly to res.json()",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "HttpException status codes used across services",
+       "columns": [
+        "Code",
+        "Meaning",
+        "Example trigger"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "422",
+         "Validation failure",
+         "Blank title, duplicate email"
+        ],
+        [
+         "404",
+         "Not found",
+         "Article slug does not exist"
+        ],
+        [
+         "403",
+         "Forbidden",
+         "Editing another user's article"
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "getting-authenticated",
+   "title": "Getting Authenticated",
+   "sub": "User registration, login, current-user retrieval, profile update, JWT token issuance, and auth middleware",
+   "footprint": {
+    "dirs": [
+     "src/app/routes/auth"
+    ],
+    "files": 7
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Independent API capabilities sharing the auth service layer and JWT mechanism"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 1,
+   "detail": "Four endpoints under `/api` handle account creation, login, retrieval, and update. Every successful response includes a fresh JWT; protected routes validate tokens via `express-jwt` middleware.",
+   "code": [
+    {
+     "file": "src/app/routes/auth/auth.controller.ts",
+     "start": 14,
+     "end": 68,
+     "label": "Four route handlers for auth endpoints"
+    },
+    {
+     "file": "src/app/routes/auth/auth.service.ts",
+     "start": 38,
+     "end": 183,
+     "label": "Service functions: createUser, login, getCurrentUser, updateUser"
+    },
+    {
+     "file": "src/app/routes/auth/auth.ts",
+     "start": 14,
+     "end": 26,
+     "label": "JWT middleware definitions (required and optional)"
+    },
+    {
+     "file": "src/app/routes/routes.ts",
+     "start": 7,
+     "end": 13,
+     "label": "Auth controller mounted under /api"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "routes",
+     "rows": [
+      {
+       "method": "POST",
+       "path": "/api/users",
+       "auth": "none",
+       "state": "derived",
+       "note": "Register a new user"
+      },
+      {
+       "method": "POST",
+       "path": "/api/users/login",
+       "auth": "none",
+       "state": "derived",
+       "note": "Log in with email and password"
+      },
+      {
+       "method": "GET",
+       "path": "/api/user",
+       "auth": "required",
+       "state": "derived",
+       "note": "Current authenticated user"
+      },
+      {
+       "method": "PUT",
+       "path": "/api/user",
+       "auth": "required",
+       "state": "derived",
+       "note": "Update authenticated user"
+      }
+     ]
+    },
+    {
+     "kind": "diagram",
+     "caption": "How requests flow through the auth module to the database",
+     "boxes": [
+      {
+       "id": "client",
+       "label": "API Client",
+       "sub": "browser or mobile app",
+       "col": 0,
+       "row": 1
+      },
+      {
+       "id": "register-ep",
+       "label": "POST /users",
+       "sub": "registration endpoint",
+       "col": 1,
+       "row": 0,
+       "opens": "au-registration"
+      },
+      {
+       "id": "login-ep",
+       "label": "POST /users/login",
+       "sub": "login endpoint",
+       "col": 1,
+       "row": 1,
+       "opens": "au-login"
+      },
+      {
+       "id": "jwt-mw",
+       "label": "JWT Middleware",
+       "sub": "express-jwt guard",
+       "col": 1,
+       "row": 2,
+       "opens": "au-token"
+      },
+      {
+       "id": "auth-svc",
+       "label": "Auth Service",
+       "sub": "bcrypt, Prisma, tokens",
+       "col": 2,
+       "row": 0
+      },
+      {
+       "id": "user-ep",
+       "label": "GET & PUT /user",
+       "sub": "current user endpoints",
+       "col": 2,
+       "row": 2,
+       "opens": "au-user-mgmt"
+      },
+      {
+       "id": "token-utils",
+       "label": "Token Utils",
+       "sub": "signs {user: {id}}",
+       "col": 3,
+       "row": 1,
+       "opens": "au-token"
+      },
+      {
+       "id": "user-table",
+       "label": "User Table",
+       "sub": "PostgreSQL via Prisma",
+       "col": 3,
+       "row": 0
+      }
+     ],
+     "arrows": [
+      {
+       "from": "client",
+       "to": "register-ep",
+       "label": "no auth",
+       "at": "src/app/routes/auth/auth.controller.ts:14"
+      },
+      {
+       "from": "client",
+       "to": "login-ep",
+       "label": "no auth",
+       "at": "src/app/routes/auth/auth.controller.ts:30"
+      },
+      {
+       "from": "client",
+       "to": "jwt-mw",
+       "label": "Authorization header",
+       "at": "src/app/routes/auth/auth.ts:4"
+      },
+      {
+       "from": "register-ep",
+       "to": "auth-svc",
+       "label": "calls createUser",
+       "at": "src/app/routes/auth/auth.controller.ts:16"
+      },
+      {
+       "from": "login-ep",
+       "to": "auth-svc",
+       "label": "calls login",
+       "at": "src/app/routes/auth/auth.controller.ts:32"
+      },
+      {
+       "from": "jwt-mw",
+       "to": "user-ep",
+       "label": "decoded token",
+       "at": "src/app/routes/auth/auth.controller.ts:45"
+      },
+      {
+       "from": "user-ep",
+       "to": "auth-svc",
+       "label": "calls service",
+       "at": "src/app/routes/auth/auth.controller.ts:47"
+      },
+      {
+       "from": "auth-svc",
+       "to": "user-table",
+       "label": "Prisma queries",
+       "at": "src/app/routes/auth/auth.service.ts:60"
+      },
+      {
+       "from": "auth-svc",
+       "to": "token-utils",
+       "label": "calls generateToken",
+       "at": "src/app/routes/auth/auth.service.ts:80"
+      }
+     ]
+    }
+   ],
+   "children": [
+    {
+     "id": "au-registration",
+     "title": "User Registration",
+     "sub": "Creating a new account with email, username, and password",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/auth/auth.controller.ts",
+       "src/app/routes/auth/auth.service.ts",
+       "src/app/routes/auth/register-input.model.ts"
+      ],
+      "files": 3
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "`POST /api/users` trims and validates input, checks email and username uniqueness with two DB queries, hashes the password with bcrypt, and creates the user row.",
+     "code": [
+      {
+       "file": "src/app/routes/auth/auth.controller.ts",
+       "start": 14,
+       "end": 21,
+       "label": "POST /users route handler"
+      },
+      {
+       "file": "src/app/routes/auth/auth.service.ts",
+       "start": 38,
+       "end": 82,
+       "label": "createUser: validate, hash, store, return token"
+      },
+      {
+       "file": "src/app/routes/auth/auth.service.ts",
+       "start": 9,
+       "end": 36,
+       "label": "checkUserUniqueness: two findUnique queries"
+      },
+      {
+       "file": "src/app/routes/auth/register-input.model.ts",
+       "start": 1,
+       "end": 8,
+       "label": "RegisterInput interface"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Trim Input",
+         "detail": "Email, username, and password are trimmed of whitespace.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Validate Required Fields",
+         "detail": "Throws 422 if email, username, or password is blank after trimming.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Check Uniqueness",
+         "detail": "Two separate findUnique queries check email and username against existing users. Throws 422 listing which are taken.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Hash Password",
+         "detail": "Password is hashed with bcrypt at cost factor 10.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Create And Return",
+         "detail": "User row created via Prisma. Response includes id, email, username, bio, image, and a fresh JWT.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Registration input fields (RegisterInput interface)",
+       "columns": [
+        "Field",
+        "Type",
+        "Required"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "email",
+         "string",
+         "Yes — trimmed, must not be blank"
+        ],
+        [
+         "username",
+         "string",
+         "Yes — trimmed, must not be blank"
+        ],
+        [
+         "password",
+         "string",
+         "Yes — trimmed, hashed before storage"
+        ],
+        [
+         "image",
+         "string",
+         "No — optional profile image URL"
+        ],
+        [
+         "bio",
+         "string",
+         "No — optional biography text"
+        ],
+        [
+         "demo",
+         "boolean",
+         "No — forced to false by controller"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "au-login",
+     "title": "Logging In",
+     "sub": "Verifying credentials and issuing a token",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/auth/auth.controller.ts",
+       "src/app/routes/auth/auth.service.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "`POST /api/users/login` finds the user by email, compares the password with bcrypt, and returns the user with a fresh JWT. Both wrong-email and wrong-password yield the same 403.",
+     "code": [
+      {
+       "file": "src/app/routes/auth/auth.controller.ts",
+       "start": 30,
+       "end": 37,
+       "label": "POST /users/login route handler"
+      },
+      {
+       "file": "src/app/routes/auth/auth.service.ts",
+       "start": 84,
+       "end": 129,
+       "label": "login: lookup by email, bcrypt compare, return token or 403"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Trim Input",
+         "detail": "Email and password are trimmed of whitespace.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Validate Required Fields",
+         "detail": "Throws 422 if email or password is blank after trimming.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Find User By Email",
+         "detail": "Prisma findUnique by email, selecting id, email, username, password, bio, and image.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Compare Password",
+         "detail": "bcrypt.compare checks the input against the stored hash.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Return Or Reject",
+         "detail": "On match, returns user profile with fresh JWT. Otherwise throws 403 with generic 'email or password is invalid'.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Login request from client to database and back",
+       "actors": [
+        "Client",
+        "Auth Service",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "Auth Service",
+         "label": "POST /api/users/login with email and password",
+         "state": "derived"
+        },
+        {
+         "from": "Auth Service",
+         "to": "Database",
+         "label": "findUnique user by email",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Auth Service",
+         "label": "user row with hashed password, or null",
+         "state": "derived"
+        },
+        {
+         "from": "Auth Service",
+         "to": "Client",
+         "label": "200 with user and token, or 403 error",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "au-token",
+     "title": "Token Lifecycle",
+     "sub": "How JWTs are issued by service functions and validated by middleware",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/auth/token.utils.ts",
+       "src/app/routes/auth/auth.ts"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Generation and validation are independent mechanisms sharing the same secret"
+     },
+     "shape": {
+      "kind": "count",
+      "value": 60,
+      "unit": "day expiry"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "`generateToken` signs a JWT with the user's ID using HS256 and a 60-day expiry. `auth.required` and `auth.optional` middlewares decode tokens from the `Authorization` header.",
+     "code": [
+      {
+       "file": "src/app/routes/auth/token.utils.ts",
+       "start": 3,
+       "end": 6,
+       "label": "generateToken signs JWT with user ID"
+      },
+      {
+       "file": "src/app/routes/auth/auth.ts",
+       "start": 4,
+       "end": 26,
+       "label": "Header extraction and middleware definitions"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Both sides of the JWT share the same secret",
+       "boxes": [
+        {
+         "id": "gen",
+         "label": "generateToken",
+         "sub": "signs {user: {id}}",
+         "col": 0,
+         "row": 0,
+         "opens": "au-token-gen"
+        },
+        {
+         "id": "jwt-secret",
+         "label": "JWT_SECRET",
+         "sub": "env var or fallback",
+         "col": 0,
+         "row": 1,
+         "tone": "warn"
+        },
+        {
+         "id": "required",
+         "label": "auth.required",
+         "sub": "rejects without token",
+         "col": 1,
+         "row": 0,
+         "opens": "au-token-mw"
+        },
+        {
+         "id": "optional",
+         "label": "auth.optional",
+         "sub": "allows anonymous",
+         "col": 1,
+         "row": 1,
+         "opens": "au-token-mw"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "jwt-secret",
+         "to": "gen",
+         "label": "signs with",
+         "at": "src/app/routes/auth/token.utils.ts:4"
+        },
+        {
+         "from": "jwt-secret",
+         "to": "required",
+         "label": "verifies with",
+         "at": "src/app/routes/auth/auth.ts:16"
+        },
+        {
+         "from": "jwt-secret",
+         "to": "optional",
+         "label": "verifies with",
+         "at": "src/app/routes/auth/auth.ts:21"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Which auth mode each feature area uses",
+       "columns": [
+        "Auth Mode",
+        "Used By"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "none",
+         "Registration, login (2 routes)"
+        ],
+        [
+         "auth.required",
+         "User profile, article CRUD, comments, favorites, follows (12 routes)"
+        ],
+        [
+         "auth.optional",
+         "Article listing, single article, comments read, profiles, tags (5 routes)"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Hardcoded fallback JWT secret",
+       "detail": "Both token generation and middleware verification fall back to the string 'superSecret' when JWT_SECRET is unset. The server starts silently, and anyone who knows this default can forge tokens for any user ID.",
+       "where": "src/app/routes/auth/token.utils.ts:4"
+      }
+     ],
+     "children": [
+      {
+       "id": "au-token-gen",
+       "title": "Generating Tokens",
+       "sub": "Signing a JWT with the user ID and a 60-day expiry",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "`generateToken` calls `jwt.sign` with payload `{user: {id}}`, the `JWT_SECRET` env var (falling back to `'superSecret'`), and a 60-day expiry. No algorithm is explicitly specified.",
+       "code": [
+        {
+         "file": "src/app/routes/auth/token.utils.ts",
+         "start": 1,
+         "end": 9,
+         "label": "Full generateToken module"
+        },
+        {
+         "file": "src/app/routes/auth/auth.service.ts",
+         "start": 78,
+         "end": 81,
+         "label": "Called after user creation with user.id"
+        },
+        {
+         "file": "src/app/routes/auth/auth.service.ts",
+         "start": 117,
+         "end": 121,
+         "label": "Called after successful login"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "Algorithm",
+           "value": "HS256",
+           "state": "derived"
+          },
+          {
+           "label": "Expiry",
+           "value": "60 days",
+           "state": "derived"
+          },
+          {
+           "label": "Payload",
+           "value": "{user: {id: <number>}}",
+           "state": "derived"
+          },
+          {
+           "label": "Secret source",
+           "value": "process.env.JWT_SECRET || 'superSecret'",
+           "state": "derived"
+          },
+          {
+           "label": "Library",
+           "value": "jsonwebtoken",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "example",
+         "caption": "Decoded JWT payload (example)",
+         "value": "{\n  \"user\": {\n    \"id\": 123\n  },\n  \"iat\": 1700000000,\n  \"exp\": 1705184000\n}",
+         "notes": [
+          {
+           "label": "id",
+           "value": "Autoincrement primary key from the User table",
+           "state": "derived"
+          },
+          {
+           "label": "iat / exp",
+           "value": "Issued-at and expiry timestamps added by jsonwebtoken",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "au-token-mw",
+       "title": "Validating Tokens",
+       "sub": "Express middleware that decodes JWTs from the Authorization header",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "`express-jwt` middleware extracts the token from `Token <jwt>` or `Bearer <jwt>` in the Authorization header. `required` rejects unauthenticated requests; `optional` lets them through.",
+       "code": [
+        {
+         "file": "src/app/routes/auth/auth.ts",
+         "start": 4,
+         "end": 12,
+         "label": "getTokenFromHeaders parses Authorization"
+        },
+        {
+         "file": "src/app/routes/auth/auth.ts",
+         "start": 14,
+         "end": 26,
+         "label": "auth.required and auth.optional definitions"
+        },
+        {
+         "file": "src/app/routes/auth/auth.controller.ts",
+         "start": 45,
+         "end": 45,
+         "label": "auth.required used on GET /user"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "map",
+         "caption": "Authorization header parsing",
+         "rows": [
+          {
+           "from": "Token <jwt>",
+           "to": "Token extracted and decoded to req.auth",
+           "state": "derived"
+          },
+          {
+           "from": "Bearer <jwt>",
+           "to": "Token extracted and decoded to req.auth",
+           "state": "derived"
+          },
+          {
+           "from": "Other or missing",
+           "to": "null — rejected by required, ignored by optional",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "auth.required",
+           "value": "Rejects with 401 if token is absent or invalid",
+           "state": "derived"
+          },
+          {
+           "label": "auth.optional",
+           "value": "Sets req.auth if token present, allows through if not",
+           "state": "derived"
+          },
+          {
+           "label": "Decoded location",
+           "value": "req.auth.user.id",
+           "state": "derived"
+          },
+          {
+           "label": "Library",
+           "value": "express-jwt (expressjwt import)",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "au-user-mgmt",
+     "title": "Managing Your Account",
+     "sub": "Retrieving and updating the current user behind JWT auth",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/auth/auth.controller.ts",
+       "src/app/routes/auth/auth.service.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`GET /user` returns the current user by token ID; `PUT /user` updates any provided fields, re-hashing the password if included. Both require `auth.required`.",
+     "code": [
+      {
+       "file": "src/app/routes/auth/auth.controller.ts",
+       "start": 45,
+       "end": 52,
+       "label": "GET /user route handler"
+      },
+      {
+       "file": "src/app/routes/auth/auth.controller.ts",
+       "start": 61,
+       "end": 68,
+       "label": "PUT /user route handler"
+      },
+      {
+       "file": "src/app/routes/auth/auth.service.ts",
+       "start": 131,
+       "end": 149,
+       "label": "getCurrentUser: find by ID, return with token"
+      },
+      {
+       "file": "src/app/routes/auth/auth.service.ts",
+       "start": 151,
+       "end": 183,
+       "label": "updateUser: selective update with optional rehash"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Updatable fields via PUT /user",
+       "columns": [
+        "Field",
+        "Behavior On Update"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "email",
+         "Replaced if provided (no uniqueness check)"
+        ],
+        [
+         "username",
+         "Replaced if provided (no uniqueness check)"
+        ],
+        [
+         "password",
+         "Re-hashed with bcrypt cost 10, then stored"
+        ],
+        [
+         "image",
+         "Replaced if provided"
+        ],
+        [
+         "bio",
+         "Replaced if provided"
+        ]
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "GET /user request flow",
+       "actors": [
+        "Client",
+        "JWT Middleware",
+        "Service",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "JWT Middleware",
+         "label": "GET /api/user with JWT in Authorization header",
+         "state": "derived"
+        },
+        {
+         "from": "JWT Middleware",
+         "to": "Service",
+         "label": "decoded req.auth.user.id passed to getCurrentUser",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Database",
+         "label": "findUnique by id, selecting profile fields",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Service",
+         "label": "user row or null if deleted",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Client",
+         "label": "user profile with a fresh JWT",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "No uniqueness check on update",
+       "detail": "Unlike createUser, updateUser does not call checkUserUniqueness before writing. Changing email or username to one already taken throws a raw Prisma unique-constraint error instead of a structured 422 response.",
+       "where": "src/app/routes/auth/auth.service.ts:159"
+      },
+      {
+       "title": "Deleted user crashes getCurrentUser",
+       "detail": "If a user is deleted while their 60-day token is still valid, findUnique returns null. The result is cast to User and accessing user.id on line 147 throws an unhandled TypeError with no friendly error response.",
+       "where": "src/app/routes/auth/auth.service.ts:147"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "following-profiles",
+   "title": "Following Profiles",
+   "sub": "Viewing user profiles and managing follow and unfollow relationships",
+   "footprint": {
+    "dirs": [
+     "src/app/routes/profile"
+    ],
+    "files": 4
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Three independent aspects of the same module: reading a profile, toggling follows, and the shared data shape"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 2,
+   "detail": "Three endpoints under `/api/profiles/:username` let consumers view a public profile and toggle a follow relationship. All three return the same four-field `Profile` shape via `profileMapper`.",
+   "code": [
+    {
+     "file": "src/app/routes/profile/profile.controller.ts",
+     "start": 5,
+     "end": 67,
+     "label": "Profile router with all three route handlers"
+    },
+    {
+     "file": "src/app/routes/routes.ts",
+     "start": 10,
+     "end": 10,
+     "label": "Profile controller mounted under /api"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How profile requests flow through the module",
+     "boxes": [
+      {
+       "id": "auth",
+       "label": "Auth Middleware",
+       "sub": "JWT token extraction",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "view",
+       "label": "View Profile",
+       "sub": "GET with optional auth",
+       "col": 1,
+       "row": 0,
+       "opens": "pr-view"
+      },
+      {
+       "id": "toggle",
+       "label": "Toggle Follow",
+       "sub": "POST and DELETE with auth",
+       "col": 1,
+       "row": 1,
+       "opens": "pr-toggle"
+      },
+      {
+       "id": "user-tbl",
+       "label": "User Table",
+       "sub": "followedBy self-relation",
+       "col": 2,
+       "row": 0
+      },
+      {
+       "id": "shape",
+       "label": "Profile Mapper",
+       "sub": "User to Profile shape",
+       "col": 2,
+       "row": 1,
+       "opens": "pr-shape"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "auth",
+       "to": "view",
+       "label": "optional JWT",
+       "at": "src/app/routes/profile/profile.controller.ts:16"
+      },
+      {
+       "from": "auth",
+       "to": "toggle",
+       "label": "required JWT",
+       "at": "src/app/routes/profile/profile.controller.ts:36"
+      },
+      {
+       "from": "view",
+       "to": "user-tbl",
+       "label": "findUnique + followers",
+       "at": "src/app/routes/profile/profile.service.ts:6"
+      },
+      {
+       "from": "toggle",
+       "to": "user-tbl",
+       "label": "connect or disconnect",
+       "at": "src/app/routes/profile/profile.service.ts:23"
+      },
+      {
+       "from": "view",
+       "to": "shape",
+       "label": "maps response",
+       "at": "src/app/routes/profile/profile.service.ts:19"
+      },
+      {
+       "from": "toggle",
+       "to": "shape",
+       "label": "maps response",
+       "at": "src/app/routes/profile/profile.service.ts:39"
+      }
+     ]
+    },
+    {
+     "kind": "routes",
+     "rows": [
+      {
+       "method": "GET",
+       "path": "/api/profiles/:username",
+       "auth": "optional (auth.optional)",
+       "state": "derived",
+       "note": "Returns profile with following status"
+      },
+      {
+       "method": "POST",
+       "path": "/api/profiles/:username/follow",
+       "auth": "required (auth.required)",
+       "state": "derived",
+       "note": "Adds caller to target's followedBy"
+      },
+      {
+       "method": "DELETE",
+       "path": "/api/profiles/:username/follow",
+       "auth": "required (auth.required)",
+       "state": "derived",
+       "note": "Removes caller from target's followedBy"
+      }
+     ]
+    },
+    {
+     "kind": "schema",
+     "table": "User (follow-relevant fields from Prisma schema)",
+     "rows": [
+      {
+       "name": "id",
+       "type": "Int",
+       "key": "PK",
+       "state": "derived"
+      },
+      {
+       "name": "username",
+       "type": "String",
+       "key": "UQ",
+       "state": "derived",
+       "note": "lookup key for all three routes"
+      },
+      {
+       "name": "bio",
+       "type": "String?",
+       "nullable": true,
+       "state": "derived"
+      },
+      {
+       "name": "image",
+       "type": "String?",
+       "nullable": true,
+       "state": "derived",
+       "note": "defaults to smiley-cyrus.jpeg"
+      },
+      {
+       "name": "followedBy",
+       "type": "User[]",
+       "state": "derived",
+       "note": "self-relation via implicit _UserFollows join table"
+      },
+      {
+       "name": "following",
+       "type": "User[]",
+       "state": "derived",
+       "note": "other side of same UserFollows relation"
+      }
+     ],
+     "rel": [
+      "_UserFollows implicit join table (Prisma many-to-many)"
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "All followers loaded to check one id",
+     "detail": "Every service function uses `include: { followedBy: true }`, loading every follower as a full User record. The mapper then does a linear scan (`followedBy.some()`) for one id. For a user with many followers this is an unbounded query.",
+     "where": "src/app/routes/profile/profile.service.ts:11"
+    }
+   ],
+   "children": [
+    {
+     "id": "pr-view",
+     "title": "Viewing A Profile",
+     "sub": "Fetching a public profile with optional follow status for the caller",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "`GET /profiles/:username` uses optional JWT auth. The service queries the user with their full `followedBy` list, throws a 404 if not found, then maps to a `Profile`.",
+     "code": [
+      {
+       "file": "src/app/routes/profile/profile.controller.ts",
+       "start": 14,
+       "end": 25,
+       "label": "GET route handler with auth.optional"
+      },
+      {
+       "file": "src/app/routes/profile/profile.service.ts",
+       "start": 5,
+       "end": 20,
+       "label": "getProfile: findUnique, 404 check, profileMapper"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Optional JWT extraction",
+         "detail": "`auth.optional` runs express-jwt with `credentialsRequired: false`, so unauthenticated requests pass through with no `req.auth`.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Find user by username",
+         "detail": "`prisma.user.findUnique` with `include: { followedBy: true }` loads the user and all their followers as full User records.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "404 if not found",
+         "detail": "If `findUnique` returns null, throws `HttpException(404, {})`. This is the only service function in the module with an explicit existence check.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Map to Profile",
+         "detail": "`profileMapper` extracts username, bio, image, and computes `following` by scanning the `followedBy` array for the caller's id.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Request flow for viewing a profile",
+       "actors": [
+        "Client",
+        "Server",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "Server",
+         "label": "GET /api/profiles/:username (token optional)",
+         "state": "derived"
+        },
+        {
+         "from": "Server",
+         "to": "Database",
+         "label": "findUnique by username, include followedBy",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Server",
+         "label": "user record with all followers, or null",
+         "state": "derived"
+        },
+        {
+         "from": "Server",
+         "to": "Client",
+         "label": "{ profile } with following boolean, or 404",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "pr-toggle",
+     "title": "Following And Unfollowing",
+     "sub": "Adding or removing a follow relationship via Prisma connect and disconnect",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "POST and DELETE on `/profiles/:username/follow` require authentication. Both call `prisma.user.update` with `connect` or `disconnect` on the target's `followedBy` relation, with no prior existence check.",
+     "code": [
+      {
+       "file": "src/app/routes/profile/profile.controller.ts",
+       "start": 34,
+       "end": 45,
+       "label": "POST follow route with auth.required"
+      },
+      {
+       "file": "src/app/routes/profile/profile.controller.ts",
+       "start": 54,
+       "end": 65,
+       "label": "DELETE unfollow route with auth.required"
+      },
+      {
+       "file": "src/app/routes/profile/profile.service.ts",
+       "start": 22,
+       "end": 40,
+       "label": "followUser: connect caller's id to target's followedBy"
+      },
+      {
+       "file": "src/app/routes/profile/profile.service.ts",
+       "start": 42,
+       "end": 60,
+       "label": "unfollowUser: disconnect caller's id from target's followedBy"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "map",
+       "caption": "How follow and unfollow map to Prisma operations",
+       "rows": [
+        {
+         "from": "POST .../follow",
+         "to": "user.update with followedBy: { connect: { id } }",
+         "state": "derived"
+        },
+        {
+         "from": "DELETE .../follow",
+         "to": "user.update with followedBy: { disconnect: { id } }",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Follow request flow (unfollow is identical with disconnect)",
+       "actors": [
+        "Client",
+        "Server",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "Server",
+         "label": "POST /api/profiles/:username/follow with JWT",
+         "state": "derived"
+        },
+        {
+         "from": "Server",
+         "to": "Database",
+         "label": "user.update: connect caller id to followedBy",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Server",
+         "label": "updated user with full followedBy list",
+         "state": "derived"
+        },
+        {
+         "from": "Server",
+         "to": "Client",
+         "label": "{ profile } with following: true",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "No 404 for nonexistent target user",
+       "detail": "Unlike `getProfile`, `followUser` and `unfollowUser` go straight to `prisma.user.update` without checking the user exists. A nonexistent username causes a Prisma P2025 error instead of a clean `HttpException(404)`.",
+       "where": "src/app/routes/profile/profile.service.ts:23"
+      },
+      {
+       "title": "No self-follow prevention",
+       "detail": "Nothing checks whether the authenticated user's id belongs to the target username. A user can follow their own profile, and Prisma silently inserts a self-referencing row in the join table, which also makes the article feed return their own articles.",
+       "where": "src/app/routes/profile/profile.service.ts:22"
+      }
+     ]
+    },
+    {
+     "id": "pr-shape",
+     "title": "Profile Data Shape",
+     "sub": "The Profile interface and the mapper that builds it from a User record",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "`Profile` has four fields: `username`, `bio`, `image`, and `following`. The `profileMapper` builds it by scanning the target user's `followedBy` array for the caller's id.",
+     "code": [
+      {
+       "file": "src/app/routes/profile/profile.model.ts",
+       "start": 1,
+       "end": 6,
+       "label": "Profile interface definition"
+      },
+      {
+       "file": "src/app/routes/profile/profile.utils.ts",
+       "start": 4,
+       "end": 11,
+       "label": "profileMapper: User to Profile with following check"
+      },
+      {
+       "file": "src/app/routes/article/author.mapper.ts",
+       "start": 3,
+       "end": 10,
+       "label": "Near-identical authorMapper in article module"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Profile interface fields",
+       "columns": [
+        "Field",
+        "Type",
+        "Source"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "username",
+         "string",
+         "user.username"
+        ],
+        [
+         "bio",
+         "string",
+         "user.bio"
+        ],
+        [
+         "image",
+         "string",
+         "user.image"
+        ],
+        [
+         "following",
+         "boolean",
+         "true if caller's id is in user.followedBy"
+        ]
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Example profile response (synthesized from code)",
+       "value": "{\n  \"profile\": {\n    \"username\": \"jake\",\n    \"bio\": \"I work at statefarm\",\n    \"image\": \"https://api.realworld.io/images/smiley-cyrus.jpeg\",\n    \"following\": false\n  }\n}",
+       "notes": [
+        {
+         "label": "following: false",
+         "value": "caller is not authenticated, or their id is not in the user's followedBy list",
+         "state": "derived"
+        },
+        {
+         "label": "image default",
+         "value": "Prisma schema sets a default smiley-cyrus.jpeg URL when no image is provided",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "Two mappers that do the same job",
+       "rows": [
+        {
+         "from": "profileMapper (profile module)",
+         "to": "username, bio, image, following via followedBy.some()",
+         "state": "derived"
+        },
+        {
+         "from": "authorMapper (article module)",
+         "to": "username, bio, image, following via followedBy.some()",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Duplicate mapper logic in article module",
+       "detail": "`authorMapper` in the article module is a near-exact copy of `profileMapper` — same four fields, same `followedBy.some()` check. A change to one must be mirrored in the other or they diverge silently.",
+       "where": "src/app/routes/article/author.mapper.ts:3"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "working-with-articles",
+   "title": "Working With Articles",
+   "sub": "Article CRUD, listing and filtering, commenting, and favoriting",
+   "footprint": {
+    "dirs": [
+     "src/app/routes/article"
+    ],
+    "files": 6
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Four independent feature areas that all operate on the article table through Prisma"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 3,
+   "detail": "The article controller mounts 11 Express routes under `/api/articles`. Each delegates to a service function that calls Prisma, and two mappers (`articleMapper`, `authorMapper`) shape rows into the RealWorld API response format.",
+   "code": [
+    {
+     "file": "src/app/routes/article/article.controller.ts",
+     "start": 1,
+     "end": 17,
+     "label": "Router setup and service imports"
+    },
+    {
+     "file": "src/app/routes/article/article.service.ts",
+     "start": 1,
+     "end": 6,
+     "label": "Service imports: slugify, Prisma, mappers"
+    },
+    {
+     "file": "src/app/routes/routes.ts",
+     "start": 7,
+     "end": 13,
+     "label": "Article controller mounted under /api"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Four feature areas and their shared database",
+     "boxes": [
+      {
+       "id": "browsing",
+       "label": "Browsing Articles",
+       "sub": "list, filter, feed",
+       "col": 0,
+       "row": 0,
+       "opens": "ar-browsing"
+      },
+      {
+       "id": "lifecycle",
+       "label": "Article CRUD",
+       "sub": "create, read, update, delete",
+       "col": 2,
+       "row": 0,
+       "opens": "ar-lifecycle"
+      },
+      {
+       "id": "db",
+       "label": "Prisma Database",
+       "sub": "article, comment, tag, user",
+       "col": 1,
+       "row": 1
+      },
+      {
+       "id": "commenting",
+       "label": "Commenting",
+       "sub": "list, add, delete",
+       "col": 0,
+       "row": 2,
+       "opens": "ar-commenting"
+      },
+      {
+       "id": "favoriting",
+       "label": "Favoriting",
+       "sub": "favorite / unfavorite toggle",
+       "col": 2,
+       "row": 2,
+       "opens": "ar-favoriting"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "browsing",
+       "to": "db",
+       "label": "reads articles",
+       "at": "src/app/routes/article/article.service.ts:77"
+      },
+      {
+       "from": "lifecycle",
+       "to": "db",
+       "label": "writes articles",
+       "at": "src/app/routes/article/article.service.ts:197"
+      },
+      {
+       "from": "commenting",
+       "to": "db",
+       "label": "writes comments",
+       "at": "src/app/routes/article/article.service.ts:487"
+      },
+      {
+       "from": "favoriting",
+       "to": "db",
+       "label": "updates favoritedBy",
+       "at": "src/app/routes/article/article.service.ts:563"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "All article endpoints with authentication requirements",
+     "columns": [
+      "Method",
+      "Path",
+      "Auth"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "GET",
+       "/articles",
+       "optional"
+      ],
+      [
+       "GET",
+       "/articles/feed",
+       "required"
+      ],
+      [
+       "POST",
+       "/articles",
+       "required"
+      ],
+      [
+       "GET",
+       "/articles/:slug",
+       "optional"
+      ],
+      [
+       "PUT",
+       "/articles/:slug",
+       "required"
+      ],
+      [
+       "DELETE",
+       "/articles/:slug",
+       "required"
+      ],
+      [
+       "GET",
+       "/articles/:slug/comments",
+       "optional"
+      ],
+      [
+       "POST",
+       "/articles/:slug/comments",
+       "required"
+      ],
+      [
+       "DELETE",
+       "/articles/:slug/comments/:id",
+       "required"
+      ],
+      [
+       "POST",
+       "/articles/:slug/favorite",
+       "required"
+      ],
+      [
+       "DELETE",
+       "/articles/:slug/favorite",
+       "required"
+      ]
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Favorite endpoints leak user passwords",
+     "detail": "`favoriteArticle` and `unfavoriteArticle` spread the raw Prisma article into the response. The `favoritedBy` field is an array of full User records including `password` and `email`. The `articleMapper` used by all other endpoints strips these fields, but the favorite functions bypass it.",
+     "where": "src/app/routes/article/article.service.ts:597"
+    }
+   ],
+   "children": [
+    {
+     "id": "ar-browsing",
+     "title": "Browsing Articles",
+     "sub": "Listing, filtering, and feed of articles from followed authors",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/article"
+      ],
+      "files": 3
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Two independent read paths: global list with filters and personal feed"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Both paths include a demo-user filter: anonymous users see only demo content, authenticated users see demo articles plus their own. Every query loads the full `favoritedBy` and `followedBy` user arrays into memory just for a boolean check and a count.",
+     "code": [
+      {
+       "file": "src/app/routes/article/article.controller.ts",
+       "start": 30,
+       "end": 37,
+       "label": "GET /articles route with optional auth"
+      },
+      {
+       "file": "src/app/routes/article/article.controller.ts",
+       "start": 45,
+       "end": 60,
+       "label": "GET /articles/feed route with required auth"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 8,
+       "end": 67,
+       "label": "buildFindAllQuery: constructs the demo + user filter and optional params"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Two read paths to the article table",
+       "boxes": [
+        {
+         "id": "list",
+         "label": "Global List",
+         "sub": "filter by tag/author/favorited",
+         "col": 0,
+         "row": 0,
+         "opens": "ar-list"
+        },
+        {
+         "id": "feed",
+         "label": "Personal Feed",
+         "sub": "followed authors only",
+         "col": 2,
+         "row": 0,
+         "opens": "ar-feed"
+        },
+        {
+         "id": "mapper",
+         "label": "Article Mapper",
+         "sub": "strips internal fields",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "prisma",
+         "label": "Prisma DB",
+         "sub": "article + user + tag tables",
+         "col": 1,
+         "row": 2
+        }
+       ],
+       "arrows": [
+        {
+         "from": "list",
+         "to": "prisma",
+         "label": "findMany with filters",
+         "at": "src/app/routes/article/article.service.ts:77"
+        },
+        {
+         "from": "feed",
+         "to": "prisma",
+         "label": "findMany by followed",
+         "at": "src/app/routes/article/article.service.ts:122"
+        },
+        {
+         "from": "list",
+         "to": "mapper",
+         "label": "maps each result",
+         "at": "src/app/routes/article/article.service.ts:108"
+        },
+        {
+         "from": "feed",
+         "to": "mapper",
+         "label": "maps each result",
+         "at": "src/app/routes/article/article.service.ts:157"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Single-article fetch skips demo filter",
+       "detail": "`getArticle` (GET /articles/:slug) queries by slug only with no author filter. An article hidden from listings by the demo filter is still accessible directly if the slug is known.",
+       "where": "src/app/routes/article/article.service.ts:242"
+      }
+     ],
+     "children": [
+      {
+       "id": "ar-list",
+       "title": "Global Article List",
+       "sub": "Paginated articles filtered by tag, author, or favorited username",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "`getArticles` builds a compound AND query: always a demo-or-self author filter, plus optional tag, author username, and favorited-by username clauses. Results are paginated by `offset` and `limit`.",
+       "code": [
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 8,
+         "end": 67,
+         "label": "buildFindAllQuery: composes the Prisma WHERE from query params"
+        },
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 69,
+         "end": 111,
+         "label": "getArticles: count, findMany, map results"
+        },
+        {
+         "file": "src/app/routes/article/article.mapper.ts",
+         "start": 3,
+         "end": 14,
+         "label": "articleMapper: picks slug, title, description, body, favorited, favoritesCount, author"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "map",
+         "caption": "Query parameters to Prisma WHERE clauses",
+         "rows": [
+          {
+           "from": "(always)",
+           "to": "author: OR [demo=true, id=user]",
+           "state": "derived"
+          },
+          {
+           "from": "?tag=X",
+           "to": "tagList: some { name: X }",
+           "state": "derived"
+          },
+          {
+           "from": "?author=X",
+           "to": "author: AND [{ username: X }]",
+           "state": "derived"
+          },
+          {
+           "from": "?favorited=X",
+           "to": "favoritedBy: some { username: X }",
+           "state": "derived"
+          },
+          {
+           "from": "?offset=N&limit=M",
+           "to": "skip: N (default 0), take: M (default 10)",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "Sort order",
+           "value": "createdAt descending",
+           "state": "derived"
+          },
+          {
+           "label": "Default page size",
+           "value": "10 articles",
+           "state": "derived"
+          },
+          {
+           "label": "Response shape",
+           "value": "{ articles: [...], articlesCount: N }",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "ar-feed",
+       "title": "Personal Feed",
+       "sub": "Paginated articles from authors the current user follows",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "`getFeed` queries for articles whose author has the current user in their `followedBy` list, i.e., authors the current user follows. Unlike the global list, it has no demo filter — it only shows articles from followed authors.",
+       "code": [
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 113,
+         "end": 160,
+         "label": "getFeed: count + findMany where author is followed by current user"
+        },
+        {
+         "file": "src/app/routes/article/article.controller.ts",
+         "start": 45,
+         "end": 60,
+         "label": "GET /articles/feed route, auth required"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "sequence",
+         "caption": "How the feed is fetched",
+         "actors": [
+          "Client",
+          "Controller",
+          "Service",
+          "Prisma"
+         ],
+         "rows": [
+          {
+           "from": "Client",
+           "to": "Controller",
+           "label": "GET /articles/feed?offset=0&limit=10 with JWT",
+           "state": "derived"
+          },
+          {
+           "from": "Controller",
+           "to": "Service",
+           "label": "getFeed(offset, limit, userId)",
+           "state": "derived"
+          },
+          {
+           "from": "Service",
+           "to": "Prisma",
+           "label": "count articles where author.followedBy has userId",
+           "state": "derived"
+          },
+          {
+           "from": "Service",
+           "to": "Prisma",
+           "label": "findMany same filter, ordered by createdAt desc",
+           "state": "derived"
+          },
+          {
+           "from": "Prisma",
+           "to": "Service",
+           "label": "article rows with tags, author, favoritedBy",
+           "state": "derived"
+          },
+          {
+           "from": "Service",
+           "to": "Controller",
+           "label": "{ articles: mapped[], articlesCount }",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "ar-lifecycle",
+     "title": "Article CRUD",
+     "sub": "Creating, reading, updating, and deleting articles with slug-based addressing",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/article"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Three write operations; reading a single article is handled by getArticle"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "Articles are addressed by slug (`slugify(title)-userId`); only the author can update or delete. Tags use a many-to-many relation with Prisma `connectOrCreate`.",
+     "code": [
+      {
+       "file": "src/app/routes/article/article.controller.ts",
+       "start": 71,
+       "end": 78,
+       "label": "POST /articles route"
+      },
+      {
+       "file": "src/app/routes/article/article.controller.ts",
+       "start": 110,
+       "end": 140,
+       "label": "PUT and DELETE /articles/:slug routes"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 162,
+       "end": 178,
+       "label": "createArticle: validation and slug generation"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 241,
+       "end": 274,
+       "label": "getArticle: fetch single article by slug"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Three write operations and the shared database",
+       "boxes": [
+        {
+         "id": "create",
+         "label": "Creating",
+         "sub": "validate, slug, tags, insert",
+         "col": 0,
+         "row": 0,
+         "opens": "ar-create"
+        },
+        {
+         "id": "update",
+         "label": "Updating",
+         "sub": "auth check, regen slug, tags",
+         "col": 1,
+         "row": 0,
+         "opens": "ar-update"
+        },
+        {
+         "id": "delete",
+         "label": "Deleting",
+         "sub": "auth check then remove",
+         "col": 2,
+         "row": 0,
+         "opens": "ar-delete"
+        },
+        {
+         "id": "db",
+         "label": "Prisma DB",
+         "sub": "article + tag tables",
+         "col": 1,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "create",
+         "to": "db",
+         "label": "article.create",
+         "at": "src/app/routes/article/article.service.ts:197"
+        },
+        {
+         "from": "update",
+         "to": "db",
+         "label": "article.update",
+         "at": "src/app/routes/article/article.service.ts:345"
+        },
+        {
+         "from": "delete",
+         "to": "db",
+         "label": "article.delete",
+         "at": "src/app/routes/article/article.service.ts:409"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Slug format",
+         "value": "slugify(title)-userId, e.g. How-to-train-your-dragon-123",
+         "state": "derived"
+        },
+        {
+         "label": "Uniqueness",
+         "value": "Slug is unique; same title by different users produces different slugs",
+         "state": "derived"
+        },
+        {
+         "label": "Tag handling",
+         "value": "Tags are connectOrCreate: created if new, linked if existing",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "ar-create",
+       "title": "Creating An Article",
+       "sub": "Validates fields, generates slug, connects tags, and inserts into the database",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "`createArticle` requires title, description, and body. It generates a slug from `slugify(title)-userId`, checks uniqueness, and uses `connectOrCreate` to link or create tags.",
+       "code": [
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 162,
+         "end": 239,
+         "label": "createArticle: full function with validation, slug, tags, and Prisma create"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Validate required fields",
+           "detail": "Throws 422 if title, description, or body is missing.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Generate slug",
+           "detail": "Built as `slugify(title)-userId`. Two users can have the same title.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Check uniqueness",
+           "detail": "Looks up existing article by slug; throws 422 if the same user already used this title.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Create with tags",
+           "detail": "Prisma `article.create` with `connectOrCreate` for each tag string. Author connected by user id.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Map and return",
+           "detail": "Passes through `articleMapper` to strip internal fields before returning.",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "ar-update",
+       "title": "Updating An Article",
+       "sub": "Checks authorship, regenerates slug if title changed, disconnects and reconnects tags",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "`updateArticle` verifies the caller is the author (403 otherwise) and regenerates the slug if the title changes. Tags are always disconnected first, then reconnected from the request body.",
+       "code": [
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 289,
+         "end": 383,
+         "label": "updateArticle: auth check, slug regen, tag disconnect/reconnect, Prisma update"
+        },
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 276,
+         "end": 287,
+         "label": "disconnectArticlesTags: sets tagList to empty array"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Verify authorship",
+           "detail": "Fetches article by slug; throws 404 if missing, 403 if caller is not the author.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Regenerate slug",
+           "detail": "If title changed, builds new slug as `slugify(newTitle)-userId` and checks uniqueness.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Disconnect all tags",
+           "detail": "`disconnectArticlesTags` sets the article's tagList to [] unconditionally.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Reconnect tags",
+           "detail": "If tagList is provided and non-empty, `connectOrCreate` links each tag. Otherwise none are reconnected.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Apply update",
+           "detail": "Updates only provided fields (title, body, description, slug) plus `updatedAt`.",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Updating without tagList strips all tags",
+         "detail": "`disconnectArticlesTags` runs unconditionally on every update. If the request body omits `tagList`, the empty-array fallback means no tags are reconnected, silently removing all existing tags from the article.",
+         "where": "src/app/routes/article/article.service.ts:343"
+        }
+       ]
+      },
+      {
+       "id": "ar-delete",
+       "title": "Deleting An Article",
+       "sub": "Checks authorship then removes the article and its cascaded relations",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "`deleteArticle` verifies the caller is the author (403 otherwise), then calls `prisma.article.delete`. Comments cascade-delete via the schema's `onDelete: Cascade`.",
+       "code": [
+        {
+         "file": "src/app/routes/article/article.service.ts",
+         "start": 385,
+         "end": 414,
+         "label": "deleteArticle: auth check and Prisma delete"
+        },
+        {
+         "file": "src/prisma/schema.prisma",
+         "start": 30,
+         "end": 31,
+         "label": "Comment onDelete: Cascade from article"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Fetch and verify",
+           "detail": "Finds article by slug, checks that the author id matches the caller. Throws 404 or 403.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Delete article",
+           "detail": "Prisma `article.delete` by slug. Comments are cascade-deleted by the database.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Return 204",
+           "detail": "Controller sends 204 No Content with no body.",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "ar-commenting",
+     "title": "Commenting",
+     "sub": "Listing, adding, and deleting comments on articles",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/article"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Comments are filtered to show only demo users' and the current user's comments. Adding validates the body but skips article existence; deleting checks ownership via a combined query.",
+     "code": [
+      {
+       "file": "src/app/routes/article/article.controller.ts",
+       "start": 149,
+       "end": 201,
+       "label": "GET, POST, DELETE comment routes"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 416,
+       "end": 471,
+       "label": "getCommentsByArticle: demo + self filter, author follow mapping"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 473,
+       "end": 525,
+       "label": "addComment: validate body, create via Prisma"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 527,
+       "end": 560,
+       "label": "deleteComment: ownership check and delete"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Adding a comment to an article",
+       "actors": [
+        "Client",
+        "Service",
+        "Prisma"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "Service",
+         "label": "addComment(body, slug, userId)",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Service",
+         "label": "validate body is non-empty, else 422",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Prisma",
+         "label": "article.findUnique({ slug }) for id",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Prisma",
+         "label": "comment.create connected to article and author",
+         "state": "derived"
+        },
+        {
+         "from": "Prisma",
+         "to": "Service",
+         "label": "comment with author (including followedBy)",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Client",
+         "label": "{ id, createdAt, updatedAt, body, author }",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "Comment visibility rules in getCommentsByArticle",
+       "rows": [
+        {
+         "from": "Anonymous user",
+         "to": "Only comments by demo users",
+         "state": "derived"
+        },
+        {
+         "from": "Authenticated user",
+         "to": "Comments by demo users OR self",
+         "state": "derived"
+        },
+        {
+         "from": "Other real users' comments",
+         "to": "Hidden from all other users",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Adding a comment to a missing article crashes",
+       "detail": "`addComment` calls `article.findUnique` but does not check if the result is null. When the article does not exist, `article?.id` is undefined and Prisma throws a validation error instead of the service returning a clean 404.",
+       "where": "src/app/routes/article/article.service.ts:491"
+      },
+      {
+       "title": "Delete ignores the slug URL parameter",
+       "detail": "`deleteComment` receives only the comment id and user id. The `:slug` in the URL is never checked, so a DELETE to `/articles/wrong-slug/comments/42` will delete comment 42 from any article as long as the user owns it.",
+       "where": "src/app/routes/article/article.service.ts:527"
+      }
+     ]
+    },
+    {
+     "id": "ar-favoriting",
+     "title": "Favoriting",
+     "sub": "Adding or removing the current user from an article's favoritedBy list",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/article"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`favoriteArticle` and `unfavoriteArticle` use Prisma `connect`/`disconnect` on the many-to-many `favoritedBy` relation. Unlike other endpoints, they bypass `articleMapper` and spread the raw Prisma object into the response.",
+     "code": [
+      {
+       "file": "src/app/routes/article/article.controller.ts",
+       "start": 210,
+       "end": 241,
+       "label": "POST and DELETE /articles/:slug/favorite routes"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 562,
+       "end": 606,
+       "label": "favoriteArticle: connect user, build response with spread"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 608,
+       "end": 652,
+       "label": "unfavoriteArticle: disconnect user, same spread pattern"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Favoriting an article",
+       "actors": [
+        "Client",
+        "Controller",
+        "Service",
+        "Prisma"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "Controller",
+         "label": "POST /articles/:slug/favorite with JWT",
+         "state": "derived"
+        },
+        {
+         "from": "Controller",
+         "to": "Service",
+         "label": "favoriteArticle(slug, userId)",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Prisma",
+         "label": "article.update: connect userId to favoritedBy",
+         "state": "derived"
+        },
+        {
+         "from": "Prisma",
+         "to": "Service",
+         "label": "updated article with full favoritedBy User records",
+         "note": "includes id, email, password, username of every user who favorited",
+         "state": "derived"
+        },
+        {
+         "from": "Service",
+         "to": "Client",
+         "label": "{ ...article, author, tagList, favorited, favoritesCount }",
+         "note": "favoritedBy array with passwords still in the spread",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Fields in the favorite response vs the normal article response",
+       "columns": [
+        "Field",
+        "articleMapper (others)",
+        "favoriteArticle"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "slug, title, description, body",
+         "included",
+         "included (via spread)"
+        ],
+        [
+         "tagList",
+         "mapped to string[]",
+         "mapped to string[]"
+        ],
+        [
+         "author",
+         "via authorMapper",
+         "via profileMapper"
+        ],
+        [
+         "favorited, favoritesCount",
+         "from .length",
+         "from _count"
+        ],
+        [
+         "id, authorId",
+         "stripped",
+         "leaked via spread"
+        ],
+        [
+         "favoritedBy (User[])",
+         "stripped",
+         "leaked with passwords"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Response includes user passwords",
+       "detail": "The `favoritedBy` array in the response contains full Prisma User records — including `password` (the hash), `email`, and `id` — for every user who favorited the article. The `...article` spread includes this array, and nothing overrides it.",
+       "where": "src/app/routes/article/article.service.ts:597"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "browsing-tags",
+   "title": "Browsing Tags",
+   "sub": "Listing the most popular tags for content discovery",
+   "state": "derived",
+   "col": 0,
+   "row": 4,
+   "detail": "A single GET endpoint returns up to 10 tag names ordered by article count. A `demo`-user filter means anonymous visitors see only tags from seed data, and logged-in users see those plus their own.",
+   "footprint": {
+    "dirs": [
+     "src/app/routes/tag"
+    ],
+    "files": 3
+   },
+   "group": {
+    "ordering": "sequence"
+   },
+   "code": [
+    {
+     "file": "src/app/routes/tag/tag.controller.ts",
+     "start": 13,
+     "end": 20,
+     "label": "GET /api/tags route handler"
+    },
+    {
+     "file": "src/app/routes/tag/tag.service.ts",
+     "start": 4,
+     "end": 38,
+     "label": "getTags builds the Prisma query"
+    },
+    {
+     "file": "src/app/routes/tag/tag.model.ts",
+     "start": 1,
+     "end": 3,
+     "label": "Tag interface"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Request path from client to database and back",
+     "boxes": [
+      {
+       "id": "client",
+       "label": "Client",
+       "sub": "GET /api/tags",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "auth-mw",
+       "label": "Auth Middleware",
+       "sub": "optional JWT check",
+       "col": 1,
+       "row": 0,
+       "opens": "tg-endpoint"
+      },
+      {
+       "id": "controller",
+       "label": "Tag Controller",
+       "sub": "calls getTags, wraps JSON",
+       "col": 2,
+       "row": 0,
+       "opens": "tg-endpoint"
+      },
+      {
+       "id": "service",
+       "label": "Tag Service",
+       "sub": "builds Prisma query",
+       "col": 3,
+       "row": 0,
+       "opens": "tg-query"
+      },
+      {
+       "id": "tag-tbl",
+       "label": "Tag Table",
+       "sub": "id, name (unique)",
+       "col": 4,
+       "row": 0,
+       "opens": "tg-data"
+      },
+      {
+       "id": "article-tbl",
+       "label": "Article Table",
+       "sub": "joined for count + author",
+       "col": 4,
+       "row": 1
+      }
+     ],
+     "arrows": [
+      {
+       "from": "client",
+       "to": "auth-mw",
+       "label": "request",
+       "at": "src/app/routes/tag/tag.controller.ts:13"
+      },
+      {
+       "from": "auth-mw",
+       "to": "controller",
+       "label": "req.auth?.user?.id",
+       "at": "src/app/routes/tag/tag.controller.ts:15"
+      },
+      {
+       "from": "controller",
+       "to": "service",
+       "label": "getTags(id?)",
+       "at": "src/app/routes/tag/tag.controller.ts:15"
+      },
+      {
+       "from": "service",
+       "to": "tag-tbl",
+       "label": "findMany top 10",
+       "at": "src/app/routes/tag/tag.service.ts:16"
+      },
+      {
+       "from": "service",
+       "to": "article-tbl",
+       "label": "join via articles",
+       "at": "src/app/routes/tag/tag.service.ts:18"
+      }
+     ]
+    },
+    {
+     "kind": "routes",
+     "rows": [
+      {
+       "method": "GET",
+       "path": "/api/tags",
+       "auth": "optional",
+       "state": "derived",
+       "note": "Returns { tags: string[] }"
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "caption": "Response shape",
+     "value": "{\n  \"tags\": [\n    \"robotics\",\n    \"cooking\",\n    \"travel\",\n    \"javascript\"\n  ]\n}",
+     "notes": [
+      {
+       "label": "length",
+       "value": "At most 10 tag names, ordered by article count descending",
+       "state": "derived"
+      },
+      {
+       "label": "filtering",
+       "value": "Only tags on articles by demo users (always) and the authenticated user (if logged in)",
+       "state": "derived"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Tags from real users are invisible to others",
+     "detail": "The query always filters articles to those whose author has `demo: true` OR matches the current user id. Tags that appear only on other non-demo users' articles are never returned, making the \"popular tags\" list incomplete for any real multi-user deployment.",
+     "where": "src/app/routes/tag/tag.service.ts:6"
+    }
+   ],
+   "edges": [
+    {
+     "from": "tg-endpoint",
+     "to": "tg-query",
+     "state": "derived",
+     "label": "calls getTags",
+     "order": 1
+    },
+    {
+     "from": "tg-query",
+     "to": "tg-data",
+     "state": "derived",
+     "label": "queries tag table",
+     "order": 2
+    }
+   ],
+   "children": [
+    {
+     "id": "tg-endpoint",
+     "title": "Tag Endpoint",
+     "sub": "The Express route that receives the request and returns the tag list",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "A single GET handler on `/api/tags` applies `auth.optional` to parse a JWT if present, passes the user id to the service, and wraps the result as `{ tags }`. Errors are forwarded to Express error handling via `next`.",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/tag/tag.controller.ts"
+      ],
+      "files": 1
+     },
+     "code": [
+      {
+       "file": "src/app/routes/tag/tag.controller.ts",
+       "start": 1,
+       "end": 23,
+       "label": "Complete tag controller"
+      },
+      {
+       "file": "src/app/routes/auth/auth.ts",
+       "start": 20,
+       "end": 25,
+       "label": "auth.optional middleware definition"
+      },
+      {
+       "file": "src/app/routes/routes.ts",
+       "start": 7,
+       "end": 13,
+       "label": "Controller mounted under /api"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Request lifecycle for GET /api/tags",
+       "actors": [
+        "Client",
+        "auth.optional",
+        "Controller",
+        "getTags"
+       ],
+       "rows": [
+        {
+         "from": "Client",
+         "to": "auth.optional",
+         "label": "GET /api/tags with optional Authorization header",
+         "state": "derived"
+        },
+        {
+         "from": "auth.optional",
+         "to": "Controller",
+         "label": "Populates req.auth.user.id if token valid, continues either way",
+         "state": "derived"
+        },
+        {
+         "from": "Controller",
+         "to": "getTags",
+         "label": "getTags(req.auth?.user?.id)",
+         "state": "derived"
+        },
+        {
+         "from": "getTags",
+         "to": "Controller",
+         "label": "string[] of tag names",
+         "state": "derived"
+        },
+        {
+         "from": "Controller",
+         "to": "Client",
+         "label": "res.json({ tags })",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "HTTP method",
+         "value": "GET",
+         "state": "derived"
+        },
+        {
+         "label": "Path",
+         "value": "/api/tags (mounted via /api prefix in routes.ts)",
+         "state": "derived"
+        },
+        {
+         "label": "Auth",
+         "value": "Optional — express-jwt with credentialsRequired: false",
+         "state": "derived"
+        },
+        {
+         "label": "Error handling",
+         "value": "try/catch forwards to next(error)",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "tg-query",
+     "title": "Tag Query Logic",
+     "sub": "The Prisma query that selects up to 10 tags ordered by article count",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "Builds an OR filter on article authors — always includes `demo: true` users, and adds the caller's id when authenticated. Tags are ordered by total article count (not just filtered articles) descending and capped at 10.",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/tag/tag.service.ts"
+      ],
+      "files": 1
+     },
+     "code": [
+      {
+       "file": "src/app/routes/tag/tag.service.ts",
+       "start": 4,
+       "end": 38,
+       "label": "getTags function: builds and executes the Prisma query"
+      },
+      {
+       "file": "src/app/routes/tag/tag.service.ts",
+       "start": 5,
+       "end": 14,
+       "label": "Building the OR queries array with demo + optional user id"
+      },
+      {
+       "file": "src/app/routes/tag/tag.service.ts",
+       "start": 16,
+       "end": 35,
+       "label": "Prisma findMany with where, select, orderBy, take"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Build author filter",
+         "detail": "Starts with `{ demo: true }`. If an id is passed, adds `{ id: { equals: id } }` to the same OR array.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Filter tags by articles",
+         "detail": "Finds tags where `articles.some.author` matches the OR filter — only tags used on qualifying articles survive.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Order by popularity",
+         "detail": "Sorts by `articles._count: 'desc'` so the most-used tags come first.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Cap and map",
+         "detail": "`take: 10` limits the result. Each tag object is mapped to its `name` string before returning.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "What the caller sees depending on authentication",
+       "rows": [
+        {
+         "from": "Anonymous (no token)",
+         "to": "Tags from articles by demo users only",
+         "state": "derived"
+        },
+        {
+         "from": "Logged-in user",
+         "to": "Tags from articles by demo users OR the logged-in user",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Prisma query generated (simplified)",
+       "value": "prisma.tag.findMany({\n  where: {\n    articles: {\n      some: {\n        author: {\n          OR: [\n            { demo: true },\n            { id: { equals: 42 } }\n          ]\n        }\n      }\n    }\n  },\n  select: { name: true },\n  orderBy: { articles: { _count: 'desc' } },\n  take: 10\n})"
+      }
+     ],
+     "issues": [
+      {
+       "title": "Article count includes non-qualifying articles",
+       "detail": "The `orderBy` counts ALL articles per tag, not just those matching the `where` filter's author clause. A tag popular among non-demo users but rarely used by demo users still ranks high, even though its qualifying articles are few. The ranking and the filtering disagree.",
+       "where": "src/app/routes/tag/tag.service.ts:29"
+      }
+     ]
+    },
+    {
+     "id": "tg-data",
+     "title": "Tag Data Model",
+     "sub": "The Prisma schema, TypeScript interface, and how tags are created",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Tags are rows in a `Tag` table with a unique `name`, created via `connectOrCreate` when articles are published. The seed script generates 4 random-word tags per article across 144 demo articles.",
+     "footprint": {
+      "dirs": [
+       "src/app/routes/tag/tag.model.ts",
+       "src/prisma/schema.prisma"
+      ],
+      "files": 2
+     },
+     "code": [
+      {
+       "file": "src/prisma/schema.prisma",
+       "start": 37,
+       "end": 41,
+       "label": "Tag model in Prisma schema"
+      },
+      {
+       "file": "src/app/routes/tag/tag.model.ts",
+       "start": 1,
+       "end": 3,
+       "label": "TypeScript Tag interface"
+      },
+      {
+       "file": "src/app/routes/article/article.service.ts",
+       "start": 203,
+       "end": 207,
+       "label": "Tags are connectOrCreate'd when an article is created"
+      },
+      {
+       "file": "src/prisma/seed.ts",
+       "start": 25,
+       "end": 34,
+       "label": "Seed generates 4 random tags per article"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "schema",
+       "table": "Tag",
+       "rows": [
+        {
+         "name": "id",
+         "type": "Int",
+         "key": "PK",
+         "nullable": false,
+         "state": "derived",
+         "note": "Auto-increment"
+        },
+        {
+         "name": "name",
+         "type": "String",
+         "key": "UQ",
+         "nullable": false,
+         "state": "derived",
+         "note": "The tag text, unique across the system"
+        },
+        {
+         "name": "articles",
+         "type": "Article[]",
+         "nullable": false,
+         "state": "derived",
+         "note": "Implicit many-to-many join table managed by Prisma"
+        }
+       ],
+       "rel": [
+        "Article.tagList <-> Tag.articles (implicit many-to-many)"
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "How tags enter the database — there is no tag-creation API",
+       "boxes": [
+        {
+         "id": "create-art",
+         "label": "Create Article",
+         "sub": "POST /api/articles",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "update-art",
+         "label": "Update Article",
+         "sub": "PUT /api/articles/:slug",
+         "col": 0,
+         "row": 1
+        },
+        {
+         "id": "connect-or-create",
+         "label": "connectOrCreate",
+         "sub": "Prisma upserts each tag",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "tag-row",
+         "label": "Tag Row",
+         "sub": "name is unique key",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "join-tbl",
+         "label": "Join Table",
+         "sub": "_ArticleToTag (implicit)",
+         "col": 2,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "create-art",
+         "to": "connect-or-create",
+         "label": "tagList strings",
+         "at": "src/app/routes/article/article.service.ts:203"
+        },
+        {
+         "from": "update-art",
+         "to": "connect-or-create",
+         "label": "tagList strings",
+         "at": "src/app/routes/article/article.service.ts:335"
+        },
+        {
+         "from": "connect-or-create",
+         "to": "tag-row",
+         "label": "create if missing",
+         "at": "src/app/routes/article/article.service.ts:205"
+        },
+        {
+         "from": "connect-or-create",
+         "to": "join-tbl",
+         "label": "links article ↔ tag",
+         "at": "src/app/routes/article/article.service.ts:203"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "No orphan cleanup",
+         "value": "When an article is deleted or its tags are changed, old Tag rows remain even if no articles reference them",
+         "state": "inferred"
+        },
+        {
+         "label": "Seed data",
+         "value": "12 demo users × 12 articles × 4 random-word tags = up to 576 tag rows",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Orphan tags accumulate forever",
+       "detail": "Tags are created via connectOrCreate but never deleted. When an article is removed or its tagList is replaced, the old Tag rows remain with no articles referencing them.",
+       "where": "src/app/routes/article/article.service.ts:205"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "the-database",
+   "title": "The Database",
+   "sub": "Prisma schema, SQL migrations, singleton client, and seed script for a PostgreSQL backend",
+   "footprint": {
+    "dirs": [
+     "src/prisma"
+    ],
+    "files": 7
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Schema defines models, migrations apply DDL, client connects, seed populates — orthogonal concerns of the data layer"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 5,
+   "detail": "Four Prisma models (User, Article, Comment, Tag) with three implicit many-to-many junction tables, served through a singleton `PrismaClient` to four service modules.",
+   "code": [
+    {
+     "file": "src/prisma/schema.prisma",
+     "start": 1,
+     "end": 9,
+     "label": "PostgreSQL datasource and prisma-client-js generator config"
+    },
+    {
+     "file": "src/prisma/prisma-client.ts",
+     "start": 14,
+     "end": 23,
+     "label": "Singleton client exported to all services"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Schema defines types, client connects, migrations apply DDL, seed populates",
+     "boxes": [
+      {
+       "id": "schema",
+       "label": "schema.prisma",
+       "sub": "4 models, 3 junction tables",
+       "col": 0,
+       "row": 0,
+       "opens": "db-schema"
+      },
+      {
+       "id": "client",
+       "label": "PrismaClient",
+       "sub": "singleton, dev-safe",
+       "col": 1,
+       "row": 0,
+       "opens": "db-client"
+      },
+      {
+       "id": "migrations",
+       "label": "SQL Migrations",
+       "sub": "4 sequential scripts",
+       "col": 0,
+       "row": 1,
+       "opens": "db-migrations"
+      },
+      {
+       "id": "pg",
+       "label": "PostgreSQL",
+       "sub": "DATABASE_URL at runtime",
+       "col": 1,
+       "row": 1
+      },
+      {
+       "id": "seed",
+       "label": "Seed Script",
+       "sub": "12 users, 144 articles",
+       "col": 2,
+       "row": 1,
+       "opens": "db-seed"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "schema",
+       "to": "client",
+       "label": "generates types",
+       "at": "src/prisma/schema.prisma:7"
+      },
+      {
+       "from": "client",
+       "to": "pg",
+       "label": "connects via URL",
+       "at": "src/prisma/schema.prisma:3"
+      },
+      {
+       "from": "migrations",
+       "to": "pg",
+       "label": "applies DDL",
+       "at": "src/prisma/migrations/20210924225358_initial/migration.sql:2"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "Every module that imports the singleton PrismaClient",
+     "columns": [
+      "Consumer",
+      "Operations used"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "auth.service",
+       "user.create, findUnique, update"
+      ],
+      [
+       "article.service",
+       "article.create, findMany, findUnique, update, delete; comment.create, findFirst, delete"
+      ],
+      [
+       "profile.service",
+       "user.findUnique, update (followedBy connect/disconnect)"
+      ],
+      [
+       "tag.service",
+       "tag.findMany (top 10 by article count)"
+      ]
+     ]
+    }
+   ],
+   "children": [
+    {
+     "id": "db-schema",
+     "title": "Data Model",
+     "sub": "Four Prisma models and their relationships defining a blogging platform",
+     "footprint": {
+      "dirs": [
+       "src/prisma/schema.prisma"
+      ],
+      "files": 1
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Three model groups: users and social, content and tags, comments"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Defines `User`, `Article`, `Comment`, and `Tag` in `schema.prisma`, connected by three implicit many-to-many join tables for follows, favorites, and tags.",
+     "code": [
+      {
+       "file": "src/prisma/schema.prisma",
+       "start": 11,
+       "end": 56,
+       "label": "All four model definitions"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Entity relationships — FKs, implicit junction tables, and cascade deletes",
+       "boxes": [
+        {
+         "id": "user",
+         "label": "User",
+         "sub": "accounts, auth, social",
+         "col": 0,
+         "row": 0,
+         "opens": "db-users"
+        },
+        {
+         "id": "article",
+         "label": "Article",
+         "sub": "content with unique slug",
+         "col": 1,
+         "row": 0,
+         "opens": "db-articles"
+        },
+        {
+         "id": "comment",
+         "label": "Comment",
+         "sub": "cascade on both FKs",
+         "col": 0,
+         "row": 1,
+         "opens": "db-comments"
+        },
+        {
+         "id": "tag",
+         "label": "Tag",
+         "sub": "unique name, M2M",
+         "col": 1,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "user",
+         "to": "article",
+         "label": "author, favorites",
+         "at": "src/prisma/schema.prisma:20"
+        },
+        {
+         "from": "user",
+         "to": "user",
+         "label": "follows (self M2M)",
+         "at": "src/prisma/schema.prisma:52"
+        },
+        {
+         "from": "user",
+         "to": "comment",
+         "label": "author (cascade)",
+         "at": "src/prisma/schema.prisma:33"
+        },
+        {
+         "from": "article",
+         "to": "tag",
+         "label": "many-to-many",
+         "at": "src/prisma/schema.prisma:19"
+        },
+        {
+         "from": "article",
+         "to": "comment",
+         "label": "has many (cascade)",
+         "at": "src/prisma/schema.prisma:23"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "updatedAt never auto-updates",
+       "detail": "Both Article and Comment use `@default(now())` for `updatedAt` instead of Prisma's `@updatedAt` directive. The field is set only at creation. `updateArticle` compensates by manually setting `new Date()`, but other article updates (favoriting, tag changes) leave it stale.",
+       "where": "src/prisma/schema.prisma:18"
+      }
+     ],
+     "children": [
+      {
+       "id": "db-users",
+       "title": "User Model",
+       "sub": "Accounts, authentication fields, and self-referential social relationships",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "Stores accounts with hashed password, optional bio and image. Self-referential `_UserFollows` tracks follows; `_UserFavorites` links users to favorited articles.",
+       "code": [
+        {
+         "file": "src/prisma/schema.prisma",
+         "start": 43,
+         "end": 56,
+         "label": "User model definition with all relations"
+        },
+        {
+         "file": "src/prisma/migrations/20210924225358_initial/migration.sql",
+         "start": 44,
+         "end": 66,
+         "label": "User table, _UserFavorites and _UserFollows DDL"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "schema",
+         "table": "User",
+         "rows": [
+          {
+           "name": "id",
+           "type": "serial",
+           "key": "PK",
+           "state": "derived"
+          },
+          {
+           "name": "email",
+           "type": "text",
+           "key": "UQ",
+           "state": "derived"
+          },
+          {
+           "name": "username",
+           "type": "text",
+           "key": "UQ",
+           "state": "derived"
+          },
+          {
+           "name": "password",
+           "type": "text",
+           "state": "derived",
+           "note": "bcrypt-hashed by auth.service"
+          },
+          {
+           "name": "image",
+           "type": "text",
+           "nullable": true,
+           "state": "derived",
+           "note": "defaults to smiley-cyrus.jpeg"
+          },
+          {
+           "name": "bio",
+           "type": "text",
+           "nullable": true,
+           "state": "derived"
+          },
+          {
+           "name": "demo",
+           "type": "boolean",
+           "state": "derived",
+           "note": "true for seeded users; filters visibility"
+          }
+         ],
+         "rel": [
+          "articles: Article[] via UserArticles (author)",
+          "favorites: Article[] via _UserFavorites (M2M)",
+          "followedBy: User[] via _UserFollows (self M2M)",
+          "following: User[] via _UserFollows (self M2M)",
+          "comments: Comment[]"
+         ]
+        },
+        {
+         "kind": "table",
+         "caption": "Implicit junction tables for social features",
+         "columns": [
+          "Table",
+          "Side A",
+          "Side B",
+          "Purpose"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "_UserFollows",
+           "User (follower)",
+           "User (followed)",
+           "Self-referential follow graph"
+          ],
+          [
+           "_UserFavorites",
+           "Article",
+           "User",
+           "Which users favorited which articles"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "id": "db-articles",
+       "title": "Articles And Tags",
+       "sub": "Blog content with unique slugs and a many-to-many tag system",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "Each article has a unique slug and belongs to one author via `authorId`. Tags are linked through an implicit `_ArticleToTag` junction using `connectOrCreate`.",
+       "code": [
+        {
+         "file": "src/prisma/schema.prisma",
+         "start": 11,
+         "end": 24,
+         "label": "Article model with author FK and tag relation"
+        },
+        {
+         "file": "src/prisma/schema.prisma",
+         "start": 37,
+         "end": 41,
+         "label": "Tag model with unique name"
+        },
+        {
+         "file": "src/prisma/migrations/20211001143221_implicit_tags/migration.sql",
+         "start": 17,
+         "end": 36,
+         "label": "Implicit _ArticleToTag junction creation"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "schema",
+         "table": "Article",
+         "rows": [
+          {
+           "name": "id",
+           "type": "serial",
+           "key": "PK",
+           "state": "derived"
+          },
+          {
+           "name": "slug",
+           "type": "text",
+           "key": "UQ",
+           "state": "derived",
+           "note": "slugify(title)-authorId"
+          },
+          {
+           "name": "title",
+           "type": "text",
+           "state": "derived"
+          },
+          {
+           "name": "description",
+           "type": "text",
+           "state": "derived"
+          },
+          {
+           "name": "body",
+           "type": "text",
+           "state": "derived"
+          },
+          {
+           "name": "createdAt",
+           "type": "timestamp",
+           "state": "derived",
+           "note": "default now()"
+          },
+          {
+           "name": "updatedAt",
+           "type": "timestamp",
+           "state": "derived",
+           "note": "@default(now()), not @updatedAt"
+          },
+          {
+           "name": "authorId",
+           "type": "integer",
+           "key": "FK",
+           "state": "derived",
+           "note": "cascade delete from User"
+          }
+         ],
+         "rel": [
+          "tagList: Tag[] via _ArticleToTag (implicit M2M)",
+          "author: User via authorId",
+          "favoritedBy: User[] via _UserFavorites",
+          "comments: Comment[]"
+         ]
+        },
+        {
+         "kind": "schema",
+         "table": "Tag",
+         "rows": [
+          {
+           "name": "id",
+           "type": "serial",
+           "key": "PK",
+           "state": "derived"
+          },
+          {
+           "name": "name",
+           "type": "text",
+           "key": "UQ",
+           "state": "derived",
+           "note": "added in migration 2"
+          }
+         ],
+         "rel": [
+          "articles: Article[] via _ArticleToTag (implicit M2M)"
+         ]
+        },
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "Tag creation",
+           "value": "Tags are created on the fly via connectOrCreate when an article is saved",
+           "state": "derived"
+          },
+          {
+           "label": "Orphan tags",
+           "value": "Deleting an article removes the junction row but leaves the Tag row; unused tags accumulate",
+           "state": "derived"
+          },
+          {
+           "label": "Slug formula",
+           "value": "slugify(title) + '-' + authorId — same title from the same author collides",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "db-comments",
+       "title": "Comment Model",
+       "sub": "Article comments with cascade-delete foreign keys to both article and author",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "Each comment belongs to one article and one author via cascade-delete foreign keys. Deleting an article or user removes their comments automatically.",
+       "code": [
+        {
+         "file": "src/prisma/schema.prisma",
+         "start": 26,
+         "end": 35,
+         "label": "Comment model with two cascade FKs"
+        },
+        {
+         "file": "src/prisma/migrations/20210924225358_initial/migration.sql",
+         "start": 24,
+         "end": 33,
+         "label": "Comment table DDL"
+        },
+        {
+         "file": "src/prisma/migrations/20210924225358_initial/migration.sql",
+         "start": 98,
+         "end": 102,
+         "label": "Cascade-delete foreign keys for article and author"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "schema",
+         "table": "Comment",
+         "rows": [
+          {
+           "name": "id",
+           "type": "serial",
+           "key": "PK",
+           "state": "derived"
+          },
+          {
+           "name": "createdAt",
+           "type": "timestamp",
+           "state": "derived",
+           "note": "default now()"
+          },
+          {
+           "name": "updatedAt",
+           "type": "timestamp",
+           "state": "derived",
+           "note": "@default(now()); no update endpoint exists"
+          },
+          {
+           "name": "body",
+           "type": "text",
+           "state": "derived"
+          },
+          {
+           "name": "articleId",
+           "type": "integer",
+           "key": "FK",
+           "state": "derived",
+           "note": "cascade delete"
+          },
+          {
+           "name": "authorId",
+           "type": "integer",
+           "key": "FK",
+           "state": "derived",
+           "note": "cascade delete"
+          }
+         ]
+        },
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "No update endpoint",
+           "value": "Comments can be created and deleted but never edited; updatedAt is vestigial",
+           "state": "derived"
+          },
+          {
+           "label": "Double cascade",
+           "value": "Deleting either the parent article or the author user removes the comment row",
+           "state": "derived"
+          },
+          {
+           "label": "Visibility filter",
+           "value": "getCommentsByArticle only returns comments by demo users or the current user",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "db-migrations",
+     "title": "Migration History",
+     "sub": "Four sequential SQL scripts that built and refined the PostgreSQL schema",
+     "footprint": {
+      "dirs": [
+       "src/prisma/migrations"
+      ],
+      "files": 5
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "Four sequential SQL scripts tracked by Prisma Migrate, evolving from initial table creation through an article-tag refactor to index renaming.",
+     "code": [
+      {
+       "file": "src/prisma/migrations/20210924225358_initial/migration.sql",
+       "start": 2,
+       "end": 13,
+       "label": "Initial migration: first table (Article)"
+      },
+      {
+       "file": "src/prisma/migrations/20211001143221_implicit_tags/migration.sql",
+       "start": 14,
+       "end": 36,
+       "label": "Implicit tags: drops ArticleTags, creates _ArticleToTag"
+      },
+      {
+       "file": "src/prisma/migrations/20211105153605_api_url/migration.sql",
+       "start": 1,
+       "end": 3,
+       "label": "Default avatar URL change"
+      },
+      {
+       "file": "src/prisma/migrations/20211221184529_deprecated_preview/migration.sql",
+       "start": 1,
+       "end": 12,
+       "label": "Rename indexes to Prisma _key convention"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Initial Schema",
+         "detail": "Creates Article, ArticleTags (explicit junction), Comment, Tag, User, _UserFavorites, _UserFollows, plus unique indexes on slug, email, and username.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Implicit Tags",
+         "detail": "Drops the explicit ArticleTags table, creates Prisma's implicit _ArticleToTag junction. Adds a unique constraint on Tag.name.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Default Avatar URL",
+         "detail": "Changes User.image default from the Heroku URL to api.realworld.io/images/smiley-cyrus.jpeg.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Index Renaming",
+         "detail": "Renames Article.slug_unique, Tag.name_unique, User.email_unique, User.username_unique to Prisma's _key convention.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Tables present in the final schema state",
+       "columns": [
+        "Table",
+        "Type",
+        "Created In"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Article",
+         "Entity",
+         "Migration 1"
+        ],
+        [
+         "Comment",
+         "Entity",
+         "Migration 1"
+        ],
+        [
+         "Tag",
+         "Entity",
+         "Migration 1"
+        ],
+        [
+         "User",
+         "Entity",
+         "Migration 1"
+        ],
+        [
+         "_ArticleToTag",
+         "Implicit M2M junction",
+         "Migration 2 (replaces ArticleTags)"
+        ],
+        [
+         "_UserFavorites",
+         "Implicit M2M junction",
+         "Migration 1"
+        ],
+        [
+         "_UserFollows",
+         "Implicit M2M junction",
+         "Migration 1"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "db-client",
+     "title": "Singleton Client",
+     "sub": "A shared PrismaClient instance reused across hot reloads in development",
+     "footprint": {
+      "dirs": [
+       "src/prisma/prisma-client.ts",
+       "src/tests/prisma-mock.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "A singleton `PrismaClient` stored on `global` in development to survive hot reloads. Tests replace it with a `jest-mock-extended` deep mock.",
+     "code": [
+      {
+       "file": "src/prisma/prisma-client.ts",
+       "start": 10,
+       "end": 23,
+       "label": "Singleton pattern: reuse from global or create new"
+      },
+      {
+       "file": "src/tests/prisma-mock.ts",
+       "start": 1,
+       "end": 17,
+       "label": "Test mock: deep-mock the singleton, reset before each test"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Creation",
+         "value": "global.prisma || new PrismaClient() — reuses existing or creates fresh",
+         "state": "derived"
+        },
+        {
+         "label": "Dev guard",
+         "value": "Assigned to global.prisma only when NODE_ENV === 'development'",
+         "state": "derived"
+        },
+        {
+         "label": "Production",
+         "value": "New instance per cold start; no global caching",
+         "state": "inferred"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Modules that import the singleton",
+       "columns": [
+        "Consumer",
+        "Import line"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "auth.service",
+         "import prisma from '../../../prisma/prisma-client'"
+        ],
+        [
+         "article.service",
+         "import prisma from '../../../prisma/prisma-client'"
+        ],
+        [
+         "profile.service",
+         "import prisma from '../../../prisma/prisma-client'"
+        ],
+        [
+         "tag.service",
+         "import prisma from '../../../prisma/prisma-client'"
+        ],
+        [
+         "prisma-mock.ts",
+         "jest.mock with mockDeep<PrismaClient>()"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "db-seed",
+     "title": "Seed Script",
+     "sub": "Populates the database with randomly generated demo users, articles, and comments",
+     "footprint": {
+      "dirs": [
+       "src/prisma/seed.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "Generates 12 demo users, 144 articles, and 1,728 comments using `@ngneat/falso` for fake data, calling the real service functions to write.",
+     "code": [
+      {
+       "file": "src/prisma/seed.ts",
+       "start": 16,
+       "end": 37,
+       "label": "Generator functions for user, article, comment"
+      },
+      {
+       "file": "src/prisma/seed.ts",
+       "start": 39,
+       "end": 57,
+       "label": "Main loop: 12 users × 12 articles × 12 commenters"
+      },
+      {
+       "file": "src/prisma/seed.ts",
+       "start": 59,
+       "end": 66,
+       "label": "Disconnect handler (wrong client instance)"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Create 12 Users",
+         "detail": "Calls auth.service.createUser with random name, email, password. Each is flagged demo: true.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Create 12 Articles Per User",
+         "detail": "Calls article.service.createArticle with random title, body, and 4 random word tags. 144 articles total.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Comment On Every Article",
+         "detail": "Every user comments on every article via addComment. 12 users × 144 articles = 1,728 comments.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Disconnect",
+         "detail": "Calls prisma.$disconnect() on the script's own PrismaClient, not the singleton the services used.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Data library",
+         "value": "@ngneat/falso: randFullName, randEmail, randPassword, randPhrase, randParagraph, randWord",
+         "state": "derived"
+        },
+        {
+         "label": "Demo flag",
+         "value": "All seeded users have demo: true; article and tag queries filter on this to show demo content to everyone",
+         "state": "derived"
+        },
+        {
+         "label": "Passwords",
+         "value": "Random strings bcrypt-hashed by createUser; the plaintext is never stored or logged, so nobody can log in as a seeded user",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Singleton client never disconnected",
+       "detail": "The seed script creates its own PrismaClient at line 14 and disconnects it on exit. But all data writes go through service functions that use the singleton from prisma-client.ts, whose connection pool is never closed. The process may hang after seeding.",
+       "where": "src/prisma/seed.ts:14"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "E0": [
+  {
+   "from": "starting-server",
+   "to": "getting-authenticated",
+   "label": "mounts auth routes into",
+   "order": 1,
+   "state": "derived"
+  },
+  {
+   "from": "getting-authenticated",
+   "to": "following-profiles",
+   "label": "issues token used by",
+   "order": 2,
+   "state": "derived"
+  },
+  {
+   "from": "following-profiles",
+   "to": "working-with-articles",
+   "label": "embeds follow status in",
+   "order": 3,
+   "state": "derived"
+  },
+  {
+   "from": "working-with-articles",
+   "to": "browsing-tags",
+   "label": "attaches tags listed by",
+   "order": 4,
+   "state": "derived"
+  }
+ ],
+ "LINKS": []
+}

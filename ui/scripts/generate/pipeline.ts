@@ -25,7 +25,7 @@ export async function main(args: string[]) {
   const only = opt("--roots")?.split(",");
   const stopAfter = opt("--stop-after");
   const pick = (env: string | undefined) => MODELS[(env ?? "opus") as keyof typeof MODELS] ?? MODELS.opus;
-  const models = { summarize: MODELS.haiku, cut: pick(process.env.SLOP_CUT), author: pick(process.env.SLOP_AUTHOR), verify: MODELS.haiku, review: MODELS.sonnet };
+  const models = { summarize: MODELS.haiku, cut: pick(process.env.SLOP_CUT), author: pick(process.env.SLOP_AUTHOR), verify: MODELS.haiku };
 
   const out = `maps/${name}`;
   mkdirSync(out, { recursive: true });
@@ -83,7 +83,7 @@ export async function main(args: string[]) {
     Promise.all(
       cut.roots.map(async (r) => {
         const root = authored[r.id].root;
-        if (root && !(only && !only.includes(r.id))) verdicts[r.id] = await verifyTree(root, inv, models.review);
+        if (root && !(only && !only.includes(r.id))) verdicts[r.id] = await verifyTree(root, inv, models.author);
       }),
     ),
   );

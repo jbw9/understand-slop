@@ -15,7 +15,8 @@
  * bugs, a third of the issues were documented rules written up as defects.
  */
 import type { CodeRef, Node } from "@/lib/data";
-import { ask, callsOf, invoke, MODELS, type Block, type Message } from "./bedrock";
+import { ask, BACKEND, callsOf, invoke, MODELS, type Block, type Message } from "./bedrock";
+import { ccAgent } from "./claude-code";
 import { runTool, TOOLS } from "./author";
 import { fileReader } from "./check";
 import { numbered, type Inventory } from "./inventory";
@@ -91,14 +92,23 @@ const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boo
 
 async function verifyNode(n: Node, inv: Inventory, model: string): Promise<Verdict> {
   const v: Verdict = { id: n.id, ok: true, flagged: 0, rewritten: false, downgraded: false, claims: [] };
-  const screen = await ask<{ claims: { claim: string; verdict: string; why?: string }[] }>({
+  type Screen = { claims: { claim: string; verdict: string; why?: string }[] };
+  const screenWith = (maxTokens: number) => ask<Screen>({
     model: MODELS.haiku,
     stage: "verify",
-    maxTokens: 4000,
+    maxTokens,
     system: "You check a short explanation of code against the code it cites. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not. An issue must be something going wrong; one that describes deliberate behaviour is intended, even when it is accurate.",
     messages: [{ role: "user", content: `## The node\n${claims(n)}\n\n## The cited code\n${evidence(n, inv)}` }],
     tool: SCREEN,
   });
+  // A node with many claims can outrun the first answer's room (umami's did);
+  // it gets more, and if it still has no answer it is unverified, not fatal.
+  let screen: Screen;
+  try {
+    screen = await screenWith(4000).catch(() => screenWith(16000));
+  } catch {
+    return { ...v, ok: false, claims: ["the verify screen gave no answer"] };
+  }
   const flags = screen.claims.filter((c) => c.verdict !== "supported").map((c) => `${c.claim} — ${c.verdict}${c.why ? `: ${c.why}` : ""}`);
   v.flagged = flags.length;
   if (!flags.length) return v;
@@ -139,7 +149,23 @@ async function review(n: Node, flags: string[], inv: Inventory, model: string): 
 - A claim nothing in this repository can show: say so in unresolvable.
 - An issue flagged intended: if the code shows the behaviour is deliberate (a docstring or comment saying so, an explicit raise for misuse, standard language behaviour), drop it from issues. Keep it only if it really makes something go wrong for whoever hits it.
 The detail must stay at most two sentences and 40 words. Finish by calling review.`;
-  const messages: Message[] = [{ role: "user", content: `## The node\n${claims(n)}\n\n## Claims a first reader flagged\n- ${flags.join("\n- ")}\n\n## The cited code\n${evidence(n, inv)}` }];
+  const prompt = `## The node\n${claims(n)}\n\n## Claims a first reader flagged\n- ${flags.join("\n- ")}\n\n## The cited code\n${evidence(n, inv)}`;
+  const tooLong = (out: Review) => out.real.length && (words(out.detail) > 40 || sentences(out.detail) > 2);
+  const lengthError = (out: Review) => `The detail has ${words(out.detail)} words and ${sentences(out.detail)} sentences; the limit is 40 words and 2 sentences. Call review again.`;
+
+  if (BACKEND === "claude-code") {
+    const r = await ccAgent<Review>({
+      model, system, prompt, tools, effort: "medium", stage: "verify-review", maxTurns: 10, nudge: "Finish by calling review.",
+      handle: (name, input) => {
+        if (name !== "review") return { content: runTool({ name, input }, inv, known) };
+        const out = input as Review;
+        return tooLong(out) ? { content: lengthError(out), isError: true } : { content: "Recorded. Stop now.", done: out };
+      },
+    });
+    return r.value;
+  }
+
+  const messages: Message[] = [{ role: "user", content: prompt }];
   for (let turn = 0; turn < 10; turn++) {
     const r = await invoke({ model, stage: "verify-review", effort: "medium", maxTokens: 8000, system, messages, tools });
     messages.push({ role: "assistant", content: r.content });
@@ -147,8 +173,8 @@ The detail must stay at most two sentences and 40 words. Finish by calling revie
     const done = calls.find((c) => c.name === "review");
     if (done) {
       const out = done.input as Review;
-      if (out.real.length && (words(out.detail) > 40 || sentences(out.detail) > 2) && turn < 9) {
-        messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: done.id, is_error: true, content: `The detail has ${words(out.detail)} words and ${sentences(out.detail)} sentences; the limit is 40 words and 2 sentences. Call review again.` }] });
+      if (tooLong(out) && turn < 9) {
+        messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: done.id, is_error: true, content: lengthError(out) }] });
         continue;
       }
       return out;

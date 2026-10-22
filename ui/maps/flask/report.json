@@ -10,62 +10,62 @@
  "elapsed": {
   "summarize": 200,
   "cut": 90,
-  "author": 1188,
-  "verify": 1902,
-  "total": 3380
+  "author": 549,
+  "verify": 68,
+  "total": 907
  },
- "usd": 10.25,
- "fullUsd": 10.25,
+ "usd": 2.36,
+ "fullUsd": 12.55,
  "bill": {
   "summarize": {
    "calls": 36,
-   "cached": 0,
+   "cached": 36,
    "input": 160904,
    "output": 23768,
    "cacheRead": 0,
-   "usd": 0.279744,
+   "usd": 0,
    "fullUsd": 0.279744
   },
   "cut": {
    "calls": 1,
-   "cached": 0,
+   "cached": 1,
    "input": 7772,
    "output": 6136,
    "cacheRead": 0,
-   "usd": 0.19226,
+   "usd": 0,
    "fullUsd": 0.19226
   },
   "author": {
-   "calls": 78,
-   "cached": 0,
-   "input": 288038,
-   "output": 128861,
-   "cacheRead": 2451584,
-   "usd": 6.247442000000001,
-   "fullUsd": 6.247442000000001
+   "calls": 87,
+   "cached": 87,
+   "input": 592209,
+   "output": 175355,
+   "cacheRead": 2579905,
+   "usd": 0,
+   "fullUsd": 9.37501
   },
   "verify": {
-   "calls": 66,
-   "cached": 0,
-   "input": 160363,
-   "output": 45806,
+   "calls": 65,
+   "cached": 58,
+   "input": 163302,
+   "output": 41503,
    "cacheRead": 0,
-   "usd": 0.389393,
-   "fullUsd": 0.389393
+   "usd": 0.032581,
+   "fullUsd": 0.37081699999999995
   },
   "verify-review": {
-   "calls": 122,
+   "calls": 83,
    "cached": 0,
-   "input": 475044,
-   "output": 30624,
+   "input": 358160,
+   "output": 21582,
    "cacheRead": 0,
-   "usd": 3.14082,
-   "fullUsd": 3.14082
+   "usd": 2.330350000000001,
+   "fullUsd": 2.330350000000001
   }
  },
  "throttled": {
-  "waits": 506,
-  "seconds": 5445
+  "waits": 0,
+  "seconds": 0
  },
  "files": {
   "listed": 227,
@@ -75,7 +75,7 @@
  "excluded": [
   {
    "path": "docs/conf.py",
-   "reason": "Sphinx documentation build configuration — pure tooling, not part of the framework."
+   "reason": "Sphinx documentation build configuration \u2014 pure tooling, not part of the framework."
   }
  ],
  "roots": [
@@ -83,20 +83,20 @@
    "id": "creating-app",
    "title": "Creating the App",
    "accepted": true,
-   "turns": 11,
-   "reads": 21,
+   "turns": 14,
+   "reads": 20,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 13,
-    "ok": 13,
-    "flagged": 8,
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 3,
     "rewritten": [
      {
-      "id": "ca-class-defaults",
+      "id": "creating-app",
       "claims": [
-       "With no SECRET_KEY, session cookies are unsigned — not_shown: The code shows only the default_config dict definition; it contains no logic or documentation about session signing behavior.",
-       "Every Flask app starts with these defaults in `app.config` — not_shown: The code shows the default_config dict definition, but does not show how or when it is assigned to app.config or confirm that every Flask app uses it."
+       "Flask's constructor builds a `Config` dict with 26 defaults \u2014 not_shown: Line 317 shows `self.config = self.make_config(instance_relative_config)` but the cited code does not show the Config class definition or its 26 defaults",
+       "Flask's constructor wires up the Jinja environment \u2014 not_shown: The cited code does not show any Jinja environment setup in the __init__ methods shown"
       ]
      }
     ],
@@ -107,19 +107,26 @@
    "id": "defining-routes",
    "title": "Defining Routes",
    "accepted": true,
-   "turns": 13,
-   "reads": 19,
+   "turns": 15,
+   "reads": 21,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 13,
-    "ok": 13,
-    "flagged": 4,
+    "nodes": 16,
+    "ok": 16,
+    "flagged": 8,
     "rewritten": [
      {
       "id": "rt-scaffold",
       "claims": [
-       "All eight defaultdict registries initialised here — contradicted: The code shows 7 registries initialized: error_handler_spec (line 126), before_request_funcs (line 140), after_request_funcs (line 154), teardown_request_funcs (line 169), template_context_processors (line 184), url_value_preprocessors (line 200), and url_default_functions (line 215). Additionally, view_functions (line 108) is initialized as a plain dict, not a defaultdict. That's 7 defaultdicts, not 8."
+       "only `App` implements it \u2014 not_shown: The cited code does not show the `App` class or its implementation of `add_url_rule`. This claim cannot be verified from the provided code."
+      ]
+     },
+     {
+      "id": "rt-scaffold-error",
+      "claims": [
+       "@errorhandler decorator calls _get_exc_class_and_code to normalise its argument \u2014 not_shown",
+       "@errorhandler decorator stores the handler in error_handler_spec dict \u2014 not_shown"
       ]
      }
     ],
@@ -130,22 +137,15 @@
    "id": "handling-requests",
    "title": "Handling Requests",
    "accepted": true,
-   "turns": 14,
-   "reads": 24,
+   "turns": 12,
+   "reads": 21,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 10,
-    "ok": 10,
-    "flagged": 5,
-    "rewritten": [
-     {
-      "id": "rq-ctx-push",
-      "claims": [
-       "`push()` guards against double-push via `_push_count` — contradicted: Line 428 increments `_push_count` but never checks it. The guard against double-push is actually the check `if self._cv_token is not None: return` on lines 430-431, which uses `_cv_token`, not `_push_count`."
-      ]
-     }
-    ],
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 2,
+    "rewritten": [],
     "downgraded": []
    }
   },
@@ -154,21 +154,14 @@
    "title": "Rendering Responses",
    "accepted": true,
    "turns": 16,
-   "reads": 25,
-   "submits": 2,
+   "reads": 23,
+   "submits": 4,
    "lastProblems": [],
    "verify": {
-    "nodes": 9,
-    "ok": 9,
-    "flagged": 6,
-    "rewritten": [
-     {
-      "id": "ro-templates",
-      "claims": [
-       "create_jinja_environment handles filters — not_shown: Code [3] does not show any filter configuration or updates. The cited code shows globals and policies but not filters."
-      ]
-     }
-    ],
+    "nodes": 12,
+    "ok": 12,
+    "flagged": 5,
+    "rewritten": [],
     "downgraded": []
    }
   },
@@ -176,26 +169,20 @@
    "id": "running-testing",
    "title": "Running & Testing",
    "accepted": true,
-   "turns": 16,
-   "reads": 20,
+   "turns": 18,
+   "reads": 22,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 12,
-    "ok": 12,
-    "flagged": 7,
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 2,
     "rewritten": [
      {
-      "id": "ru-cli",
+      "id": "ru-dotenv",
       "claims": [
-       "This duplicates the normal eager-processing path — not_shown: The code shows handle_parse_result is called manually, but the code does not show what the normal eager-processing path does or demonstrate that this is a duplication of it.",
-       "could produce side effects if callbacks are not idempotent — not_shown: The code shows the manual invocation but does not show the callback implementations or any evidence of side effects."
-      ]
-     },
-     {
-      "id": "ru-test-client",
-      "claims": [
-       "This is intentional but not obvious — not_shown: The code shows the behavior but does not indicate whether it is intentional or document why nesting is prevented."
+       "If python-dotenv is not installed and no .env/.flaskenv files exist in the working directory, load_dotenv silently returns False \u2014 contradicted: Lines 735-741 show that if python-dotenv is not installed, the function checks `if path or os.path.isfile(\".env\") or os.path.isfile(\".flaskenv\")` and if any of these conditions are true, it prints a yellow warning message via `click.secho`. It only returns False silently if none of these conditions are met. So it is not silent when .env or .flaskenv files exist.",
+       "A developer expecting FLASK_APP from .flaskenv gets a confusing 'Could not locate a Flask application' error instead \u2014 not_shown: The cited code does not show what error message a developer would receive or demonstrate the scenario where FLASK_APP is expected from .flaskenv but not found. The code only shows that load_dotenv returns False and potentially prints a tip message."
       ]
      }
     ],
@@ -206,16 +193,31 @@
    "id": "example-apps",
    "title": "Example Applications",
    "accepted": true,
-   "turns": 8,
-   "reads": 16,
+   "turns": 12,
+   "reads": 25,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 9,
+    "nodes": 10,
     "ok": 9,
     "flagged": 7,
-    "rewritten": [],
-    "downgraded": []
+    "rewritten": [
+     {
+      "id": "example-apps",
+      "claims": [
+       "Each has its own test suite"
+      ]
+     },
+     {
+      "id": "ex-celery-tasks",
+      "claims": [
+       "`block` uses the global default (ignored) \u2014 not_shown: Line 12 shows `@shared_task()` with no parameters specified for block. The detail claims this uses the global default for ignore_result, but the code does not show what the global default is or confirm that results are ignored."
+      ]
+     }
+    ],
+    "downgraded": [
+     "ex-celery-tasks"
+    ]
    }
   }
  ],
@@ -224,35 +226,35 @@
   "depth": [
    {
     "id": "creating-app",
-    "depth": 3,
-    "nodes": 13
+    "depth": 2,
+    "nodes": 6
    },
    {
     "id": "defining-routes",
     "depth": 3,
-    "nodes": 13
+    "nodes": 16
    },
    {
     "id": "handling-requests",
     "depth": 3,
-    "nodes": 10
+    "nodes": 11
    },
    {
     "id": "rendering-responses",
     "depth": 3,
-    "nodes": 9
+    "nodes": 12
    },
    {
     "id": "running-testing",
     "depth": 3,
-    "nodes": 12
+    "nodes": 10
    },
    {
     "id": "example-apps",
     "depth": 3,
-    "nodes": 9
+    "nodes": 10
    }
   ]
  },
- "verifyPassRate": 100
+ "verifyPassRate": 98
 }

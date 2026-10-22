@@ -23,7 +23,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} ${mono.variable} h-full antialiased`}>
-      <body className="h-full overflow-hidden">{children}</body>
+      {/* Browser extensions stamp attributes on <body> before React loads. */}
+      <body className="h-full overflow-hidden" suppressHydrationWarning>{children}</body>
     </html>
   );
 }

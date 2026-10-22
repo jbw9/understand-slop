@@ -100,14 +100,30 @@ export async function main(args: string[]) {
   });
   const present = new Set(AUTHORED.map((n) => n.id));
   const E0: Edge[] = cut.edges.filter((e) => present.has(e.from) && present.has(e.to)).map((e) => ({ ...e, state: "derived" as const }));
+  // A stage replayed wholly from cache took seconds and cost nothing, not what
+  // generating it costs; the last report's time and bill for it stand, so the
+  // record stays a plan.
+  const last = existsSync(`${out}/report.json`) ? JSON.parse(readFileSync(`${out}/report.json`, "utf8")) : null;
+  const before = last?.elapsed ?? {};
+  const spent = { ...bill };
+  let total = Math.round((Date.now() - t0) / 1000);
+  for (const stage of Object.keys(elapsed)) {
+    const runs = Object.entries(bill).filter(([k]) => k === stage || k.startsWith(`${stage}-`));
+    if (runs.length && runs.every(([, b]) => b.calls === b.cached) && typeof before[stage] === "number") {
+      total += before[stage] - elapsed[stage];
+      elapsed[stage] = before[stage];
+      for (const [k] of runs) if (last.bill?.[k]) spent[k] = last.bill[k];
+    }
+  }
   const map: MapFile = {
     RUN: {
       command: `understand-slop map ${inv.name}`,
-      repo: inv.name,
+      // A scoped map is named for its part and counts only the files it covers.
+      repo: inv.scope ? name : inv.name,
       about: cut.about,
       commit: inv.commit,
-      files: inv.files.length,
-      elapsed: `${Math.round((Date.now() - t0) / 60000)} min`,
+      files: inv.scope ? code.length : inv.files.length,
+      elapsed: `${Math.round(total / 60)} min`,
       root: repo,
       models,
     },
@@ -119,20 +135,8 @@ export async function main(args: string[]) {
   writeFileSync(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
 
   const allVerdicts = Object.values(verdicts).flat();
-  // A stage replayed wholly from cache took seconds, not what generating it
-  // costs; the last report's time for it stands, so the record stays a plan.
-  const last = existsSync(`${out}/report.json`) ? JSON.parse(readFileSync(`${out}/report.json`, "utf8")) : null;
-  const before = last?.elapsed ?? {};
-  let total = Math.round((Date.now() - t0) / 1000);
-  for (const stage of Object.keys(elapsed)) {
-    const runs = Object.entries(bill).filter(([k]) => k === stage || k.startsWith(`${stage}-`));
-    if (runs.length && runs.every(([, b]) => b.calls === b.cached) && typeof before[stage] === "number") {
-      total += before[stage] - elapsed[stage];
-      elapsed[stage] = before[stage];
-    }
-  }
-  const usd = Object.values(bill).reduce((a, b) => a + b.usd, 0);
-  const fullUsd = Object.values(bill).reduce((a, b) => a + b.fullUsd, 0);
+  const usd = Object.values(spent).reduce((a, b) => a + b.usd, 0);
+  const fullUsd = Object.values(spent).reduce((a, b) => a + b.fullUsd, 0);
   const report = {
     repo: inv.name,
     commit: inv.commit,
@@ -140,8 +144,8 @@ export async function main(args: string[]) {
     // A --roots repair is not what the map costs to make: the full run's
     // time and price stand, and the repair is listed beside them.
     ...(only && last
-      ? { elapsed: last.elapsed, usd: last.usd, fullUsd: last.fullUsd, bill: last.bill, repairs: [...(last.repairs ?? []), { roots: only, seconds: total, usd: Math.round(usd * 100) / 100, bill }] }
-      : { elapsed: { ...elapsed, total }, usd: Math.round(usd * 100) / 100, fullUsd: Math.round(fullUsd * 100) / 100, bill }),
+      ? { elapsed: last.elapsed, usd: last.usd, fullUsd: last.fullUsd, bill: last.bill, repairs: [...(last.repairs ?? []), { roots: only, seconds: total, usd: Math.round(Object.values(bill).reduce((a, b) => a + b.usd, 0) * 100) / 100, bill }] }
+      : { elapsed: { ...elapsed, total }, usd: Math.round(usd * 100) / 100, fullUsd: Math.round(fullUsd * 100) / 100, bill: spent }),
     throttled: { waits: throttle.waits, seconds: Math.round(throttle.seconds) },
     files: { listed: inv.files.length, summarised: code.length, unassigned: leftover },
     excluded: cut.excluded,

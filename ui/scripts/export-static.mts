@@ -43,6 +43,8 @@ try {
   renameSync(".api-aside", "app/api");
 }
 writeFileSync(join(out, "source.json"), JSON.stringify(source));
+// public/shots holds other apps' screens; a map that shows none must not publish them.
+if (!JSON.stringify(file.AUTHORED).includes('"shot"')) rmSync(join(out, "shots"), { recursive: true, force: true });
 // Pages runs Jekyll by default, which drops `_next/`.
 writeFileSync(join(out, ".nojekyll"), "");
 console.log(`${out}: ${cited.size} cited files baked in${existsSync(join(out, "index.html")) ? "" : " — but no index.html!"}`);

@@ -1,11 +1,11 @@
 {
  "RUN": {
   "command": "understand-slop map kafka",
-  "repo": "kafka",
+  "repo": "kafka-control-plane",
   "about": "Cut by the lifecycle of a KRaft cluster — format storage, boot processes, register nodes, run the controller event loop, decide resource state, propagate metadata to brokers — the sequence a control-plane engineer follows.",
   "commit": "d18f93f",
-  "files": 7557,
-  "elapsed": "12 min",
+  "files": 142,
+  "elapsed": "19 min",
   "root": "/Users/jonathanmacmini/Desktop/Code/slop-eval/kafka",
   "models": {
    "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",

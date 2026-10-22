@@ -1,6 +1,7 @@
 {
  "repo": "node-express-realworld-example-app",
  "commit": "30b68e1",
+ "backend": "bedrock",
  "models": {
   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
   "cut": "global.anthropic.claude-opus-4-6-v1",

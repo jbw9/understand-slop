@@ -1,0 +1,204 @@
+{
+ "repo": "ky",
+ "commit": "3541888",
+ "backend": "bedrock",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 25,
+  "cut": 102,
+  "author": 287,
+  "verify": 73,
+  "total": 487
+ },
+ "usd": 7.98,
+ "fullUsd": 7.98,
+ "bill": {
+  "summarize": {
+   "calls": 52,
+   "cached": 0,
+   "input": 134833,
+   "output": 22977,
+   "cacheRead": 0,
+   "usd": 0.24971800000000002,
+   "fullUsd": 0.24971800000000002
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 0,
+   "input": 7810,
+   "output": 7770,
+   "cacheRead": 0,
+   "usd": 0.2333,
+   "fullUsd": 0.2333
+  },
+  "author": {
+   "calls": 84,
+   "cached": 0,
+   "input": 288974,
+   "output": 93918,
+   "cacheRead": 2850226,
+   "usd": 5.579033,
+   "fullUsd": 5.579033
+  },
+  "verify": {
+   "calls": 43,
+   "cached": 0,
+   "input": 110543,
+   "output": 29250,
+   "cacheRead": 0,
+   "usd": 0.256793,
+   "fullUsd": 0.256793
+  },
+  "verify-review": {
+   "calls": 65,
+   "cached": 0,
+   "input": 268230,
+   "output": 12915,
+   "cacheRead": 0,
+   "usd": 1.664024999999999,
+   "fullUsd": 1.664024999999999
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 112,
+  "summarised": 52,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "test-d/",
+   "reason": "Compile-time type tests (expect-type assertions) that verify TypeScript signatures; they contain no runtime logic."
+  }
+ ],
+ "roots": [
+  {
+   "id": "setting-up",
+   "title": "Setting Up Ky",
+   "accepted": true,
+   "turns": 14,
+   "reads": 19,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 2,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "making-request",
+   "title": "Making A Request",
+   "accepted": true,
+   "turns": 14,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 3,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "reading-response",
+   "title": "Reading The Response",
+   "accepted": true,
+   "turns": 23,
+   "reads": 30,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 2,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "retrying",
+   "title": "Retrying On Failure",
+   "accepted": true,
+   "turns": 16,
+   "reads": 20,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 17,
+    "ok": 16,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "rt-loop-dispatch",
+      "claims": [
+       "Hooks can lower the retry limit — not_shown: The cited code shows the retry limit is re-read from options each attempt, but does not show or explain how hooks can lower it."
+      ]
+     }
+    ],
+    "downgraded": [
+     "rt-loop-dispatch"
+    ]
+   }
+  },
+  {
+   "id": "handling-errors",
+   "title": "Handling Errors",
+   "accepted": true,
+   "turns": 17,
+   "reads": 27,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 7,
+    "rewritten": [],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "setting-up",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "making-request",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "reading-response",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "retrying",
+    "depth": 3,
+    "nodes": 17
+   },
+   {
+    "id": "handling-errors",
+    "depth": 2,
+    "nodes": 7
+   }
+  ]
+ },
+ "verifyPassRate": 98
+}

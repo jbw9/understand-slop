@@ -76,8 +76,8 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
         const env = { ...process.env };
         delete env.CLAUDECODE;
         delete env.CLAUDE_CODE_ENTRYPOINT;
-        // No effort means no thinking, as on the API path.
-        if (!args.includes("--effort")) env.MAX_THINKING_TOKENS = "0";
+        // No effort means no thinking, as on the API path; with one, thinking is capped (see ccEffort).
+        env.MAX_THINKING_TOKENS = args.includes("--effort") ? THINKING : "0";
         const p = spawn("claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...args], { cwd: cwd(), env });
         let stdout = "", stderr = "";
         p.stdout.on("data", (d) => (stdout += d));
@@ -100,13 +100,18 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
 
 /** The flags every run shares: the model, its effort, and our system prompt in place of Claude Code's. */
 /**
- * Claude Code's effort for the API path's: the same word does not buy the same
- * thinking through both doors, so a run can be calibrated (SLOP_CC_EFFORT).
+ * Claude Code's effort for the API path's. The same word does not buy the same
+ * thinking through both doors: at "high", ky's authors through Claude Code
+ * thought for up to 43k tokens in one reply (13 minutes) where the API never
+ * passed 10k. A 16k cap per reply kept the effort and the maps' quality and
+ * halved the time. SLOP_CC_EFFORT and SLOP_CC_THINKING recalibrate; both are
+ * part of the cache key.
  */
-const ccEffort = (effort?: string) => (effort ? (process.env.SLOP_CC_EFFORT ?? effort) : undefined);
+const THINKING = process.env.SLOP_CC_THINKING ?? "16000";
+const ccEffort = (effort?: string) => (effort ? `${process.env.SLOP_CC_EFFORT ?? effort}/${THINKING}` : undefined);
 
 function base(model: string, system: string, effort?: string): string[] {
-  return ["--model", ccModel(model), "--system-prompt", system, ...(effort ? ["--effort", effort] : [])];
+  return ["--model", ccModel(model), "--system-prompt", system, ...(effort ? ["--effort", effort.split("/")[0]] : [])];
 }
 
 /** A conversation as one prompt. The API path's retries carry the previous answer and what was wrong with it; so does this. */

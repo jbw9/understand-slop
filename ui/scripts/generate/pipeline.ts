@@ -108,13 +108,24 @@ export async function main(args: string[]) {
   writeFileSync(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
 
   const allVerdicts = Object.values(verdicts).flat();
+  // A stage replayed wholly from cache took seconds, not what generating it
+  // costs; the last report's time for it stands, so the record stays a plan.
+  const before = existsSync(`${out}/report.json`) ? JSON.parse(readFileSync(`${out}/report.json`, "utf8")).elapsed ?? {} : {};
+  let total = Math.round((Date.now() - t0) / 1000);
+  for (const stage of Object.keys(elapsed)) {
+    const runs = Object.entries(bill).filter(([k]) => k === stage || k.startsWith(`${stage}-`));
+    if (runs.length && runs.every(([, b]) => b.calls === b.cached) && typeof before[stage] === "number") {
+      total += before[stage] - elapsed[stage];
+      elapsed[stage] = before[stage];
+    }
+  }
   const usd = Object.values(bill).reduce((a, b) => a + b.usd, 0);
   const fullUsd = Object.values(bill).reduce((a, b) => a + b.fullUsd, 0);
   const report = {
     repo: inv.name,
     commit: inv.commit,
     models,
-    elapsed: { ...elapsed, total: Math.round((Date.now() - t0) / 1000) },
+    elapsed: { ...elapsed, total },
     usd: Math.round(usd * 100) / 100,
     fullUsd: Math.round(fullUsd * 100) / 100,
     bill,

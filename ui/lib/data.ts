@@ -1050,6 +1050,8 @@ export interface Run {
   root?: string;
   /** Which model ran each generator stage. Absent on hand-authored maps. */
   models?: Record<string, string>;
+  /** Web address of the repository, read from the checkout's git remote when the page is built. */
+  url?: string;
 }
 
 /** Stable id for an anatomy row, so a wire can anchor to it. */

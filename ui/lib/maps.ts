@@ -3,6 +3,7 @@
  * each one reads its code from.
  */
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -29,4 +30,14 @@ export function loadMap(name: string | undefined): { name: string; file: MapFile
  */
 export function rootOf(run: Run): string {
   return run.root ?? process.env.SLOP_REPO_ROOT ?? resolve(homedir(), "Desktop/Code", run.repo);
+}
+
+/** The checkout's `origin` as a web address (`git@host:o/r.git` → `https://host/o/r`), if it has one. */
+export function remoteOf(run: Run): string | undefined {
+  try {
+    const url = execFileSync("git", ["-C", rootOf(run), "remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return url.replace(/^git@([^:]+):/, "https://$1/").replace(/\.git$/, "").replace(/^https:\/\/[^@/]+@/, "https://") || undefined;
+  } catch {
+    return undefined;
+  }
 }

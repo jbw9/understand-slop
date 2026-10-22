@@ -38,6 +38,23 @@ export function Crumbs({
       className="sticky top-0 z-20 bg-warm-cream/85 backdrop-blur-sm"
     >
       <div className="mx-auto flex max-w-[1220px] items-start gap-6 px-10 py-3">
+        {maps.length > 1 ? (
+          <label className="flex shrink-0 items-center gap-2">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">map</span>
+            <select
+              value={map}
+              // The router, not pushState: the map is read on the server.
+              onChange={(e) => router.push(`?map=${encodeURIComponent(e.target.value)}`)}
+              className="rounded-[7px] border border-border-strong bg-pure-white px-2 py-1 text-[12.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+            >
+              {maps.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-1">
           {stops.map((c, i) => {
             const here = i === stops.length - 1;
@@ -68,21 +85,6 @@ export function Crumbs({
           })}
         </ol>
         <div className="flex shrink-0 items-center gap-3 pt-0.5 font-mono text-[10.5px] text-faint">
-          {maps.length > 1 ? (
-            <select
-              aria-label="Map"
-              value={map}
-              // The router, not pushState: the map is read on the server.
-              onChange={(e) => router.push(`?map=${encodeURIComponent(e.target.value)}`)}
-              className="rounded border border-border-gray bg-surface px-1.5 py-0.5 text-[11px] text-muted-slate"
-            >
-              {maps.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          ) : null}
           <Hint k="esc">back</Hint>
           <Hint k="0">top</Hint>
         </div>

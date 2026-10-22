@@ -15,11 +15,7 @@ export const checkIn: Node = {
   state: "derived",
   col: 0,
   row: 5,
-  detail: `There is no guest-list table. Each event row has one text column, \`rsvp\`, holding a JSON object with one entry per student who joined, keyed by their user id. Students add and remove their own entry; the organisation only reads it — except for one flag, \`checkedIn\`.
-
-The path is three screens. From the Ongoing (or Archive) list, tapping an event opens its details page, which fetches \`rsvp\` fresh to show a headcount and faces. "View all" opens the Attendees screen: a tally of dietary needs and a list of everyone who joined. Tapping a person there toggles their \`checkedIn\` flag and writes the whole \`rsvp\` text back.
-
-The catch is which copy gets written back. The Attendees screen does not use the fresh copy the details page just fetched; it starts from the event row loaded when the list was opened, so the first tap can overwrite anyone who joined since.`,
+  detail: "There is no guest-list table: each event row holds its guest list as one JSON text, rsvp. The organiser opens it from the event's details and taps a person to mark them arrived, which rewrites the whole text.",
   code: [
     { file: "app/org/index/eventdetails.tsx", start: 145, end: 187, label: "Event details re-reads the guest list" },
     { file: "app/org/index/eventdetails.tsx", start: 199, end: 201, label: "View all passes on the list's older copy" },
@@ -33,7 +29,7 @@ The catch is which copy gets written back. The Attendees screen does not use the
         { id: "ongoing", label: "Ongoing list", sub: "loads events with rsvp", col: 0, row: 0 },
         { id: "archive", label: "Archive list", sub: "past events", col: 0, row: 1 },
         { id: "search", label: "Search", sub: "any event on the campus", col: 0, row: 2, tone: "warn" },
-        { id: "details", label: "Event details", sub: "re-reads rsvp", col: 1, row: 1 },
+        { id: "details", label: "Event details", sub: "re-reads rsvp: headcount, faces", col: 1, row: 1 },
         { id: "attendees", label: "Attendees screen", sub: "starts from the old copy", col: 2, row: 1, tone: "warn" },
         { id: "profiles", label: "Student profiles", sub: "pictures only", col: 2, row: 2 },
         { id: "rsvp", label: "events.rsvp", sub: "one JSON text", col: 3, row: 0 },
@@ -46,6 +42,17 @@ The catch is which copy gets written back. The Attendees screen does not use the
         { from: "details", to: "profiles", label: "pictures" },
         { from: "details", to: "attendees", label: "View all" },
         { from: "attendees", to: "rsvp", label: "tap rewrites it all", tone: "warn" },
+      ],
+    },
+    {
+      kind: "table",
+      caption: "Who writes the guest list",
+      columns: ["Who", "What they change"],
+      state: "derived",
+      rows: [
+        ["A student joining", "Adds or replaces their own entry"],
+        ["A student cancelling", "Removes their own entry"],
+        ["The organiser's check-in tap", "Only the checkedIn flag of one entry — but writes the whole text"],
       ],
     },
     {
@@ -65,7 +72,7 @@ The catch is which copy gets written back. The Attendees screen does not use the
     {
       title: "Checking someone in can erase newer RSVPs",
       detail:
-        "The first tap writes back a guest list loaded when the Ongoing list was opened. Anyone who joined or changed their booking since then is silently removed from the event.",
+        "The Attendees screen does not use the copy the details page just fetched. The first tap writes back a guest list loaded when the Ongoing list was opened, so anyone who joined or changed their booking since is silently removed.",
       where: "app/org/index/attendees.tsx:99",
     },
   ],
@@ -82,11 +89,7 @@ The catch is which copy gets written back. The Attendees screen does not use the
       state: "derived",
       col: 0,
       row: 0,
-      detail: `When a student joins, the join drawer reads the event's \`rsvp\` text, parses it, sets the entry under the student's user id, and writes the whole text back. The entry holds the name and contact they typed, how many people they are bringing, and their dietary needs. \`checkedIn\` is not there at first; it appears the first time the organiser taps the person.
-
-Dietary needs are picked from six fixed options, stored with their emoji. "Other" opens a text box; whatever is typed is split on commas and each piece is stored as its own need, while the word "Other" itself is dropped.
-
-The student's own profile keeps a separate list, \`individual.rsvp\`, of the event ids they joined. Check-in never touches it.`,
+      detail: "Each student who joins gets one entry in the event's rsvp text, keyed by their user id. The join drawer writes the entry; the organiser's tap only adds checkedIn.",
       code: [
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 145, end: 170, label: "Joining sets one entry under the student's id" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 82, end: 90, label: "The dietary options" },
@@ -95,6 +98,16 @@ The student's own profile keeps a separate list, \`individual.rsvp\`, of the eve
         { file: "lib/localStorage.ts", start: 49, end: 53, label: "The student feed downloads every column, rsvp included" },
       ],
       anatomy: [
+        {
+          kind: "sequence",
+          caption: "How joining writes an entry",
+          actors: ["Student's phone", "Database"],
+          rows: [
+            { from: "Student's phone", to: "Database", label: "read this event's rsvp text", state: "derived" },
+            { from: "Database", to: "Student's phone", label: "the text", note: "parsed; the entry under the student's id is set", state: "derived" },
+            { from: "Student's phone", to: "Database", label: "write the whole text back", state: "derived" },
+          ],
+        },
         {
           kind: "example",
           caption: "What events.rsvp holds (example, two students)",
@@ -117,6 +130,7 @@ The student's own profile keeps a separate list, \`individual.rsvp\`, of the eve
             { label: "keys", value: "each student's user id — the same id as their login", state: "derived" },
             { label: "stored as", value: "text, not a JSON column: every reader parses it, every writer stringifies the whole object", state: "derived" },
             { label: "\"no shellfish\"", value: "typed under Other", state: "derived" },
+            { label: "individual.rsvp", value: "a separate list of joined event ids on the student's profile; check-in never touches it", state: "derived" },
           ],
         },
         {
@@ -130,7 +144,7 @@ The student's own profile keeps a separate list, \`individual.rsvp\`, of the eve
             ["email", "\"email or phone number\", as typed", "Join drawer"],
             ["partySize", "People coming, 1 or more", "Join drawer"],
             ["dietaryRestrictions", "List of needs, emoji included", "Join drawer"],
-            ["checkedIn", "Arrived? Missing until first tap", "Organiser's check-in tap"],
+            ["checkedIn", "Arrived? Missing until the first tap", "Organiser's check-in tap"],
           ],
         },
         {
@@ -145,7 +159,7 @@ The student's own profile keeps a separate list, \`individual.rsvp\`, of the eve
             ["🥛 Dairy-free"],
             ["🥕 Vegan"],
             ["🥜 Peanut"],
-            ["Other → the typed words, one per comma"],
+            ["Other → opens a text box; the typed words are stored one per comma, and \"Other\" itself is dropped"],
           ],
         },
       ],
@@ -166,11 +180,7 @@ The student's own profile keeps a separate list, \`individual.rsvp\`, of the eve
       state: "derived",
       col: 0,
       row: 1,
-      detail: `Opened from the Ongoing or Archive list (or from search). It shows the event much like the preview, then an "Attendees" section. For that section it fetches \`rsvp\` again, then asks the \`individual\` table for the picture of each student in it.
-
-The headcount in "Attendees (N)" is the sum of everyone's \`partySize\` — people, not bookings. Up to seven pictures are shown, then the first three names and "and N more are coming". Students whose profile no longer exists are left out of this section, because it is built from the profiles that came back.
-
-"View all" opens the Attendees screen, handing it two things: the event object this page was opened with (the list's older copy) and the attendee list it just built.`,
+      detail: "The organiser's view of one event, opened from the Ongoing or Archive list or from search. It ends in an Attendees section that re-reads the guest list and fetches each student's picture.",
       code: [
         { file: "app/org/index/eventdetails.tsx", start: 145, end: 187, label: "Fetch rsvp, then each student's picture" },
         { file: "app/org/index/eventdetails.tsx", start: 189, end: 192, label: "Headcount: sum of party sizes" },
@@ -182,19 +192,39 @@ The headcount in "Attendees (N)" is the sum of everyone's \`partySize\` — peop
         {
           kind: "screen",
           title: "Event details (organisation)",
+          caption: "Robotics Demo Night, opened from Ongoing",
+          shot: "/shots/explorify/ci-details.png",
           items: [
-            { type: "heading", label: "Event name" },
+            { type: "heading", label: "Robotics Demo Night" },
             { type: "image", label: "Cover picture, full width" },
             { type: "list", label: "Category chips" },
-            { type: "button", label: "📍 Address", note: "opens Apple Maps or Google Maps" },
-            { type: "text", label: "📅 Date   ⏰ start – end", note: "date only appears if a dress code was given" },
-            { type: "text", label: "Name and description", note: "three lines, then \"more\"" },
-            { type: "text", label: "Organizer: picture and name" },
+            { type: "button", label: "📍 Siebel Center", note: "opens Apple Maps or Google Maps" },
+            { type: "text", label: "📅 date  ⏰ start – end", note: "the date appears only because a dress code is set, and reads a day early" },
+            { type: "text", label: "… more", note: "the description, cut to three lines' worth — empty on web, where that length is never measured" },
+            { type: "text", label: "Organizer", note: "the event's organisation" },
             { type: "text", label: "Food & Beverages, Dress Code", note: "each only if set" },
-            { type: "heading", label: "Attendees (N)", note: "N = total party size" },
-            { type: "button", label: "View all", note: "opens the Attendees screen" },
-            { type: "list", label: "Up to 7 profile pictures" },
-            { type: "text", label: "\"Maya, Leo, Sam and 4 more are coming\"" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Attendees section",
+          caption: "The same page, scrolled to the bottom",
+          shot: "/shots/explorify/ci-details-attendees.png",
+          items: [
+            { type: "heading", label: "Attendees (6)", note: "people, not bookings: party sizes 2 + 1 + 3" },
+            { type: "button", label: "View all", note: "opens the Attendees screen with the event as the list loaded it, plus this list" },
+            { type: "list", label: "Profile pictures", note: "up to 7; only students whose profile still exists" },
+            { type: "text", label: "Maya Chen, Leo Park, Priya Nair", note: "the first three names; with more bookings it adds \"and N more are coming\", N = people minus 3" },
+          ],
+        },
+        {
+          kind: "sequence",
+          caption: "What the Attendees section fetches",
+          actors: ["Phone", "Database"],
+          rows: [
+            { from: "Phone", to: "Database", label: "rsvp of this event", state: "derived" },
+            { from: "Phone", to: "Database", label: "id and picture of each student in it", state: "derived" },
+            { from: "Database", to: "Phone", label: "one profile per student who still exists", note: "the section is built from these, so deleted students drop out", state: "derived" },
           ],
         },
       ],
@@ -215,11 +245,7 @@ The headcount in "Attendees (N)" is the sum of everyone's \`partySize\` — peop
       state: "derived",
       col: 0,
       row: 2,
-      detail: `The screen parses the event's \`rsvp\` text into one row per student, with \`checkedIn\` defaulting to false. The title, "Attendees (N)", is again the sum of party sizes.
-
-Above the list is a row of dietary chips such as "🥕 Vegan (2)". Each count is the number of bookings that listed that need, not the number of people: a party of four with one vegan counts once, as does a party of one. If nobody listed anything, it says "No dietary restrictions".
-
-Each person's row shows a picture, name, email, party size and — once checked in — a green tick. The pictures are not looked up by person: row 1 gets the first picture from the details page's list, row 2 the second, and so on.`,
+      detail: "A tally of dietary needs, then one row per booking from the event's rsvp text. Tapping a row checks that person in, or out again.",
       code: [
         { file: "app/org/index/attendees.tsx", start: 58, end: 95, label: "Parse the guest list and tally dietary needs" },
         { file: "app/org/index/attendees.tsx", start: 129, end: 132, label: "Title count: sum of party sizes" },
@@ -229,25 +255,27 @@ Each person's row shows a picture, name, email, party size and — once checked 
       anatomy: [
         {
           kind: "screen",
-          title: "Attendees (N)",
+          title: "Attendees (6)",
+          caption: "Robotics Demo Night: three bookings, Maya already checked in",
+          shot: "/shots/explorify/ci-list.png",
           items: [
-            { type: "button", label: "← Back", note: "returns to details with the latest copy" },
-            { type: "heading", label: "Dietary Restrictions" },
-            { type: "list", label: "🥕 Vegan (2)  🕌 Halal (1)  no shellfish (1)", note: "or \"No dietary restrictions\"" },
-            { type: "heading", label: "Attendee List" },
-            { type: "list", label: "Picture · name · email · party size · ✓", note: "tapping a row checks the person in, or out" },
+            { type: "button", label: "← Back", note: "returns to details with this screen's latest copy" },
+            { type: "heading", label: "Attendees (6)", note: "the sum of party sizes" },
+            { type: "list", label: "🥕 Vegan (1)  🕌 Halal (1)  no shellfish (1)", note: "bookings that listed each need, not people; \"No dietary restrictions\" if none" },
+            { type: "list", label: "Picture · name · email · party size", note: "one row per entry in rsvp; checkedIn counts as false until set" },
+            { type: "image", label: "Green tick", note: "this person is checked in" },
           ],
         },
         {
           kind: "table",
-          caption: "The tally for three bookings",
+          caption: "The tally for the three bookings above",
           columns: ["Booking", "Party size", "Needs listed"],
           state: "derived",
           rows: [
-            ["Maya", "4", "🥕 Vegan"],
-            ["Leo", "1", "🥕 Vegan, 🕌 Halal"],
-            ["Sam", "2", "none"],
-            ["Shown", "Attendees (7)", "🥕 Vegan (2) · 🕌 Halal (1)"],
+            ["Maya Chen", "2", "🥕 Vegan"],
+            ["Leo Park", "1", "🕌 Halal, no shellfish"],
+            ["Priya Nair", "3", "none"],
+            ["Shown", "Attendees (6)", "🥕 Vegan (1) · 🕌 Halal (1) · no shellfish (1)"],
           ],
         },
       ],
@@ -261,7 +289,7 @@ Each person's row shows a picture, name, email, party size and — once checked 
         {
           title: "Dietary counts are per booking, not per person",
           detail:
-            "A party of four with one vegan adds one to Vegan, the same as a party of one. An organiser ordering food from these numbers can only guess how many plates each need applies to.",
+            "Maya's party of two counts once under Vegan, the same as a party of one. An organiser ordering food from these numbers can only guess how many plates each need applies to.",
           where: "app/org/index/attendees.tsx:83",
         },
       ],
@@ -277,11 +305,7 @@ Each person's row shows a picture, name, email, party size and — once checked 
         "Whether the database lets one organisation write another organisation's event depends on its row-level security rules, which live in the Supabase dashboard and not in this repository.",
       col: 0,
       row: 3,
-      detail: `The tap handler parses the screen's copy of \`rsvp\`, flips \`checkedIn\` on that one person, and saves the whole object back with a single update. It does not read the column first. Tapping again checks the person out.
-
-The screen's copy starts as the event row loaded by the Ongoing list, passed through the details page unchanged. After a successful tap the database returns the updated row and that becomes the copy, so each later tap writes the list as it was at the previous tap. Students who join in between are erased by the next tap. The join drawer is safer only by timing: it reads the column just before writing it, so its window for the same mistake is a fraction of a second rather than the whole session.
-
-Nothing checks that the event belongs to the organiser. The organisation's search screen lists every event on the campus and opens the same details page, so another organisation's guest list can be opened and tapped.`,
+      detail: "A tap flips one person's checkedIn flag and writes the whole guest list back, without reading it first. The copy it writes can be as old as the Ongoing list, so newer RSVPs are erased.",
       code: [
         { file: "app/org/index/attendees.tsx", start: 42, end: 45, label: "The screen starts from the event it was handed" },
         { file: "app/org/index/components/ongoing.tsx", start: 46, end: 46, label: "…which the Ongoing list loaded, rsvp and all" },
@@ -290,12 +314,22 @@ Nothing checks that the event belongs to the organiser. The organisation's searc
       ],
       anatomy: [
         {
+          kind: "screen",
+          title: "After one tap",
+          caption: "Leo Park tapped once",
+          shot: "/shots/explorify/ci-tap.png",
+          items: [
+            { type: "list", label: "Leo Park ✓", note: "checkedIn flipped to true and the whole guest list written back" },
+            { type: "list", label: "Maya Chen ✓", note: "tapping again checks her out" },
+          ],
+        },
+        {
           kind: "flow",
           rows: [
-            { n: 1, title: "Start from a copy", detail: "The event row the Ongoing list loaded, handed on by the details page.", state: "derived" },
+            { n: 1, title: "Start from a copy", detail: "The event row the Ongoing list loaded, handed on unchanged by the details page.", state: "derived" },
             { n: 2, title: "Flip the flag", detail: "checkedIn = !checkedIn on that person's entry.", state: "derived" },
             { n: 3, title: "Write it all back", detail: "The whole edited object replaces the rsvp column, with no read first.", state: "derived" },
-            { n: 4, title: "Keep the reply", detail: "The updated row becomes the copy for the next tap.", state: "derived" },
+            { n: 4, title: "Keep the reply", detail: "The updated row becomes the copy for the next tap, so each tap writes the list as it was at the previous one.", state: "derived" },
           ],
         },
         {
@@ -308,6 +342,16 @@ Nothing checks that the event belongs to the organiser. The organisation's searc
             { from: "Student", to: "Database", label: "writes { Maya, Leo }", state: "derived" },
             { from: "Organiser", to: "Database", label: "taps Maya: writes { Maya ✓ } from its copy", state: "derived" },
             { from: "Database", to: "Organiser", label: "{ Maya ✓ } — Leo is gone", note: "Leo's app still shows the event as joined", state: "derived" },
+          ],
+        },
+        {
+          kind: "table",
+          caption: "Two writers of the same text, and how stale their copy can be",
+          columns: ["Writer", "Reads rsvp", "Window for losing someone else's change"],
+          state: "derived",
+          rows: [
+            ["Student's join drawer", "Just before writing", "A fraction of a second"],
+            ["Organiser's check-in tap", "When the Ongoing list was opened, then from its own last write", "The whole session on that screen"],
           ],
         },
       ],

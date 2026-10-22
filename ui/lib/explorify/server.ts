@@ -17,11 +17,7 @@ export const server: Node = {
     "The app also calls a function named delete-organization whose code is not in this repository. It may have been deployed to Supabase from somewhere else, or may not exist.",
   col: 1,
   row: 2,
-  detail: `Almost everything in this app runs on the phone and talks straight to Supabase. The exceptions live in \`supabase/functions/\` (small TypeScript programs Supabase runs on its servers, called "edge functions") and in \`api/\` (a Python web app).
-
-Only one of them does real work: \`delete-user\`, which the student's Delete Account button calls. It needs to run on a server because deleting a login requires Supabase's service-role key, which can do anything and must never be on a phone. It works out whose account to delete from the caller's sign-in token, so a student can only delete themselves. The organisation's Delete button calls a second function, \`delete-organization\`, which is not in the repository.
-
-The other two are leftovers. \`archive-event\` is the "Hello" example that \`supabase functions new\` generates, never edited and never called. The Python app answers "Hello World" on one address and nothing in the app talks to it.`,
+  detail: "Almost all of explorify runs on the phone and talks straight to Supabase. Only one server function does real work, deleting a student's account; one the app calls is missing and two are leftovers.",
   code: [
     { file: "supabase/functions/delete-user/index.ts", start: 1, end: 60, label: "delete-user, the one working function" },
     { file: "app/individual/account/index.tsx", start: 125, end: 130, label: "The student's Delete Account calls it" },
@@ -36,7 +32,7 @@ The other two are leftovers. \`archive-event\` is the "Hello" example that \`sup
       boxes: [
         { id: "student", label: "Student account", sub: "Delete Account", col: 0, row: 0 },
         { id: "org", label: "Organisation account", sub: "Delete Organization", col: 0, row: 1 },
-        { id: "deluser", label: "delete-user", sub: "edge function", col: 1, row: 0 },
+        { id: "deluser", label: "delete-user", sub: "edge function, on Supabase's servers", col: 1, row: 0 },
         { id: "delorg", label: "delete-organization", sub: "not in this repo", col: 1, row: 1, tone: "warn" },
         { id: "archive", label: "archive-event", sub: "template, never called", col: 1, row: 3, tone: "warn" },
         { id: "python", label: "Python app", sub: "\"Hello World\", never called", col: 1, row: 4, tone: "warn" },
@@ -56,9 +52,9 @@ The other two are leftovers. \`archive-event\` is the "Hello" example that \`sup
       columns: ["Piece", "Where", "Runs on", "Called by", "Does"],
       state: "partial",
       rows: [
-        ["delete-user", "supabase/functions/delete-user", "Supabase (Deno)", "Student's Delete Account", "Deletes the caller's own profile and login"],
+        ["delete-user", "supabase/functions/delete-user", "Supabase (Deno)", "Student's Delete Account", "Deletes the caller's own profile and login — on a server because that needs the service-role key, which can do anything and must never be on a phone"],
         ["delete-organization", "not in the repo", "unknown", "Organisation's Delete", "unknown"],
-        ["archive-event", "supabase/functions/archive-event", "Supabase (Deno)", "nothing", "Replies \"Hello <name>!\""],
+        ["archive-event", "supabase/functions/archive-event", "Supabase (Deno)", "nothing", "Replies \"Hello <name>!\" — the unedited example `supabase functions new` generates"],
         ["CORS headers", "supabase/functions/_shared/cors.ts", "—", "nothing imports it", "A shared header list, unused"],
         ["Python app", "api/app.py", "Flask, someone's machine", "nothing", "Replies \"Hello World\""],
       ],
@@ -74,11 +70,7 @@ The other two are leftovers. \`archive-event\` is the "Hello" example that \`sup
       state: "derived",
       col: 0,
       row: 0,
-      detail: `The student's Delete Account button (after an "are you sure" alert) calls \`supabase.functions.invoke("delete-user", { body: { userId } })\`. The Supabase library sends the student's sign-in token along with it. On success the phone signs out, wipes its local storage and returns to the start screen.
-
-Inside, the function builds an admin client from \`SUPABASE_SERVICE_ROLE_KEY\`, a key that skips every database access rule — so the function's own check is the only one. It reads the token from the \`Authorization\` header and asks Supabase Auth whose it is. No token, or one that belongs to no user, gets a 401. Otherwise it deletes the \`individual\` row and then the login of that user. The \`userId\` in the body is ignored.
-
-That check is new: until commit \`304a512\` the function deleted whichever \`userId\` the body named, so anyone holding the app's public key could delete any account. The mapped commit, \`59a89b3\`, still has that version.`,
+      detail: "Deletes the calling student's profile row and login with the service key, which skips every access rule. Whose account goes is worked out from the sign-in token, never from the request body.",
       code: [
         { file: "supabase/functions/delete-user/index.ts", start: 6, end: 13, label: "The admin client" },
         { file: "supabase/functions/delete-user/index.ts", start: 15, end: 29, label: "Who is calling: the token, not the body" },
@@ -92,12 +84,12 @@ That check is new: until commit \`304a512\` the function deleted whichever \`use
           caption: "One account deletion",
           actors: ["Phone", "delete-user", "Auth", "Database"],
           rows: [
-            { from: "Phone", to: "delete-user", label: "POST /functions/v1/delete-user, with the sign-in token", note: "the body's userId is no longer read", state: "derived" },
+            { from: "Phone", to: "delete-user", label: "POST /functions/v1/delete-user, with the sign-in token", note: "after an \"are you sure\" alert; sent as invoke(\"delete-user\", { body: { userId } }), and the body's userId is no longer read", state: "derived" },
             { from: "delete-user", to: "Auth", label: "whose token is this?", state: "derived" },
             { from: "Auth", to: "delete-user", label: "the user — or nothing, and the reply is 401", state: "derived" },
             { from: "delete-user", to: "Database", label: "delete from individual where id = that user", note: "service key: no access rules apply", state: "derived" },
             { from: "delete-user", to: "Auth", label: "delete that user's login", state: "derived" },
-            { from: "delete-user", to: "Phone", label: "200 { \"success\": true }", state: "derived" },
+            { from: "delete-user", to: "Phone", label: "200 { \"success\": true }", note: "the phone signs out, wipes its local storage and returns to the start screen", state: "derived" },
           ],
         },
         {
@@ -120,10 +112,20 @@ That check is new: until commit \`304a512\` the function deleted whichever \`use
         {
           kind: "flow",
           rows: [
-            { n: 1, title: "Admin client", detail: "Built from SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the function's environment.", state: "derived" },
-            { n: 2, title: "Find out who is calling", detail: "The Authorization token is looked up with Auth; without a user behind it the reply is 401.", state: "derived" },
+            { n: 1, title: "Admin client", detail: "Built from SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the function's environment. That key skips every database access rule, so the function's own check is the only one.", state: "derived" },
+            { n: 2, title: "Find out who is calling", detail: "The token from the Authorization header is looked up with Auth; no token, or no user behind it, and the reply is 401.", state: "derived" },
             { n: 3, title: "Delete the profile", detail: "From individual only — never from organizations.", state: "derived" },
             { n: 4, title: "Delete the login", detail: "auth.admin.deleteUser on the caller's id.", state: "derived" },
+          ],
+        },
+        {
+          kind: "table",
+          caption: "The check is new",
+          columns: ["Version", "Whose account it deletes", "Who could delete"],
+          state: "derived",
+          rows: [
+            ["Before commit 304a512 — including the mapped commit, 59a89b3", "Whichever userId the body names", "Anyone holding the app's public key, any account"],
+            ["304a512 and later", "The caller, from the sign-in token", "A student, only themselves"],
           ],
         },
       ],
@@ -146,11 +148,30 @@ That check is new: until commit \`304a512\` the function deleted whichever \`use
         "Only the call is in the repository. Whether delete-organization exists on the Supabase project, and what it deletes, cannot be told from here.",
       col: 0,
       row: 1,
-      detail: `The organisation's account screen calls \`supabase.functions.invoke("delete-organization", { body: { userId } })\` with its own id — the same shape as the student's call. \`supabase/functions/\` holds only \`delete-user\` and \`archive-event\`.
-
-If the function was never deployed, the call fails and the organisation sees "There was an error deleting your organization. Please try again." every time. If it was deployed from somewhere else, its code — and whether it trusts the body's id the way \`delete-user\` used to — cannot be reviewed here.`,
+      detail: "The organisation's Delete button calls a server function, delete-organization, whose code is not in this repository. supabase/functions/ holds only delete-user and archive-event.",
       code: [
         { file: "app/org/account/index.tsx", start: 129, end: 168, label: "The call, and what the phone does after" },
+      ],
+      anatomy: [
+        {
+          kind: "sequence",
+          caption: "The call",
+          actors: ["Phone", "delete-organization"],
+          rows: [
+            { from: "Phone", to: "delete-organization", label: "invoke(\"delete-organization\", { body: { userId } }), with its own id", note: "the same shape as the student's call", state: "derived" },
+            { from: "delete-organization", to: "Phone", label: "unknown — no code to read", state: "inferred" },
+          ],
+        },
+        {
+          kind: "table",
+          caption: "The two possibilities",
+          columns: ["If the function…", "What happens"],
+          state: "inferred",
+          rows: [
+            ["was never deployed", "The call fails and the organisation sees \"There was an error deleting your organization. Please try again.\" every time"],
+            ["was deployed from somewhere else", "Its code — and whether it trusts the body's id the way delete-user used to — cannot be reviewed here"],
+          ],
+        },
       ],
       issues: [
         {
@@ -169,9 +190,7 @@ If the function was never deployed, the call fails and the organisation sees "Th
       state: "derived",
       col: 0,
       row: 2,
-      detail: `The name suggests it moves finished events into an archive. It does not: it is exactly what \`supabase functions new archive-event\` generates — it reads a \`name\` from the request and replies with a greeting. The setup comments and the sample curl command are still in the file.
-
-No code calls it. The organisation's Archive list does the archiving on the phone instead, by showing published events dated before today. If archiving should become a real stored state, this is the obvious place for it; otherwise the folder can be deleted.`,
+      detail: "Despite its name it archives nothing: it is the unedited hello-world example Supabase generates for a new function. No code calls it.",
       code: [
         { file: "supabase/functions/archive-event/index.ts", start: 8, end: 20, label: "The whole function" },
         { file: "supabase/functions/archive-event/index.ts", start: 22, end: 31, label: "The generated how-to-call comment" },
@@ -183,6 +202,27 @@ No code calls it. The organisation's Archive list does the archiving on the phon
           caption: "Its only behaviour",
           value: `request:  POST /functions/v1/archive-event   { "name": "Functions" }
 reply:    200   { "message": "Hello Functions!" }`,
+          notes: [
+            { label: "generated by", value: "supabase functions new archive-event — its setup comments and sample curl command are still in the file", state: "derived" },
+          ],
+        },
+        {
+          kind: "table",
+          caption: "Where archiving really happens",
+          columns: ["Place", "What it does"],
+          state: "derived",
+          rows: [
+            ["archive-event function", "Nothing — never called"],
+            ["Organisation's Archive list, on the phone", "Shows published events dated before today"],
+          ],
+        },
+      ],
+      issues: [
+        {
+          title: "A function named for a job it does not do",
+          detail:
+            "Anyone reading the folder will expect events to be archived on a server. If archiving should become a real stored state, this is the obvious place for it; otherwise the folder can be deleted.",
+          where: "supabase/functions/archive-event/index.ts:8",
         },
       ],
     },
@@ -194,11 +234,7 @@ reply:    200   { "message": "Hello Functions!" }`,
       state: "derived",
       col: 0,
       row: 3,
-      detail: `\`api/app.py\` is twenty lines: it creates a Flask app, allows requests from any website, sets up a database handle it never uses, and answers \`GET /\` with "Hello World". Nothing in the app sends it a request — the only web calls the phone makes go to Supabase and Google.
-
-It most likely dates from before the project moved to Supabase; the repository does not say. As written it would not start cleanly: the host in \`app.run\` uses commas where the dots of an IP address belong, the comment at the top gives a different port from the code, and \`flask_cors\` is imported but missing from \`requirements.txt\`.
-
-\`package.json\` also has a \`proxy\` entry pointing at port 5000, a setting from web projects that Expo is not known to use.`,
+      detail: "A twenty-line Flask app whose one address replies Hello World. Nothing in explorify sends it a request, and as committed it would not start cleanly.",
       code: [
         { file: "api/app.py", start: 1, end: 2, label: "How it was meant to be run" },
         { file: "api/app.py", start: 4, end: 17, label: "The app and its one route" },
@@ -222,6 +258,20 @@ It most likely dates from before the project moved to Supabase; the repository d
             ["app.py:2", "flask run --host=10.193.207.116 --port=8082", "Port disagrees with line 20"],
             ["app.py:5", "from flask_cors import CORS", "Flask-Cors is not in requirements.txt, so a fresh install fails here"],
             ["app.py:20", "host='10,193,207,116', port='8081'", "Commas instead of dots: not an address"],
+            ["package.json:5", "\"proxy\": \"http://127.0.0.1:5000\"", "A setting from web projects that Expo is not known to use"],
+          ],
+        },
+        {
+          kind: "table",
+          caption: "What the file holds",
+          columns: ["Piece", "Used?"],
+          state: "derived",
+          rows: [
+            ["A Flask app", "Yes, it answers GET / with \"Hello World\""],
+            ["CORS for every website", "Yes, any website may call it"],
+            ["A database handle (SQLAlchemy, \"explorify_db\")", "Never"],
+            ["Callers in the phone app", "None — the phone's only web calls go to Supabase and Google"],
+            ["Why it exists", "Most likely from before the project moved to Supabase; the repository does not say"],
           ],
         },
       ],

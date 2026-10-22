@@ -16,11 +16,7 @@ export const rsvp: Node = {
   state: "derived",
   col: 0,
   row: 4,
-  detail: `Joining happens in a drawer, not on a page. The Join button on any card or event page opens it; one copy of it is drawn for the whole app by \`EventProvider\`, which \`app/_layout.tsx\` wraps around every screen. The student checks their name and contact (filled in from their profile), sets party size and dietary needs, and swipes the blue bar up to confirm.
-
-A join is written in two places. The event's \`rsvp\` column is the guest list: one string of JSON text, keyed by student id, holding each guest's details. The student's own \`individual.rsvp\` is a list of event ids. Every write reads the current value, changes it on the phone, and writes the whole value back — nothing in between stops another phone doing the same.
-
-Saving (the bookmark) only edits \`individual.saved_events\`, another list of event ids. Both lists appear on the Saved tab. Whether a button shows Join or Cancel, filled or empty, comes from a list held in memory that starts empty on every launch — the root of most of the problems listed in the parts below.`,
+  detail: "Join opens a drawer; swiping it up writes you into the event's guest list and your own list of joined events. The bookmark only adds the event to your saved list; the Saved tab shows both.",
   code: [
     { file: "app/individual/index/components/eventContext.tsx", start: 17, end: 67, label: "The shared state and the one drawer" },
     { file: "app/_layout.tsx", start: 102, end: 113, label: "Mounted once around the whole app" },
@@ -30,7 +26,7 @@ Saving (the bookmark) only edits \`individual.saved_events\`, another list of ev
   anatomy: [
     {
       kind: "diagram",
-      caption: "Every place that writes a join or a save, and where it ends up",
+      caption: "Every place that writes a join or a save, and where it ends up — the button memory, empty on every launch, is behind most of the problems below",
       boxes: [
         { id: "join", label: "Join drawer", sub: "adds your entry", col: 0, row: 0 },
         { id: "cancel", label: "Cancel button", sub: "cards, event page", col: 0, row: 1 },
@@ -65,11 +61,11 @@ Saving (the bookmark) only edits \`individual.saved_events\`, another list of ev
       caption: "Joining, message by message",
       actors: ["Student", "Phone", "Supabase"],
       rows: [
-        { from: "Student", to: "Phone", label: "taps Join", state: "derived" },
-        { from: "Phone", to: "Phone", label: "drawer opens, name and contact pre-filled", state: "derived" },
+        { from: "Student", to: "Phone", label: "taps Join", note: "on any card or the event page", state: "derived" },
+        { from: "Phone", to: "Phone", label: "drawer opens, name and contact pre-filled", note: "one drawer for the whole app, drawn by EventProvider around every screen", state: "derived" },
         { from: "Student", to: "Phone", label: "party size, diet, swipes up", state: "derived" },
         { from: "Phone", to: "Supabase", label: "read this event's rsvp", state: "derived" },
-        { from: "Supabase", to: "Phone", label: "the guest list text", state: "derived" },
+        { from: "Supabase", to: "Phone", label: "the guest list text", note: "JSON keyed by student id", state: "derived" },
         { from: "Phone", to: "Phone", label: "add or replace my entry", state: "derived" },
         { from: "Phone", to: "Supabase", label: "write the whole guest list back", note: "a join saved in between is lost", state: "derived" },
         { from: "Phone", to: "Supabase", label: "read, then write my rsvp list", note: "a failure here is only logged", state: "derived" },

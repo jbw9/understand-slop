@@ -166,6 +166,8 @@ export async function invoke(req: Request): Promise<Reply> {
         return JSON.parse(new TextDecoder().decode(res.body)) as Reply;
       } catch (e) {
         const msg = `${(e as Error).name}: ${(e as Error).message}`;
+        // A daily cap does not lift in minutes; retrying only burns them.
+        if (/per day/i.test(msg)) throw new Error(`${req.stage} ${req.model}: daily token quota spent — ${msg}`);
         const throttled = /Throttling|TooManyRequests/i.test(msg);
         if (attempt >= (throttled ? 12 : 6) || !RETRYABLE.test(msg)) throw new Error(`${req.stage} ${req.model}: ${msg}`);
         const wait = Math.min(60_000, 2000 * 2 ** attempt) * (0.5 + Math.random());

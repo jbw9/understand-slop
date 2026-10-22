@@ -1,0 +1,325 @@
+{
+ "repo": "full-stack-fastapi-template",
+ "commit": "b1125d8",
+ "models": {
+  "summarize": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "us.anthropic.claude-opus-4-6-v1",
+  "author": "us.anthropic.claude-opus-4-6-v1",
+  "verify": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 54,
+  "cut": 530,
+  "author": 893,
+  "verify": 112,
+  "total": 1589
+ },
+ "usd": 11.97,
+ "fullUsd": 11.97,
+ "repairs": [
+  {
+   "roots": [
+    "backend",
+    "api-client"
+   ],
+   "seconds": 803,
+   "usd": 3.2
+  }
+ ],
+ "bill": {
+  "summarize": {
+   "calls": 124,
+   "cached": 124,
+   "input": 0,
+   "output": 0,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.5320640000000003
+  },
+  "author": {
+   "calls": 28,
+   "cached": 0,
+   "input": 74468,
+   "output": 50527,
+   "cacheRead": 945667,
+   "usd": 2.2013935,
+   "fullUsd": 2.2013935
+  },
+  "verify": {
+   "calls": 16,
+   "cached": 0,
+   "input": 34799,
+   "output": 11359,
+   "cacheRead": 0,
+   "usd": 0.09159399999999998,
+   "fullUsd": 0.09159399999999998
+  },
+  "verify-review": {
+   "calls": 34,
+   "cached": 0,
+   "input": 133797,
+   "output": 9586,
+   "cacheRead": 0,
+   "usd": 0.9086349999999999,
+   "fullUsd": 0.9086349999999999
+  }
+ },
+ "files": {
+  "listed": 231,
+  "summarised": 124,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "frontend/playwright.config.ts",
+   "reason": "End-to-end test configuration, not product code."
+  },
+  {
+   "path": "hooks/post_gen_project.py",
+   "reason": "Cookiecutter template generation hook, runs only at project scaffold time."
+  },
+  {
+   "path": "scripts/add_latest_release_date.py",
+   "reason": "Release-process tooling script, not part of the running application."
+  },
+  {
+   "path": "scripts/prepare_release.py",
+   "reason": "Release-process tooling script, not part of the running application."
+  }
+ ],
+ "roots": [
+  {
+   "id": "signing-in",
+   "title": "Signing In",
+   "accepted": true,
+   "turns": 1,
+   "reads": 0,
+   "submits": 0,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "flagged": 4,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "managing-items",
+   "title": "Managing Items",
+   "accepted": true,
+   "turns": 1,
+   "reads": 0,
+   "submits": 0,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 8,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "mi-items-page",
+      "claims": [
+       "Shows a skeleton loader while pending — not_shown: The code shows an empty state when `items.data.length === 0` (lines 34-43) but does not show any skeleton loader implementation for the pending state."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "changing-settings",
+   "title": "Changing Settings",
+   "accepted": true,
+   "turns": 1,
+   "reads": 0,
+   "submits": 0,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 4,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "cs-delete-account",
+      "claims": [
+       "Because the tab filter at the settings page level is a no-op, superusers reach this tab — not_shown: No code is cited that shows a tab filter or its behavior at the settings page level."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "managing-users",
+   "title": "Managing Users",
+   "accepted": true,
+   "turns": 1,
+   "reads": 0,
+   "submits": 0,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "mu-add",
+      "claims": [
+       "while the backend model defaults to true — not_shown: The cited code does not show the backend User model definition or its default value for is_active.",
+       "and sends it in the welcome email body — not_shown: The cited code shows the plaintext password is passed to `generate_new_account_email` and the result is sent via `send_email`, but the actual email body content is not shown in the cited lines."
+      ]
+     },
+     {
+      "id": "mu-private",
+      "claims": [
+       "the User model has no is_verified column"
+      ]
+     }
+    ],
+    "downgraded": [
+     "mu-private"
+    ]
+   }
+  },
+  {
+   "id": "app-shell",
+   "title": "The App Shell",
+   "accepted": true,
+   "turns": 1,
+   "reads": 0,
+   "submits": 0,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "as-shared",
+      "claims": [
+       "NotFound has Go Back button — contradicted: Line 24 shows the button text is 'Go Back', but it links to '/' (Go Home), not a back navigation. The button says 'Go Back' but functionally goes home."
+      ]
+     },
+     {
+      "id": "as-ui-library",
+      "claims": [
+       "Button sizes: default, sm, lg, icon — contradicted: Lines 23-30 define five sizes, not four: default, sm, lg, icon, icon-sm, and icon-lg. The label omits icon-sm and icon-lg."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "backend",
+   "title": "The Backend",
+   "accepted": true,
+   "turns": 12,
+   "reads": 26,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 6,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "be-startup",
+      "claims": [
+       "serves the frontend from a static directory — contradicted: Line 36 in [0] calls `app.frontend(...)` which is not a standard FastAPI method. FastAPI does not have a `.frontend()` method; this appears to be incorrect. The code defines `FRONTEND_DIR` but the method call is not valid FastAPI syntax."
+      ]
+     },
+     {
+      "id": "be-crud",
+      "claims": [
+       "Five CRUD functions handle user and item operations — not_shown: The cited code shows only 1 CRUD function (create_user). The authenticate function is not a CRUD operation. No item operations are shown in the cited code."
+      ]
+     }
+    ],
+    "downgraded": [
+     "be-startup"
+    ]
+   }
+  },
+  {
+   "id": "api-client",
+   "title": "The API Client",
+   "accepted": true,
+   "turns": 16,
+   "reads": 28,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 8,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "api-client",
+      "claims": [
+       "It sends unauthenticated requests to `/api/v1/private/users/`"
+      ]
+     },
+     {
+      "id": "ac-codegen",
+      "claims": [
+       "All service methods are bundled even if only a few are called — not_shown: The code shows the configuration setting and a comment about tree-shaking, but does not demonstrate or show the behavior that all service methods are bundled"
+      ]
+     },
+     {
+      "id": "ac-services",
+      "claims": [
+       "PrivateService: createUser (no auth, never called) — partially_supported: PrivateService.createUser exists at line 373 and has no `security` declaration (lines 374-382 show no security field). However, the code does not show whether it is 'never called' - that is not verifiable from the cited code."
+      ]
+     },
+     {
+      "id": "ac-http-serial",
+      "claims": [
+       "all others use JSON — not_shown: The cited code does not show endpoint definitions or their serializer assignments, so it cannot verify which endpoints use which serializers."
+      ]
+     }
+    ],
+    "downgraded": [
+     "ac-codegen"
+    ]
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "signing-in",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "managing-items",
+    "depth": 3,
+    "nodes": 8
+   },
+   {
+    "id": "changing-settings",
+    "depth": 2,
+    "nodes": 4
+   },
+   {
+    "id": "managing-users",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "app-shell",
+    "depth": 3,
+    "nodes": 12
+   },
+   {
+    "id": "backend",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "api-client",
+    "depth": 3,
+    "nodes": 9
+   }
+  ]
+ },
+ "verifyPassRate": 94
+}

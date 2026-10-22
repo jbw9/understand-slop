@@ -6,8 +6,7 @@
  * flagged claims and in the same breath called them accurate (taxonomy: 18 of
  * 54 nodes downgraded, most wrongly). So Haiku screens every claim with an
  * explicit verdict, and only what it marks contradicted or not shown goes to
- * a stronger reviewer (Sonnet: a quota apart from the author's Opus, which
- * throttled flask's verify to 32 minutes). That reviewer can search the repository: a true claim
+ * the author model. That reviewer can search the repository: a true claim
  * whose lines were simply not cited gets the missing code ref (taxonomy's
  * second run downgraded 24 nodes for exactly that), a false one is corrected,
  * and only a claim the repository cannot show at all marks the node `partial`.

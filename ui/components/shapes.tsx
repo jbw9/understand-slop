@@ -212,6 +212,34 @@ const MARKS: Record<string, { name: string; draw: React.ReactNode }> = {
   },
 };
 
+/**
+ * The technologies behind a level, inline in its title row (D39). They used to
+ * own a 300px column beside the header — tiny glyphs in a big empty space —
+ * so they now sit where the eye already is. The note becomes the tooltip.
+ */
+export function InlineMarks({ ids, note }: { ids: string[]; note?: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5" title={note}>
+      {ids.map((id) => {
+        const mark = MARKS[id];
+        return (
+          <span
+            key={id}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] font-medium text-on-surface-variant"
+          >
+            {mark ? (
+              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden className="shrink-0">
+                {mark.draw}
+              </svg>
+            ) : null}
+            {mark ? mark.name : id}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 /** One glyph + name, or just the name when we have no mark for the id. */
 function Mark({ id }: { id: string }) {
   const mark = MARKS[id];

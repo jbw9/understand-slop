@@ -47,6 +47,8 @@ const walkBlocks = (owner: string, blocks: any[] = [], d: number): number => {
       b.rows.forEach((r: string[], i: number) => {
         if (r.length !== b.columns.length) problems.push(`TABLE ${owner} row ${i} has ${r.length} cells, ${b.columns.length} columns`);
       });
+    if (b.kind === "screen" && b.shot && !existsSync(join(process.cwd(), "public", b.shot)))
+      problems.push(`SHOT ${owner} ${b.shot} does not exist under ui/public`);
     if (b.kind === "diagram") {
       const cells = new Set<string>();
       for (const x of b.boxes) {
@@ -69,7 +71,11 @@ const walk = (n: any, d: number): number => {
   ids.set(n.id, (ids.get(n.id) ?? 0) + 1);
   if (!/^[A-Z0-9"]/.test(n.title)) problems.push(`TITLE ${n.id} "${n.title}" — start with a capital`);
   if (n.title.split(/\s+/).length > 4) problems.push(`TITLE ${n.id} "${n.title}" — more than 4 words`);
-  if ((n.detail ?? "").split(/\n\s*\n/).length > 3) problems.push(`DETAIL ${n.id} — more than 3 paragraphs`);
+  // D38: two short sentences at most; the rest is pictures.
+  const words = (n.detail ?? "").split(/\s+/).filter(Boolean).length;
+  const sentences = (n.detail ?? "").split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
+  if (words > 40) problems.push(`DETAIL ${n.id} — ${words} words (max 40)`);
+  if (sentences > 2) problems.push(`DETAIL ${n.id} — ${sentences} sentences (max 2)`);
   if (n.state !== "derived" && !n.unsure) problems.push(`UNSURE ${n.id} is ${n.state} but gives no reason`);
   if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);
   for (const c of n.code ?? []) {

@@ -113,11 +113,8 @@ Nothing ever moves an event to "archived". The Archive list is simply published 
       state: "derived",
       col: 0,
       row: 0,
-      detail: `An organisation's app has three tabs along the bottom: Other Events, Home and Account. Home greets the organisation by name and offers four tiles — Ongoing, Draft, Archive and Add. Add opens the event form; the other three swap the tiles for a list of the organisation's own events, each with an Edit button and a trash icon.
-
-The three lists are three queries over the same \`events\` rows, filtered by the organisation's id (\`uuid\`). Draft asks for \`published = false\`. Ongoing and Archive ask for the same thing — \`published = true\` — and then split the result on the phone by comparing the event's date with today.
-
-Tapping a draft opens the preview, where it can be published. Tapping an Ongoing or Archive event opens its details page, which leads on to the guest list and check-in.`,
+      // Exemplar for D37/D38: two sentences, then the real screens.
+      detail: "Home greets the organisation and offers four tiles. Ongoing, Draft and Archive swap the tiles for a list of its own events; Add opens the event form.",
       code: [
         { file: "app/org/_layout.tsx", start: 13, end: 56, label: "The three tabs along the bottom" },
         { file: "app/org/index/index.tsx", start: 102, end: 137, label: "The four tiles" },
@@ -134,16 +131,36 @@ Tapping a draft opens the preview, where it can be published. Tapping an Ongoing
         {
           kind: "screen",
           title: "Home",
-          caption: "Top to bottom, as the JSX lays it out",
+          caption: "Home, as an organisation first sees it",
+          shot: "/shots/explorify/ce-home.png",
           items: [
-            { type: "heading", label: "Hello, <organisation name>!", note: "name read from the profile cached on the phone" },
-            { type: "button", label: "Search for an event...", note: "searches the campus events cached on the phone, not just this organisation's" },
-            { type: "text", label: "What do you want to do today? 👀" },
-            { type: "button", label: "Ongoing", note: "replaces the tiles with the Ongoing list" },
-            { type: "button", label: "Draft", note: "replaces the tiles with the Draft list" },
-            { type: "button", label: "Archive", note: "replaces the tiles with the Archive list" },
+            { type: "heading", label: "Hello, Illini Robotics Club!", note: "the name comes from the profile cached on the phone" },
+            { type: "field", label: "Search for an event…", note: "searches every campus event cached on the phone, not only this organisation's" },
+            { type: "button", label: "Ongoing · Draft · Archive", note: "each swaps the tiles for one list of the organisation's events" },
             { type: "button", label: "Add", note: "opens the event form" },
-            { type: "list", label: "Bottom tabs: Other Events · Home · Account" },
+            { type: "list", label: "Bottom tabs", note: "Other Events · Home · Account" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Ongoing",
+          caption: "After tapping Ongoing",
+          shot: "/shots/explorify/ce-home-ongoing.png",
+          items: [
+            { type: "list", label: "Each event", note: "published and dated today or later, soonest first" },
+            { type: "button", label: "Edit", note: "opens the same form on the saved event" },
+            { type: "button", label: "Trash icon", note: "deletes the event at once — no confirmation, guest list included" },
+            { type: "button", label: "Back arrow", note: "returns to the four tiles" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Draft",
+          caption: "After tapping Draft",
+          shot: "/shots/explorify/ce-home-draft.png",
+          items: [
+            { type: "list", label: "Each draft", note: "saved by Preview but never published — students can't see it" },
+            { type: "button", label: "Tapping a draft", note: "opens the preview, where it can be published" },
           ],
         },
         {

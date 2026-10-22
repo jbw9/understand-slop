@@ -213,7 +213,10 @@ export const PLAIN_TITLE_EXAMPLES = {
  * that rule (a card names, never shows, what is behind it) still holds. The
  * open level itself may explain as much as it needs, in blocks, not walls.
  */
-export const DETAIL_PARAGRAPHS_MAX = 3;
+export const DETAIL_PARAGRAPHS_MAX = 1;
+/** "this is way too long … replace the huge text block with simple diagrams" (D38). */
+export const DETAIL_WORDS_MAX = 40;
+export const DETAIL_SENTENCES_MAX = 2;
 
 /**
  * Code is the last resort, always one click away — never the bottom layer.

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { CodeDrawer, ExplainedBlock, WatchOut, isExplained } from "@/components/blocks";
-import { ShapeView } from "@/components/shapes";
+import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Crumbs } from "@/components/chrome";
@@ -646,8 +646,8 @@ function Header({
   onCode?: () => void;
 }) {
   return (
-    <header className="mb-8 flex items-start gap-10 border-b border-border-gray pb-7">
-      <div className="min-w-0 max-w-[660px] flex-1">
+    <header className="mb-8 border-b border-border-gray pb-7">
+      <div className="min-w-0 max-w-[660px]">
         {back ? (
           <button
             onClick={back.onClick}
@@ -658,11 +658,17 @@ function Header({
           </button>
         ) : null}
         <Eyebrow>{eyebrow}</Eyebrow>
-        <div className="mt-2.5 flex items-center gap-3">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
             {title}
           </h1>
           {state ? <StateChip state={state} alarm={alarm} /> : null}
+          {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
+          {shape?.kind === "count" ? (
+            <span className="rounded-full border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
+              <span className="tnum font-semibold text-ink">{shape.value}</span> {shape.unit}
+            </span>
+          ) : null}
         </div>
         {sub ? (
           <p className="mt-1.5 text-[15px] leading-snug text-on-surface-variant">{sub}</p>
@@ -696,13 +702,6 @@ function Header({
           </div>
         ) : null}
       </div>
-      {/* Something to recognise: brand marks or one number. A figure is not
-          drawn here — it is the main picture of the level, below (D34). */}
-      {shape ? (
-        <div className="w-[300px] shrink-0 self-center">
-          <ShapeView shape={shape} />
-        </div>
-      ) : null}
     </header>
   );
 }

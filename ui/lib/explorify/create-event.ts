@@ -15,11 +15,7 @@ export const createEvent: Node = {
   state: "derived",
   col: 0,
   row: 2,
-  detail: `An organisation taps Add on its home screen and fills in one form: name, picture, description, categories, date and time, address, campus, food and dress code. Tapping Preview does more than preview — it uploads the picture and saves the event straight into the \`events\` table with \`published\` set to false. That saved row is the draft.
-
-The preview screen shows the event as a student would see it. Publish changes one value on that row, \`published\`, to true. From then on the event is in the organisation's Ongoing list and in the feed of every student whose campus matches the event's \`campus\` exactly. Edit opens the same form on the saved row and comes back to the preview.
-
-Nothing ever moves an event to "archived". The Archive list is simply published events whose date is before today, worked out on the phone each time the list opens.`,
+  detail: "An organisation fills in one form, and tapping Preview already saves it as a draft. Publish flips one true/false value, and the event then reaches students on the same campus.",
   code: [
     { file: "app/org/index/addEvent.tsx", start: 193, end: 251, label: "Tapping Preview checks the form, uploads the picture and saves a draft" },
     { file: "app/org/index/previewEvent.tsx", start: 103, end: 119, label: "Publishing flips the draft to live" },
@@ -36,8 +32,8 @@ Nothing ever moves an event to "archived". The Archive list is simply published 
         { id: "bucket", label: "Picture storage", sub: "event_thumbnail bucket", col: 1, row: 0 },
         { id: "draft", label: "Draft event", sub: "published = false", col: 2, row: 1 },
         { id: "drafts", label: "Draft list", sub: "on the home screen", col: 2, row: 2 },
-        { id: "preview", label: "Preview screen", sub: "Publish or Edit", col: 3, row: 1 },
-        { id: "edit", label: "Edit screen", sub: "same fields", col: 3, row: 2 },
+        { id: "preview", label: "Preview screen", sub: "as a student sees it", col: 3, row: 1 },
+        { id: "edit", label: "Edit screen", sub: "same fields, saved row", col: 3, row: 2 },
         { id: "live", label: "Published event", sub: "published = true", col: 4, row: 1, tone: "good" },
         { id: "archive", label: "Archive list", sub: "once its date has passed", col: 4, row: 2 },
         { id: "feed", label: "Students' feed", sub: "same campus only", col: 5, row: 1, tone: "good" },
@@ -51,7 +47,7 @@ Nothing ever moves an event to "archived". The Archive list is simply published 
         { from: "draft", to: "drafts", label: "listed in" },
         { from: "drafts", to: "preview", label: "tap" },
         { from: "preview", to: "edit", label: "Edit" },
-        { from: "edit", to: "draft", label: "saves" },
+        { from: "edit", to: "draft", label: "saves, back to preview" },
         { from: "preview", to: "live", label: "Publish", tone: "good" },
         { from: "live", to: "feed", tone: "good" },
         { from: "live", to: "archive", label: "date passes" },
@@ -65,8 +61,8 @@ Nothing ever moves an event to "archived". The Archive list is simply published 
       state: "derived",
       rows: [
         ["Draft", "Organiser taps Preview on the form", "published = false", "Only its organisation, in the Draft list"],
-        ["Published, upcoming", "Organiser taps Publish on the preview", "published = true, date today or later", "Its organisation (Ongoing) and students on the same campus"],
-        ["Past", "Nothing — the date passes", "Unchanged; date is before today", "Its organisation (Archive); gone from students' feeds"],
+        ["Published, upcoming", "Organiser taps Publish on the preview", "published = true, date today or later", "Its organisation (Ongoing) and students whose campus matches the event's exactly"],
+        ["Past", "Nothing is ever marked archived — the date just passes", "Unchanged; date is before today", "Its organisation (Archive, worked out on the phone each time the list opens); gone from students' feeds"],
         ["Deleted", "Trash icon on any list, one tap", "Row removed, guest list with it", "Nobody"],
       ],
     },
@@ -78,7 +74,7 @@ Nothing ever moves an event to "archived". The Archive list is simply published 
         { from: "Phone", to: "Storage", label: "uploads the cover picture to event_thumbnail", state: "derived" },
         { from: "Storage", to: "Phone", label: "a public web address for it", state: "derived" },
         { from: "Phone", to: "Auth", label: "who is signed in?", state: "derived" },
-        { from: "Phone", to: "Database", label: "insert into events, published = false", state: "derived" },
+        { from: "Phone", to: "Database", label: "insert into events, published = false", note: "this saved row is the draft", state: "derived" },
         { from: "Database", to: "Phone", label: "the new row, with its id", note: "the preview screen is drawn from this", state: "derived" },
         { from: "Phone", to: "Database", label: "update events set published = true where id = …", note: "on Publish", state: "derived" },
       ],
@@ -199,14 +195,11 @@ Nothing ever moves an event to "archived". The Archive list is simply published 
       state: "derived",
       col: 0,
       row: 1,
-      detail: `One scrolling screen, "Add Event". Name, description, room number and dress code are typed. Everything else opens a drawer from the bottom of the screen: a list of the eight categories, a calendar, two time wheels, a list of 61 universities, and a Yes/No food question. The cover picture comes from the photo library, cropped square. The address box searches Google Places as you type.
-
-When Preview is tapped, \`checkRequiredFields\` checks eight values: name, description, at least one category, a date, an end time, an address, a food answer and a picture. If any is missing an alert says "Missing Information" and nothing is saved. Campus has a red star like the others but is not on that list.
-
-Every field becomes one column of the \`events\` row with the same meaning — the table below gives each one. The three fields with a story of their own (campus, date and time, picture) each have a page.`,
+      detail: "One scrolling screen of eleven fields, each saved into one column of the event. Preview refuses to go on until eight of them are filled.",
       code: [
         { file: "app/org/index/addEvent.tsx", start: 35, end: 47, label: "Everything the form holds" },
         { file: "app/org/index/addEvent.tsx", start: 177, end: 191, label: "What Preview requires" },
+        { file: "app/org/index/addEvent.tsx", start: 193, end: 201, label: "Missing anything: an alert, nothing saved" },
         { file: "app/org/index/addEvent.tsx", start: 286, end: 380, label: "The form, name to time" },
         { file: "app/org/index/addEvent.tsx", start: 440, end: 493, label: "The form, room number to dress code" },
         { file: "app/org/index/editEvent/categorydrawer.tsx", start: 50, end: 61, label: "Categories: tap to toggle, no upper limit" },
@@ -217,19 +210,44 @@ Every field becomes one column of the \`events\` row with the same meaning — t
         {
           kind: "screen",
           title: "Add Event",
+          caption: "The top of the form, as it opens",
+          shot: "/shots/explorify/ce-form.png",
           items: [
-            { type: "field", label: "Name *", note: "\"what is your event name?\"" },
-            { type: "image", label: "Cover picture *", note: "photo library, cropped square" },
-            { type: "field", label: "Description *", note: "several lines" },
-            { type: "choice", label: "Category *", note: "drawer with the eight categories, pick any number" },
-            { type: "choice", label: "Date *", note: "calendar drawer" },
-            { type: "choice", label: "Time *", note: "start and end time wheels" },
-            { type: "field", label: "Location *", note: "Google address search" },
-            { type: "field", label: "Room Number", note: "\"leave blank if not applicable\"" },
-            { type: "choice", label: "Campus *", note: "drawer with 61 universities — the star is not enforced" },
-            { type: "choice", label: "Any food and/or beverages served *", note: "Yes or No, plus a note" },
-            { type: "field", label: "Dress code", note: "\"leave blank if not applicable\"" },
-            { type: "button", label: "Preview", note: "saves the draft and opens the preview" },
+            { type: "field", label: "Name *", note: "typed" },
+            { type: "image", label: "Cover picture *", note: "the grey + box: photo library, cropped square" },
+            { type: "field", label: "Description *", note: "typed, several lines" },
+            { type: "choice", label: "Category *", note: "a drawer with the eight categories, pick any number" },
+            { type: "choice", label: "Date *", note: "a calendar drawer" },
+            { type: "choice", label: "Time *", note: "a drawer with start and end time wheels" },
+            { type: "button", label: "Preview", note: "always on screen; checks the fields, then saves a draft" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Add Event, scrolled down",
+          caption: "The rest of the form",
+          shot: "/shots/explorify/ce-form-lower.png",
+          items: [
+            { type: "field", label: "Location *", note: "searches Google Places as you type" },
+            { type: "field", label: "Room Number", note: "typed, optional" },
+            { type: "choice", label: "Campus *", note: "a drawer of 61 universities — the star is not enforced" },
+            { type: "choice", label: "Any food and/or beverages served *", note: "a Yes/No drawer, plus a note" },
+            { type: "field", label: "Dress code", note: "typed, optional" },
+          ],
+        },
+        {
+          kind: "diagram",
+          caption: "What tapping Preview checks first",
+          boxes: [
+            { id: "tap", label: "Tap Preview", col: 0, row: 1 },
+            { id: "check", label: "Eight fields filled?", sub: "campus is not one", col: 1, row: 1 },
+            { id: "alert", label: "\"Missing Information\"", sub: "alert; nothing saved", col: 2, row: 0, tone: "warn" },
+            { id: "save", label: "Upload and save", sub: "the draft", col: 2, row: 1, tone: "good" },
+          ],
+          arrows: [
+            { from: "tap", to: "check" },
+            { from: "check", to: "alert", label: "no", tone: "warn" },
+            { from: "check", to: "save", label: "yes", tone: "good" },
           ],
         },
         {
@@ -239,15 +257,15 @@ Every field becomes one column of the \`events\` row with the same meaning — t
           state: "derived",
           rows: [
             ["Name", "Yes", "name", "Typed"],
-            ["Cover picture", "Yes", "thumbnail", "Photo library → uploaded → public web address"],
+            ["Cover picture", "Yes", "thumbnail", "Photo library, cropped square → uploaded → public web address"],
             ["Description", "Yes", "description", "Typed"],
-            ["Category", "At least one", "type", "Any of the eight categories, no maximum"],
-            ["Date", "Yes", "date", "Calendar"],
-            ["Time", "End time, yes", "time, end_time", "Two wheels; end is never checked to be after start"],
-            ["Location", "Yes", "location", "Google address search"],
+            ["Category", "At least one", "type", "Drawer: any of the eight categories, no maximum"],
+            ["Date", "Yes", "date", "Drawer: calendar"],
+            ["Time", "End time, yes", "time, end_time", "Drawer: two wheels; end is never checked to be after start"],
+            ["Location", "Yes", "location", "Google address search as you type"],
             ["Room number", "No", "room_number", "Typed"],
-            ["Campus", "No, despite the star", "campus", "Picked from 61 universities"],
-            ["Food", "Yes", "food", "Yes or No, plus an optional note"],
+            ["Campus", "No, despite the star", "campus", "Drawer: 61 universities"],
+            ["Food", "Yes", "food", "Drawer: Yes or No, plus an optional note"],
             ["Dress code", "No", "dress_code", "Typed"],
           ],
         },
@@ -298,11 +316,7 @@ Every field becomes one column of the \`events\` row with the same meaning — t
           state: "derived",
           col: 0,
           row: 0,
-          detail: `The campus is saved as the university's full name, for example "University of Illinois Urbana-Champaign". The student feed asks for published events whose \`campus\` equals the student's campus word for word, so this one field decides whether any student ever sees the event.
-
-It is meant to fill itself in. When an address is picked, the form asks Google Places for that place's coordinates and picks the nearest of the 61 universities in \`universityList\` by straight-line distance. But that request is sent with the literal text \`YOUR_API_KEY\` as its key, so Google returns no coordinates and the campus stays empty. The address search itself already has the coordinates (\`fetchDetails\` is on), but they are ignored.
-
-So in practice the only way a campus is set is by hand, from the Campus drawer. The add form does not require it; the edit form does.`,
+          detail: "The campus decides which students see an event: their feed matches it word for word. It should fill itself in from the address, but that lookup always fails, so it is set by hand or not at all.",
           code: [
             { file: "app/org/index/addEvent.tsx", start: 386, end: 413, label: "Picking an address, then a lookup sent with a placeholder key" },
             { file: "app/org/index/addEvent.tsx", start: 122, end: 138, label: "Nearest university by straight-line distance" },
@@ -321,7 +335,7 @@ So in practice the only way a campus is set is by hand, from the Campus drawer. 
               boxes: [
                 { id: "addr", label: "Pick an address", sub: "Google address search", col: 0, row: 0 },
                 { id: "lookup", label: "Ask for coordinates", sub: "key = YOUR_API_KEY", col: 1, row: 0, tone: "warn" },
-                { id: "nearest", label: "Nearest university", sub: "never reached", col: 2, row: 0, tone: "warn" },
+                { id: "nearest", label: "Nearest university", sub: "straight-line; never reached", col: 2, row: 0, tone: "warn" },
                 { id: "drawer", label: "Campus drawer", sub: "61 universities", col: 1, row: 1 },
                 { id: "campus", label: "events.campus", sub: "full university name", col: 3, row: 1 },
                 { id: "feed", label: "Students' feed", sub: "exact match only", col: 4, row: 1, tone: "good" },
@@ -332,6 +346,17 @@ So in practice the only way a campus is set is by hand, from the Campus drawer. 
                 { from: "nearest", to: "campus", tone: "warn" },
                 { from: "drawer", to: "campus", label: "by hand" },
                 { from: "campus", to: "feed", tone: "good" },
+              ],
+            },
+            {
+              kind: "screen",
+              title: "Select University",
+              caption: "The Campus drawer, opened from the form",
+              shot: "/shots/explorify/ce-campus.png",
+              items: [
+                { type: "field", label: "Search for a university...", note: "matches the full name or the short name; no match shows \"Don't see your university? Email us at explorifydev@gmail.com\"" },
+                { type: "list", label: "University name (short name)", note: "list order until a campus is picked, then nearest-first to that pick" },
+                { type: "button", label: "Tapping a university", note: "saves its full name as the campus and closes the drawer" },
               ],
             },
             {
@@ -356,15 +381,6 @@ So in practice the only way a campus is set is by hand, from the Campus drawer. 
                 ["Stanford University", "Stanford", "37.4275", "-122.1697"],
               ],
             },
-            {
-              kind: "screen",
-              title: "Campus drawer",
-              items: [
-                { type: "field", label: "Search for a university...", note: "matches the full name or the short name" },
-                { type: "list", label: "University name (short name)", note: "sorted nearest-first to the current pick; tapping one saves it and closes" },
-                { type: "text", label: "Don't see your university? Email us at explorifydev@gmail.com", note: "when nothing matches" },
-              ],
-            },
           ],
           issues: [
             {
@@ -385,15 +401,11 @@ So in practice the only way a campus is set is by hand, from the Campus drawer. 
           id: "ce-dates",
           title: "Date And Time",
           sub: "How one date and two times are picked, saved as text, and read back",
-          footprint: { dirs: ["app/org/index/addEvent.tsx", "app/org/index/editEvent/"], files: 5 },
+          footprint: { dirs: ["app/org/index/addEvent.tsx", "app/org/index/editEvent/", "app/org/index/components/"], files: 6 },
           state: "derived",
           col: 0,
           row: 1,
-          detail: `The form keeps the start as one JavaScript \`Date\` and the end as another. The calendar drawer sets the day; the time drawer sets the start hour and minute on that day, and the end time separately. Only three text values are saved: \`date\` ("2026-10-22"), \`time\` ("14:00:00") and \`end_time\`.
-
-The bug is in how the day is cut out. \`date\` comes from \`toISOString()\`, which is in UTC; \`time\` comes from \`toTimeString()\`, which is local. In Illinois (5 hours behind UTC in autumn) anything from 7 pm onwards is already tomorrow in UTC, so the event is saved on the next day with the right clock time. The edit screen rebuilds the start as local time from those two strings and saves it the same way, so every save moves an evening event one more day.
-
-Reading the date back has its own slip: the preview and details screens turn "2026-10-22" into a date with \`new Date()\`, which treats it as midnight UTC — the evening before, in the Americas. The lists on the home screen just split the text, so they show the saved day.`,
+          detail: "The form keeps the start and end as two clock values but saves three pieces of text: date, time and end_time. The date is cut in UTC and the times in local time, so evening events slip a day.",
           code: [
             { file: "app/org/index/addEvent.tsx", start: 526, end: 556, label: "The date and time drawers write into one Date" },
             { file: "app/org/index/editEvent/dateDrawer.tsx", start: 105, end: 118, label: "The calendar keeps the time of day it was opened with" },
@@ -402,11 +414,39 @@ Reading the date back has its own slip: the preview and details screens turn "20
             { file: "app/org/index/editEvent/[id].tsx", start: 218, end: 223, label: "…and cuts the date in UTC again" },
             { file: "app/org/index/previewEvent.tsx", start: 212, end: 217, label: "The preview reads the date as midnight UTC" },
             { file: "app/org/index/components/ongoing.tsx", start: 98, end: 100, label: "The lists show the saved text as-is" },
+            { file: "app/org/index/components/draft.tsx", start: 103, end: 105, label: "…the Draft list too" },
           ],
           anatomy: [
             {
+              kind: "diagram",
+              caption: "Two drawers fill two clock values; three pieces of text are saved",
+              boxes: [
+                { id: "cal", label: "Calendar drawer", sub: "sets the day", col: 0, row: 0 },
+                { id: "wheels", label: "Time drawer", sub: "start and end wheels", col: 0, row: 2 },
+                { id: "start", label: "Start", sub: "one Date: day + start time", col: 1, row: 0 },
+                { id: "end", label: "End", sub: "a second Date", col: 1, row: 2 },
+                { id: "iso", label: "toISOString()", sub: "UTC: 2026-10-23T01:00Z", col: 2, row: 0, tone: "warn" },
+                { id: "tts", label: "toTimeString()", sub: "local: 20:00:00", col: 2, row: 1 },
+                { id: "tte", label: "toTimeString()", sub: "local", col: 2, row: 2 },
+                { id: "date", label: "date", sub: "\"2026-10-23\" — a day late", col: 3, row: 0, tone: "warn" },
+                { id: "time", label: "time", sub: "\"20:00:00\"", col: 3, row: 1, tone: "good" },
+                { id: "endt", label: "end_time", sub: "\"22:00:00\"", col: 3, row: 2, tone: "good" },
+              ],
+              arrows: [
+                { from: "cal", to: "start" },
+                { from: "wheels", to: "start", label: "hour, minute" },
+                { from: "wheels", to: "end" },
+                { from: "start", to: "iso" },
+                { from: "start", to: "tts" },
+                { from: "end", to: "tte" },
+                { from: "iso", to: "date", label: "text before T", tone: "warn" },
+                { from: "tts", to: "time", label: "text before space" },
+                { from: "tte", to: "endt" },
+              ],
+            },
+            {
               kind: "table",
-              caption: "An event on Thursday 22 October 2026, entered on a phone in Illinois (UTC−5)",
+              caption: "An event on Thursday 22 October 2026, entered on a phone in Illinois (UTC−5 in autumn)",
               columns: ["Starts at", "Saved date", "Saved time", "Home screen list shows", "Preview and details show"],
               state: "derived",
               rows: [
@@ -416,20 +456,22 @@ Reading the date back has its own slip: the preview and details screens turn "20
               ],
             },
             {
-              kind: "diagram",
-              caption: "One Date, cut two ways",
-              boxes: [
-                { id: "start", label: "Start, as picked", sub: "Thu 22 Oct, 8:00 pm local", col: 0, row: 1 },
-                { id: "iso", label: "toISOString()", sub: "2026-10-23T01:00Z (UTC)", col: 1, row: 0, tone: "warn" },
-                { id: "tts", label: "toTimeString()", sub: "20:00:00 (local)", col: 1, row: 2 },
-                { id: "date", label: "date", sub: "\"2026-10-23\" — a day late", col: 2, row: 0, tone: "warn" },
-                { id: "time", label: "time", sub: "\"20:00:00\"", col: 2, row: 2, tone: "good" },
+              kind: "screen",
+              title: "Draft list",
+              caption: "One draft whose saved date is \"2026-10-23\"",
+              shot: "/shots/explorify/ce-dates-list.png",
+              items: [
+                { type: "text", label: "Oct 23", note: "the lists split the saved text, so they show the saved day" },
               ],
-              arrows: [
-                { from: "start", to: "iso" },
-                { from: "start", to: "tts" },
-                { from: "iso", to: "date", label: "text before T", tone: "warn" },
-                { from: "tts", to: "time", label: "text before space" },
+            },
+            {
+              kind: "screen",
+              title: "Preview",
+              caption: "The same draft, opened (phone set to Illinois time)",
+              shot: "/shots/explorify/ce-dates-preview.png",
+              items: [
+                { type: "text", label: "📅 Thursday, October 22", note: "\"2026-10-23\" read as midnight UTC — the evening before in Illinois" },
+                { type: "text", label: "⏰ 12:00 PM - 2:00 PM", note: "times are plain clock text, so they stay right" },
               ],
             },
           ],
@@ -468,11 +510,7 @@ Reading the date back has its own slip: the preview and details screens turn "20
           state: "derived",
           col: 0,
           row: 2,
-          detail: `Tapping the round picture box opens the photo library with a square crop. The picker component uploads the image right away to the \`user_avatar\` storage bucket, throws away where it put it, and hands the form only the file on the phone.
-
-When Preview is tapped the form uploads that same file a second time, to the \`event_thumbnail\` bucket, under a name made from the current time. It asks Storage for the file's public web address and saves that address in \`thumbnail\`. Every screen that shows the event loads the picture from there.
-
-The edit form does the same, but only uploads again if a new picture was picked; otherwise it keeps the saved address.`,
+          detail: "Picking a photo uploads it once, to a bucket nothing reads. Tapping Preview uploads it again, and that copy's public web address is what every screen shows.",
           code: [
             { file: "app/org/index/editEvent/imageupload.tsx", start: 20, end: 65, label: "On pick: uploads to user_avatar and keeps only the local file" },
             { file: "app/org/index/addEvent.tsx", start: 117, end: 120, label: "The form remembers the local file" },
@@ -484,17 +522,28 @@ The edit form does the same, but only uploads again if a new picture was picked;
               kind: "diagram",
               caption: "One picture, two uploads",
               boxes: [
-                { id: "pick", label: "Pick a photo", sub: "square crop", col: 0, row: 0 },
+                { id: "pick", label: "Pick a photo", sub: "library, square crop", col: 0, row: 0 },
                 { id: "avatar", label: "user_avatar bucket", sub: "copy nobody uses", col: 1, row: 0, tone: "warn" },
-                { id: "local", label: "File on the phone", sub: "kept by the form", col: 1, row: 1 },
-                { id: "thumb", label: "event_thumbnail bucket", sub: "uploaded on Preview", col: 2, row: 1 },
-                { id: "url", label: "events.thumbnail", sub: "public web address", col: 3, row: 1, tone: "good" },
+                { id: "local", label: "File on the phone", sub: "all the form keeps", col: 1, row: 1 },
+                { id: "thumb", label: "event_thumbnail bucket", sub: "named by upload time", col: 2, row: 1 },
+                { id: "url", label: "events.thumbnail", sub: "every screen loads it", col: 3, row: 1, tone: "good" },
               ],
               arrows: [
-                { from: "pick", to: "avatar", label: "upload 1", tone: "warn" },
+                { from: "pick", to: "avatar", label: "upload 1, address dropped", tone: "warn" },
                 { from: "pick", to: "local" },
-                { from: "local", to: "thumb", label: "upload 2" },
-                { from: "thumb", to: "url", tone: "good" },
+                { from: "local", to: "thumb", label: "upload 2, on Preview" },
+                { from: "thumb", to: "url", label: "public address", tone: "good" },
+              ],
+            },
+            {
+              kind: "table",
+              caption: "When the picture is uploaded",
+              columns: ["Moment", "Uploaded to", "Kept"],
+              state: "derived",
+              rows: [
+                ["Picked from the library (round-cornered box on the form)", "user_avatar", "Nothing — only the file on the phone is handed to the form"],
+                ["Preview tapped on the add form", "event_thumbnail", "Its public web address, in thumbnail"],
+                ["Update tapped on the edit form", "event_thumbnail, only if a new picture was picked", "The new address — otherwise the saved one"],
               ],
             },
             {
@@ -526,25 +575,56 @@ The edit form does the same, but only uploads again if a new picture was picked;
       state: "derived",
       col: 0,
       row: 2,
-      detail: `Preview is not a dry run. After the field check and the picture upload, \`handlePreview\` inserts a full row into \`events\` with \`published: false\` and the organisation's user id in \`uuid\` — that id is how the row belongs to the organisation. The preview screen is then drawn from the row the database sends back.
-
-Because the draft already exists, the preview's back arrow does not need to save anything; it shows "Draft Saved! Find drafts in the draft section." and goes home. The draft can be reopened from the Draft list at any time, which opens this same preview.
-
-Each tap of Preview inserts a new row; it never updates an earlier one.`,
+      detail: "Preview is not a dry run: it inserts the event into the database as a draft before showing it. The preview screen is drawn from the row that comes back.",
       code: [
         { file: "app/org/index/addEvent.tsx", start: 222, end: 242, label: "The row Preview inserts" },
         { file: "app/org/index/addEvent.tsx", start: 243, end: 250, label: "Opens the preview — or, on failure, shows an alert" },
         { file: "app/org/index/previewEvent.tsx", start: 69, end: 74, label: "Back only says \"Draft Saved!\"" },
+        { file: "app/org/index/previewEvent.tsx", start: 131, end: 140, label: "How long the description may be: measured on the phone" },
         { file: "app/org/index/previewEvent.tsx", start: 220, end: 386, label: "The preview screen" },
       ],
       anatomy: [
+        {
+          kind: "diagram",
+          caption: "Every way into the preview — the draft already exists by then",
+          boxes: [
+            { id: "form", label: "Event form", sub: "tap Preview", col: 0, row: 0 },
+            { id: "insert", label: "Insert a new row", sub: "published = false", col: 1, row: 0 },
+            { id: "drafts", label: "Draft list", sub: "tap a draft, any time", col: 1, row: 1 },
+            { id: "preview", label: "Preview screen", sub: "drawn from the row", col: 2, row: 0, tone: "good" },
+            { id: "home", label: "Home", sub: "\"Draft Saved!\"", col: 3, row: 1 },
+          ],
+          arrows: [
+            { from: "form", to: "insert", label: "every tap" },
+            { from: "insert", to: "preview", label: "the row it returns" },
+            { from: "drafts", to: "preview" },
+            { from: "preview", to: "home", label: "back: nothing written" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Preview",
+          caption: "A draft as a student would see it",
+          shot: "/shots/explorify/ce-draft.png",
+          items: [
+            { type: "button", label: "← Back", note: "says \"Draft Saved! Find drafts in the draft section.\" and goes home; nothing is written" },
+            { type: "button", label: "Edit icon", note: "opens the edit form on this row" },
+            { type: "image", label: "Cover picture, full width" },
+            { type: "text", label: "📍 Siebel Center", note: "only the first part of the saved address" },
+            { type: "text", label: "📅 date  ⏰ start – end", note: "the date reads a day early — see Date And Time" },
+            { type: "text", label: "… more", note: "the description, cut to three lines' worth; that length is measured on the phone, so the web shot shows none" },
+            { type: "text", label: "Organizer", note: "the signed-in organisation's picture and name" },
+            { type: "text", label: "Food & Beverages, Dress Code", note: "each only if set" },
+            { type: "button", label: "Publish!", note: "makes the event live" },
+          ],
+        },
         {
           kind: "table",
           caption: "The row Preview inserts into events",
           columns: ["Column", "Comes from", "Example"],
           state: "derived",
           rows: [
-            ["uuid", "The signed-in organisation's user id", "8c2f…e41a"],
+            ["uuid", "The signed-in organisation's user id — how the row belongs to it", "8c2f…e41a"],
             ["name", "Name", "Robotics Demo Night"],
             ["location", "Address search", "{ description, terms }"],
             ["room_number", "Room Number", "1404"],
@@ -558,25 +638,6 @@ Each tap of Preview inserts a new row; it never updates an earlier one.`,
             ["time", "Start time, local", "14:00:00"],
             ["end_time", "End time, local", "16:00:00"],
             ["published", "Always", "false"],
-          ],
-        },
-        {
-          kind: "screen",
-          title: "Preview",
-          caption: "The event as a student would see it",
-          items: [
-            { type: "button", label: "← Back", note: "says \"Draft Saved!\" and goes home; nothing is written" },
-            { type: "button", label: "✎ Edit", note: "opens the edit form for this row" },
-            { type: "image", label: "Cover picture, full width" },
-            { type: "list", label: "Category chips" },
-            { type: "text", label: "📍 Address (first part)" },
-            { type: "text", label: "📅 Weekday, Month Day   ⏰ start – end" },
-            { type: "heading", label: "Event name" },
-            { type: "text", label: "Description", note: "three lines, then \"more\"" },
-            { type: "text", label: "Organizer: picture and name" },
-            { type: "text", label: "Food & Beverages", note: "only if the food answer starts with Yes" },
-            { type: "text", label: "Dress Code", note: "only if filled in" },
-            { type: "button", label: "Publish!", note: "makes the event live" },
           ],
         },
       ],
@@ -605,16 +666,22 @@ Each tap of Preview inserts a new row; it never updates an earlier one.`,
         "Whether the database stops one organisation from publishing another's event depends on its row-level security rules, which are set in the Supabase dashboard and are not in this repository.",
       col: 0,
       row: 3,
-      detail: `Publish! runs one update: set \`published\` to true on the row with this event's id. On success an alert says "Your event has been published!" and the app returns home, where the event now sits in the Ongoing list.
-
-Students do not get the event pushed to them. Their feed asks the database for events that are published, whose \`campus\` equals the student's campus, and keeps only those dated today or later. A published event shows up the next time a student's feed loads — if its campus matches.
-
-The update names only the event id. The app itself never checks that the signed-in organisation owns the event.`,
+      detail: "Publish! sets one value, published, to true on this event's row. Nothing is pushed to students; the event appears the next time a student's feed loads, if the campus matches.",
       code: [
         { file: "app/org/index/previewEvent.tsx", start: 103, end: 119, label: "Publish: one update by event id" },
         { file: "lib/localStorage.ts", start: 42, end: 70, label: "The student feed's filter: published, same campus, not past" },
       ],
       anatomy: [
+        {
+          kind: "sequence",
+          caption: "One tap of Publish!",
+          actors: ["Phone", "Database"],
+          rows: [
+            { from: "Phone", to: "Database", label: "update events set published = true where id = this event", note: "names only the event id", state: "derived" },
+            { from: "Database", to: "Phone", label: "ok", note: "alert \"Your event has been published!\", then home — it is now in Ongoing", state: "derived" },
+            { from: "Database", to: "Phone", label: "or an error", note: "alert \"Failed to publish event. Please try again.\"", state: "derived" },
+          ],
+        },
         {
           kind: "diagram",
           caption: "The three checks between a published event and a student's feed",
@@ -623,7 +690,7 @@ The update names only the event id. The app itself never checks that the signed-
             { id: "pub", label: "published = true?", col: 1, row: 1 },
             { id: "campus", label: "Same campus?", sub: "exact text match", col: 2, row: 1 },
             { id: "date", label: "Today or later?", sub: "checked on the phone", col: 3, row: 1 },
-            { id: "feed", label: "Student's feed", col: 4, row: 1, tone: "good" },
+            { id: "feed", label: "Student's feed", sub: "next time it loads", col: 4, row: 1, tone: "good" },
             { id: "draft", label: "Stays a draft", col: 1, row: 0, tone: "warn" },
             { id: "other", label: "Never shown", sub: "includes empty campus", col: 2, row: 2, tone: "warn" },
             { id: "past", label: "Past — dropped", col: 3, row: 0, tone: "warn" },
@@ -656,27 +723,48 @@ The update names only the event id. The app itself never checks that the signed-
       state: "derived",
       col: 0,
       row: 4,
-      detail: `The Edit button on every list, and the pencil on the preview, open \`editEvent/[id]\`. It loads the row by id, fills every field from it, and rebuilds the start and end times as local times from the saved date and time text.
-
-Update checks nine fields — the add form's eight plus campus — uploads a new picture only if one was picked, and saves every field back with one update. It does not touch \`published\`, so a live event stays live. It then opens the preview again, whose back arrow still says "Draft Saved!" even for a published event.
-
-Because the date is cut in UTC again on every save, an evening event moves a day forward each time Update is tapped (see Date And Time).`,
+      detail: "Edit opens the same form, filled from the saved row, and Update saves every field back over it. A published event stays published.",
       code: [
         { file: "app/org/index/editEvent/[id].tsx", start: 94, end: 135, label: "Loads the event and fills the form" },
+        { file: "app/org/index/editEvent/[id].tsx", start: 402, end: 404, label: "The address box starts empty" },
         { file: "app/org/index/editEvent/[id].tsx", start: 179, end: 194, label: "Nine required fields, campus included" },
         { file: "app/org/index/editEvent/[id].tsx", start: 196, end: 253, label: "Saves every field and returns to the preview" },
         { file: "app/org/index/components/ongoing.tsx", start: 38, end: 40, label: "The Edit button on each list" },
       ],
       anatomy: [
         {
+          kind: "screen",
+          title: "Edit Event",
+          caption: "Opened from the Edit button on the Draft list",
+          shot: "/shots/explorify/ce-edit.png",
+          items: [
+            { type: "field", label: "Name, picture, description", note: "filled from the saved row" },
+            { type: "choice", label: "Date", note: "the saved date read back as local time" },
+            { type: "choice", label: "Time", note: "the saved clock text, start – end" },
+            { type: "button", label: "Update", note: "checks nine fields, saves, then reopens the preview" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Edit Event, scrolled down",
+          caption: "The same event, further down",
+          shot: "/shots/explorify/ce-edit-lower.png",
+          items: [
+            { type: "field", label: "Location", note: "empty although an address is saved; the saved one is kept unless a new one is picked" },
+            { type: "choice", label: "Campus", note: "required here, unlike the add form" },
+            { type: "choice", label: "Any food and/or beverages served", note: "the whole saved sentence" },
+          ],
+        },
+        {
           kind: "flow",
           rows: [
-            { n: 1, title: "Load", detail: "Select the event by id and copy each column into the form.", state: "derived" },
-            { n: 2, title: "Rebuild times", detail: "Start = `${date}T${time}` read as local time; end the same with end_time.", state: "derived" },
-            { n: 3, title: "Check", detail: "Nine fields must be filled — campus is required here, unlike the add form.", state: "derived" },
-            { n: 4, title: "Upload if changed", detail: "A newly picked picture goes to event_thumbnail; otherwise the old address is kept.", state: "derived" },
-            { n: 5, title: "Save", detail: "One update with every field, date cut in UTC again. published is left alone.", state: "derived" },
-            { n: 6, title: "Back to preview", detail: "Opens the preview with the updated row.", state: "derived" },
+            { n: 1, title: "Open", detail: "The Edit button on every list, or the pencil on the preview, opens editEvent/[id].", state: "derived" },
+            { n: 2, title: "Load", detail: "Select the event by id and copy each column into the form.", state: "derived" },
+            { n: 3, title: "Rebuild times", detail: "Start = `${date}T${time}` read as local time; end the same with end_time.", state: "derived" },
+            { n: 4, title: "Check", detail: "Nine fields must be filled — the add form's eight plus campus.", state: "derived" },
+            { n: 5, title: "Upload if changed", detail: "A newly picked picture goes to event_thumbnail; otherwise the old address is kept.", state: "derived" },
+            { n: 6, title: "Save", detail: "One update with every field, date cut in UTC again, so an evening event moves a day each time (see Date And Time). published is left alone.", state: "derived" },
+            { n: 7, title: "Back to preview", detail: "Opens the preview with the updated row; its back arrow still says \"Draft Saved!\", even for a published event.", state: "derived" },
           ],
         },
       ],

@@ -20,11 +20,7 @@ export const feed: Node = {
   state: "derived",
   col: 0,
   row: 3,
-  detail: `When a student opens the app they land on Home. Home first settles which university they are at — from the phone's GPS, or from a list they pick from — then downloads every published, upcoming event for that university in one query and keeps a copy on the phone.
-
-Everything on Home reads that copy. "You might like" scores it against the student's interests and a few other rules and shows the best eight; "Happening this week" shows the first eight by date; Search filters it as you type. Tapping any card opens the event's page, where Join starts an RSVP (see Joining And Saving).
-
-The copy is downloaded on Home's first visit, on pull-to-refresh, and when the university changes — coming back to Home later does not download again. Fetching once and filtering on the phone keeps search instant; the cost is that every column of every event, including its guest list, lands on every student's phone.`,
+  detail: "Home picks the student's university, downloads its published upcoming events in one query, and keeps a copy on the phone. Both rows and Search read that copy; tapping any card opens the event page.",
   code: [
     { file: "app/individual/index/index.tsx", start: 104, end: 128, label: "What Home does on its first visit" },
     { file: "app/individual/index/index.tsx", start: 60, end: 71, label: "Download a university's events, then show the copy" },
@@ -65,18 +61,30 @@ The copy is downloaded on Home's first visit, on pull-to-refresh, and when the u
     {
       kind: "screen",
       title: "Home",
-      caption: "What the student sees, top to bottom",
+      caption: "Home for Maya, a sample student interested in STEM and social events",
+      shot: "/shots/explorify/feed.png",
       items: [
-        { type: "heading", label: "Hello, Ana!", note: "first word of the cached full name" },
+        { type: "heading", label: "Hello, Maya!", note: "first word of the cached full name" },
         { type: "button", label: "Exploring events at UIUC ▾", note: "the short name; tap to open the campus picker" },
-        { type: "image", label: "Profile picture", note: "only if one is set" },
+        { type: "image", label: "Profile picture", note: "top right, only when one is set — Maya has none" },
         { type: "field", label: "Search for an event...", note: "opens Search" },
-        { type: "heading", label: "You might like 🤩" },
-        { type: "button", label: "View more", note: "every scored event, same order" },
-        { type: "list", label: "Up to 8 large cards", note: "picture, date, place, time, \"N coming\", Join, Save" },
-        { type: "heading", label: "Happening this week 🙀" },
-        { type: "button", label: "View more", note: "every cached event" },
-        { type: "list", label: "Up to 8 rows", note: "the first eight by date, with Join and Save" },
+        { type: "button", label: "View more (You might like)", note: "every scored event, same order" },
+        { type: "list", label: "Large cards", note: "up to 8: picture, date, place, time, \"N coming\" with faces, Join, Save" },
+        { type: "button", label: "Join", note: "Maya already joined this event, yet it says Join — see Join And Save Buttons" },
+        { type: "button", label: "View more (Happening this week)", note: "every cached event" },
+        { type: "list", label: "Rows", note: "the first eight by date, with Join and Save" },
+        { type: "list", label: "Bottom tabs", note: "Saved (heart) · Home · Account" },
+      ],
+    },
+    {
+      kind: "table",
+      caption: "Why one download, filtered on the phone",
+      columns: ["Trade-off", "What it means"],
+      state: "derived",
+      rows: [
+        ["Gain", "both rows and Search filter instantly, without asking Supabase for events again"],
+        ["Cost", "every column of every event, guest lists included, lands on every student's phone"],
+        ["When it downloads", "Home's first visit, pull-to-refresh, a new university — not when coming back to Home"],
       ],
     },
     {
@@ -122,15 +130,11 @@ The copy is downloaded on Home's first visit, on pull-to-refresh, and when the u
       state: "derived",
       col: 0,
       row: 0,
-      detail: `Every event belongs to one university, stored as its full name in \`events.campus\`, so Home must settle on one before it can show anything. On the first visit it asks for location permission. If granted, it measures the straight-line distance from the phone to each of the 61 universities in \`universityList.tsx\` and takes the closest — however far away that is. The distance formula (haversine) is written out by hand in \`index.tsx\`.
-
-If permission is refused, an alert offers the picker ("OK") or asks again ("Try Again"). The picker also opens when the student taps the university name in the header. It is the organisation side's \`CampusDrawer\`, reused: the same 61, sorted by distance from the current choice, with a search box matching the full or short name. Choosing one downloads that university's events at once.
-
-The header shows the short name; the query uses the full name. The choice lives only in the screen's memory — nothing saves it — so the next launch asks for location again and a hand-picked university is forgotten.`,
+      detail: "Every event belongs to one university, so Home settles on one before showing anything. GPS picks the nearest of 61, however far away; the student can choose another in the picker.",
       code: [
         { file: "app/individual/index/index.tsx", start: 130, end: 148, label: "Asking for location permission" },
         { file: "app/individual/index/index.tsx", start: 150, end: 173, label: "Picking the nearest university by GPS" },
-        { file: "app/individual/index/index.tsx", start: 179, end: 196, label: "Straight-line distance, written by hand" },
+        { file: "app/individual/index/index.tsx", start: 179, end: 196, label: "Straight-line distance (haversine), written by hand" },
         { file: "app/individual/index/index.tsx", start: 73, end: 91, label: "Applying a university picked by hand" },
         { file: "app/org/index/editEvent/campusDrawer.tsx", start: 95, end: 106, label: "Choosing one in the picker" },
         { file: "app/org/index/editEvent/campusDrawer.tsx", start: 118, end: 143, label: "Sorting by distance and searching" },
@@ -139,11 +143,11 @@ The header shows the short name; the query uses the full name. The choice lives 
       anatomy: [
         {
           kind: "diagram",
-          caption: "How Home settles on a university",
+          caption: "How Home settles on a university — events.campus holds the full name, so one must be chosen first",
           boxes: [
             { id: "open", label: "Home opens", sub: "first visit only", col: 0, row: 1 },
             { id: "perm", label: "Location allowed?", col: 1, row: 1 },
-            { id: "gps", label: "Nearest of 61", sub: "straight-line distance", col: 2, row: 0 },
+            { id: "gps", label: "Nearest of 61", sub: "straight-line, however far", col: 2, row: 0 },
             { id: "alert", label: "Alert", sub: "OK or Try Again", col: 2, row: 2 },
             { id: "header", label: "Header tap", sub: "\"Exploring events at …\"", col: 2, row: 3 },
             { id: "picker", label: "Campus picker", sub: "sorted by distance", col: 3, row: 2 },
@@ -155,6 +159,7 @@ The header shows the short name; the query uses the full name. The choice lives 
             { from: "open", to: "perm" },
             { from: "perm", to: "gps", label: "yes" },
             { from: "perm", to: "alert", label: "no" },
+            { from: "alert", to: "perm", label: "Try Again" },
             { from: "alert", to: "picker", label: "OK" },
             { from: "header", to: "picker" },
             { from: "gps", to: "chosen" },
@@ -164,8 +169,20 @@ The header shows the short name; the query uses the full name. The choice lives 
           ],
         },
         {
+          kind: "screen",
+          title: "Campus picker",
+          caption: "After tapping \"Exploring events at UIUC\"",
+          shot: "/shots/explorify/fd-campus.png",
+          items: [
+            { type: "heading", label: "Select University", note: "the organisation side's campus drawer, reused" },
+            { type: "field", label: "Search for a university...", note: "matches the full name or the short one" },
+            { type: "list", label: "The 61 universities", note: "nearest to the current choice first: UIUC, then Purdue, IU, UChicago…" },
+            { type: "button", label: "Tapping one", note: "downloads that university's events at once; the header shows its short name, the query uses the full one" },
+          ],
+        },
+        {
           kind: "table",
-          caption: "The 61 universities, in the order the file lists them — the first is the starting point before GPS answers",
+          caption: "The 61 universities, in the order universityList.tsx lists them — the first is the starting point before GPS answers",
           columns: ["University (stored as)", "Header shows", "Latitude, longitude"],
           state: "derived",
           rows: [
@@ -257,11 +274,7 @@ The header shows the short name; the query uses the full name. The choice lives 
       state: "derived",
       col: 0,
       row: 1,
-      detail: `\`fetchAllEvents(campus)\` in \`lib/localStorage.ts\` asks Supabase for every event whose \`published\` is true and whose \`campus\` is exactly the university's full name, oldest first. It asks for every column (\`select("*")\`), not just the ones the cards draw.
-
-The phone then throws away events dated before today and saves the rest under the key \`events\`, replacing what was there. Home reads that copy back and hands it to both rows; Search reads it too. If the download fails the function only returns \`false\`, and Home quietly shows whatever copy it had before.
-
-Home is not the only caller. Student sign-up primes the copy with \`"UIUC"\`, and the organisation side's Other Events tab uses the same function and the same key with the organisation's campus.`,
+      detail: "One query downloads a university's published events, every column, oldest first. The phone drops past days and saves the rest as \"events\", replacing the old copy.",
       code: [
         { file: "lib/localStorage.ts", start: 42, end: 76, label: "Downloading and saving a university's events" },
         { file: "lib/localStorage.ts", start: 49, end: 54, label: "The query" },
@@ -274,10 +287,10 @@ Home is not the only caller. Student sign-up primes the copy with \`"UIUC"\`, an
         {
           kind: "flow",
           rows: [
-            { n: 1, title: "Ask for this university's events", detail: "published = true and campus = the full university name, exact text, oldest first, every column.", state: "derived" },
+            { n: 1, title: "Ask for this university's events", detail: "fetchAllEvents(campus) in lib/localStorage.ts: published = true and campus = the full university name, exact text, oldest first, every column (select(\"*\")), not just the ones the cards draw.", state: "derived" },
             { n: 2, title: "Drop past days", detail: "Done on the phone after the download: keep events dated today or later.", state: "derived" },
-            { n: 3, title: "Save them on the phone", detail: "The whole list, every column — guest lists included — under the key \"events\".", state: "derived" },
-            { n: 4, title: "Show them", detail: "Home reads the copy back and passes it to You Might Like and Happening This Week.", state: "derived" },
+            { n: 3, title: "Save them on the phone", detail: "The whole list, every column — guest lists included — under the key \"events\". If the download fails the function only returns false, and Home quietly shows the copy it had before.", state: "derived" },
+            { n: 4, title: "Show them", detail: "Home reads the copy back and passes it to You Might Like and Happening This Week; Search reads it too.", state: "derived" },
           ],
         },
         {
@@ -330,11 +343,7 @@ Home is not the only caller. Student sign-up primes the copy with \`"UIUC"\`, an
       state: "derived",
       col: 0,
       row: 2,
-      detail: `The app keeps a few things in AsyncStorage, the phone's simple key–value store, so screens can read them without asking Supabase every time. \`lib/localStorage.ts\` wraps it: \`storeData\` saves any value as JSON text, \`retrieveData\` reads it back, and both swallow errors and return \`false\` or \`null\`.
-
-Supabase's client keeps the login session in the same store — \`lib/supabase.ts\` passes \`AsyncStorage\` as its storage — so signing out with \`AsyncStorage.clear()\` wipes the session and every copy at once.
-
-A copy is only as fresh as its last download. The \`user\` copy is refreshed at launch, at sign-in and whenever an event page opens; editing interests on the profile changes the database but not this copy.`,
+      detail: "The app keeps copies in AsyncStorage, the phone's key–value store, so screens can skip asking Supabase. A copy is only as fresh as its last download, and the login session lives in the same store.",
       code: [
         { file: "lib/localStorage.ts", start: 5, end: 30, label: "Saving and reading a key" },
         { file: "lib/localStorage.ts", start: 108, end: 136, label: "Downloading your profile into \"user\"" },
@@ -354,6 +363,25 @@ A copy is only as fresh as its last download. The \`user\` copy is refreshed at 
             ["uuid", "your user id", "launch, sign-in, sign-up", "the profile download"],
             ["tempPassword", "the made-up password used during sign-up", "sign-up, step 2", "removed when sign-up finishes"],
             ["(Supabase's own key)", "the login session tokens", "the Supabase client", "every request"],
+          ],
+        },
+        {
+          kind: "diagram",
+          caption: "One store holds the app's copies and the login session, so one call clears both",
+          boxes: [
+            { id: "store", label: "storeData", sub: "saves as JSON text", col: 0, row: 0 },
+            { id: "read", label: "retrieveData", sub: "reads, parses", col: 0, row: 1 },
+            { id: "client", label: "Supabase client", sub: "lib/supabase.ts", col: 0, row: 2 },
+            { id: "as", label: "AsyncStorage", sub: "on the phone", col: 1, row: 1 },
+            { id: "err", label: "Errors swallowed", sub: "false or null", col: 2, row: 0, tone: "warn" },
+            { id: "out", label: "Sign out", sub: "AsyncStorage.clear()", col: 2, row: 2 },
+          ],
+          arrows: [
+            { from: "store", to: "as" },
+            { from: "read", to: "as" },
+            { from: "client", to: "as", label: "session" },
+            { from: "as", to: "err", label: "on failure", tone: "warn" },
+            { from: "out", to: "as", label: "wipes session and copies" },
           ],
         },
         {
@@ -409,11 +437,7 @@ A copy is only as fresh as its last download. The \`user\` copy is refreshed at 
         "The same-city rule reads `location.city` from the student's profile. Nothing in the app writes it; whether someone fills it by hand in the Supabase dashboard cannot be seen from the repo, so the rule is treated here as never firing.",
       col: 0,
       row: 3,
-      detail: `The only ranking in the app. Whenever Home's event list changes, \`youmightlike.tsx\` reads your profile from the phone copy, drops events whose date has passed, gives each remaining event a score out of 13 and sorts highest first. The row shows the top eight; View more shows them all in the same order.
-
-The score is the sum of five independent rules (below). The heaviest is interests: the share of *your* interests the event is tagged with, times 5 — so a student with two interests gets 2.5 for one match. The others reward events that are soon, popular, in your city, or in the evening.
-
-Each large card then fetches its own guest list again — the event's \`rsvp\` and the attendees' profile pictures — to draw the faces and the "N coming" count, which adds up party sizes. If no event survives the date check, the row falls back to showing every cached event, unranked.`,
+      detail: "The only ranking in the app: each upcoming cached event gets a score out of 13 from five rules. The row shows the best eight; View more shows all of them in the same order.",
       code: [
         { file: "app/individual/index/components/youmightlike.tsx", start: 48, end: 90, label: "Scoring and sorting" },
         { file: "app/individual/index/components/youmightlike.tsx", start: 55, end: 56, label: "Dropping events whose date has passed" },
@@ -429,7 +453,7 @@ Each large card then fetches its own guest list again — the event's \`rsvp\` a
           columns: ["Rule", "How it is measured", "Points"],
           state: "derived",
           rows: [
-            ["Interests", "share of your interests the event is tagged with", "0 to 5 (1 of 2 matching → 2.5)"],
+            ["Interests", "share of your interests the event is tagged with, times 5 — the heaviest rule", "0 to 5 (1 of 2 matching → 2.5)"],
             ["Soon", "whole days until the event", "3 within 7 days · 2 within 14 · 1 within 30"],
             ["Popular", "number of RSVP entries, not people", "2 for 10 or more · 1 for 5 or more"],
             ["Same city", "your profile's city appears in the event's address", "2 — never fires, nothing sets your city"],
@@ -453,8 +477,9 @@ total                             7.5 of 13`,
         },
         {
           kind: "diagram",
-          caption: "How the row is built from the phone copy",
+          caption: "How the row is built from the phone copy — again whenever Home's event list changes",
           boxes: [
+            { id: "card", label: "Each card re-fetches", sub: "guest list → faces, \"N coming\" (party sizes)", col: 4, row: 0 },
             { id: "copy", label: "Cached events", col: 0, row: 2 },
             { id: "me", label: "Your profile copy", sub: "interests, location", col: 0, row: 0 },
             { id: "date", label: "Date not passed", sub: "today is already out", col: 1, row: 2, tone: "warn" },
@@ -482,6 +507,7 @@ total                             7.5 of 13`,
             { from: "r5", to: "sum" },
             { from: "sum", to: "top", tone: "good" },
             { from: "sum", to: "none", label: "nothing scored", tone: "warn" },
+            { from: "top", to: "card", label: "rsvp + pictures" },
           ],
         },
       ],
@@ -520,11 +546,7 @@ total                             7.5 of 13`,
       state: "derived",
       col: 0,
       row: 4,
-      detail: `Search never asks Supabase for events. Each time the screen comes into view it reads the \`events\` copy from the phone, then looks up each event's organiser name — one query per event — so you can search by organiser too.
-
-Typing filters as you go: an event stays if the text appears, ignoring case, in its name, its description, its address, or its organiser's name. The category buttons narrow it further: with any selected, an event stays if it has at least one of them. Both filters apply together.
-
-Because it searches the copy, results are limited to the current university and to upcoming events. The organisation side has its own near-identical screen, \`app/org/index/search.tsx\`.`,
+      detail: "Search filters the phone's copy of events as you type, and category buttons narrow it further. It never downloads events, but looks up each event's organiser name every time it opens.",
       code: [
         { file: "app/individual/index/search.tsx", start: 48, end: 62, label: "Reading the copy and looking up each organiser" },
         { file: "app/individual/index/search.tsx", start: 113, end: 132, label: "Filtering by text and category" },
@@ -533,8 +555,37 @@ Because it searches the copy, results are limited to the current university and 
       ],
       anatomy: [
         {
+          kind: "screen",
+          title: "Search",
+          caption: "Search, opened from Home — the organisation side has a near-identical copy in app/org/index/search.tsx",
+          shot: "/shots/explorify/fd-search.png",
+          items: [
+            { type: "field", label: "Search here...", note: "filters on every keystroke, ignoring case" },
+            { type: "choice", label: "Filter by 📝", note: "the eight categories, scrolling sideways; pick any number" },
+            { type: "list", label: "Event cards, two across", note: "only the current university's upcoming events — the phone's copy" },
+            { type: "button", label: "Join · bookmark", note: "the same buttons as on Home" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "STEM selected",
+          shot: "/shots/explorify/fd-search-stem.png",
+          items: [
+            { type: "choice", label: "STEM 🔬", note: "selected: an event stays if it has any selected category" },
+            { type: "list", label: "2 of the 5 cached events", note: "text and categories apply together" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Typing \"terms\"",
+          shot: "/shots/explorify/fd-search-terms.png",
+          items: [
+            { type: "field", label: "terms", note: "matches every event: it is a field name inside every stored address" },
+          ],
+        },
+        {
           kind: "table",
-          caption: "What the text box searches",
+          caption: "What the text box searches, ignoring case",
           columns: ["Searched", "Comes from"],
           state: "derived",
           rows: [
@@ -565,8 +616,8 @@ Because it searches the copy, results are limited to the current university and 
           caption: "Opening Search",
           actors: ["Phone", "Supabase"],
           rows: [
-            { from: "Phone", to: "Phone", label: "read the \"events\" copy", state: "derived" },
-            { from: "Phone", to: "Supabase", label: "organiser name for event 1", state: "derived" },
+            { from: "Phone", to: "Phone", label: "read the \"events\" copy", note: "every time the screen comes into view", state: "derived" },
+            { from: "Phone", to: "Supabase", label: "organiser name for event 1", note: "so you can search by organiser", state: "derived" },
             { from: "Phone", to: "Supabase", label: "organiser name for event 2", state: "derived" },
             { from: "Phone", to: "Supabase", label: "… one per cached event", state: "derived" },
             { from: "Phone", to: "Phone", label: "filter on every keystroke", state: "derived" },
@@ -596,16 +647,14 @@ Because it searches the copy, results are limited to the current university and 
       state: "derived",
       col: 0,
       row: 5,
-      detail: `Tapping any card opens \`eventdetails.tsx\` with the event the card already had — it is not downloaded again. The page then fetches two things: the organiser's profile, for the name and picture, and the guest list, by re-reading the event's \`rsvp\` and looking up each attendee's profile picture.
-
-It shows the picture, category tags, address (tapping opens Apple Maps on iPhone, Google Maps on Android), date and time, the description with Read more, the organiser, food if the \`food\` text starts with "Yes", the dress code, and the attendees: the first three names and a count that adds up party sizes. View all lists every attendee's name and party size. Join at the bottom opens the RSVP drawer — see Joining And Saving.
-
-Every time the page comes into view it re-downloads your profile into the \`user\` copy, the most frequent refresh of that copy anywhere in the app.`,
+      detail: "Tapping any card opens the event's page with the copy the card already had. The page then fetches the organiser and the guest list, and its Join opens the RSVP drawer.",
       code: [
         { file: "app/individual/index/eventdetails.tsx", start: 124, end: 133, label: "Refreshing your profile copy on every visit" },
         { file: "app/individual/index/eventdetails.tsx", start: 135, end: 176, label: "Loading the guest list" },
         { file: "app/individual/index/eventdetails.tsx", start: 178, end: 217, label: "Loading the organiser's whole profile" },
         { file: "app/individual/index/eventdetails.tsx", start: 80, end: 107, label: "Opening the address in Maps" },
+        { file: "app/individual/index/eventdetails.tsx", start: 267, end: 297, label: "The date, read as midnight UTC" },
+        { file: "app/individual/index/eventdetails.tsx", start: 431, end: 493, label: "Description, organiser, food, dress code" },
         { file: "app/individual/index/eventdetails.tsx", start: 495, end: 536, label: "Attendees and the Join button" },
         { file: "app/individual/index/attendees.tsx", start: 40, end: 110, label: "View all: every attendee" },
       ],
@@ -613,21 +662,35 @@ Every time the page comes into view it re-downloads your profile into the \`user
         {
           kind: "screen",
           title: "Event page",
+          caption: "Tapping Robotics Demo Night on Home",
+          shot: "/shots/explorify/fd-details.png",
           items: [
-            { type: "heading", label: "Robotics Night" },
             { type: "button", label: "Bookmark", note: "Save — see Joining And Saving" },
-            { type: "image", label: "Event picture" },
-            { type: "list", label: "Category tags", note: "e.g. stem" },
-            { type: "button", label: "📍 Siebel Center, 1404", note: "opens Maps" },
-            { type: "text", label: "Date · 6:30 PM – 8:00 PM" },
-            { type: "text", label: "Description", note: "long ones fold behind Read more" },
-            { type: "heading", label: "Organizer", note: "picture and name" },
-            { type: "heading", label: "Food & Beverages", note: "only if food starts with \"Yes\"" },
+            { type: "list", label: "stem · social", note: "the event's category tags" },
+            { type: "button", label: "📍 Siebel Center, Room 1002", note: "opens Apple Maps on iPhone, Google Maps on Android" },
+            { type: "text", label: "📅 Friday, October 23", note: "a day early — the card on Home says Oct 24" },
+            { type: "text", label: "… more", note: "the description, folded; on the phone the first three lines show, this web capture shows none" },
+            { type: "heading", label: "Organizer", note: "picture and name, from the organiser's whole profile" },
+            { type: "button", label: "Join", note: "pinned to the bottom; opens the RSVP drawer" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Event page, scrolled",
+          shot: "/shots/explorify/fd-details-bottom.png",
+          items: [
+            { type: "heading", label: "Food & Beverages", note: "only if food starts with \"Yes\"; shows the words after its first comma" },
             { type: "heading", label: "Dress Code", note: "only if set" },
-            { type: "heading", label: "Attendees (N)", note: "N adds up party sizes" },
-            { type: "button", label: "View all", note: "every attendee's name and party size" },
-            { type: "text", label: "Ana, Ben, Chi and 4 more are coming" },
-            { type: "button", label: "Join", note: "opens the RSVP drawer" },
+            { type: "heading", label: "Attendees (6)", note: "adds up party sizes: 2 + 1 + 3" },
+            { type: "list", label: "Faces and names", note: "the first three names; \"and N more are coming\" only past three" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "View all",
+          shot: "/shots/explorify/fd-details-attendees.png",
+          items: [
+            { type: "list", label: "Every attendee", note: "picture, name, and party size on the right" },
           ],
         },
         {
@@ -635,7 +698,8 @@ Every time the page comes into view it re-downloads your profile into the \`user
           caption: "What the page fetches when it opens",
           actors: ["Phone", "Supabase"],
           rows: [
-            { from: "Phone", to: "Supabase", label: "my profile → the \"user\" copy", state: "derived" },
+            { from: "Phone", to: "Phone", label: "open with the card's event", note: "not downloaded again", state: "derived" },
+            { from: "Phone", to: "Supabase", label: "my profile → the \"user\" copy", note: "every time the page comes into view — the copy's most frequent refresh", state: "derived" },
             { from: "Phone", to: "Supabase", label: "the organiser's whole profile", state: "derived" },
             { from: "Phone", to: "Supabase", label: "this event's rsvp", state: "derived" },
             { from: "Phone", to: "Supabase", label: "attendees' ids and pictures", state: "derived" },
@@ -648,6 +712,12 @@ Every time the page comes into view it re-downloads your profile into the \`user
           detail:
             "It selects every column of the organisation's row to show a name and a picture. If the `password` column that password reset writes exists, a student's phone receives the organisation's password in plain text.",
           where: "app/individual/index/eventdetails.tsx:182",
+        },
+        {
+          title: "The page shows the day before",
+          detail:
+            "Cards read the stored date as text, but this page and the RSVP drawer pass it to `new Date`, which reads it as midnight UTC. In the Americas that is the previous evening, so an event the card lists on Oct 24 shows here as October 23.",
+          where: "app/individual/index/eventdetails.tsx:292",
         },
       ],
     },

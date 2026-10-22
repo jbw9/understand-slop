@@ -208,8 +208,11 @@ export type Anatomy =
   | { kind: "table"; caption?: string; columns: string[]; rows: string[][]; state: State }
   // Who talks to whom, in order — phone, Supabase, email, a table.
   | { kind: "sequence"; caption?: string; actors: string[]; rows: Message[] }
-  // What the user sees on one screen.
-  | { kind: "screen"; title: string; caption?: string; items: ScreenItem[] }
+  // What the user sees on one screen. `shot` is a real capture of the app
+  // (scripts/capture/phone.mjs, sample data), served from ui/public — e.g.
+  // "/shots/explorify/ce-home.png". With a shot, `items` that carry a `note`
+  // become the callouts beside it; without one, `items` are drawn (D37).
+  | { kind: "screen"; title: string; caption?: string; shot?: string; items: ScreenItem[] }
   // What a stored value looks like. Synthesized and labelled as an example.
   | { kind: "example"; caption: string; value: string; notes?: Pair[] }
   | { kind: "schema"; table: string; rows: Column[]; rel?: string[] }
@@ -270,9 +273,10 @@ export interface Node {
   col: number;
   row: number;
   /**
-   * The explanation, shown when this node is the open level: what it is, how
-   * it works, why it is this way. Plain English; paragraphs split on a blank
-   * line. Never shown on the card that links here.
+   * At most two short sentences (≤ 40 words) — the one thing to know before
+   * looking at the pictures. Everything else is a block: steps are a `flow` or
+   * `sequence`, connections a `diagram`, values a `table`. A paragraph that
+   * explains the code is exactly what this tool replaces (D38).
    */
   detail?: string;
   /** Where this lives in the code. Every authored node has at least one. */

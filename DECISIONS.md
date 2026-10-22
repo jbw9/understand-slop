@@ -996,3 +996,38 @@ needed "till the 2nd to last layer". Higher up, a path answers a question
 nobody has asked yet; the code drawer still lists every file on every level.
 **Cost accepted:** a root no longer says at a glance which directories it
 spans. **At scale:** unchanged — it is a per-node height check.
+
+## D37 — Screens are real screenshots of the app, on sample data
+
+**Chose:** `screen.shot` points at a PNG under `ui/public/shots/<repo>/`, taken by
+`ui/scripts/capture/phone.mjs`. The script drives explorify's own Expo web build in
+headless Chrome at 390x844 @2x. Every `*supabase.co` request is answered from
+`fixtures.mjs` (made-up people and events), and the served bundle is patched
+in memory for three web-only gaps: `Appearance.setColorScheme`, NativeWind's
+web output, and the missing `SvgXml`. The noted parts sit beside the shot as
+numbered callouts. **Beat:** drawn phone mockups, which the user said weren't
+"realistic and relevant to what actually shows"; and screenshots against the
+live project, which would read and write real users' data.
+**Cost accepted:** shots go stale when the app changes and need retaking by hand.
+The bundle patches are tied to explorify's current library versions, and a few
+native-only screens (camera, push) can't be captured on web, so they stay drawn.
+**At scale:** each repo needs its own harness and fixtures; nothing here is
+generic beyond "serve the app, stub its backend, screenshot".
+
+## D38 — Detail is two sentences at most; the rest is pictures
+
+**Chose:** `detail` ≤ 2 sentences and ≤ 40 words, enforced by check-map.
+What used to be paragraphs moves into `diagram`, `sequence`, `table` and
+`screen` blocks, plus `issues`. **Beat:** 1-3 paragraphs (D34), which the
+user called "way too long … i want to replace the huge text block with
+beautiful simple diagrams". **Cost accepted:** nuance that only fits in prose
+(why a thing is shaped as it is) has to fit in a diagram label, an issue, or
+`unsure`, or it gets cut. **At scale:** the limit is per node, so it holds.
+
+## D39 — Brand marks sit inline in the title row
+
+**Chose:** `InlineMarks`: small pills (glyph + name) beside the title, with the
+note as a tooltip. **Beat:** a right-hand column of marks with a note under
+each, which the user called "a waste of space" with icons too small to read.
+**Cost accepted:** the note is hover-only. **At scale:** past ~4 marks the
+title row wraps.

@@ -391,15 +391,30 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
       <div className="flex flex-wrap items-start gap-6">
-        <div className="w-[280px] shrink-0 rounded-[30px] border-[1.5px] border-border-strong bg-pure-white p-3 shadow-panel">
-          <div className="mx-auto mb-3 h-[5px] w-16 rounded-full bg-surface-container" />
-          <p className="mb-3 px-2 text-center text-[13px] font-semibold text-ink">{block.title}</p>
-          <div className="flex flex-col gap-2 px-2 pb-3">
-            {block.items.map((it, i) => (
-              <ScreenThing key={i} type={it.type} label={it.label} n={num.get(i)} />
-            ))}
+        {block.shot ? (
+          // The real screen, captured from the app's own web build with
+          // sample data (D37). Numbered callouts sit beside it, not on it:
+          // the capture has no coordinates for where each item landed.
+          <figure className="w-[300px] shrink-0">
+            <div className="overflow-hidden rounded-[36px] border-[6px] border-ink bg-pure-white shadow-panel">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a static capture at its own size; next/image adds nothing here */}
+              <img src={block.shot} alt={block.title} className="block h-auto w-full" />
+            </div>
+            <figcaption className="mt-2 text-center font-mono text-[10.5px] text-faint">
+              the real screen · sample data
+            </figcaption>
+          </figure>
+        ) : (
+          <div className="w-[280px] shrink-0 rounded-[30px] border-[1.5px] border-border-strong bg-pure-white p-3 shadow-panel">
+            <div className="mx-auto mb-3 h-[5px] w-16 rounded-full bg-surface-container" />
+            <p className="mb-3 px-2 text-center text-[13px] font-semibold text-ink">{block.title}</p>
+            <div className="flex flex-col gap-2 px-2 pb-3">
+              {block.items.map((it, i) => (
+                <ScreenThing key={i} type={it.type} label={it.label} n={num.get(i)} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         {noted.length ? (
           <ol className="flex min-w-[240px] flex-1 flex-col gap-2.5 pt-10">
             {noted.map((it, k) => (

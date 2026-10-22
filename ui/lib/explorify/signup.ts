@@ -434,11 +434,7 @@ If the search matches nothing, it says "Don't see your university? Email us at e
       state: "derived",
       col: 0,
       row: 2,
-      detail: `Every student and every event is tagged from one fixed list of eight categories. A student picks 2 to 5 when signing up — these become their interests. An organisation picks 2 to 5 that describe it, and tags each event it creates with at least one.
-
-The feed ranks events by overlap: the more of an event's categories appear in a student's interests, the higher it sits in "You Might Like". Both search screens use the same list as filter buttons.
-
-Only the stored value is ever compared — the lowercase words in the second column below. The label with the emoji is just what the screen shows.`,
+      detail: "Every student and every event is tagged from one fixed list of eight categories. The feed ranks events by how many of their tags match a student's interests.",
       code: [
         { file: "app/individual/index/data/categories.ts", start: 1, end: 10, label: "The list itself" },
         { file: "app/(auth)/registerIndividual.tsx", start: 177, end: 184, label: "Picking interests: a sixth tap is ignored" },

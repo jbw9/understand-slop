@@ -122,3 +122,24 @@ fixed), `ui/scripts/check-map.mts`, all of `ui/components/`.
 Fan-in: `npx -y tsx --tsconfig tsconfig.json scripts/check-map.mts @/lib/explorify
 ~/Desktop/Code/explorify` with 0 problems, tsc, eslint, every root driven in the
 browser, LINKS repaired in index.ts.
+
+## Round 4 (2026-10-21) — short text, real screens
+
+The user: "this is way too long … i want to replace the huge text block with
+beautiful simple diagrams instead", and screens should be "the real thing".
+Every node's `detail` ≤ 2 sentences / ≤ 40 words (D38): the substance moves
+into diagram/sequence/table/screen blocks and issues, and nothing true is lost.
+Every `screen` block that the web build can show gets a real `shot` (D37).
+Exemplars: `ce-home` (three shots) and `su-cats`.
+
+Contracts (frozen this round, main thread only): everything frozen in Round 3,
+plus `ui/scripts/capture/*`.
+
+| ID | Owns | Agent |
+|---|---|---|
+| G1 - sign up, launch, account | `ui/lib/explorify/{signup,launch,account}.ts`, `ui/public/shots/explorify/{su,ln,ac,signup,launch,account}*.png` | builder |
+| G2 - organisation side + server | `ui/lib/explorify/{create-event,check-in,server}.ts`, `ui/public/shots/explorify/{ce,ci,sv,create-event,check-in,server}*.png` | builder |
+| G3 - student side + backend | `ui/lib/explorify/{feed,rsvp,supabase}.ts`, `ui/public/shots/explorify/{fd,rv,sb,feed,rsvp,supabase}*.png` | builder |
+
+Fan-in: check-map 0 problems, tsc, eslint, every level crawled, and the
+screenshots looked at.

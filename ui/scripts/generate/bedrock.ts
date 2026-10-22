@@ -129,6 +129,7 @@ async function slot<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+let coolUntil = 0;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RETRYABLE = /Throttling|TooManyRequests|ServiceUnavailable|ModelNotReady|InternalServer|ModelError|timeout|ECONNRESET|socket hang up/i;
 
@@ -155,14 +156,20 @@ export async function invoke(req: Request): Promise<Reply> {
   const r = await slot(async () => {
     for (let attempt = 0; ; attempt++) {
       try {
+        if (coolUntil > Date.now()) await sleep(coolUntil - Date.now());
         const res = await client.send(
           new InvokeModelCommand({ modelId: req.model, contentType: "application/json", accept: "application/json", body: json }),
         );
         return JSON.parse(new TextDecoder().decode(res.body)) as Reply;
       } catch (e) {
         const msg = `${(e as Error).name}: ${(e as Error).message}`;
-        if (attempt >= 6 || !RETRYABLE.test(msg)) throw new Error(`${req.stage} ${req.model}: ${msg}`);
-        await sleep(Math.min(60_000, 2000 * 2 ** attempt) * (0.5 + Math.random()));
+        const throttled = /Throttling|TooManyRequests/i.test(msg);
+        if (attempt >= (throttled ? 12 : 6) || !RETRYABLE.test(msg)) throw new Error(`${req.stage} ${req.model}: ${msg}`);
+        const wait = Math.min(60_000, 2000 * 2 ** attempt) * (0.5 + Math.random());
+        // A throttle is the account's quota, not this request: every call
+        // waits it out, or the rest keep hitting the limit and burn retries.
+        if (throttled) coolUntil = Math.max(coolUntil, Date.now() + wait);
+        await sleep(wait);
       }
     }
   });
@@ -183,15 +190,36 @@ export const callsOf = (r: Reply) =>
  * else. Forced tool_choice is a 400 on the 5.5 models, so this asks, checks,
  * and asks again with the reason when the call is missing.
  */
+/**
+ * What is wrong with a tool answer at the top level, or null. Models now and
+ * then send an array as its JSON text (saas-starter's verify stage crashed on
+ * one); that is unwrapped in place, anything else goes back as an error.
+ */
+function shapeOf(tool: Tool, input: Record<string, unknown>): string | null {
+  const schema = tool.input_schema as { required?: string[]; properties?: Record<string, { type?: string }> };
+  for (const k of schema.required ?? []) if (input?.[k] === undefined) return `Missing required field "${k}".`;
+  for (const [k, p] of Object.entries(schema.properties ?? {})) {
+    if (p.type !== "array" || input[k] === undefined) continue;
+    if (typeof input[k] === "string") {
+      try { input[k] = JSON.parse(input[k] as string); } catch { /* reported below */ }
+    }
+    if (!Array.isArray(input[k])) return `Field "${k}" must be an array, not ${typeof input[k]}.`;
+  }
+  return null;
+}
+
 export async function ask<T>(req: Omit<Request, "tools"> & { tool: Tool }): Promise<T> {
   const messages = [...req.messages];
   for (let attempt = 0; attempt < 3; attempt++) {
     const r = await invoke({ ...req, messages, tools: [req.tool] });
     const call = callsOf(r).find((c) => c.name === req.tool.name);
-    if (call) return call.input as T;
+    const wrong = call ? shapeOf(req.tool, call.input as Record<string, unknown>) : null;
+    if (call && !wrong) return call.input as T;
     messages.push(
       { role: "assistant", content: r.content },
-      { role: "user", content: `Answer by calling the ${req.tool.name} tool exactly once. stop_reason was ${r.stop_reason}.` },
+      call
+        ? { role: "user", content: [{ type: "tool_result", tool_use_id: call.id, is_error: true, content: `${wrong} Call ${req.tool.name} again with the corrected input.` }] }
+        : { role: "user", content: `Answer by calling the ${req.tool.name} tool exactly once. stop_reason was ${r.stop_reason}.` },
     );
   }
   throw new Error(`${req.stage}: no ${req.tool.name} call after 3 attempts`);

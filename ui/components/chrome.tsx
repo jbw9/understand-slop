@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,13 +18,19 @@ export function Crumbs({
   repo,
   crumbs,
   onJump,
+  map,
+  maps,
 }: {
   repo: string;
+  /** The open map and every map on disk; a switcher shows when there are two. */
+  map: string;
+  maps: string[];
   /** One entry per level below the repo, outermost first. */
   crumbs: { id: string; title: string; step?: number }[];
   /** Jump to depth `n` — 0 is the repo. */
   onJump: (depth: number) => void;
 }) {
+  const router = useRouter();
   const stops = [{ id: "", title: repo, step: undefined as number | undefined }, ...crumbs];
   return (
     <nav
@@ -61,6 +68,21 @@ export function Crumbs({
           })}
         </ol>
         <div className="flex shrink-0 items-center gap-3 pt-0.5 font-mono text-[10.5px] text-faint">
+          {maps.length > 1 ? (
+            <select
+              aria-label="Map"
+              value={map}
+              // The router, not pushState: the map is read on the server.
+              onChange={(e) => router.push(`?map=${encodeURIComponent(e.target.value)}`)}
+              className="rounded border border-border-gray bg-surface px-1.5 py-0.5 text-[11px] text-muted-slate"
+            >
+              {maps.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <Hint k="esc">back</Hint>
           <Hint k="0">top</Hint>
         </div>

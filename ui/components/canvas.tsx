@@ -10,7 +10,7 @@ import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Crumbs } from "@/components/chrome";
-import { E0, L0, LINKS, RUN, levelAt, nodeAt } from "@/lib/map";
+import { useMap } from "@/components/map-context";
 import type { Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
@@ -29,42 +29,6 @@ import { BLURB_LINES, type Shape } from "@/lib/view";
  * one, and the bottom of every branch is the code itself.
  */
 
-
-const byOrder = (a: Edge, b: Edge) => (a.order ?? 0) - (b.order ?? 0);
-
-/**
- * The path everyone walks, in the order E0 chains it: the ordered edges with
- * no lane. Walking them from the first `from` IS the sequence.
- */
-const SPINE = (() => {
-  const sorted = E0.filter((e) => e.order !== undefined && !e.lane).sort(byOrder);
-  return sorted.length ? [sorted[0].from, ...sorted.map((e) => e.to)] : [];
-})();
-
-/** Where the path splits, one ordered branch per lane. Empty if it never does. */
-const LANES = [...new Set(E0.flatMap((e) => (e.lane ? [e.lane] : [])))].map((name) => {
-  const sorted = E0.filter((e) => e.lane === name).sort(byOrder);
-  return { name, from: sorted[0].from, ids: sorted.map((e) => e.to) };
-});
-
-/** Edges with no order: one branch handing something to another. */
-const HANDOFFS = E0.filter((e) => e.order === undefined);
-
-const ON_PATH = new Set([...SPINE, ...LANES.flatMap((l) => l.ids)]);
-
-function roots(ids: string[]) {
-  return ids.map((id) => L0.find((n) => n.id === id)).filter((n): n is Node => n !== undefined);
-}
-
-/** 1-indexed position on the path, counting the shared steps into a lane. */
-function stepOf(id: string): { n: number; of: number; lane?: string } | undefined {
-  const i = SPINE.indexOf(id);
-  if (i !== -1) return { n: i + 1, of: SPINE.length };
-  for (const l of LANES) {
-    const j = l.ids.indexOf(id);
-    if (j !== -1) return { n: SPINE.length + j + 1, of: SPINE.length + l.ids.length, lane: l.name };
-  }
-}
 
 /** Levels below this node: 0 for a leaf. */
 function height(node: Node): number {
@@ -117,6 +81,7 @@ function setNote(node: Node): string | null {
 }
 
 export function Canvas() {
+  const { LINKS, RUN, levelAt, nodeAt, stepOf, name, maps } = useMap();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { nodes, anchor, version } = useWireAnchors();
@@ -135,7 +100,7 @@ export function Canvas() {
   const path = useMemo(() => {
     const asked = params.getAll("at");
     return asked.length && nodeAt(asked) ? asked : [];
-  }, [params]);
+  }, [params, nodeAt]);
   const key = path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
@@ -159,6 +124,8 @@ export function Canvas() {
   // follows it, and so does back/forward.
   const go = useCallback((next: string[]) => {
     const q = new URLSearchParams();
+    const map = new URLSearchParams(window.location.search).get("map");
+    if (map) q.set("map", map);
     for (const id of next) q.append("at", id);
     window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
   }, []);
@@ -187,7 +154,7 @@ export function Canvas() {
       frontier = next;
     }
     return seen;
-  }, [traced]);
+  }, [traced, LINKS]);
 
   // Only row-to-row wires remain: sibling order is drawn by `Sequence` itself,
   // where a wrapping layout can't send a wire across a card. Foreign keys show
@@ -209,7 +176,7 @@ export function Canvas() {
     return LINKS.filter(
       (l) => l.label === "FK" && shown.has(owner(l.from)) && shown.has(owner(l.to)),
     ).map((l) => ({ from: l.from, to: l.to, kind: kind(l), depth: 0, relation: true }));
-  }, [traced, lit, focus, path]);
+  }, [traced, lit, focus, path, LINKS, levelAt]);
 
   /* ── rows that open their own level ───────────────────────── */
 
@@ -224,7 +191,7 @@ export function Canvas() {
       const at = ownerAt === -1 ? [...path, owner] : path.slice(0, ownerAt + 1);
       if (nodeAt([...at, id])) go([...at, id]);
     },
-    [path, go],
+    [path, go, nodeAt],
   );
 
   const ctx = useMemo<RowCtx>(
@@ -266,7 +233,7 @@ export function Canvas() {
   return (
     <div className="flex h-dvh w-screen overflow-hidden bg-warm-cream">
       <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
-        <Crumbs repo={RUN.repo} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
         <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
           <WireLayer
             canvasRef={contentRef}
@@ -311,6 +278,7 @@ export function Canvas() {
  * side, and the roots E0 never touches grouped under their own heading.
  */
 function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
+  const { RUN, E0, L0, SPINE, LANES, HANDOFFS, ON_PATH, roots } = useMap();
   const chain = roots(SPINE);
   const outside = L0.filter((n) => !ON_PATH.has(n.id));
   const fork = LANES.length ? L0.find((n) => n.id === LANES[0].from) : undefined;
@@ -386,6 +354,7 @@ function Level({
   ctx: RowCtx;
   onOpen: (p: string[]) => void;
 }) {
+  const { RUN, nodeAt, stepOf } = useMap();
   const kids = authored(node);
   const parent = path.length > 1 ? nodeAt(path.slice(0, -1)) : null;
   const step = path.length === 1 ? stepOf(node.id) : undefined;
@@ -560,6 +529,7 @@ function Steps({
   at: string[];
   onOpen: (p: string[]) => void;
 }) {
+  const { L0, stepOf } = useMap();
   return (
     <ol className="flex max-w-[880px] flex-col">
       {nodes.map((n, i) => {

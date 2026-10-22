@@ -6,6 +6,7 @@ import { Eyebrow, Prose } from "@/components/state";
 import { SourceView, type RowCtx } from "@/components/anatomy";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
+import { useMap } from "@/components/map-context";
 
 /**
  * The blocks a reader learns from without opening code (round 3, D34): the
@@ -719,11 +720,12 @@ export function CodeDrawer({
 function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: RowCtx }) {
   const [slice, setSlice] = useState<RepoSlice | null | "failed">(null);
   const [shown, setShown] = useState(false);
+  const { name: map } = useMap();
 
   const toggle = async () => {
     setShown((v) => !v);
     if (slice) return;
-    const q = new URLSearchParams({ file: code.file, start: String(code.start), end: String(code.end) });
+    const q = new URLSearchParams({ map, file: code.file, start: String(code.start), end: String(code.end) });
     try {
       const res = await fetch(`/api/source?${q}`);
       setSlice(res.ok ? ((await res.json()) as RepoSlice) : "failed");

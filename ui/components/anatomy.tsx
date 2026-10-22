@@ -8,6 +8,7 @@ import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX, type Shape } from "@/lib/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Slice, WriteResult } from "@/lib/repo";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
+import { useMap } from "@/components/map-context";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -856,6 +857,7 @@ export function SourceView({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(quoted);
   const [saved, setSaved] = useState<WriteResult | null>(null);
+  const { name: map } = useMap();
 
   /**
    * One read of the repository, resolved to what the UI should show.
@@ -866,6 +868,7 @@ export function SourceView({
   const read = useCallback(
     async (signal?: AbortSignal) => {
       const q = new URLSearchParams({
+        map,
         file: block.file,
         start: String(block.start),
         end: String(end),
@@ -881,7 +884,7 @@ export function SourceView({
         return { slice: null, failed: "unreachable" };
       }
     },
-    [block.file, block.start, end, quoted],
+    [map, block.file, block.start, end, quoted],
   );
 
   // Aborted on unmount and whenever the block changes, so a slow response for
@@ -909,6 +912,7 @@ export function SourceView({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        map,
         file: block.file,
         start: block.start,
         end,

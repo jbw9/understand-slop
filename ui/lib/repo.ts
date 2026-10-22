@@ -12,18 +12,14 @@
  */
 
 /**
- * Where the mapped repository lives. Absolute, from env, one repo per run.
- *
- * The fallback is the mapped repo's own directory under the home directory,
- * not written out: a literal `/Users/<name>/…` is true on one machine, and on
- * every other one the code level silently fell back to the pasted quote it
- * exists to replace.
+ * Where the mapped repository lives: absolute, one per map, resolved by
+ * `rootOf` in `lib/maps.ts` from the map the reader has open. The route hands
+ * it in; nothing caller-supplied ever chooses it.
  */
-export const REPO_ROOT =
-  process.env.SLOP_REPO_ROOT ?? resolve(homedir(), "Desktop/Code", RUN.repo);
+export type RepoRoot = string;
 
 export interface SliceRequest {
-  /** Repo-relative path. Must stay inside REPO_ROOT once resolved. */
+  /** Repo-relative path. Must stay inside the repo root once resolved. */
   file: string;
   /** 1-indexed first line. */
   start: number;
@@ -48,12 +44,12 @@ export interface Slice extends SliceRequest {
 /**
  * Read a slice of a real file.
  *
- * Path safety: resolve the path and confirm it is still under REPO_ROOT.
+ * Path safety: resolve the path and confirm it is still under the repo root.
  * `../` traversal, absolute paths and symlinks pointing outside are refused —
  * this endpoint reads arbitrary caller-supplied paths, so the containment check
  * is the whole security model.
  */
-export type ReadSlice = (req: SliceRequest) => Promise<Slice>;
+export type ReadSlice = (req: SliceRequest, fixture: string | undefined, root: RepoRoot) => Promise<Slice>;
 
 /**
  * Write an edited slice back.
@@ -61,7 +57,7 @@ export type ReadSlice = (req: SliceRequest) => Promise<Slice>;
  * Deliberately narrow, because this is the one operation in the product that
  * can destroy work:
  *
- * - Inside REPO_ROOT only, same containment check as the read.
+ * - Inside the repo root only, same containment check as the read.
  * - One contiguous slice of one file per call.
  * - `expected` must match what is currently on disk, or the write is refused.
  *   This is optimistic concurrency: it stops a save built on a stale read from
@@ -86,7 +82,7 @@ export interface WriteResult {
   refused?: string;
 }
 
-export type WriteSlice = (req: WriteRequest) => Promise<WriteResult>;
+export type WriteSlice = (req: WriteRequest, root: RepoRoot) => Promise<WriteResult>;
 
 // ---------------------------------------------------------------------------
 // Implementation. The types above are the frozen contract; everything below
@@ -95,8 +91,6 @@ export type WriteSlice = (req: WriteRequest) => Promise<WriteResult>;
 
 import { readFile, writeFile, realpath, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-import { homedir } from "node:os";
-import { RUN } from "@/lib/map";
 
 /**
  * The entire security model, in one function.
@@ -104,7 +98,7 @@ import { RUN } from "@/lib/map";
  * `file` arrives from the network, so it is assumed hostile. Three things are
  * checked, in this order, because each one defeats a different attack:
  *
- * 1. `resolve(REPO_ROOT, file)` collapses `../` textually — this is what stops
+ * 1. `resolve(the repo root, file)` collapses `../` textually — this is what stops
  *    `../../../etc/passwd` and, because `resolve` discards the base when given
  *    an absolute second argument, it also folds absolute paths back through the
  *    same prefix test rather than silently honouring them.
@@ -117,8 +111,8 @@ import { RUN } from "@/lib/map";
  *
  * Returns the real absolute path, or null when the path escapes.
  */
-async function contain(file: string): Promise<string | null> {
-  const root = await realpath(REPO_ROOT);
+async function contain(repoRoot: RepoRoot, file: string): Promise<string | null> {
+  const root = await realpath(repoRoot);
   const inside = (p: string) => p === root || p.startsWith(root + sep);
 
   const target = resolve(root, file);
@@ -139,16 +133,15 @@ async function contain(file: string): Promise<string | null> {
 export class Refused extends Error {}
 
 /**
- * `fixture` is extra, and deliberately not in the contract: it is what the MAP
- * claims sits at these lines, which the repository itself has no opinion about.
- * An optional parameter keeps this assignable to the frozen `ReadSlice` type —
- * asserted below — so callers holding that type are unaffected.
+ * `fixture` is what the MAP claims sits at these lines, which the repository
+ * itself has no opinion about; undefined when the caller made no claim.
  */
 export const readSlice = async (
   req: SliceRequest,
-  fixture?: string,
+  fixture: string | undefined,
+  root: RepoRoot,
 ): Promise<Slice> => {
-  const real = await contain(req.file);
+  const real = await contain(root, req.file);
   if (!real) throw new Refused("outside repo");
   if (!(await stat(real)).isFile()) throw new Refused("not a file");
 
@@ -196,8 +189,8 @@ function quoteHolds(fixture: string, disk: string): boolean {
   );
 }
 
-export const writeSlice: WriteSlice = async (req) => {
-  const real = await contain(req.file);
+export const writeSlice: WriteSlice = async (req, root) => {
+  const real = await contain(root, req.file);
   if (!real) return { ok: false, diff: "", refused: "outside repo" };
   if (!(await stat(real)).isFile()) {
     return { ok: false, diff: "", refused: "not a file" };

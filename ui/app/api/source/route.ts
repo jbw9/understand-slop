@@ -1,4 +1,8 @@
 import { readSlice, writeSlice, Refused } from "@/lib/repo";
+import { loadMap, rootOf } from "@/lib/maps";
+
+/** The checkout behind the map the reader has open (`?map=`). */
+const rootFor = (map: string | null | undefined) => rootOf(loadMap(map ?? undefined).file.RUN);
 
 /**
  * The only door to the real repository.
@@ -31,7 +35,7 @@ export async function GET(request: Request) {
     // what lets the answer say "this has drifted" instead of quietly showing
     // fresh code under a stale explanation.
     return Response.json(
-      await readSlice({ file, start, end }, q.get("fixture") ?? undefined),
+      await readSlice({ file, start, end }, q.get("fixture") ?? undefined, rootFor(q.get("map"))),
     );
   } catch (e) {
     return bad(e instanceof Refused ? e.message : "unreadable");
@@ -40,7 +44,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { file, start, end, code, expected } = body ?? {};
+  const { file, start, end, code, expected, map } = body ?? {};
   if (
     typeof file !== "string" ||
     !Number.isInteger(start) ||
@@ -51,6 +55,6 @@ export async function POST(request: Request) {
     return bad("bad request");
   }
 
-  const result = await writeSlice({ file, start, end, code, expected });
+  const result = await writeSlice({ file, start, end, code, expected }, rootFor(typeof map === "string" ? map : null));
   return Response.json(result, { status: result.ok ? 200 : 409 });
 }

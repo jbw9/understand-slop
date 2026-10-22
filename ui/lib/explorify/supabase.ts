@@ -20,11 +20,7 @@ export const supabase: Node = {
     "The tables, their column types and their access rules live in the hosted Supabase project, not in this repository. Everything below about them is reconstructed from the app's own queries.",
   col: 1,
   row: 1,
-  detail: `explorify has no server of its own for its data. Every screen talks to one Supabase project through one client, created in \`lib/supabase.ts\` with the project's URL and its public "anon" key. Supabase provides the accounts and login (Auth), a Postgres database reached through an automatic API, file storage for pictures, and edge functions for the few jobs that need more power than a phone should have.
-
-Because the phone queries the database directly, the only thing deciding who may read or change which row is Postgres row-level security (RLS) — rules set in the Supabase dashboard. Neither those rules nor the tables are in this repository: there are no migrations and the seed file is empty, so the tables below are reconstructed from how the app uses them.
-
-The app's queries also show what those rules must allow for it to work at all — for example, a student joining an event updates a row of \`events\` they do not own (see What The Repo Lacks → Access Rules Needed).`,
+  detail: "explorify has no server of its own: every screen calls one Supabase project straight from the phone. Only access rules kept in Supabase's dashboard decide who may read or change each row, and they are not in this repo.",
   code: [
     { file: "lib/supabase.ts", start: 9, end: 16, label: "The one client every screen uses" },
     { file: "supabase/config.toml", start: 1, end: 16, label: "Local development settings — the only Supabase config here" },
@@ -37,9 +33,9 @@ The app's queries also show what those rules must allow for it to work at all �
       boxes: [
         { id: "phone", label: "The phone app", sub: "one Supabase client", col: 0, row: 2 },
         { id: "auth", label: "Auth", sub: "accounts, sessions", col: 1, row: 0 },
-        { id: "api", label: "Database API", sub: "every query, via RLS", col: 1, row: 2 },
+        { id: "api", label: "Database API", sub: "Postgres; every query via RLS", col: 1, row: 2 },
         { id: "storage", label: "Storage", sub: "picture files", col: 1, row: 4 },
-        { id: "fns", label: "Edge functions", sub: "delete an account", col: 1, row: 5 },
+        { id: "fns", label: "Edge functions", sub: "jobs too powerful for a phone", col: 1, row: 5 },
         { id: "ind", label: "individual", sub: "student profiles", col: 2, row: 1 },
         { id: "org", label: "organizations", sub: "organisation profiles", col: 2, row: 2 },
         { id: "ev", label: "events", sub: "events and guest lists", col: 2, row: 3 },
@@ -70,7 +66,7 @@ The app's queries also show what those rules must allow for it to work at all �
         { from: "Supabase Auth", to: "Phone", label: "session tokens", note: "saved in AsyncStorage", state: "derived" },
         { from: "Phone", to: "Database API", label: "query, with anon key + token", state: "derived" },
         { from: "Database API", to: "Postgres", label: "run it as this user", state: "derived" },
-        { from: "Postgres", to: "Postgres", label: "RLS rules filter rows", note: "rules not in the repo", state: "partial" },
+        { from: "Postgres", to: "Postgres", label: "RLS rules filter rows", note: "row-level security, set in the dashboard — the only gate, and not in the repo", state: "partial" },
         { from: "Postgres", to: "Phone", label: "rows, as JSON", state: "derived" },
         { from: "Phone", to: "Supabase Auth", label: "refresh the session", note: "only while the app is in front", state: "derived" },
       ],
@@ -80,7 +76,7 @@ The app's queries also show what those rules must allow for it to work at all �
     {
       title: "No schema, rules or migrations in the repo",
       detail:
-        "Nobody can rebuild the database from this repository, review its access rules, or see a change to them in history. A fresh Supabase project would have none of the tables the app expects.",
+        "There are no migrations and the seed file is empty, so the tables on these pages are reconstructed from the app's own queries. Nobody can rebuild the database from this repository, review its access rules, or see a change to them in history; a fresh Supabase project would have none of the tables the app expects.",
       where: "supabase/",
     },
   ],
@@ -93,11 +89,7 @@ The app's queries also show what those rules must allow for it to work at all �
       state: "derived",
       col: 0,
       row: 0,
-      detail: `\`lib/supabase.ts\` creates the single client with \`createClient\`, passing the project URL and the anon key as literals in the file rather than from configuration. An anon key is designed to ship inside apps — on its own it can do only what the access rules allow — but changing it means shipping a new build.
-
-The login session is stored in AsyncStorage (the same store the app's own copies use), kept across launches, and refreshed automatically. \`app/(auth)/login.tsx\` starts that refreshing when the app comes to the front and stops it when it goes to the background. \`detectSessionInUrl\` is off because there is no web sign-in redirect to read.
-
-Every Supabase Auth call the app makes is listed below; the screens that use them are explained under Sign Up, Opening The App and Account.`,
+      detail: "Every screen shares one Supabase client, made in `lib/supabase.ts` with the project's address and public key written into the file. It keeps the login session on the phone and renews it while the app is in front.",
       code: [
         { file: "lib/supabase.ts", start: 9, end: 16, label: "The client and its session settings" },
         { file: "app/(auth)/login.tsx", start: 23, end: 30, label: "Refreshing only while the app is in front" },
@@ -110,15 +102,16 @@ Every Supabase Auth call the app makes is listed below; the screens that use the
           columns: ["Setting", "Value", "Effect"],
           state: "derived",
           rows: [
-            ["storage", "AsyncStorage", "the session survives a restart; AsyncStorage.clear() logs you out"],
-            ["autoRefreshToken", "true", "the session is renewed before it expires"],
+            ["address and anon key", "written into the file, not configuration", "an anon key is meant to ship in apps and can do only what the access rules allow; changing it means a new build"],
+            ["storage", "AsyncStorage", "the same store as the app's own copies; the session survives a restart; AsyncStorage.clear() logs you out"],
+            ["autoRefreshToken", "true", "the session is renewed before it expires — login.tsx starts this when the app comes to the front and stops it in the background"],
             ["persistSession", "true", "kept across launches"],
-            ["detectSessionInUrl", "false", "no web redirect sign-in"],
+            ["detectSessionInUrl", "false", "there is no web sign-in redirect to read"],
           ],
         },
         {
           kind: "table",
-          caption: "Every Supabase Auth call in the app",
+          caption: "Every Supabase Auth call in the app — the screens are explained under Sign Up, Opening The App and Account",
           columns: ["Call", "Used for", "Where"],
           state: "derived",
           rows: [
@@ -146,11 +139,7 @@ Every Supabase Auth call the app makes is listed below; the screens that use the
         "No table definitions are in the repo. Whether any of these links is a real foreign key, and what happens on delete, depends on the hosted database.",
       col: 0,
       row: 1,
-      detail: `Each account is a Supabase Auth user. Sign-up then inserts a profile row whose \`id\` is that user's id — into \`individual\` for a student, \`organizations\` for an organisation — and launch routing asks which table has the id. Events point at their organisation through \`events.uuid\`, and joins point both ways: student ids are the keys inside \`events.rsvp\`, event ids sit in \`individual.rsvp\` and \`saved_events\`.
-
-None of these links is visibly enforced. The ids inside \`rsvp\` text and inside the arrays cannot be foreign keys at all, so the database cannot clean them up — keeping them in step is entirely the app's job.
-
-What a row of each table holds, who writes each column and what goes wrong is one level down.`,
+      detail: "Three tables: student profiles, organisation profiles and events, each profile sharing its id with a login account. The links between rows are ids the app copies itself, and nothing in the repo shows the database enforcing them.",
       code: [
         { file: "app/(auth)/registerIndividual.tsx", start: 128, end: 138, label: "A student's row gets the Auth user's id" },
         { file: "app/(auth)/registerOrg.tsx", start: 117, end: 127, label: "So does an organisation's" },
@@ -160,7 +149,7 @@ What a row of each table holds, who writes each column and what goes wrong is on
       anatomy: [
         {
           kind: "diagram",
-          caption: "How the tables point at each other — dashed lines are ids kept only by the app",
+          caption: "How the tables point at each other — dashed lines are ids kept only by the app; launch decides student or organisation by which profile table holds the user's id",
           boxes: [
             { id: "auth", label: "Auth users", sub: "email, password", col: 0, row: 1 },
             { id: "ind", label: "individual", sub: "one per student", col: 1, row: 0 },
@@ -177,7 +166,7 @@ What a row of each table holds, who writes each column and what goes wrong is on
         },
         {
           kind: "table",
-          caption: "Every link between rows",
+          caption: "Every link between rows — ids inside text or arrays can never be foreign keys, so the database cannot clean them up; keeping them in step is the app's job",
           columns: ["From", "Points at", "Kind of link"],
           state: "partial",
           rows: [
@@ -209,11 +198,7 @@ What a row of each table holds, who writes each column and what goes wrong is on
             "Columns are known only from the app's queries; types are the shapes the app reads and writes. Columns the app only reads may not exist at all.",
           col: 0,
           row: 0,
-          detail: `Sign-up inserts the row with \`id\`, \`email\`, \`full_name\` and \`interests\`. Everything else is filled in later by the student's own actions: joining an event adds to \`rsvp\`, the bookmark edits \`saved_events\`, a new profile picture sets \`avatar_url\`, and the profile drawer can change \`interests\`.
-
-Some columns are read but written by nothing in the app: \`location\` (used by You Might Like's same-city rule), \`major\` and \`campus\` (shown in the profile drawer). Launch tries to write \`expo_push_token\`, but that line refers to a \`token\` that is never defined, so it always fails.
-
-Other students read a narrow slice of each row — \`id\` and \`avatar_url\`, for the faces on guest lists — and password reset looks a row up by \`email\`.`,
+          detail: "One row per student, created at sign-up with id, email, name and interests. Joining, saving and the profile screens fill in the rest; three columns the app reads are written by nothing.",
           code: [
             { file: "app/(auth)/registerIndividual.tsx", start: 128, end: 138, label: "The row is created at sign-up" },
             { file: "app/individual/account/components/EditProfileDrawer.tsx", start: 105, end: 112, label: "Changing interests" },
@@ -230,13 +215,13 @@ Other students read a narrow slice of each row — \`id\` and \`avatar_url\`, fo
                 { name: "email", type: "text", state: "derived", note: "set at sign-up; password reset looks it up" },
                 { name: "full_name", type: "text", state: "derived", note: "set at sign-up; pre-fills the RSVP drawer" },
                 { name: "interests", type: "text[]", state: "derived", note: "category values; sign-up and profile drawer" },
-                { name: "rsvp", type: "event id[]", nullable: true, state: "derived", note: "joined events; duplicates events.rsvp" },
-                { name: "saved_events", type: "event id[]", nullable: true, state: "derived", note: "bookmarks; can hold duplicates" },
-                { name: "avatar_url", type: "path in user_avatar", nullable: true, state: "derived" },
-                { name: "location", type: "{ city }", nullable: true, state: "partial", note: "read by You Might Like; written by nothing" },
+                { name: "rsvp", type: "event id[]", nullable: true, state: "derived", note: "joined events, added by joining; duplicates events.rsvp" },
+                { name: "saved_events", type: "event id[]", nullable: true, state: "derived", note: "bookmarks, edited by the bookmark; can hold duplicates" },
+                { name: "avatar_url", type: "path in user_avatar", nullable: true, state: "derived", note: "set by a new profile picture; other students read it, with id, for guest-list faces" },
+                { name: "location", type: "{ city }", nullable: true, state: "partial", note: "read by You Might Like's same-city rule; written by nothing" },
                 { name: "major", type: "text", nullable: true, state: "partial", note: "read by the profile drawer; written by nothing" },
                 { name: "campus", type: "text", nullable: true, state: "partial", note: "read by the profile drawer; written by nothing" },
-                { name: "expo_push_token", type: "text", nullable: true, state: "partial", note: "its only write always fails" },
+                { name: "expo_push_token", type: "text", nullable: true, state: "partial", note: "launch's only write always fails: `token` is never defined" },
               ],
               rel: [
                 "id is the Auth user's id — the same value appears as a key inside events.rsvp.",
@@ -276,11 +261,7 @@ Other students read a narrow slice of each row — \`id\` and \`avatar_url\`, fo
             "Columns are known only from the app's queries. `password` is written by password reset, but whether that column exists — the write's error is logged and ignored — cannot be told from here.",
           col: 0,
           row: 1,
-          detail: `Sign-up inserts the row with \`id\`, \`email\`, \`org_name\` and \`type\` (the categories that describe it). The organisation's profile drawer later fills \`bio\`, \`contact_name\`, \`contact_email\`, \`website\` and \`instagram\`, and the profile picture sets \`avatar_url\`.
-
-\`campus\` is read by the organisation's Other Events tab, but its only writer, \`campusSelection.tsx\`, is a screen nothing navigates to. Password reset writes the new password into a \`password\` column in plain text, matched by email.
-
-Students read these rows too: the event page downloads the organiser's whole row, and Search looks up \`org_name\` once per event.`,
+          detail: "One row per organisation, created at sign-up and filled in later from its profile drawer. Students read these rows too, and password reset may write a plain-text password into one.",
           code: [
             { file: "app/(auth)/registerOrg.tsx", start: 117, end: 127, label: "The row is created at sign-up" },
             { file: "app/org/account/components/EditProfileDrawer.tsx", start: 106, end: 118, label: "The profile drawer's fields" },
@@ -295,18 +276,18 @@ Students read these rows too: the event page downloads the organiser's whole row
               rows: [
                 { name: "id", type: "Auth user id", key: "PK", state: "derived", note: "set at sign-up" },
                 { name: "email", type: "text", state: "derived", note: "set at sign-up; password reset matches on it" },
-                { name: "org_name", type: "text", state: "derived", note: "shown on event pages and searched" },
-                { name: "type", type: "text[]", state: "derived", note: "category values" },
-                { name: "avatar_url", type: "path in user_avatar", nullable: true, state: "derived" },
+                { name: "org_name", type: "text", state: "derived", note: "set at sign-up; shown on event pages; Search looks it up once per event" },
+                { name: "type", type: "text[]", state: "derived", note: "set at sign-up: the categories that describe it" },
+                { name: "avatar_url", type: "path in user_avatar", nullable: true, state: "derived", note: "set by the profile picture" },
                 { name: "bio", type: "text", nullable: true, state: "derived", note: "profile drawer" },
                 { name: "contact_name", type: "text", nullable: true, state: "derived", note: "profile drawer" },
                 { name: "contact_email", type: "text", nullable: true, state: "derived", note: "profile drawer" },
                 { name: "website", type: "text", nullable: true, state: "derived", note: "profile drawer" },
                 { name: "instagram", type: "text", nullable: true, state: "derived", note: "profile drawer" },
-                { name: "campus", type: "text", nullable: true, state: "partial", note: "read by Other Events; no reachable writer" },
-                { name: "password", type: "text", nullable: true, state: "partial", note: "plain text, written on reset — if it exists" },
+                { name: "campus", type: "text", nullable: true, state: "partial", note: "read by Other Events; only writer is campusSelection.tsx, which nothing navigates to" },
+                { name: "password", type: "text", nullable: true, state: "partial", note: "plain text, written on reset, matched by email — if it exists" },
               ],
-              rel: ["events.uuid holds this row's id."],
+              rel: ["events.uuid holds this row's id.", "A student's event page downloads the organiser's whole row."],
             },
           ],
           issues: [
@@ -334,11 +315,7 @@ Students read these rows too: the event page downloads the organiser's whole row
             "Columns are known only from the app's queries; types are the shapes the app writes. Whether `uuid` is a real foreign key is not in the repo.",
           col: 0,
           row: 2,
-          detail: `An organisation's event form inserts the row as a draft (\`published\` false); the preview screen flips \`published\` to true, and only then can students download it. The edit form rewrites the descriptive columns, and the organisation's three dashboard lists can delete a row outright.
-
-Students write exactly one column, \`rsvp\`, when they join or cancel; the organisation's check-in writes it too. \`date\` and \`time\` are written separately: \`date\` is the UTC calendar day of the start, \`time\` the local clock time — which disagree for late-evening events in the Americas.
-
-\`location\` is what Google Places autocomplete returned, and cards show the first part of its first term. \`food\` is free text that the event page shows only when it starts with "Yes".`,
+          detail: "One row per event, guest list included, inserted as a draft and published from the preview. Students write only the `rsvp` column; organisations write everything else.",
           code: [
             { file: "app/org/index/addEvent.tsx", start: 222, end: 242, label: "Inserting an event as a draft" },
             { file: "app/org/index/previewEvent.tsx", start: 104, end: 108, label: "Publishing it" },
@@ -347,6 +324,27 @@ Students write exactly one column, \`rsvp\`, when they join or cancel; the organ
             { file: "lib/localStorage.ts", start: 49, end: 54, label: "What students download" },
           ],
           anatomy: [
+            {
+              kind: "diagram",
+              caption: "An event row's life",
+              boxes: [
+                { id: "form", label: "Event form", sub: "organisation", col: 0, row: 0 },
+                { id: "draft", label: "Draft", sub: "published = false", col: 1, row: 0 },
+                { id: "pub", label: "Published", sub: "via the preview", col: 2, row: 0, tone: "good" },
+                { id: "feed", label: "Students download it", sub: "with its guest list", col: 3, row: 0 },
+                { id: "edit", label: "Edit form", sub: "descriptive columns", col: 2, row: 1 },
+                { id: "join", label: "Join, cancel, check-in", sub: "rsvp only", col: 3, row: 1 },
+                { id: "del", label: "Deleted", sub: "from a dashboard list", col: 2, row: 2, tone: "warn" },
+              ],
+              arrows: [
+                { from: "form", to: "draft", label: "insert" },
+                { from: "draft", to: "pub", label: "Publish" },
+                { from: "pub", to: "feed" },
+                { from: "edit", to: "pub", label: "rewrites" },
+                { from: "join", to: "pub", label: "rewrites rsvp" },
+                { from: "pub", to: "del", tone: "warn" },
+              ],
+            },
             {
               kind: "schema",
               table: "events",
@@ -358,13 +356,13 @@ Students write exactly one column, \`rsvp\`, when they join or cancel; the organ
                 { name: "type", type: "text[]", state: "derived", note: "category values" },
                 { name: "campus", type: "text", state: "derived", note: "full university name; the feed's only filter" },
                 { name: "date", type: "YYYY-MM-DD", state: "derived", note: "UTC day of the start" },
-                { name: "time", type: "HH:MM:SS", state: "derived", note: "local start time" },
+                { name: "time", type: "HH:MM:SS", state: "derived", note: "local start time — disagrees with date for late-evening events in the Americas" },
                 { name: "end_time", type: "HH:MM:SS", state: "derived", note: "local end time" },
                 { name: "location", type: "{ description, terms }", state: "derived", note: "from Google Places" },
                 { name: "room_number", type: "text", state: "derived" },
                 { name: "thumbnail", type: "public URL", nullable: true, state: "derived", note: "full URL into event_thumbnail" },
                 { name: "dress_code", type: "text", nullable: true, state: "derived" },
-                { name: "food", type: "text", nullable: true, state: "derived", note: "\"Yes, …\" shows a food section" },
+                { name: "food", type: "text", nullable: true, state: "derived", note: "free text; the event page shows food only when it starts with \"Yes\"" },
                 { name: "published", type: "boolean", state: "derived", note: "false = draft" },
                 { name: "rsvp", type: "JSON as text", nullable: true, state: "derived", note: "the guest list — see Joining And Saving" },
               ],
@@ -424,11 +422,7 @@ Students write exactly one column, \`rsvp\`, when they join or cancel; the organ
         "Bucket settings are not in the repo. The app shows pictures through public URLs, which only load if both buckets are public — inferred from that, not seen.",
       col: 0,
       row: 2,
-      detail: `Pictures are uploaded straight from the phone. The file is read into memory and uploaded under a name made from the current time — \`1729….jpg\` — or, for profile pictures, \`individual_\` or \`organization_\` plus the time. The screens then ask Storage for a public link and show that.
-
-The two kinds are stored differently. A profile row keeps the file's path (\`avatar_url\`) and turns it into a link each time a face is drawn; an event row keeps the full public link (\`thumbnail\`).
-
-Choosing an event picture in the event form uploads it once, to \`user_avatar\`, as soon as it is picked; saving the event uploads it again, to \`event_thumbnail\`, and only that copy is used. Nothing in the app ever deletes a picture.`,
+      detail: "Pictures go straight from the phone into two Storage buckets and are shown through public links. Profile rows keep the file's path; event rows keep the full link.",
       code: [
         { file: "app/individual/account/components/UploadAvatar.tsx", start: 101, end: 127, label: "Uploading a profile picture" },
         { file: "app/individual/account/components/UploadAvatar.tsx", start: 39, end: 50, label: "Turning a path into a public link" },
@@ -442,8 +436,25 @@ Choosing an event picture in the event form uploads it once, to \`user_avatar\`,
           columns: ["Bucket", "Holds", "File name", "Kept on the row as", "Uploaded by"],
           state: "derived",
           rows: [
-            ["user_avatar", "profile pictures — plus an unused copy of every event picture", "individual_1729….jpg", "path, in avatar_url", "profile screens; event picture picker"],
-            ["event_thumbnail", "event pictures", "1729….jpg", "full public URL, in events.thumbnail", "event form and edit form, on save"],
+            ["user_avatar", "profile pictures — plus an unused copy of every event picture", "individual_ or organization_ + the time, e.g. individual_1729….jpg", "path, in avatar_url — made into a link each time a face is drawn", "profile screens; event picture picker"],
+            ["event_thumbnail", "event pictures", "the time, e.g. 1729….jpg", "full public URL, in events.thumbnail", "event form and edit form, on save"],
+          ],
+        },
+        {
+          kind: "diagram",
+          caption: "One event picture, uploaded twice — and nothing ever deletes either",
+          boxes: [
+            { id: "pick", label: "Picture picked", sub: "event form", col: 0, row: 1 },
+            { id: "av", label: "user_avatar", sub: "copy never used", col: 1, row: 0, tone: "warn" },
+            { id: "save", label: "Event saved", col: 1, row: 1 },
+            { id: "th", label: "event_thumbnail", sub: "the copy shown", col: 2, row: 1, tone: "good" },
+            { id: "row", label: "events.thumbnail", sub: "full public link", col: 3, row: 1 },
+          ],
+          arrows: [
+            { from: "pick", to: "av", label: "at once", tone: "warn" },
+            { from: "pick", to: "save" },
+            { from: "save", to: "th", label: "again" },
+            { from: "th", to: "row" },
           ],
         },
         {
@@ -481,11 +492,7 @@ Choosing an event picture in the event form uploads it once, to \`user_avatar\`,
       state: "derived",
       col: 0,
       row: 3,
-      detail: `\`supabase/\` holds what \`supabase init\` creates — a \`config.toml\` for running Supabase locally and an empty \`seed.sql\` — plus two edge functions. The tables, their columns, their access rules and the storage buckets were all made by hand in the hosted project, and none of it was exported back.
-
-That matters most for the access rules. Because the phone talks to the database directly with a key anyone can extract from the app, those rules are the entire security model — and the app's own queries show they must be quite open for it to work.
-
-The app also calls a function, \`delete-organization\`, that is not in \`supabase/functions/\`.`,
+      detail: "`supabase/` holds only what `supabase init` creates, plus two edge functions. The tables, access rules and buckets were made by hand in the hosted project and never exported.",
       code: [
         { file: "supabase/config.toml", start: 1, end: 16, label: "Local development settings" },
         { file: "supabase/functions/archive-event/index.ts", start: 1, end: 20, label: "archive-event: still the starter template" },
@@ -511,6 +518,12 @@ The app also calls a function, \`delete-organization\`, that is not in \`supabas
       ],
       issues: [
         {
+          title: "The missing rules are the whole security model",
+          detail:
+            "The phone talks to the database directly with a key anyone can extract from the app, so the access rules are all that protects the data — and the app's own queries show they must be quite open for it to work (see Access Rules Needed).",
+          where: "supabase/",
+        },
+        {
           title: "The organisation delete calls a missing function",
           detail:
             "Deleting an organisation account invokes `delete-organization`, which is not in this repo. Unless it was deployed by hand, the call fails.",
@@ -528,11 +541,7 @@ The app also calls a function, \`delete-organization\`, that is not in \`supabas
             "The rules themselves are not in the repo. Each row is worked backwards from a query the app makes: if the rules forbade it, that feature could not work.",
           col: 0,
           row: 0,
-          detail: `Each row below is a query the app makes, and what Supabase's access rules must therefore allow. None of the rules can be read here; this is the minimum the working app implies.
-
-The riskiest is the first. Joining or cancelling updates a row of \`events\` that belongs to an organisation, so students must be allowed to update events. Row-level rules decide which rows, not which columns — so unless something else limits the update to \`rsvp\`, any signed-in student holding the public key could rename, unpublish or re-date any event.
-
-One path skips the rules altogether: the \`delete-user\` function uses the service-role key. It is safe only because it first reads the caller's login token and deletes that account and no other.`,
+          detail: "Each row below is a query the app makes, and what the missing access rules must therefore allow. The riskiest: joining means students may update events rows they don't own.",
           code: [
             { file: "app/individual/index/components/rsvpDrawer.tsx", start: 166, end: 170, label: "A student updating an event row" },
             { file: "lib/localStorage.ts", start: 49, end: 54, label: "Students reading every column of events" },
@@ -543,7 +552,7 @@ One path skips the rules altogether: the \`delete-user\` function uses the servi
           anatomy: [
             {
               kind: "table",
-              caption: "What the rules must allow, query by query",
+              caption: "What the rules must allow, query by query — the minimum the working app implies, since none of the rules can be read here",
               columns: ["The app does", "So the rules must let", "Where"],
               state: "partial",
               rows: [
@@ -554,7 +563,7 @@ One path skips the rules altogether: the \`delete-user\` function uses the servi
                 ["password reset checks the email", "someone not signed in look up individual and organizations by email", "resetPassword.tsx:38"],
                 ["password reset saves the password", "update an organisation row matched by email", "resetPassword.tsx:161"],
                 ["an organisation checks people in", "an organisation update rsvp on its events", "org/index/attendees.tsx:104"],
-                ["deleting a student account", "nothing — the function's service key skips the rules; it deletes only the caller", "delete-user/index.ts:17"],
+                ["deleting a student account", "nothing — the function's service-role key skips the rules; it is safe only because it reads the caller's login token first and deletes that account alone", "delete-user/index.ts:17"],
               ],
             },
           ],

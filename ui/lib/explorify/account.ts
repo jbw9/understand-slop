@@ -17,33 +17,52 @@ export const account: Node = {
     "Deleting an organisation calls a Supabase Edge Function named `delete-organization` that is not in `supabase/functions/`. It may have been deployed from somewhere else, or may not exist at all; the repo cannot say which.",
   col: 1,
   row: 0,
-  detail: `Students and organisations each have an Account tab (\`app/individual/account/index.tsx\`, \`app/org/account/index.tsx\`). They are near copies: a round photo and the name at the top, Edit Profile, then Reset password and Delete account under Settings, two Support links that open the same Google Form, and Sign Out at the bottom.
-
-The name and photo come from the profile copy saved on the phone (\`user\`), not from the database. Edit Profile and the photo write to the database directly; Reset password opens a shared screen that also serves the login page; Delete account asks a Supabase Edge Function to do what the app itself is not allowed to do — remove the login account.
-
-The two tabs differ where it matters: an organisation's delete calls a function that is not in this repository, and an organisation's password reset also writes the new password, readable, into the \`organizations\` table.`,
+  detail: "Students and organisations each have a near-identical Account tab. Its name and photo come from the profile copy on the phone, and each row on it leads to one of the pages here.",
   code: [
     { file: "app/individual/account/index.tsx", start: 168, end: 275, label: "What the student Account tab shows" },
     { file: "app/individual/account/index.tsx", start: 51, end: 59, label: "Name and photo come from the phone's copy" },
+    { file: "app/individual/account/index.tsx", start: 39, end: 43, label: "Read again every time the tab opens" },
     { file: "app/individual/account/index.tsx", start: 61, end: 67, label: "Feedback and Report an issue open the same form" },
     { file: "app/org/account/index.tsx", start: 51, end: 75, label: "The organisation tab waits for the copy" },
   ],
   anatomy: [
     {
       kind: "screen",
-      title: "Account tab",
-      caption: "The student tab; the organisation tab is the same with its own name and \"Organization Settings\"",
+      title: "Account tab (student)",
+      caption: "A student's Account tab, before any photo is chosen",
+      shot: "/shots/explorify/account.png",
       items: [
-        { type: "image", label: "Profile photo", note: "tap to pick a new one (see Profile Photo)" },
-        { type: "heading", label: "Your name", note: "full_name — or org_name — from the phone's copy of the profile" },
+        { type: "image", label: "Profile photo", note: "a placeholder until one is chosen; tap to pick one (see Profile Photo)" },
+        { type: "heading", label: "Maya Chen", note: "full_name from the phone's copy of the profile, read again each time the tab opens" },
         { type: "button", label: "Edit Profile", note: "slides up the edit drawer" },
-        { type: "text", label: "Settings" },
-        { type: "list", label: "🔒 Reset password", note: "opens the shared reset screen" },
+        { type: "list", label: "🔒 Reset password", note: "opens the shared reset screen, also used by the login page" },
         { type: "list", label: "🗑️ Delete account", note: "asks to confirm, then calls an Edge Function" },
-        { type: "text", label: "Support" },
-        { type: "list", label: "💬 Feedback", note: "opens a Google Form" },
-        { type: "list", label: "📢 Report an issue", note: "opens the same Google Form" },
+        { type: "list", label: "💬 Feedback · 📢 Report an issue", note: "both open the same Google Form" },
         { type: "button", label: "Sign Out", note: "clears the phone, then signs out" },
+      ],
+    },
+    {
+      kind: "screen",
+      title: "Account tab (organisation)",
+      caption: "An organisation's Account tab: the same rows",
+      shot: "/shots/explorify/account-org.png",
+      items: [
+        { type: "heading", label: "Illini Robotics Club", note: "org_name from the phone's copy; this tab waits for the copy to arrive" },
+        { type: "text", label: "Organization Settings", note: "the same two rows, but they behave differently (table below)" },
+        { type: "list", label: "Bottom tabs", note: "Other Events · Home · Account" },
+      ],
+    },
+    {
+      kind: "table",
+      caption: "Where the two tabs differ",
+      columns: ["", "Student", "Organisation"],
+      state: "derived",
+      rows: [
+        ["Section heading", "Settings", "Organization Settings"],
+        ["Delete account calls", "delete-user, in this repo", "delete-organization, not in this repo"],
+        ["Reset password also writes", "nothing more", "the new password, readable, into organizations.password"],
+        ["Edit Profile changes", "photo, interests", "photo, bio, contact name, contact email, website, Instagram"],
+        ["Waits for the profile copy", "no", "yes, up to 5 retries"],
       ],
     },
     {
@@ -66,7 +85,7 @@ The two tabs differ where it matters: an organisation's delete calls a function 
         { from: "tab", to: "reset" },
         { from: "tab", to: "del" },
         { from: "tab", to: "out" },
-        { from: "edit", to: "profile", label: "saves" },
+        { from: "edit", to: "profile", label: "saves directly" },
         { from: "reset", to: "auth" },
         { from: "del", to: "fnS", label: "students" },
         { from: "del", to: "fnO", label: "organisations", tone: "warn" },
@@ -83,11 +102,7 @@ The two tabs differ where it matters: an organisation's delete calls a function 
       state: "derived",
       col: 0,
       row: 0,
-      detail: `Edit Profile slides up a drawer, filled from the phone's copy of the profile. The two kinds of account get different drawers: a student can change only their photo and interests (still at most 5); an organisation can change its photo, bio, contact name, contact email, website and Instagram. Names and login emails cannot be changed anywhere in the app.
-
-Save sends one \`update\` to the profile table for the signed-in id and closes the drawer. It never looks at the result: Supabase reports a failure as a returned error rather than by throwing, so the "Failed to save profile" alert can never appear, and a failed save looks exactly like a successful one.
-
-Save also does not refresh the phone's copy (\`user\`), and every other screen reads that copy. For a student, the new interests are in the database but You Might Like keeps ranking by the old ones until the app is next opened.`,
+      detail: "Edit Profile slides up a drawer filled from the phone's copy: students change their photo and interests, organisations their photo and contact details. Save sends one update and closes, never checking the result or refreshing that copy.",
       code: [
         { file: "app/individual/account/components/EditProfileDrawer.tsx", start: 46, end: 63, label: "Fill the drawer from the phone's copy" },
         { file: "app/individual/account/components/EditProfileDrawer.tsx", start: 104, end: 124, label: "Student save: interests only, result never checked" },
@@ -115,14 +130,25 @@ Save also does not refresh the phone's copy (\`user\`), and every other screen r
         {
           kind: "screen",
           title: "Edit Profile (student)",
+          caption: "A student's drawer with five interests picked",
+          shot: "/shots/explorify/ac-profile.png",
           items: [
-            { type: "heading", label: "Edit Profile" },
-            { type: "image", label: "Profile photo", note: "tap to replace it" },
-            { type: "text", label: "Interests" },
-            { type: "choice", label: "STEM 🔬", note: "the 8 categories; tap to add or remove" },
-            { type: "choice", label: "Social 👫" },
+            { type: "image", label: "Profile photo", note: "tap to replace it (see Profile Photo)" },
+            { type: "choice", label: "Interests", note: "the 8 categories, picked ones in blue; tap to add or remove, a sixth is ignored" },
             { type: "text", label: "Maximum of 5 interests can be selected", note: "in red, once 5 are chosen" },
-            { type: "button", label: "Save", note: "updates individual.interests and closes" },
+            { type: "button", label: "Save", note: "updates individual.interests and closes; any number from 0 to 5 is accepted" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Edit Profile (organisation)",
+          caption: "An organisation's drawer, filled from its profile",
+          shot: "/shots/explorify/ac-profile-org.png",
+          items: [
+            { type: "field", label: "Organization bio", note: "organizations.bio" },
+            { type: "field", label: "Contact Name · Contact Email", note: "contact_name, contact_email" },
+            { type: "field", label: "Website · Instagram", note: "website, instagram" },
+            { type: "button", label: "Save", note: "one update of all five fields, then closes" },
           ],
         },
       ],
@@ -130,13 +156,13 @@ Save also does not refresh the phone's copy (\`user\`), and every other screen r
         {
           title: "Save never reports a failure",
           detail:
-            "Both drawers ignore the error Supabase returns, so a save that the database rejected closes the drawer as if it worked.",
+            "Supabase returns a failure as an error value rather than throwing, and both drawers ignore it. So the \"Failed to save profile\" alert can never appear, and a rejected save closes the drawer as if it worked.",
           where: "app/individual/account/components/EditProfileDrawer.tsx:106",
         },
         {
           title: "New interests ignored until reopening",
           detail:
-            "The drawer does not update the cached `user`, which You Might Like reads, so a student's ranking only changes after the next launch.",
+            "The drawer does not update the cached `user`, which every other screen reads. The new interests are in the database, but You Might Like keeps ranking by the old ones until the app is next opened.",
           where: "app/individual/account/components/EditProfileDrawer.tsx:114",
         },
         {
@@ -155,11 +181,7 @@ Save also does not refresh the phone's copy (\`user\`), and every other screen r
           state: "derived",
           col: 0,
           row: 0,
-          detail: `The round photo on the Account tab and in the edit drawer is one shared component, \`UploadAvatar.tsx\`, used by both kinds of account. Tapping it opens the phone's photo library with cropping on. The chosen image is uploaded to the Supabase Storage bucket \`user_avatar\` under a new name: \`individual_\` or \`organization_\`, the current time in milliseconds, and the file's extension.
-
-The new name is then saved in the profile's \`avatar_url\` column. To show a photo, the app asks the bucket for that file's public web address, so anyone with the address can view it.
-
-Only a student's phone copy of the profile is updated with the new \`avatar_url\`. An organisation's home screen keeps showing the old photo until the next launch. Old photos are never deleted from the bucket.`,
+          detail: "Tapping the round photo opens the photo library, uploads the pick to the `user_avatar` bucket and points the profile's `avatar_url` at it. Anyone with the file's public address can view it.",
           code: [
             { file: "app/individual/account/components/UploadAvatar.tsx", start: 84, end: 133, label: "Pick, upload, save" },
             { file: "app/individual/account/components/UploadAvatar.tsx", start: 54, end: 82, label: "Save avatar_url; update the phone copy for students only" },
@@ -184,8 +206,10 @@ Only a student's phone copy of the profile is updated with the new \`avatar_url\
               caption: "What gets stored (example value)",
               value: `avatar_url = "individual_1712345678901.jpg"`,
               notes: [
-                { label: "Bucket", value: "user_avatar", state: "derived" },
+                { label: "Name", value: "individual_ or organization_, the time in milliseconds, then the file's extension", state: "derived" },
+                { label: "Bucket", value: "user_avatar, in Supabase Storage", state: "derived" },
                 { label: "Shown from", value: "the bucket's public URL for that name", state: "derived" },
+                { label: "Used by", value: "one shared component, on the Account tab and in the edit drawer, for both kinds of account", state: "derived" },
               ],
             },
           ],
@@ -220,11 +244,7 @@ Only a student's phone copy of the profile is updated with the new \`avatar_url\
         "Step 1 reads the `individual` and `organizations` tables before anyone is signed in. Whether the database allows that is decided by row-level security rules kept in the Supabase dashboard, not in this repo; if it does not, every reset ends at \"No account found\". Whether `organizations` really has a `password` column is not visible here either, because a failed write is ignored.",
       col: 0,
       row: 1,
-      detail: `Reached from Forgot password on the login screen and from Reset password on either Account tab. Step 1 takes an email and looks for it in \`individual\` and then \`organizations\`, to learn which kind of account it is. Only if it is found does it ask Supabase Auth to email a recovery code.
-
-Step 2 takes the code and a new password together. \`verifyOtp\` with type \`recovery\` checks the code and signs the person in, and \`updateUser\` sets the new password. For organisations the new password is also written into \`organizations.password\` — a second, readable copy beside the scrambled one Supabase Auth keeps. Then it shows "Password has been reset successfully" and opens the login screen.
-
-The email is matched exactly as typed, with no trimming or lower-casing, and the new password is not checked against the sign-up rule.`,
+      detail: "Step 1 checks the email is in a profile table, then asks Supabase to email a recovery code. Step 2 takes the code and a new password together and sets it.",
       code: [
         { file: "app/(auth)/resetPassword.tsx", start: 35, end: 75, label: "Step 1: which table has this email?" },
         { file: "app/(auth)/resetPassword.tsx", start: 77, end: 111, label: "Step 1: send the recovery email" },
@@ -234,6 +254,27 @@ The email is matched exactly as typed, with no trimming or lower-casing, and the
         { file: "app.json", start: 8, end: 8, label: "The app's real link scheme" },
       ],
       anatomy: [
+        {
+          kind: "diagram",
+          caption: "Two ways in, one screen, and back to login still signed in",
+          boxes: [
+            { id: "login", label: "Login screen", sub: "Forgot password", col: 0, row: 0 },
+            { id: "acct", label: "Account tab", sub: "Reset password", col: 0, row: 2 },
+            { id: "s1", label: "Step 1", sub: "email", col: 1, row: 1 },
+            { id: "tables", label: "Profile tables", sub: "individual, then organizations", col: 2, row: 1 },
+            { id: "none", label: "No account found", sub: "neither has the email", col: 2, row: 2, tone: "warn" },
+            { id: "s2", label: "Step 2", sub: "code + new password", col: 3, row: 1 },
+            { id: "end", label: "Login screen", sub: "still signed in", col: 4, row: 1, tone: "warn" },
+          ],
+          arrows: [
+            { from: "login", to: "s1" },
+            { from: "acct", to: "s1" },
+            { from: "s1", to: "tables", label: "looks up" },
+            { from: "tables", to: "none", label: "not found", tone: "warn" },
+            { from: "tables", to: "s2", label: "found: code emailed" },
+            { from: "s2", to: "end", label: "password set" },
+          ],
+        },
         {
           kind: "sequence",
           caption: "An organisation resetting its password",
@@ -246,25 +287,31 @@ The email is matched exactly as typed, with no trimming or lower-casing, and the
             { from: "Phone", to: "Supabase Auth", label: "code, type \"recovery\"", state: "derived" },
             { from: "Supabase Auth", to: "Phone", label: "signed in", state: "derived" },
             { from: "Phone", to: "Supabase Auth", label: "set the new password", state: "derived" },
-            { from: "Phone", to: "Database", label: "organizations.password = new password", note: "readable copy", state: "derived" },
+            { from: "Phone", to: "Database", label: "organizations.password = new password", note: "a readable copy beside Supabase Auth's scrambled one", state: "derived" },
+            { from: "Phone", to: "Phone", label: "\"Password has been reset successfully\", open login", state: "derived" },
           ],
         },
         {
           kind: "screen",
           title: "Step 1 of 2",
+          caption: "Step 1, with an email typed",
+          shot: "/shots/explorify/ac-reset.png",
           items: [
+            { type: "button", label: "Back arrow", note: "on step 2, back to step 1; on step 1, the previous screen" },
             { type: "heading", label: "What's your email address?" },
-            { type: "field", label: "Email", note: "matched exactly as typed" },
+            { type: "field", label: "Email", note: "matched exactly as typed — no trimming, no lower-casing" },
             { type: "button", label: "Send OTP", note: "grey until something is typed; \"No account found with this email\" if neither table has it" },
           ],
         },
         {
           kind: "screen",
           title: "Step 2 of 2",
+          caption: "Step 2, with a code and a new password typed",
+          shot: "/shots/explorify/ac-reset-code.png",
           items: [
             { type: "heading", label: "Enter OTP and New Password" },
             { type: "field", label: "Enter OTP code", note: "number pad, no length limit" },
-            { type: "field", label: "New Password", note: "hidden; no rule is checked" },
+            { type: "field", label: "New Password", note: "hidden; the sign-up rule is not checked" },
             { type: "button", label: "Reset Password", note: "grey until both are filled; then opens login" },
           ],
         },
@@ -306,11 +353,7 @@ The email is matched exactly as typed, with no trimming or lower-casing, and the
         "What happens on Supabase's side depends on the supabase-js library, which is not part of this repo. With the saved session already wiped, `signOut` may have no session left to end, so the session could stay valid on the server until it expires. Whether the opening screen's launch check runs before or after the wipe is also a matter of timing.",
       col: 0,
       row: 2,
-      detail: `Both Account tabs have the same \`handleSignOut\`. It first sets a "signing out" flag, which immediately swaps the tab for a spinner and sends the app to the opening screen \`/\`. Then it clears all of phone storage with \`AsyncStorage.clear()\`, and only then calls \`supabase.auth.signOut()\`.
-
-Clearing storage removes everything at once: the cached \`user\`, \`uuid\` and \`events\`, and also the Supabase login session, because the Supabase client keeps its session in that same storage. The opening screen runs the launch check again and, finding no session, sends the person to login.
-
-The order is the reverse of Delete account, which signs out first and clears storage second. Errors while signing out are only logged.`,
+      detail: "Sign Out swaps the tab for a spinner and opens the opening screen, wipes all phone storage, and only then calls Supabase's sign-out. The wipe also removes the saved login session.",
       code: [
         { file: "app/individual/account/index.tsx", start: 69, end: 79, label: "Sign out: clear the phone, then sign out" },
         { file: "app/individual/account/index.tsx", start: 45, end: 49, label: "Going to / as soon as it starts" },
@@ -321,10 +364,21 @@ The order is the reverse of Delete account, which signs out first and clears sto
         {
           kind: "flow",
           rows: [
-            { n: 1, title: "Spinner, then the opening screen", detail: "Setting the flag swaps the tab for a spinner and opens `/`.", state: "derived" },
-            { n: 2, title: "Clear phone storage", detail: "Every key, including the Supabase session.", state: "derived" },
+            { n: 1, title: "Spinner, then the opening screen", detail: "`handleSignOut`, the same in both tabs, sets a \"signing out\" flag, which swaps the tab for a spinner and opens `/`.", state: "derived" },
+            { n: 2, title: "Clear phone storage", detail: "`AsyncStorage.clear()`: `user`, `uuid`, `events`, and the Supabase session, which the client keeps in the same storage.", state: "derived" },
             { n: 3, title: "Sign out of Supabase", detail: "With the saved session already gone, there may be nothing left for it to end.", state: "inferred" },
             { n: 4, title: "Back to login", detail: "The opening screen's launch check finds no one signed in.", state: "inferred" },
+          ],
+        },
+        {
+          kind: "table",
+          caption: "Sign Out and Delete account do the same two things in opposite orders",
+          columns: ["", "Sign Out", "Delete account"],
+          state: "derived",
+          rows: [
+            ["First", "clear phone storage", "sign out of Supabase"],
+            ["Second", "sign out of Supabase", "clear phone storage"],
+            ["Errors", "only logged", "shown in an alert"],
           ],
         },
       ],
@@ -339,11 +393,7 @@ The order is the reverse of Delete account, which signs out first and clears sto
         "`delete-organization` is not in `supabase/functions/`. If it was deployed to the Supabase project from elsewhere it may work; if not, every organisation delete fails.",
       col: 0,
       row: 3,
-      detail: `The app cannot delete a Supabase login account by itself — that needs the project's secret service-role key, which must never ship inside an app. So Delete account, after an "irreversible" confirmation, calls a Supabase Edge Function — a small script that runs on Supabase's servers with that key. The app also puts the account id in the request body.
-
-Students call \`delete-user\`, which is in this repo (see Account Deletion Function under Server Code). Since commit 304a512 it ignores the id in the body — before that fix it trusted it, so anyone could delete any account: it asks Supabase Auth whose session token came with the call (a call with none gets "Unauthorized"), then deletes that person's \`individual\` row, then their login account, and replies with success. The app then signs out, clears phone storage, shows "Account Deleted" and returns to the opening screen. Organisations call \`delete-organization\`, which is not in this repo (see Missing Organisation Delete under Server Code); when it fails they see "There was an error deleting your organization. Please try again."
-
-So a student can only ever delete themselves. But the function removes only the profile row and the login: copies of the student's name, email, party size and dietary needs inside every event they joined stay where they are.`,
+      detail: "The app cannot delete a login itself, so after an \"irreversible\" confirmation it asks a server function to. Students call `delete-user`, which is in this repo; organisations call `delete-organization`, which is not.",
       code: [
         { file: "app/individual/account/index.tsx", start: 93, end: 109, label: "The confirmation" },
         { file: "app/individual/account/index.tsx", start: 111, end: 162, label: "Student delete: call delete-user, sign out, clear" },
@@ -356,8 +406,17 @@ So a student can only ever delete themselves. But the function removes only the 
           kind: "map",
           caption: "Who calls what",
           rows: [
-            { from: "student", to: "delete-user — in supabase/functions/; deletes the profile row, then the login", state: "derived" },
-            { from: "organisation", to: "delete-organization — not in this repo", state: "partial" },
+            { from: "student", to: "delete-user — in supabase/functions/ (see Account Deletion Function under Server Code); deletes the profile row, then the login", state: "derived" },
+            { from: "organisation", to: "delete-organization — not in this repo (see Missing Organisation Delete under Server Code)", state: "partial" },
+          ],
+        },
+        {
+          kind: "facts",
+          rows: [
+            { label: "Why a server function", value: "deleting a login needs the project's secret service-role key, which must never ship inside an app; an Edge Function runs on Supabase's servers with it", state: "derived" },
+            { label: "The id in the body", value: "sent by the app, ignored by delete-user since commit 304a512 — before that fix it was trusted, so anyone could delete any account", state: "derived" },
+            { label: "No session token", value: "delete-user answers \"Unauthorized\" — so a student can only ever delete themselves", state: "derived" },
+            { label: "Organisation failure", value: "\"There was an error deleting your organization. Please try again.\"", state: "derived" },
           ],
         },
         {
@@ -372,7 +431,7 @@ So a student can only ever delete themselves. But the function removes only the 
             { from: "delete-user", to: "Database", label: "delete the individual row", state: "derived" },
             { from: "delete-user", to: "Supabase Auth", label: "delete the login", state: "derived" },
             { from: "delete-user", to: "Phone", label: "success", state: "derived" },
-            { from: "Phone", to: "Phone", label: "sign out, clear storage, go to /", state: "derived" },
+            { from: "Phone", to: "Phone", label: "sign out, clear storage, \"Account Deleted\", go to /", state: "derived" },
           ],
         },
         {

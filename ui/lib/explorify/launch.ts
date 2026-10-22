@@ -15,11 +15,7 @@ export const launch: Node = {
   state: "derived",
   col: 0,
   row: 1,
-  detail: `There is no "role" field anywhere in the app. A user is a student if the \`individual\` table has a row with their account id, and an organisation if \`organizations\` has one. Students get the student home (tabs: Saved, Home, Account); organisations get the organisation home (tabs: Other Events, Home, Account).
-
-On every launch Expo Router loads \`app/_layout.tsx\`, which wraps every screen, and \`app/index.tsx\`, the first screen. Both ask Supabase who is signed in and run that lookup — so it runs twice at once — and logging in runs it a third time. Along the way the account id, and then the whole profile row, are copied into phone storage, which is where almost every later screen reads them from.
-
-Someone who is signed in but whose id is in neither table — a sign-up abandoned after the code — is not sent anywhere.`,
+  detail: "There is no role field: you are a student if `individual` has a row with your account id, an organisation if `organizations` does. The check runs twice at once on every launch, and again after logging in.",
   code: [
     { file: "app/_layout.tsx", start: 46, end: 90, label: "The launch check in the root layout" },
     { file: "app/index.tsx", start: 18, end: 74, label: "The same check again on the first screen" },
@@ -27,15 +23,52 @@ Someone who is signed in but whose id is in neither table — a sign-up abandone
   ],
   anatomy: [
     {
+      kind: "diagram",
+      caption: "The launch check: the first table holding your id decides which home opens, and the profile is then copied onto the phone",
+      boxes: [
+        { id: "open", label: "App opens", sub: "root layout + first screen", col: 0, row: 1 },
+        { id: "auth", label: "Supabase Auth", sub: "who is signed in?", col: 1, row: 1 },
+        { id: "ind", label: "individual table", sub: "a row with this id?", col: 2, row: 0 },
+        { id: "org", label: "organizations table", sub: "a row with this id?", col: 2, row: 1 },
+        { id: "login", label: "Login screen", sub: "no one signed in", col: 2, row: 2 },
+        { id: "shome", label: "Student home", sub: "Saved · Home · Account", col: 3, row: 0, tone: "good" },
+        { id: "ohome", label: "Organisation home", sub: "Other Events · Home · Account", col: 3, row: 1, tone: "good" },
+        { id: "stuck", label: "Nowhere", sub: "in neither table", col: 3, row: 2, tone: "warn" },
+        { id: "phone", label: "Phone storage", sub: "uuid, then user", col: 4, row: 1 },
+      ],
+      arrows: [
+        { from: "open", to: "auth" },
+        { from: "auth", to: "ind", label: "signed in" },
+        { from: "auth", to: "login", label: "not signed in" },
+        { from: "ind", to: "shome", label: "found", tone: "good" },
+        { from: "ind", to: "org", label: "no row" },
+        { from: "org", to: "ohome", label: "found", tone: "good" },
+        { from: "org", to: "stuck", label: "no row", tone: "warn" },
+        { from: "shome", to: "phone", label: "profile copied" },
+        { from: "ohome", to: "phone", label: "profile copied" },
+      ],
+    },
+    {
       kind: "table",
       caption: "Where you end up",
       columns: ["Signed in?", "Row in individual?", "Row in organizations?", "Opens"],
       state: "derived",
       rows: [
         ["No", "—", "—", "Login screen"],
-        ["Yes", "Yes", "not asked", "Student home"],
-        ["Yes", "No", "Yes", "Organisation home"],
-        ["Yes", "No", "No", "Nothing — stays on the opening screen"],
+        ["Yes", "Yes", "not asked", "Student home (tabs: Saved, Home, Account)"],
+        ["Yes", "No", "Yes", "Organisation home (tabs: Other Events, Home, Account)"],
+        ["Yes", "No", "No", "Nothing — stays on the opening screen (e.g. a sign-up abandoned after the code)"],
+      ],
+    },
+    {
+      kind: "table",
+      caption: "Who runs the check",
+      columns: ["File", "What it is", "Runs the check"],
+      state: "derived",
+      rows: [
+        ["app/_layout.tsx", "wraps every screen", "on every launch"],
+        ["app/index.tsx", "the first screen", "on every launch, at the same time"],
+        ["app/(auth)/login.tsx", "the login screen", "after a password sign-in"],
       ],
     },
   ],
@@ -49,11 +82,7 @@ Someone who is signed in but whose id is in neither table — a sign-up abandone
       state: "derived",
       col: 0,
       row: 0,
-      detail: `\`checkUser\` in \`app/_layout.tsx\` runs once when the app starts. \`supabase.auth.getUser()\` asks Supabase Auth to confirm the session saved on the phone and returns the account, or nothing.
-
-With an account, it saves the id on the phone as \`uuid\`, then asks \`individual\` for a row with that id; a row sends you to \`/individual\`. Otherwise it asks \`organizations\`, and a row there sends you to \`/org\`. Either way it then starts copying the full profile onto the phone in the background. With no account, it goes to \`/login\`.
-
-Three details matter. The order means an id in both tables is always a student. The \`uuid\` save is not waited for, and the profile copy starts only after the home screen is opened — so a home screen can appear before its profile is on the phone, which is why several screens wait and retry (see Saved On The Phone). And query errors are ignored, so a failed lookup looks the same as "not in this table".`,
+      detail: "`checkUser` in the root layout runs once at start-up: ask Supabase who is signed in, then look for that id in `individual`, then in `organizations`. The first table with a row decides which home opens.",
       code: [
         { file: "app/_layout.tsx", start: 46, end: 53, label: "Ask who is signed in, save the id" },
         { file: "app/_layout.tsx", start: 54, end: 65, label: "Student? Look in individual" },
@@ -64,9 +93,9 @@ Three details matter. The order means an id in both tables is always a student. 
         {
           kind: "flow",
           rows: [
-            { n: 1, title: "Who is signed in", detail: "`getUser()`; the id is saved as `uuid` without waiting.", state: "derived" },
-            { n: 2, title: "Student?", detail: "A row in `individual` with this id → `/individual`, then the profile is copied.", state: "derived" },
-            { n: 3, title: "Organisation?", detail: "Otherwise a row in `organizations` → `/org`, then the profile is copied.", state: "derived" },
+            { n: 1, title: "Who is signed in", detail: "`getUser()` asks Supabase Auth to confirm the session saved on the phone; the id is saved as `uuid` without waiting.", state: "derived" },
+            { n: 2, title: "Student?", detail: "A row in `individual` with this id → `/individual`, then the profile is copied in the background. Checked first, so an id in both tables is always a student.", state: "derived" },
+            { n: 3, title: "Organisation?", detail: "Otherwise a row in `organizations` → `/org`, then the profile is copied in the background.", state: "derived" },
             { n: 4, title: "Neither", detail: "Signed in, in neither table: no branch handles it, so nothing happens.", state: "derived" },
             { n: 5, title: "Not signed in", detail: "→ `/login`. An unexpected error also ends here.", state: "derived" },
           ],
@@ -100,6 +129,12 @@ Three details matter. The order means an id in both tables is always a student. 
             "Neither table query checks its error (the logging is commented out). A network or permission failure on `individual` quietly falls through to the organisation check, and then to nothing.",
           where: "app/_layout.tsx:63",
         },
+        {
+          title: "Home can open before its profile",
+          detail:
+            "The `uuid` save is not waited for, and the profile copy starts only after the home screen is opened. So a home screen can appear before `user` is on the phone, which is why several screens wait and retry (see Saved On The Phone).",
+          where: "app/_layout.tsx:59",
+        },
       ],
     },
     {
@@ -110,11 +145,7 @@ Three details matter. The order means an id in both tables is always a student. 
       state: "derived",
       col: 0,
       row: 1,
-      detail: `The login screen takes an email and a password and calls \`signInWithPassword\`. On success it saves the account id as \`uuid\`, looks for the id in \`individual\` and then \`organizations\`, copies the matching row onto the phone as \`user\`, and replaces the screen with the right home.
-
-It is a third copy of the launch check, written differently: it waits for each step, and it asks for exactly one row with \`.single()\`, which reports "no rows" as an error. The student check allows for that error; the organisation check does not. So a correct password for a login with no profile shows Supabase's raw "no rows" error instead of the intended "No matching profile found".
-
-The same file links to Forgot password and to Sign Up, and switches Supabase's automatic token refresh on whenever the app comes to the foreground and off when it goes to the background.`,
+      detail: "Signs in with email and password, then runs a third copy of the launch check and opens the right home. A correct password for a login with no profile shows a raw database error instead of the intended message.",
       code: [
         { file: "app/(auth)/login.tsx", start: 39, end: 60, label: "Sign in and save the id" },
         { file: "app/(auth)/login.tsx", start: 62, end: 86, label: "Student check: \"no rows\" is allowed" },
@@ -126,12 +157,14 @@ The same file links to Forgot password and to Sign Up, and switches Supabase's a
         {
           kind: "screen",
           title: "Login",
+          caption: "The login screen, as someone signed out first sees it",
+          shot: "/shots/explorify/ln-login.png",
           items: [
             { type: "heading", label: "Welcome back!" },
             { type: "field", label: "✉️ Email", note: "email keyboard, no auto-capitals; trimmed before sending" },
             { type: "field", label: "🔑 Password", note: "hidden; the eye icon shows it" },
             { type: "text", label: "Forgot password", note: "opens Resetting A Password" },
-            { type: "button", label: "Login", note: "alerts \"Please enter both email and password\" if either is empty" },
+            { type: "button", label: "Login", note: "blue even when empty; alerts \"Please enter both email and password\" if either is missing" },
             { type: "text", label: "Don't have an account? Sign Up", note: "asks Organization or Individual, then opens that sign-up" },
           ],
         },
@@ -148,12 +181,19 @@ The same file links to Forgot password and to Sign Up, and switches Supabase's a
             { from: "Phone", to: "Phone", label: "cache as \"user\", open /individual", state: "derived" },
           ],
         },
+        {
+          kind: "facts",
+          rows: [
+            { label: "Unlike launch", value: "waits for each step, and asks for exactly one row with .single(), which reports \"no rows\" as an error", state: "derived" },
+            { label: "Token refresh", value: "this file switches Supabase's automatic token refresh on when the app comes to the foreground and off when it goes to the background", state: "derived" },
+          ],
+        },
       ],
       issues: [
         {
           title: "Wrong error for a login with no profile",
           detail:
-            "When neither table has the id, the organisation query's \"no rows\" error is thrown before the code reaches \"No matching profile found\", so the person sees a database message instead.",
+            "The student check allows `.single()`'s \"no rows\" error; the organisation check throws it. So when neither table has the id, the person sees Supabase's raw \"no rows\" message instead of the intended \"No matching profile found\".",
           where: "app/(auth)/login.tsx:95",
         },
       ],
@@ -166,11 +206,7 @@ The same file links to Forgot password and to Sign Up, and switches Supabase's a
       state: "derived",
       col: 0,
       row: 2,
-      detail: `\`app/_layout.tsx\` wraps every screen and \`app/index.tsx\` is the first screen, so on launch both mount and both run their own \`checkUser\`. Neither knows about the other. \`login.tsx\` has a third version that runs after a password sign-in.
-
-They differ in small ways, listed below. For an organisation, both launch copies open \`/org\` — one pushes it, the other replaces the current screen with it — in whichever order the network answers.
-
-The first-screen copy is also broken for students: before routing a student it tries to save a phone notification token from a variable that does not exist, which throws. Students still reach their home only because the root layout's copy routes them.`,
+      detail: "The root layout and the first screen each run their own `checkUser` on every launch, unaware of each other; the login screen has a third. The first screen's copy throws for every student.",
       code: [
         { file: "app/_layout.tsx", start: 46, end: 90, label: "Copy 1: the root layout" },
         { file: "app/index.tsx", start: 18, end: 74, label: "Copy 2: the first screen" },
@@ -179,7 +215,7 @@ The first-screen copy is also broken for students: before routing a student it t
       anatomy: [
         {
           kind: "diagram",
-          caption: "Two copies run on every launch; only the root layout's routes a student",
+          caption: "Two copies run on every launch; only the root layout's routes a student. An organisation is opened twice, in whichever order the network answers.",
           boxes: [
             { id: "opens", label: "App opens", col: 0, row: 0 },
             { id: "layout", label: "Root layout check", sub: "app/_layout.tsx", col: 1, row: 0 },
@@ -207,8 +243,9 @@ The first-screen copy is also broken for students: before routing a student it t
             ["Opens a home with", "push", "replace", "replace"],
             ["Waits for the uuid save", "no", "no", "yes"],
             ["Errors", "ignored", "logged", "shown in an alert"],
-            ["Students", "routed", "throws before routing", "routed"],
+            ["Students", "routed", "throws before routing (see Missing Push Token)", "routed"],
             ["In neither table", "nothing happens", "nothing happens", "raw \"no rows\" error"],
+            ["Profile copy", "started after opening the home", "started just before, not waited for", "finished before opening the home"],
           ],
         },
       ],
@@ -218,6 +255,12 @@ The first-screen copy is also broken for students: before routing a student it t
           detail:
             "Two navigations can land on top of each other on every launch, and any fix to the routing has to be repeated in all three files or the copies drift further apart.",
           where: "app/index.tsx:18",
+        },
+        {
+          title: "A slow start can strand a student",
+          detail:
+            "The root layout draws nothing until its fonts load, but its check can finish first; then `router.push` throws because no navigator is drawn yet, and the catch swallows it. Organisations are still opened by the first screen's copy, but for students that copy throws too, so they stay on a blank opening screen. Seen in the web build used for these screenshots.",
+          where: "app/_layout.tsx:59",
         },
       ],
       children: [
@@ -229,14 +272,28 @@ The first-screen copy is also broken for students: before routing a student it t
           state: "derived",
           col: 0,
           row: 0,
-          detail: `For a student, \`app/index.tsx\` updates \`individual.expo_push_token\` with \`token.data\` before routing. Nothing in the file — or anywhere in the app — declares \`token\`, so this line throws a ReferenceError every time.
-
-The error is caught by the surrounding \`catch\`, logged as "Error checking individual", and the check falls through to \`organizations\`, which finds nothing. The student reaches their home anyway, because the root layout's copy of the check sent them there.
-
-\`expo-notifications\` is listed in package.json but imported nowhere: the code that once produced the token was removed and this line was left behind. No push token is ever saved for anyone.`,
+          detail: "For a student, `app/index.tsx` saves `token.data` as the push token before routing, but nothing anywhere declares `token`. The line throws every time, and no push token is ever saved.",
           code: [
             { file: "app/index.tsx", start: 26, end: 44, label: "The student branch that throws" },
             { file: "package.json", start: 38, end: 38, label: "expo-notifications: installed, never imported" },
+          ],
+          anatomy: [
+            {
+              kind: "flow",
+              rows: [
+                { n: 1, title: "Student row found", detail: "`individual` has a row with this id.", state: "derived" },
+                { n: 2, title: "Save the push token", detail: "Updates `individual.expo_push_token` with `token.data`; `token` is not defined, so this throws a ReferenceError.", state: "derived" },
+                { n: 3, title: "Caught and logged", detail: "\"Error checking individual\"; the check moves on to `organizations`.", state: "derived" },
+                { n: 4, title: "Nothing found", detail: "No organisation row, so this copy routes nowhere. The student reaches home only because the root layout's copy already sent them.", state: "derived" },
+              ],
+            },
+            {
+              kind: "facts",
+              rows: [
+                { label: "expo-notifications", value: "listed in package.json, imported nowhere", state: "derived" },
+                { label: "How it got here", value: "the code that once produced the token was removed and this line left behind", state: "inferred" },
+              ],
+            },
           ],
           issues: [
             {
@@ -257,11 +314,7 @@ The error is caught by the surrounding \`catch\`, logged as "Error checking indi
       state: "derived",
       col: 0,
       row: 3,
-      detail: `\`lib/localStorage.ts\` wraps the phone's key-value store (AsyncStorage). \`storeData\` saves any value as JSON and \`retrieveData\` reads it back; three helpers fetch from Supabase and save the result — the signed-in profile from either table, and the upcoming events for a campus.
-
-The profile is copied in at launch, login and sign-up and then trusted everywhere: screens read \`user\` for the name, photo, interests and id rather than asking the database. A change saved to the database without also updating \`user\` stays invisible until the next launch copies the profile again.
-
-Because launch opens the home screen before the copy finishes, the two home screens, Other Events and the organisation Account tab wait for \`user\`: they look up to five more times, half a second apart, and give up after about 2.5 seconds.`,
+      detail: "The signed-in profile is copied into phone storage at launch, login and sign-up, and nearly every screen reads that copy instead of the database. A database change that skips the copy stays invisible until the next launch.",
       code: [
         { file: "lib/localStorage.ts", start: 5, end: 30, label: "Save and read any value as JSON" },
         { file: "lib/localStorage.ts", start: 108, end: 136, label: "Copy a student's profile onto the phone" },
@@ -281,6 +334,31 @@ Because launch opens the home screen before the copy finishes, the two home scre
             ["events", "upcoming published events for one campus, soonest first", "student home, Other Events, sign-up", "home feed, both search screens, Other Events"],
             ["tempPassword", "sign-up's made-up password, as plain text", "sign-up stage 2", "nothing"],
             ["(Supabase session)", "the login session", "the Supabase client itself", "the Supabase client itself"],
+          ],
+        },
+        {
+          kind: "table",
+          caption: "lib/localStorage.ts: a thin layer over the phone's key-value store (AsyncStorage)",
+          columns: ["Helper", "Does"],
+          state: "derived",
+          rows: [
+            ["storeData", "saves any value as JSON under a key"],
+            ["retrieveData", "reads it back"],
+            ["fetchUserProfileIndividual", "fetches the student's row and saves it as user"],
+            ["fetchUserProfileOrg", "the same, from organizations"],
+            ["fetchAllEvents", "fetches a campus's published events from today on, soonest first, and saves them as events"],
+          ],
+        },
+        {
+          kind: "table",
+          caption: "Screens that wait for the copy, because launch opens the home before it lands",
+          columns: ["Screen", "If user is not there yet"],
+          state: "derived",
+          rows: [
+            ["Student home", "looks again up to 5 times, 0.5 s apart, then gives up (about 2.5 s)"],
+            ["Organisation home", "the same"],
+            ["Other Events", "the same"],
+            ["Organisation Account tab", "the same"],
           ],
         },
         {

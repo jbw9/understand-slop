@@ -290,6 +290,7 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
         title={RUN.repo}
         sub={RUN.about}
         meta={`${RUN.files} files · commit ${RUN.commit}`}
+        link={RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
       />
       <Caption
         count={chain.length}
@@ -685,6 +686,7 @@ function Header({
   detail,
   unsure,
   meta,
+  link,
   shape,
   onCode,
 }: {
@@ -699,6 +701,8 @@ function Header({
   /** Why this level is not certain, shown with the mark it explains. */
   unsure?: string;
   meta?: string;
+  /** Where the code lives, outside this page. */
+  link?: { href: string; label: string };
   shape?: Shape;
   onCode?: () => void;
 }) {
@@ -743,10 +747,15 @@ function Header({
             <Prose text={unsure} />
           </p>
         ) : null}
-        {meta || onCode ? (
+        {meta || link || onCode ? (
           <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             {meta ? (
               <p className="whitespace-pre-wrap font-mono text-[11px] text-faint">{meta}</p>
+            ) : null}
+            {link ? (
+              <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-deep-green hover:underline">
+                {link.label}
+              </a>
             ) : null}
             {onCode ? (
               <button

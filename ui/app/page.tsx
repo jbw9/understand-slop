@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Canvas } from "@/components/canvas";
 import { MapProvider } from "@/components/map-context";
-import { listMaps, loadMap } from "@/lib/maps";
+import { listMaps, loadMap, remoteOf } from "@/lib/maps";
 import { STATIC_MAP } from "@/lib/source";
 
 // The open level lives in the URL, and `useSearchParams` needs a Suspense
@@ -14,6 +14,7 @@ export default async function Home({
   // A static export serves one map and must not read the request.
   const asked = STATIC_MAP ?? (await searchParams).map;
   const { name, file } = loadMap(typeof asked === "string" ? asked : undefined);
+  file.RUN.url ??= remoteOf(file.RUN);
   // A published page has no checkout to read, and must not carry this machine's paths.
   if (STATIC_MAP) delete file.RUN.root;
   return (

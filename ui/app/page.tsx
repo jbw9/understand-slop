@@ -14,6 +14,8 @@ export default async function Home({
   // A static export serves one map and must not read the request.
   const asked = STATIC_MAP ?? (await searchParams).map;
   const { name, file } = loadMap(typeof asked === "string" ? asked : undefined);
+  // A published page has no checkout to read, and must not carry this machine's paths.
+  if (STATIC_MAP) delete file.RUN.root;
   return (
     <MapProvider name={name} file={file} maps={STATIC_MAP ? [STATIC_MAP] : listMaps()}>
       <Suspense>

@@ -12,7 +12,7 @@
   "cut": 364,
   "author": 493,
   "verify": 198,
-  "total": 1148
+  "total": 1149
  },
  "usd": 16.87,
  "fullUsd": 18.75,
@@ -106,13 +106,13 @@
      {
       "id": "bt-shared-raft",
       "claims": [
-       "The Raft manager config decides voter connections, timeouts, and network channels \u2014 not_shown: The code shows that a config is passed to KafkaRaftManager (line 300), but does not show what properties that config contains or what it decides."
+       "The Raft manager config decides voter connections, timeouts, and network channels — not_shown: The code shows that a config is passed to KafkaRaftManager (line 300), but does not show what properties that config contains or what it decides."
       ]
      },
      {
       "id": "bt-broker",
       "claims": [
-       "First half includes socket server \u2014 not_shown: The first section (lines 201-265) does not show socket server initialization. Socket server is referenced but not created in this range."
+       "First half includes socket server — not_shown: The first section (lines 201-265) does not show socket server initialization. Socket server is referenced but not created in this range."
       ]
      }
     ],
@@ -151,13 +151,13 @@
      {
       "id": "cel-api-routing",
       "claims": [
-       "If the event queue is backed up longer, the heartbeat times out, staling the broker's contact time and potentially causing fencing \u2014 not_shown: The code shows the deadline is set to half the interval, but the cited lines do not show what happens when the queue backs up, whether timeouts occur, or consequences for broker contact time or fencing."
+       "If the event queue is backed up longer, the heartbeat times out, staling the broker's contact time and potentially causing fencing — not_shown: The code shows the deadline is set to half the interval, but the cited lines do not show what happens when the queue backs up, whether timeouts occur, or consequences for broker contact time or fencing."
       ]
      },
      {
       "id": "cel-periodic",
       "claims": [
-       "Tasks registered at construction run as deferred ControllerWriteEvents \u2014 not_shown: The cited code shows tasks are executed via PeriodicTaskOperation (a Supplier<ControllerResult<Void>>), but does not show how they are registered at construction or confirm they are specifically 'ControllerWriteEvents'. The code does not show the constructor or registration mechanism."
+       "Tasks registered at construction run as deferred ControllerWriteEvents — not_shown: The cited code shows tasks are executed via PeriodicTaskOperation (a Supplier<ControllerResult<Void>>), but does not show how they are registered at construction or confirm they are specifically 'ControllerWriteEvents'. The code does not show the constructor or registration mechanism."
       ]
      }
     ],
@@ -214,13 +214,13 @@
      {
       "id": "fv-kraft-version",
       "claims": [
-       "Any caller that doesn't guard on version first gets a runtime crash \u2014 intended: The throw behavior is deliberate design (explicit throw statements in default cases), not a bug. This is a documented rule about which versions support these methods, not something going wrong unexpectedly."
+       "Any caller that doesn't guard on version first gets a runtime crash — intended: The throw behavior is deliberate design (explicit throw statements in default cases), not a bug. This is a documented rule about which versions support these methods, not something going wrong unexpectedly."
       ]
      },
      {
       "id": "fv-broker-features",
       "claims": [
-       "A new cluster bootstrapped this way starts with KRaft v0 even though the broker supports v1 \u2014 not_shown"
+       "A new cluster bootstrapped this way starts with KRaft v0 even though the broker supports v1 — not_shown"
       ]
      }
     ],
@@ -245,7 +245,7 @@
      {
       "id": "cli-quorum-remove",
       "claims": [
-       "automation may not handle this partial state \u2014 not_shown"
+       "automation may not handle this partial state — not_shown"
       ]
      }
     ],
@@ -298,6 +298,5 @@
    }
   ]
  },
- "verifyPassRate": 98,
- "elapsedNote": "summarize and cut ran in a --stop-after cut pass first (93s, 364s); the full run replayed them from cache"
+ "verifyPassRate": 98
 }

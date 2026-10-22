@@ -32,12 +32,12 @@ export const server: Node = {
       boxes: [
         { id: "student", label: "Student account", sub: "Delete Account", col: 0, row: 0 },
         { id: "org", label: "Organisation account", sub: "Delete Organization", col: 0, row: 1 },
-        { id: "deluser", label: "delete-user", sub: "edge function, on Supabase's servers", col: 1, row: 0 },
-        { id: "delorg", label: "delete-organization", sub: "not in this repo", col: 1, row: 1, tone: "warn" },
-        { id: "archive", label: "archive-event", sub: "template, never called", col: 1, row: 3, tone: "warn" },
-        { id: "python", label: "Python app", sub: "\"Hello World\", never called", col: 1, row: 4, tone: "warn" },
-        { id: "profile", label: "Student profile", sub: "individual row", col: 2, row: 0 },
-        { id: "login", label: "Login", sub: "Supabase Auth user", col: 2, row: 1 },
+        { id: "deluser", label: "delete-user", sub: "edge function, on Supabase's servers", col: 1, row: 0, opens: "sv-delete" },
+        { id: "delorg", label: "delete-organization", sub: "not in this repo", col: 1, row: 1, tone: "warn", opens: "sv-delorg" },
+        { id: "archive", label: "archive-event", sub: "template, never called", col: 1, row: 3, tone: "warn", opens: "sv-archive" },
+        { id: "python", label: "Python app", sub: "\"Hello World\", never called", col: 1, row: 4, tone: "warn", opens: "sv-flask" },
+        { id: "profile", label: "Student profile", sub: "individual row", col: 2, row: 0, opens: "sv-delete" },
+        { id: "login", label: "Login", sub: "Supabase Auth user", col: 2, row: 1, opens: "sv-delete" },
       ],
       arrows: [
         { from: "student", to: "deluser", label: "sign-in token" },

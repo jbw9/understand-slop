@@ -72,12 +72,14 @@ function height(node: Node): number {
 }
 
 /**
- * File paths only near the bottom — the second-to-last level and the last.
- * Higher up a path answers a question nobody is asking yet; the code drawer
- * still names every file on every level.
+ * File paths only at the bottom of a branch — the level you are standing on
+ * when there is nowhere further to go (D42). A path on a card answers a
+ * question nobody has asked yet: you can open the part and be told then. The
+ * code drawer still names every file on every level, and the open level's own
+ * header still shows its footprint.
  */
 function nearBottom(node: Node) {
-  return height(node) <= 1;
+  return height(node) === 0;
 }
 
 function authored(node: Node) {
@@ -391,6 +393,14 @@ function Level({
   const sequence = node.group?.ordering === "sequence";
   const figure = node.shape?.kind === "figure" ? node.shape : undefined;
   const blocks = node.anatomy ?? [];
+  // Which parts a box on this level's diagram already opens — those drive the
+  // list below down to a quiet index (D40).
+  const onDiagram = new Set(
+    blocks
+      .flatMap((b) => (b.kind === "diagram" ? b.boxes : []))
+      .map((box) => box.opens)
+      .filter((id): id is string => Boolean(id) && kids.some((k) => k.id === id)),
+  );
   // A row-built level has no refs of its own; the code of the nearest level
   // above it is still the code behind it.
   const code =
@@ -455,7 +465,15 @@ function Level({
         {blocks.map((b, i) =>
           isExplained(b) ? (
             <div key={i} className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
-              <ExplainedBlock block={b} />
+              <ExplainedBlock
+                block={b}
+                onOpen={(id) =>
+                  kids.some((k) => k.id === id) ? onOpen([...path, id]) : undefined
+                }
+                hrefFor={(id) =>
+                  `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
+                }
+              />
             </div>
           ) : (
             // The older blocks are typeset for a 340px card (11px rows); zoom
@@ -471,11 +489,23 @@ function Level({
             <Caption
               count={kids.length}
               what={kids.length === 1 ? "part" : "parts"}
-              how={sequence ? "in order — open one to go deeper" : "open one to go deeper"}
+              how={
+                onDiagram.size
+                  ? onDiagram.size === kids.length
+                    ? "all of them on the picture above"
+                    : `${onDiagram.size} of them on the picture above`
+                  : sequence
+                    ? "in order — open one to go deeper"
+                    : "open one to go deeper"
+              }
             />
             {note ? <Note>{note}</Note> : null}
             {sequence ? (
               <Steps nodes={kids} edges={siblingEdges(node, kids)} at={path} onOpen={onOpen} />
+            ) : onDiagram.size ? (
+              // The picture is the way down, so the list stops competing with
+              // it: names and problems, no cards, no blurbs, no paths (D40).
+              <List nodes={kids} at={path} onOpen={onOpen} />
             ) : (
               <Grid nodes={kids} at={path} onOpen={onOpen} />
             )}
@@ -598,6 +628,63 @@ function Grid({
         <Row key={n.id} node={n} at={at} onOpen={onOpen} />
       ))}
     </div>
+  );
+}
+
+/**
+ * The parts as an index, for when the diagram above is already the way down
+ * (D40). One line each: the name, and a problem count if there is one. No
+ * blurb, no block counts, no file path — the picture carries the shape of the
+ * level, and this is here so a part is still reachable by keyboard, by screen
+ * reader, and when a part has no box of its own.
+ */
+function List({
+  nodes,
+  at,
+  onOpen,
+}: {
+  nodes: Node[];
+  at: string[];
+  onOpen: (p: string[]) => void;
+}) {
+  return (
+    <ul className="max-w-[560px]">
+      {nodes.map((n) => {
+        const go = openable(n) ? () => onOpen([...at, n.id]) : undefined;
+        return (
+          <li key={n.id}>
+            <button
+              data-node-id={n.id}
+              onClick={go}
+              disabled={!go}
+              className={cn(
+                "group flex w-full items-center gap-2.5 rounded-[8px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
+                go && "hover:bg-surface-container-low",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
+              )}
+            >
+              <span className="truncate text-[14px] font-medium tracking-[-0.01em] text-ink">
+                {n.title}
+              </span>
+              {n.issues?.length ? (
+                <span className="shrink-0 font-mono text-[10.5px] text-clay-ink">
+                  ⚠ {n.issues.length}
+                </span>
+              ) : null}
+              <span className="flex-1" />
+              {go ? (
+                <span
+                  aria-hidden
+                  className="shrink-0 text-[14px] text-faint transition-colors group-hover:text-deep-green"
+                >
+                  ›
+                </span>
+              ) : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -749,7 +836,8 @@ function inside(node: Node): string {
  */
 function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: string[]) => void }) {
   const go = openable(node) ? () => onOpen([...at, node.id]) : undefined;
-  const where = nearBottom(node) ? (node.evidence ?? node.footprint?.dirs.join("  ")) : undefined;
+  // No path on a card at all (D42): a card says what the part IS, and the
+  // level it opens says where that lives.
   const peek = inside(node);
   const count = node.shape?.kind === "count" ? `${node.shape.value} ${node.shape.unit}` : null;
 
@@ -787,9 +875,6 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
           <span className="mt-1.5 block truncate text-[11.5px] text-muted-slate">
             {[count, peek].filter(Boolean).join(" · ")}
           </span>
-        ) : null}
-        {where ? (
-          <span className="mt-1 block truncate font-mono text-[10.5px] text-faint">{where}</span>
         ) : null}
       </span>
       {go ? (

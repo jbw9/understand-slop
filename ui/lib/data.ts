@@ -189,6 +189,18 @@ export interface DiagramBox {
   row: number;
   /** `good` = where things end up fine; `warn` = a problem or dead end. */
   tone?: "plain" | "good" | "warn";
+  /**
+   * The id of the child node this box is part of (D40). The box then opens
+   * that part, so the picture is the way down and the list below it is a
+   * fallback, not the only route.
+   *
+   * Boxes outnumber parts — a level draws ~8 boxes and owns ~4 parts — and the
+   * two name different things: a box is a thing at runtime (`individual
+   * table`), a part is a chapter about it (`Checking Who You Are`). So the
+   * link is authored, never matched on the label, and a box with no `opens`
+   * stays inert scenery rather than promising a click it cannot honour.
+   */
+  opens?: string;
 }
 
 export interface DiagramArrow {

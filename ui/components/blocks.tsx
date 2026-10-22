@@ -23,10 +23,22 @@ export function isExplained(b: Anatomy): b is Explained {
   return ["diagram", "table", "sequence", "screen", "example"].includes(b.kind);
 }
 
-export function ExplainedBlock({ block }: { block: Explained }) {
+export function ExplainedBlock({
+  block,
+  onOpen,
+  hrefFor,
+}: {
+  block: Explained;
+  /** Opens the part a diagram box names (D40). Absent where a block is drawn
+      inside a card, which has no room to be navigated from. */
+  onOpen?: (id: string) => void;
+  /** That part's own URL, so a box is a real link: focusable, and openable
+      in a new tab like any other. */
+  hrefFor?: (id: string) => string;
+}) {
   switch (block.kind) {
     case "diagram":
-      return <Diagram block={block} />;
+      return <Diagram block={block} onOpen={onOpen} hrefFor={hrefFor} />;
     case "table":
       return <Table block={block} />;
     case "sequence":
@@ -62,7 +74,15 @@ const TONE = {
  * scaled down: a figure whose labels shrink below reading size is decoration
  * (the measured failure in `Figure`), so a wide one scrolls instead.
  */
-function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
+function Diagram({
+  block,
+  onOpen,
+  hrefFor,
+}: {
+  block: Extract<Anatomy, { kind: "diagram" }>;
+  onOpen?: (id: string) => void;
+  hrefFor?: (id: string) => string;
+}) {
   const cols = Math.max(...block.boxes.map((b) => b.col)) + 1;
   const rows = Math.max(...block.boxes.map((b) => b.row)) + 1;
   // Each column is as wide as its longest label — estimated from character
@@ -89,7 +109,10 @@ function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
 
   return (
     <figure className="min-w-0">
-      <div className="overflow-x-auto rounded-[14px] border border-border-gray bg-pure-white/80">
+      {/* No frame: the picture is the level, not an illustration pasted onto
+          it (D41). A border here drew a box around the one thing that should
+          read as the page itself. */}
+      <div className="overflow-x-auto">
         {/* Scales down to fit the page — but never below 70%, where the
             labels stop being readable; past that the frame scrolls. */}
         <svg
@@ -141,8 +164,16 @@ function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
           })}
           {[...at.values()].map(({ x, y, w, b }) => {
             const t = TONE[b.tone ?? "plain"];
+            // Live only where the author named the part this box belongs to.
+            const go = b.opens && onOpen ? () => onOpen(b.opens!) : undefined;
             return (
-              <g key={b.id}>
+              <Box
+                key={b.id}
+                live={Boolean(go)}
+                href={b.opens ? hrefFor?.(b.opens) : undefined}
+                onActivate={go}
+                label={b.label}
+              >
                 <rect
                   x={x}
                   y={y}
@@ -169,13 +200,72 @@ function Diagram({ block }: { block: Extract<Anatomy, { kind: "diagram" }> }) {
                     {b.sub}
                   </text>
                 ) : null}
-              </g>
+                {/* The cue that this box goes somewhere, in the corner so it
+                    never collides with the label. */}
+                {go ? (
+                  <text
+                    className="dg-cue"
+                    x={x + w - 11}
+                    y={y + 16}
+                    textAnchor="middle"
+                    fontSize="11"
+                    fill={t.stroke}
+                  >
+                    ›
+                  </text>
+                ) : null}
+              </Box>
             );
           })}
         </svg>
       </div>
       <figcaption className="mt-2 text-[13px] text-muted-slate">{block.caption}</figcaption>
     </figure>
+  );
+}
+
+/**
+ * One diagram box. A box that opens a part is an <a> so that focus, Enter and
+ * a screen reader all work: Chrome refuses focus to an SVG <g>, tabIndex or
+ * not, which would have left the picture mouse-only. An inert box is a plain
+ * <g> and announces nothing extra.
+ */
+function Box({
+  live,
+  href,
+  onActivate,
+  label,
+  children,
+}: {
+  live: boolean;
+  /** A real destination, so the link focuses and Enter fires natively. */
+  href?: string;
+  onActivate?: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  if (!live) return <g>{children}</g>;
+  return (
+    <a
+      className="dg-live"
+      href={href}
+      aria-label={`${label} — open this part`}
+      onClick={(e) => {
+        // Left-click navigates in place; cmd/ctrl-click and the context menu
+        // keep the browser's own behaviour, because the href is real.
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        onActivate?.();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === " ") {
+          e.preventDefault();
+          onActivate?.();
+        }
+      }}
+    >
+      {children}
+    </a>
   );
 }
 

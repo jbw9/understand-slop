@@ -704,7 +704,9 @@ function Figure({ id, note }: { id: string; note?: string }) {
         role="img"
         aria-label={fig.title}
         style={{ minWidth: FIG_W, width: "100%" }}
-        className="block h-auto rounded-[10px] border border-border-gray bg-surface-container-low/40"
+        // Unframed, like a diagram (D41): a picture is the level, not an
+        // illustration pasted onto it.
+        className="block h-auto"
       >
         <title>{fig.title}</title>
         <Defs />

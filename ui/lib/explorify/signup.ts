@@ -30,14 +30,14 @@ export const signup: Node = {
       caption: "From the login screen to a home screen. The account is created before the profile row; the campus picker is never reached.",
       boxes: [
         { id: "login", label: "Login screen", sub: "\"Sign Up\" link", col: 0, row: 1 },
-        { id: "choice", label: "Which kind?", sub: "an alert: Organization / Individual", col: 1, row: 1 },
-        { id: "student", label: "Student sign-up", sub: "5 stages", col: 2, row: 0 },
-        { id: "org", label: "Organisation sign-up", sub: "5 stages", col: 2, row: 2 },
-        { id: "ind", label: "individual table", sub: "student profile row", col: 3, row: 0 },
-        { id: "auth", label: "Supabase Auth", sub: "account, code, password", col: 3, row: 1 },
-        { id: "orgs", label: "organizations table", sub: "organisation profile row", col: 3, row: 2 },
+        { id: "choice", label: "Which kind?", sub: "an alert: Organization / Individual", col: 1, row: 1, opens: "su-abandon" },
+        { id: "student", label: "Student sign-up", sub: "5 stages", col: 2, row: 0, opens: "su-student" },
+        { id: "org", label: "Organisation sign-up", sub: "5 stages", col: 2, row: 2, opens: "su-org" },
+        { id: "ind", label: "individual table", sub: "student profile row", col: 3, row: 0, opens: "su-student" },
+        { id: "auth", label: "Supabase Auth", sub: "account, code, password", col: 3, row: 1, opens: "su-abandon" },
+        { id: "orgs", label: "organizations table", sub: "organisation profile row", col: 3, row: 2, opens: "su-org" },
         { id: "shome", label: "Student home", sub: "/individual", col: 4, row: 0, tone: "good" },
-        { id: "campus", label: "Campus picker", sub: "nothing opens it", col: 4, row: 1, tone: "warn" },
+        { id: "campus", label: "Campus picker", sub: "nothing opens it", col: 4, row: 1, tone: "warn", opens: "su-org" },
         { id: "ohome", label: "Organisation home", sub: "/org", col: 4, row: 2, tone: "good" },
       ],
       arrows: [
@@ -419,9 +419,9 @@ export const signup: Node = {
           caption: "Where an organisation's campus should come from, and the screen that needs it",
           boxes: [
             { id: "signup", label: "Organisation sign-up", sub: "writes 4 columns", col: 0, row: 0 },
-            { id: "picker", label: "Campus picker", sub: "nothing opens it", col: 0, row: 1, tone: "warn" },
+            { id: "picker", label: "Campus picker", sub: "nothing opens it", col: 0, row: 1, tone: "warn", opens: "su-campus" },
             { id: "row", label: "organizations row", sub: "id, email, org_name, type", col: 1, row: 0 },
-            { id: "campus", label: "campus column", sub: "stays empty", col: 1, row: 1, tone: "warn" },
+            { id: "campus", label: "campus column", sub: "stays empty", col: 1, row: 1, tone: "warn", opens: "su-campus" },
             { id: "other", label: "Other Events tab", sub: "shows nothing without it", col: 2, row: 1, tone: "warn" },
           ],
           arrows: [

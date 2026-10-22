@@ -1031,3 +1031,51 @@ note as a tooltip. **Beat:** a right-hand column of marks with a note under
 each, which the user called "a waste of space" with icons too small to read.
 **Cost accepted:** the note is hover-only. **At scale:** past ~4 marks the
 title row wraps.
+
+## D40 — The picture is the way down; the parts list is the fallback
+
+**Chose:** a `DiagramBox` may name the child it belongs to (`opens`), and
+that box becomes a real link into that part. Where a level's diagram covers
+its parts, the cards below collapse to a quiet one-line index (`List`):
+name, problem count, chevron — no blurb, no block counts, no borders.
+**Beat:** the grid of cards as the only way down, which the user said felt
+like "we don't know what to do with the rest of it so we just dump it all
+here … random buttons and it's pretty hard to understand what's going on".
+**Why authored, not matched:** boxes outnumber parts (measured: 8.2 boxes to
+3.7 parts per level) and name different things — a box is a thing at runtime
+(`individual table`), a part is a chapter about it (`Checking Who You Are`).
+Naive label matching linked 0-3 of 4-6 children per level, and `sb-tables`
+matched 1 of 3 despite being a perfect conceptual fit. So `opens` is written
+by the author; a box without one stays inert scenery rather than promising a
+click it cannot honour.
+**Mechanics:** a live box is an SVG `<a href>`, not a `<g role="button">` —
+Chrome refuses focus to a `<g>` even with `tabIndex`, which would have left
+the picture mouse-only. The href is the part's own URL, so a box is also
+shareable and cmd-clickable. Verified: focus lands on a box (keydown log) and
+Enter navigates.
+**Cost accepted:** 67 links are hand-authored, one per box, and they rot if a
+diagram is re-drawn without updating them. 3 of 13 levels have a part with no
+box (`su-cats`, `ce-dates`, `ci-tap`) — the caption then reads "3 of 4 on the
+picture above" and the list still reaches them, which is exactly why the list
+stays. **At scale:** per-box authoring, like every other fixture fact; a
+second repo pays it again.
+
+## D41 — A diagram has no frame
+
+**Chose:** the diagram renders straight onto the level — no border, no card
+background. **Beat:** the bordered white panel, which drew a box around the
+one thing that should read as the page itself; the user asked to "make it
+part of the thing itself without the borders". **Cost accepted:** a wide
+diagram's scroll edge is less obvious without a frame to clip against.
+**At scale:** unchanged.
+
+## D42 — No file paths on a part's card, ever
+
+**Chose:** a card never shows a path. The open level's own header still shows
+its footprint, and the code drawer still names every file on every level.
+**Beat:** D36's "paths at most one level above the bottom", which still put
+`app/_layout.tsx` on cards the user was reading as a menu: "you sometimes
+write the path of the file. I really don't think we need that since we can go
+deeper into that anyway and then later you can show the file path itself."
+**Cost accepted:** to learn where a part lives you must open it — one extra
+click, which is the point. **At scale:** unchanged.

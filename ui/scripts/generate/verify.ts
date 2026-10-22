@@ -6,10 +6,14 @@
  * flagged claims and in the same breath called them accurate (taxonomy: 18 of
  * 54 nodes downgraded, most wrongly). So Haiku screens every claim with an
  * explicit verdict, and only what it marks contradicted or not shown goes to
- * the author model. That reviewer can search the repository: a true claim
+ * a stronger reviewer (Sonnet: a quota apart from the author's Opus, which
+ * throttled flask's verify to 32 minutes). That reviewer can search the repository: a true claim
  * whose lines were simply not cited gets the missing code ref (taxonomy's
  * second run downgraded 24 nodes for exactly that), a false one is corrected,
  * and only a claim the repository cannot show at all marks the node `partial`.
+ * An issue that is accurate but describes behaviour the code means to have is
+ * flagged `intended` and dropped: on flask, a mature library with few real
+ * bugs, a third of the issues were documented rules written up as defects.
  */
 import type { CodeRef, Node } from "@/lib/data";
 import { ask, callsOf, invoke, MODELS, type Block, type Message } from "./bedrock";
@@ -42,7 +46,7 @@ const SCREEN = {
           required: ["claim", "verdict"],
           properties: {
             claim: { type: "string", description: "The claim, quoted briefly." },
-            verdict: { type: "string", enum: ["supported", "contradicted", "not_shown"], description: "supported: the cited lines show it. contradicted: they show otherwise. not_shown: nothing cited bears on it." },
+            verdict: { type: "string", enum: ["supported", "contradicted", "not_shown", "intended"], description: "supported: the cited lines show it. contradicted: they show otherwise. not_shown: nothing cited bears on it. intended (issues only): the lines show it, but it is behaviour the code means to have — a documented rule, a deliberate error for misuse, standard language behaviour — not something going wrong." },
             why: { type: "string" },
           },
         },
@@ -92,7 +96,7 @@ async function verifyNode(n: Node, inv: Inventory, model: string): Promise<Verdi
     model: MODELS.haiku,
     stage: "verify",
     maxTokens: 4000,
-    system: "You check a short explanation of code against the code it cites. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not.",
+    system: "You check a short explanation of code against the code it cites. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not. An issue must be something going wrong; one that describes deliberate behaviour is intended, even when it is accurate.",
     messages: [{ role: "user", content: `## The node\n${claims(n)}\n\n## The cited code\n${evidence(n, inv)}` }],
     tool: SCREEN,
   });
@@ -134,6 +138,7 @@ async function review(n: Node, flags: string[], inv: Inventory, model: string): 
 - A true claim whose lines were not cited: find them (read_file, grep) and add them in add_refs.
 - A wrong claim: correct the wording so every claim is shown by code — never add what the code does not show.
 - A claim nothing in this repository can show: say so in unresolvable.
+- An issue flagged intended: if the code shows the behaviour is deliberate (a docstring or comment saying so, an explicit raise for misuse, standard language behaviour), drop it from issues. Keep it only if it really makes something go wrong for whoever hits it.
 The detail must stay at most two sentences and 40 words. Finish by calling review.`;
   const messages: Message[] = [{ role: "user", content: `## The node\n${claims(n)}\n\n## Claims a first reader flagged\n- ${flags.join("\n- ")}\n\n## The cited code\n${evidence(n, inv)}` }];
   for (let turn = 0; turn < 10; turn++) {

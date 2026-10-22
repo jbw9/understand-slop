@@ -1,0 +1,258 @@
+{
+ "repo": "flask",
+ "commit": "d086db8",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 200,
+  "cut": 90,
+  "author": 1188,
+  "verify": 1902,
+  "total": 3380
+ },
+ "usd": 10.25,
+ "fullUsd": 10.25,
+ "bill": {
+  "summarize": {
+   "calls": 36,
+   "cached": 0,
+   "input": 160904,
+   "output": 23768,
+   "cacheRead": 0,
+   "usd": 0.279744,
+   "fullUsd": 0.279744
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 0,
+   "input": 7772,
+   "output": 6136,
+   "cacheRead": 0,
+   "usd": 0.19226,
+   "fullUsd": 0.19226
+  },
+  "author": {
+   "calls": 78,
+   "cached": 0,
+   "input": 288038,
+   "output": 128861,
+   "cacheRead": 2451584,
+   "usd": 6.247442000000001,
+   "fullUsd": 6.247442000000001
+  },
+  "verify": {
+   "calls": 66,
+   "cached": 0,
+   "input": 160363,
+   "output": 45806,
+   "cacheRead": 0,
+   "usd": 0.389393,
+   "fullUsd": 0.389393
+  },
+  "verify-review": {
+   "calls": 122,
+   "cached": 0,
+   "input": 475044,
+   "output": 30624,
+   "cacheRead": 0,
+   "usd": 3.14082,
+   "fullUsd": 3.14082
+  }
+ },
+ "throttled": {
+  "waits": 506,
+  "seconds": 5445
+ },
+ "files": {
+  "listed": 227,
+  "summarised": 36,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "docs/conf.py",
+   "reason": "Sphinx documentation build configuration — pure tooling, not part of the framework."
+  }
+ ],
+ "roots": [
+  {
+   "id": "creating-app",
+   "title": "Creating the App",
+   "accepted": true,
+   "turns": 11,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 13,
+    "ok": 13,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "ca-class-defaults",
+      "claims": [
+       "With no SECRET_KEY, session cookies are unsigned — not_shown: The code shows only the default_config dict definition; it contains no logic or documentation about session signing behavior.",
+       "Every Flask app starts with these defaults in `app.config` — not_shown: The code shows the default_config dict definition, but does not show how or when it is assigned to app.config or confirm that every Flask app uses it."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "defining-routes",
+   "title": "Defining Routes",
+   "accepted": true,
+   "turns": 13,
+   "reads": 19,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 13,
+    "ok": 13,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "rt-scaffold",
+      "claims": [
+       "All eight defaultdict registries initialised here — contradicted: The code shows 7 registries initialized: error_handler_spec (line 126), before_request_funcs (line 140), after_request_funcs (line 154), teardown_request_funcs (line 169), template_context_processors (line 184), url_value_preprocessors (line 200), and url_default_functions (line 215). Additionally, view_functions (line 108) is initialized as a plain dict, not a defaultdict. That's 7 defaultdicts, not 8."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "handling-requests",
+   "title": "Handling Requests",
+   "accepted": true,
+   "turns": 14,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "rq-ctx-push",
+      "claims": [
+       "`push()` guards against double-push via `_push_count` — contradicted: Line 428 increments `_push_count` but never checks it. The guard against double-push is actually the check `if self._cv_token is not None: return` on lines 430-431, which uses `_cv_token`, not `_push_count`."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "rendering-responses",
+   "title": "Rendering Responses",
+   "accepted": true,
+   "turns": 16,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "ro-templates",
+      "claims": [
+       "create_jinja_environment handles filters — not_shown: Code [3] does not show any filter configuration or updates. The cited code shows globals and policies but not filters."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "running-testing",
+   "title": "Running & Testing",
+   "accepted": true,
+   "turns": 16,
+   "reads": 20,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "ok": 12,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "ru-cli",
+      "claims": [
+       "This duplicates the normal eager-processing path — not_shown: The code shows handle_parse_result is called manually, but the code does not show what the normal eager-processing path does or demonstrate that this is a duplication of it.",
+       "could produce side effects if callbacks are not idempotent — not_shown: The code shows the manual invocation but does not show the callback implementations or any evidence of side effects."
+      ]
+     },
+     {
+      "id": "ru-test-client",
+      "claims": [
+       "This is intentional but not obvious — not_shown: The code shows the behavior but does not indicate whether it is intentional or document why nesting is prevented."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "example-apps",
+   "title": "Example Applications",
+   "accepted": true,
+   "turns": 8,
+   "reads": 16,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 7,
+    "rewritten": [],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "creating-app",
+    "depth": 3,
+    "nodes": 13
+   },
+   {
+    "id": "defining-routes",
+    "depth": 3,
+    "nodes": 13
+   },
+   {
+    "id": "handling-requests",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "rendering-responses",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "running-testing",
+    "depth": 3,
+    "nodes": 12
+   },
+   {
+    "id": "example-apps",
+    "depth": 3,
+    "nodes": 9
+   }
+  ]
+ },
+ "verifyPassRate": 100
+}

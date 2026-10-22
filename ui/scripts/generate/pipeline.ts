@@ -11,7 +11,7 @@ import type { MapFile } from "@/lib/map";
 import { authorRoot, type Authored } from "./author";
 import { bill, MODELS, cacheIn } from "./bedrock";
 import { check } from "./check";
-import { cutRepo } from "./cut";
+import { cutRepo, type Cut } from "./cut";
 import { inventory } from "./inventory";
 import { summarize } from "./summarize";
 import { verifyTree, type Verdict } from "./verify";
@@ -50,7 +50,12 @@ export async function main(args: string[]) {
   writeFileSync(`${out}/.cache/summaries.json`, JSON.stringify(sums, null, 1));
   if (stopAfter === "summarize") return;
 
-  const { cut, leftover } = await lap("cut", () => cutRepo(inv, sums, models.cut));
+  // A re-run with --roots redoes some roots of the map that is there, so it
+  // keeps that map's cut: a fresh one could rename every root.
+  const { cut, leftover } =
+    only && existsSync(`${out}/.cache/cut.json`)
+      ? { cut: JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8")) as Cut, leftover: [] as string[] }
+      : await lap("cut", () => cutRepo(inv, sums, models.cut));
   writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(cut, null, 1));
   for (const r of cut.roots) say(`${r.id.padEnd(18)} ${r.title} — ${r.files.length} paths`);
   if (leftover.length) say(`${leftover.length} files left unassigned after three rounds`);
@@ -110,7 +115,8 @@ export async function main(args: string[]) {
   const allVerdicts = Object.values(verdicts).flat();
   // A stage replayed wholly from cache took seconds, not what generating it
   // costs; the last report's time for it stands, so the record stays a plan.
-  const before = existsSync(`${out}/report.json`) ? JSON.parse(readFileSync(`${out}/report.json`, "utf8")).elapsed ?? {} : {};
+  const last = existsSync(`${out}/report.json`) ? JSON.parse(readFileSync(`${out}/report.json`, "utf8")) : null;
+  const before = last?.elapsed ?? {};
   let total = Math.round((Date.now() - t0) / 1000);
   for (const stage of Object.keys(elapsed)) {
     const runs = Object.entries(bill).filter(([k]) => k === stage || k.startsWith(`${stage}-`));
@@ -125,9 +131,11 @@ export async function main(args: string[]) {
     repo: inv.name,
     commit: inv.commit,
     models,
-    elapsed: { ...elapsed, total },
-    usd: Math.round(usd * 100) / 100,
-    fullUsd: Math.round(fullUsd * 100) / 100,
+    // A --roots repair is not what the map costs to make: the full run's
+    // time and price stand, and the repair is listed beside them.
+    ...(only && last
+      ? { elapsed: last.elapsed, usd: last.usd, fullUsd: last.fullUsd, repairs: [...(last.repairs ?? []), { roots: only, seconds: total, usd: Math.round(usd * 100) / 100 }] }
+      : { elapsed: { ...elapsed, total }, usd: Math.round(usd * 100) / 100, fullUsd: Math.round(fullUsd * 100) / 100 }),
     bill,
     files: { listed: inv.files.length, summarised: code.length, unassigned: leftover },
     excluded: cut.excluded,
@@ -139,11 +147,17 @@ export async function main(args: string[]) {
       reads: authored[r.id].reads,
       submits: authored[r.id].submits,
       lastProblems: authored[r.id].root ? [] : authored[r.id].problems.slice(0, 20),
-      verify: verdicts[r.id] ? { nodes: verdicts[r.id].length, flagged: verdicts[r.id].filter((v) => v.flagged).length, rewritten: verdicts[r.id].filter((v) => v.rewritten).map((v) => ({ id: v.id, claims: v.claims })), downgraded: verdicts[r.id].filter((v) => v.downgraded).map((v) => v.id) } : null,
+      verify: verdicts[r.id] ? { nodes: verdicts[r.id].length, ok: verdicts[r.id].filter((v) => v.ok).length, flagged: verdicts[r.id].filter((v) => v.flagged).length, rewritten: verdicts[r.id].filter((v) => v.rewritten).map((v) => ({ id: v.id, claims: v.claims })), downgraded: verdicts[r.id].filter((v) => v.downgraded).map((v) => v.id) } : (last?.roots?.find((x: { id: string }) => x.id === r.id)?.verify ?? null),
     })),
     check: { problems: final.problems, depth: final.roots },
-    verifyPassRate: allVerdicts.length ? Math.round((100 * allVerdicts.filter((v) => v.ok).length) / allVerdicts.length) : null,
+    verifyPassRate: only && last?.verifyPassRate != null ? null : allVerdicts.length ? Math.round((100 * allVerdicts.filter((v) => v.ok).length) / allVerdicts.length) : null,
   };
+  // A repair verified only the roots it redid; the rate is over every root.
+  if (report.verifyPassRate === null) {
+    const v = report.roots.map((r) => r.verify).filter(Boolean) as { nodes: number; ok?: number; downgraded: string[] }[];
+    const nodes = v.reduce((a, x) => a + x.nodes, 0);
+    if (nodes) report.verifyPassRate = Math.round((100 * v.reduce((a, x) => a + (x.ok ?? x.nodes - x.downgraded.length), 0)) / nodes);
+  }
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1) + "\n");
   console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));

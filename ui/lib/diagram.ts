@@ -118,10 +118,10 @@ export function layoutDiagram(block: Block) {
       }
       return c;
     };
-    let best = { pts: first.pts, label: first.label, c: cost(first.pts, -20) };
+    let best = { pts: first, c: cost(first, -20) };
     for (const pts of detours(f, t, gx, gy)) {
       const c = cost(pts);
-      if (c < best.c) best = { pts, label: spotsOn(pts, 0)[0], c };
+      if (c < best.c) best = { pts, c };
     }
     for (const seg of segmentsOf(best.pts)) drawn.push({ seg, from: a.from, to: a.to });
     return best;
@@ -132,12 +132,14 @@ export function layoutDiagram(block: Block) {
     to: a.to,
     d: `M${routes[i].pts.map((p) => p.join(" ")).join("L")}`,
     tone: a.tone ?? "plain",
-    label: a.labels.length ? { text: a.labels.join(" · "), ...routes[i].label } : undefined,
+    // Placed below, once every line is down.
+    label: a.labels.length ? { text: a.labels.join(" · "), x: 0, y: 0, anchor: "start" as const } : undefined,
   }));
 
   // A label that lands on a box, another label or another arrow's line
   // moves until it is clear, to the nearest spot still beside its own line.
   const taken: Rect[] = [];
+  const runsOf = routes.map((r) => segmentsOf(r.pts));
   arrows.forEach((a, i) => {
     if (!a.label) return;
     const others = drawn.filter((d) => d.from !== a.from || d.to !== a.to).map((d) => d.seg);
@@ -148,14 +150,18 @@ export function layoutDiagram(block: Block) {
       const out = r.y < 0 || r.y + r.h > H || r.x < 0 ? 1000 : 0;
       return out + 100 * [...boxRects, ...taken].filter((o) => overlaps(room, o)).length + others.filter((o) => overlaps(room, o)).length;
     };
-    const spots = [routes[i].label, ...spotsOn(routes[i].pts, a.label.text.length * LABEL_CHAR)];
+    // A run another arrow also draws — a fan-in's trunk — names none of them,
+    // so a label goes on a run that is this arrow's alone when it can.
+    const shared = runsOf[i].map((s) => runsOf.some((rs, j) => j !== i && rs.some((o) => collinear(s, o) > 4)));
+    const spots = spotsOn(routes[i].pts, a.label.text.length * LABEL_CHAR, shared);
     let fit = spots[0], least = Infinity;
     for (const s of spots) {
-      const c = clashes(labelRect({ ...a.label, ...s }));
+      // Beside a shared run is a last resort: worse than crossing a line.
+      const c = clashes(labelRect({ ...a.label, ...s })) + (s.shared ? 5 : 0);
       if (c < least) [fit, least] = [s, c];
       if (!c) break;
     }
-    Object.assign(a.label, fit);
+    Object.assign(a.label, { x: fit.x, y: fit.y, anchor: fit.anchor });
     const r = labelRect(a.label);
     taken.push(r);
     W = Math.max(W, r.x + r.w + PAD);
@@ -165,7 +171,7 @@ export function layoutDiagram(block: Block) {
 }
 
 type Pt = [number, number];
-type Label = { x: number; y: number; anchor: "start" | "middle" | "end" };
+type Label = { x: number; y: number; anchor: "start" | "middle" | "end"; shared?: boolean };
 
 /** The straight runs of a polyline, as zero-thickness rects. */
 export function segmentsOf(pts: Pt[]): Rect[] {
@@ -188,26 +194,42 @@ function collinear(a: Rect, b: Rect) {
 /**
  * Every place a label can sit and still read as this line's: beside a run,
  * slid along it or on its other side — never off it, where it would be read
- * as naming whatever line is nearest. Longest run first.
+ * as naming whatever line is nearest. Runs no other arrow shares come first,
+ * longest first; a short one takes its label at either end, beside the box
+ * it leaves or enters, rather than centred over the line it joins.
  */
-function spotsOn(pts: Pt[], width: number): Label[] {
-  const runs = pts.slice(1).map(([x2, y2], i) => ({ x1: pts[i][0], y1: pts[i][1], x2, y2, len: Math.abs(x2 - pts[i][0]) + Math.abs(y2 - pts[i][1]) }));
+function spotsOn(pts: Pt[], width: number, shared: boolean[]): Label[] {
+  const runs = pts.slice(1).map(([x2, y2], i) => ({ x1: pts[i][0], y1: pts[i][1], x2, y2, len: Math.abs(x2 - pts[i][0]) + Math.abs(y2 - pts[i][1]), shared: Boolean(shared[i]) }));
   return runs
-    .sort((a, b) => b.len - a.len)
-    .flatMap(({ x1, y1, x2, y2, len }): Label[] => {
-      if (x1 === x2) {
-        const mid = (y1 + y2) / 2 + 4;
-        const room = Math.max(0, len / 2 - 10);
-        return [0, -14, 14, -28, 28, -42, 42]
-          .filter((d) => Math.abs(d) <= room)
-          .flatMap((d): Label[] => [{ x: x1 + 8, y: mid + d, anchor: "start" }, { x: x1 - 8, y: mid + d, anchor: "end" }]);
-      }
-      const mid = (x1 + x2) / 2;
-      const room = Math.max(0, (len - width) / 2);
-      return [0, -30, 30, -60, 60, -90, 90]
-        .filter((d) => Math.abs(d) <= room)
-        .flatMap((d): Label[] => [{ x: mid + d, y: y1 - 6, anchor: "middle" }, { x: mid + d, y: y1 + 15, anchor: "middle" }]);
-    });
+    .sort((a, b) => Number(a.shared) - Number(b.shared) || b.len - a.len)
+    .flatMap(({ x1, y1, x2, y2, len, shared }): Label[] => spotsBeside(x1, y1, x2, y2, len, width).map((l) => ({ ...l, shared })));
+}
+
+/** Beside one run: slid along it or on its other side. */
+function spotsBeside(x1: number, y1: number, x2: number, y2: number, len: number, width: number): Label[] {
+  if (x1 === x2) {
+    const mid = (y1 + y2) / 2 + 4;
+    const room = Math.max(0, len / 2 - 10);
+    return [0, -14, 14, -28, 28, -42, 42]
+      .filter((d) => Math.abs(d) <= room)
+      .flatMap((d): Label[] => [{ x: x1 + 8, y: mid + d, anchor: "start" }, { x: x1 - 8, y: mid + d, anchor: "end" }]);
+  }
+  const mid = (x1 + x2) / 2;
+  const room = Math.max(0, (len - width) / 2);
+  const right = x2 > x1;
+  const ends: Label[] =
+    len < width + 16
+      ? [y1 - 6, y1 + 15].flatMap((y): Label[] => [
+          { x: x1 + (right ? 4 : -4), y, anchor: right ? "start" : "end" },
+          { x: x2 + (right ? -6 : 6), y, anchor: right ? "end" : "start" },
+        ])
+      : [];
+  return [
+    ...[0, -30, 30, -60, 60, -90, 90]
+      .filter((d) => Math.abs(d) <= room)
+      .flatMap((d): Label[] => [{ x: mid + d, y: y1 - 6, anchor: "middle" }, { x: mid + d, y: y1 + 15, anchor: "middle" }]),
+    ...ends,
+  ];
 }
 
 /**
@@ -269,7 +291,7 @@ function laneOffsets(arrows: { from: string; to: string }[], at: Map<string, Pla
  * (or up), shifted sideways by `lane`. Otherwise out of the facing side,
  * along the gap between columns, and in.
  */
-function route(f: Placed, t: Placed, gap: number, lane = 0): { pts: Pt[]; label: Label } {
+function route(f: Placed, t: Placed, gap: number, lane = 0): Pt[] {
   const fy = f.y + BOX_H / 2;
   const ty = t.y + BOX_H / 2;
   if (f.x === t.x) {
@@ -277,16 +299,12 @@ function route(f: Placed, t: Placed, gap: number, lane = 0): { pts: Pt[]; label:
     const y1 = down ? f.y + BOX_H : f.y;
     const y2 = down ? t.y - 2 : t.y + BOX_H + 2;
     const cx = f.x + f.w / 2 + lane;
-    const left = lane < 0;
-    return { pts: [[cx, y1], [cx, y2]], label: { x: cx + (left ? -8 : 8), y: (y1 + y2) / 2 + 4, anchor: left ? "end" : "start" } };
+    return [[cx, y1], [cx, y2]];
   }
   const right = t.x > f.x;
   const x1 = right ? f.x + f.w : f.x;
   const x2 = right ? t.x - 2 : t.x + t.w + 2;
-  if (fy === ty) return { pts: [[x1, fy], [x2, fy]], label: { x: (x1 + x2) / 2, y: fy - 8, anchor: "middle" } };
+  if (fy === ty) return [[x1, fy], [x2, fy]];
   const mx = (right ? x1 + gap / 2 : x1 - gap / 2) + lane;
-  return {
-    pts: [[x1, fy], [mx, fy], [mx, ty], [x2, ty]],
-    label: { x: mx + (right ? 8 : -8), y: (fy + ty) / 2 + 4, anchor: right ? "start" : "end" },
-  };
+  return [[x1, fy], [mx, fy], [mx, ty], [x2, ty]];
 }

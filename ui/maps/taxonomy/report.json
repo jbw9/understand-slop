@@ -1,61 +1,72 @@
 {
  "repo": "taxonomy",
  "commit": "298a885",
+ "backend": "bedrock",
  "models": {
-  "summarize": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-  "cut": "us.anthropic.claude-opus-4-6-v1",
-  "author": "us.anthropic.claude-opus-4-6-v1",
-  "verify": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
  },
  "elapsed": {
-  "summarize": 51,
-  "cut": 0,
-  "author": 0,
-  "verify": 59,
-  "total": 59
+  "summarize": 61,
+  "cut": 203,
+  "author": 757,
+  "verify": 107,
+  "total": 1128
  },
- "usd": 1.98,
+ "usd": 13.33,
+ "fullUsd": 13.33,
  "bill": {
   "summarize": {
    "calls": 132,
-   "cached": 132,
-   "input": 0,
-   "output": 0,
+   "cached": 0,
+   "input": 237733,
+   "output": 47244,
    "cacheRead": 0,
-   "usd": 0
+   "usd": 0.47395299999999985,
+   "fullUsd": 0.47395299999999985
   },
   "cut": {
    "calls": 1,
-   "cached": 1,
-   "input": 0,
-   "output": 0,
+   "cached": 0,
+   "input": 11014,
+   "output": 16993,
    "cacheRead": 0,
-   "usd": 0
+   "usd": 0.479895,
+   "fullUsd": 0.479895
   },
   "author": {
-   "calls": 78,
-   "cached": 78,
-   "input": 0,
-   "output": 0,
-   "cacheRead": 0,
-   "usd": 0
+   "calls": 91,
+   "cached": 0,
+   "input": 394575,
+   "output": 237598,
+   "cacheRead": 2767042,
+   "usd": 9.7894335,
+   "fullUsd": 9.7894335
   },
   "verify": {
-   "calls": 54,
-   "cached": 54,
-   "input": 0,
-   "output": 0,
+   "calls": 49,
+   "cached": 0,
+   "input": 122233,
+   "output": 34817,
    "cacheRead": 0,
-   "usd": 0
+   "usd": 0.296318,
+   "fullUsd": 0.296318
   },
   "verify-review": {
-   "calls": 80,
+   "calls": 81,
    "cached": 0,
-   "input": 291370,
-   "output": 20952,
+   "input": 351663,
+   "output": 21335,
    "cacheRead": 0,
-   "usd": 1.9806500000000002
+   "usd": 2.2916899999999996,
+   "fullUsd": 2.2916899999999996
   }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
  },
  "files": {
   "listed": 165,
@@ -64,157 +75,167 @@
  },
  "excluded": [
   {
-   "path": "components/ui/",
-   "reason": "Vendored shadcn/ui component library \u2014 thin wrappers around Radix UI primitives with Tailwind styling, not product-specific logic."
-  },
-  {
    "path": "postcss.config.js",
-   "reason": "Pure build tooling \u2014 PostCSS plugin configuration."
+   "reason": "Pure build tooling — PostCSS plugin config with no app logic."
   },
   {
    "path": "prettier.config.js",
-   "reason": "Pure tooling \u2014 code formatting configuration."
-  },
-  {
-   "path": "tailwind.config.js",
-   "reason": "Pure build tooling \u2014 Tailwind CSS theme and plugin configuration."
+   "reason": "Pure formatting tooling — Prettier and import-sort config."
   }
  ],
  "roots": [
   {
-   "id": "marketing",
-   "title": "Marketing Site",
+   "id": "browsing",
+   "title": "Browsing the Site",
    "accepted": true,
    "turns": 13,
-   "reads": 24,
-   "submits": 2,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 8,
-    "flagged": 4,
-    "rewritten": [
-     {
-      "id": "mk-content",
-      "claims": [
-       "Author document type: title, avatar, twitter \u2014 contradicted: Lines 109-122 show title, avatar, and twitter, but line 113-114 also shows a 'description' field that is not mentioned in the code label.",
-       "Mdx component: useMDXComponent renders code with styled components \u2014 partially_supported: Lines 159-167 show `useMDXComponent(code)` being called and components being passed (line 164), but the code does not show whether those components are 'styled components' specifically\u2014only that they are passed as `components` prop."
-      ]
-     }
-    ],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "auth",
-   "title": "Authentication",
-   "accepted": true,
-   "turns": 8,
-   "reads": 15,
+   "reads": 26,
    "submits": 2,
    "lastProblems": [],
    "verify": {
     "nodes": 9,
-    "flagged": 4,
+    "ok": 9,
+    "flagged": 6,
     "rewritten": [
      {
-      "id": "au-nextauth",
+      "id": "br-blog-post",
       "claims": [
-       "not_shown: The code shows the JWT callback exists and runs a DB query, and line 19 confirms JWT strategy is used, but the code does not show how frequently the callback is invoked or demonstrate the absence of a cache layer.",
-       "not_shown: Line 16 cites the issue URL but the code does not show whether the issue is closed or whether the cast is removable."
-      ]
-     },
-     {
-      "id": "au-session",
-      "claims": [
-       "Every server component and API route that needs the authenticated user imports this single function \u2014 not_shown: The cited code only shows the implementation of getCurrentUser. It does not show how many places import this function or whether all server components and API routes that need the authenticated user actually use it.",
-       "Server-side getCurrentUser function used by dashboard and API routes \u2014 not_shown: The code shows the function is server-side (async function using getServerSession), but the cited code does not show it being used by dashboard or API routes specifically."
+       "the bare `null` on line 27 is a no-op expression rather than a `return null`"
       ]
      }
     ],
-    "downgraded": [
-     "au-nextauth"
-    ]
+    "downgraded": []
    }
   },
   {
-   "id": "dashboard",
-   "title": "Post Dashboard",
+   "id": "reading-docs",
+   "title": "Reading the Docs",
    "accepted": true,
-   "turns": 9,
+   "turns": 12,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 2,
+    "rewritten": [
+     {
+      "id": "dc-content-mdx",
+      "claims": [
+       "Callout has default, warning, and danger colors — contradicted: Lines 18-19 show only 'danger' (red) and 'warning' (yellow) colors are explicitly styled. The 'default' type (line 12) has no specific styling shown—it uses only the base classes from line 17"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "signing-in",
+   "title": "Signing In",
+   "accepted": true,
+   "turns": 12,
    "reads": 23,
    "submits": 1,
    "lastProblems": [],
    "verify": {
     "nodes": 6,
-    "flagged": 4,
+    "ok": 6,
+    "flagged": 3,
     "rewritten": [],
     "downgraded": []
    }
   },
   {
-   "id": "post-editor",
-   "title": "Post Editor",
+   "id": "managing-posts",
+   "title": "Managing Posts",
    "accepted": true,
-   "turns": 6,
-   "reads": 11,
-   "submits": 1,
+   "turns": 11,
+   "reads": 25,
+   "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 6,
-    "flagged": 4,
-    "rewritten": [],
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "po-editor",
+      "claims": [
+       "The Editor component does not destructure `formState.errors` from `useForm`",
+       "if the title fails the 3–128 character check the form refuses to submit with no visible feedback to the user"
+      ]
+     }
+    ],
     "downgraded": []
    }
   },
   {
-   "id": "billing",
-   "title": "Billing & Subscriptions",
+   "id": "subscribing",
+   "title": "Subscribing to Pro",
    "accepted": true,
-   "turns": 19,
+   "turns": 18,
    "reads": 27,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 8,
-    "flagged": 4,
-    "rewritten": [
-     {
-      "id": "bl-session",
-      "claims": [
-       "retrieves the user's subscription plan \u2014 not_shown: The cited code does not show where subscriptionPlan is retrieved. It appears on line 24 but the retrieval logic is not included in the cited lines."
-      ]
-     }
-    ],
+    "nodes": 5,
+    "ok": 5,
+    "flagged": 3,
+    "rewritten": [],
     "downgraded": []
    }
   },
   {
-   "id": "docs-guides",
-   "title": "Documentation & Guides",
+   "id": "ui-kit",
+   "title": "UI Components",
    "accepted": true,
-   "turns": 11,
-   "reads": 23,
+   "turns": 15,
+   "reads": 28,
    "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 10,
+    "nodes": 6,
+    "ok": 6,
     "flagged": 6,
-    "rewritten": [],
+    "rewritten": [
+     {
+      "id": "ui-menus",
+      "claims": [
+       "4 menu systems sharing the same sub-component anatomy"
+      ]
+     },
+     {
+      "id": "ui-display",
+      "claims": [
+       "12 presentational components — not_shown",
+       "`Card` with its 6 sub-components is the most composed — not_shown"
+      ]
+     }
+    ],
     "downgraded": []
    }
   },
   {
    "id": "app-shell",
-   "title": "App Shell",
+   "title": "The App Shell",
    "accepted": true,
-   "turns": 12,
-   "reads": 30,
-   "submits": 2,
+   "turns": 10,
+   "reads": 23,
+   "submits": 3,
    "lastProblems": [],
    "verify": {
     "nodes": 7,
-    "flagged": 4,
-    "rewritten": [],
+    "ok": 7,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "sh-utils",
+      "claims": [
+       "The `Icons` object maps 22 semantic names to Lucide icons and custom SVGs — contradicted: Lines 31-72 show the Icons object contains 21 entries (logo, close, spinner, chevronLeft, chevronRight, trash, post, page, media, settings, billing, ellipsis, add, warning, user, arrowRight, help, pizza, sun, moon, laptop, gitHub, twitter, check), not 22."
+      ]
+     }
+    ],
     "downgraded": []
    }
   }
@@ -223,34 +244,34 @@
   "problems": [],
   "depth": [
    {
-    "id": "marketing",
-    "depth": 3,
-    "nodes": 8
-   },
-   {
-    "id": "auth",
+    "id": "browsing",
     "depth": 3,
     "nodes": 9
    },
    {
-    "id": "dashboard",
+    "id": "reading-docs",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "signing-in",
     "depth": 2,
     "nodes": 6
    },
    {
-    "id": "post-editor",
-    "depth": 3,
+    "id": "managing-posts",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "subscribing",
+    "depth": 2,
+    "nodes": 5
+   },
+   {
+    "id": "ui-kit",
+    "depth": 2,
     "nodes": 6
-   },
-   {
-    "id": "billing",
-    "depth": 3,
-    "nodes": 8
-   },
-   {
-    "id": "docs-guides",
-    "depth": 3,
-    "nodes": 10
    },
    {
     "id": "app-shell",
@@ -259,5 +280,5 @@
    }
   ]
  },
- "verifyPassRate": 98
+ "verifyPassRate": 100
 }

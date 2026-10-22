@@ -396,9 +396,20 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
           // sample data (D37). Numbered callouts sit beside it, not on it:
           // the capture has no coordinates for where each item landed.
           <figure className="w-[300px] shrink-0">
-            <div className="overflow-hidden rounded-[36px] border-[6px] border-ink bg-pure-white shadow-panel">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a static capture at its own size; next/image adds nothing here */}
-              <img src={block.shot} alt={block.title} className="block h-auto w-full" />
+            {/* A bezel, and a blank strip above and below the capture: the web
+                build has no status bar, so without them the rounded corners
+                cut into the app's own title and tab bar. */}
+            <div className="rounded-[44px] bg-ink p-[9px] shadow-panel">
+              <div className="overflow-hidden rounded-[36px] bg-pure-white">
+                <div className="flex h-8 items-center justify-center">
+                  <div className="h-[18px] w-[84px] rounded-full bg-ink" />
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element -- a static capture at its own size; next/image adds nothing here */}
+                <img src={block.shot} alt={block.title} className="block h-auto w-full" />
+                <div className="flex h-6 items-center justify-center">
+                  <div className="h-[4px] w-24 rounded-full bg-ink/80" />
+                </div>
+              </div>
             </div>
             <figcaption className="mt-2 text-center font-mono text-[10.5px] text-faint">
               the real screen · sample data

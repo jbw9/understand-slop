@@ -82,16 +82,14 @@ export const rsvp: Node = {
       state: "derived",
       col: 0,
       row: 0,
-      detail: `The drawer shows the event's name, address, date and time, then a short form. Name and contact are text boxes pre-filled from the \`user\` copy on the phone and can be edited; party size is a − / + counter starting at 1; dietary needs are seven buttons, and choosing "Other" opens a box for your own, comma-separated.
-
-The blue bar at the bottom follows your finger. Let go after dragging it more than 50 points up and the bar grows to fill the screen, "RSVP Confirmed!" appears, and when that animation ends the join is written. Anything less springs back. Dragging the whole drawer down more than 100 points, or tapping outside it, closes it without joining.
-
-Two seconds after a successful write, Done (close and go back) and Add to Calendar (opens Google Calendar with the event filled in) appear. If the write fails, the confirmation simply disappears; the error only goes to the log.`,
+      detail: "A form slides up with your name and contact already filled in. Dragging the blue bar more than 50 points up confirms, and the join is written once the confirmation animation ends.",
       code: [
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 82, end: 90, label: "The dietary choices" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 388, end: 414, label: "Pre-filling name and contact" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 287, end: 300, label: "\"Other\": your own, comma-separated" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 302, end: 343, label: "The swipe: more than 50 points up confirms" },
+        { file: "app/individual/index/components/rsvpDrawer.tsx", start: 345, end: 364, label: "Dragging the drawer down 100 points closes it" },
+        { file: "app/individual/index/components/rsvpDrawer.tsx", start: 442, end: 458, label: "Tapping outside closes it" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 134, end: 190, label: "What confirming writes" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 263, end: 285, label: "Add to Calendar" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 479, end: 710, label: "What the drawer draws" },
@@ -100,18 +98,35 @@ Two seconds after a successful write, Done (close and go back) and Add to Calend
         {
           kind: "screen",
           title: "RSVP drawer",
+          caption: "Join on the event page, for Maya — who already joined this event with a party of 2",
+          shot: "/shots/explorify/rv-swipe.png",
           items: [
-            { type: "heading", label: "RSVP" },
-            { type: "text", label: "Robotics Night · 📍 address · 📅 date · ⏰ time" },
-            { type: "field", label: "Name *", note: "pre-filled from your profile" },
-            { type: "field", label: "Contact *", note: "pre-filled with your email; \"email or phone number\"" },
-            { type: "choice", label: "Party Size *  −  1  +", note: "never below 1" },
-            { type: "choice", label: "Dietary restrictions *", note: "the seven buttons below; any number" },
-            { type: "field", label: "Enter any dietary restrictions (comma-separated)", note: "only when Other is on" },
-            { type: "button", label: "^ Swipe Up to Confirm!", note: "drag more than 50 points up" },
-            { type: "text", label: "RSVP Confirmed!", note: "replaces the bar while saving" },
-            { type: "button", label: "Done", note: "closes and goes back a screen" },
-            { type: "button", label: "Add to Calendar", note: "Google Calendar link" },
+            { type: "text", label: "📍 Siebel Center · 📅 Friday, October 23", note: "place name only; the date is a day early, as on the event page" },
+            { type: "field", label: "Name *", note: "pre-filled from the \"user\" copy; editable" },
+            { type: "field", label: "Contact *", note: "pre-filled with your email; an email or a phone number" },
+            { type: "choice", label: "Party Size *  −  1  +", note: "starts at 1, never below — Maya's earlier answers are not loaded" },
+            { type: "choice", label: "Dietary restrictions *", note: "seven buttons, any number; Other opens a box for your own, comma-separated" },
+            { type: "button", label: "^ Swipe Up to Confirm!", note: "follows your finger; more than 50 points up confirms" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Confirming",
+          caption: "Just after the swipe",
+          shot: "/shots/explorify/rv-swipe-confirmed.png",
+          items: [
+            { type: "text", label: "RSVP Confirmed!", note: "the bar grows to fill the screen; shown before anything is saved" },
+            { type: "image", label: "Spinner", note: "the join is being written" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Done",
+          caption: "Two seconds after a successful write",
+          shot: "/shots/explorify/rv-swipe-done.png",
+          items: [
+            { type: "button", label: "Done", note: "closes the drawer and goes back a screen" },
+            { type: "button", label: "Add to Calendar", note: "opens Google Calendar with the event filled in" },
           ],
         },
         {
@@ -139,8 +154,11 @@ Two seconds after a successful write, Done (close and go back) and Add to Calend
             { id: "write", label: "Write the join", sub: "two places", col: 2, row: 1 },
             { id: "done", label: "Done / Calendar", sub: "after 2 seconds", col: 3, row: 0, tone: "good" },
             { id: "fail", label: "Overlay vanishes", sub: "error only logged", col: 3, row: 2, tone: "warn" },
+            { id: "down", label: "Drawer dragged down", sub: "over 100 points, or tap outside", col: 0, row: 3 },
+            { id: "closed", label: "Closed", sub: "nothing written", col: 1, row: 3 },
           ],
           arrows: [
+            { from: "down", to: "closed" },
             { from: "drag", to: "back", label: "short" },
             { from: "drag", to: "conf", label: "over 50" },
             { from: "conf", to: "write", label: "animation ends" },
@@ -173,11 +191,7 @@ Two seconds after a successful write, Done (close and go back) and Add to Calend
       state: "derived",
       col: 0,
       row: 1,
-      detail: `\`events.rsvp\` is a text column holding JSON: an object keyed by student id, each value that student's name, contact, party size and dietary needs. The organisation's check-in adds \`checkedIn\` to an entry. Because it is text, the database cannot look inside it — every reader downloads the whole string and parses it on the phone.
-
-Every writer does the same three steps: read the string, change one entry on the phone, write the whole string back. Two phones doing this at once both start from the same old string, and whichever writes second erases the other's change. Joining also writes a second copy — the event's id added to the student's \`individual.rsvp\` list — only after the first write succeeds, with no transaction around the two.
-
-For a student's join to succeed, Supabase must let a student update a row of \`events\` they do not own. Whether the access rules limit that to this column is not in the repo (see Supabase Backend → Access Rules Needed).`,
+      detail: "Each event's guest list is one JSON string in `events.rsvp`, keyed by student id. Every writer reads the whole string, changes one entry and writes it all back, so simultaneous writes erase each other.",
       code: [
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 145, end: 149, label: "1. Read the guest list" },
         { file: "app/individual/index/components/rsvpDrawer.tsx", start: 155, end: 164, label: "2. Add or replace your entry" },
@@ -191,7 +205,20 @@ For a student's join to succeed, Supabase must let a student update a row of \`e
           caption: "Where a join is recorded",
           rows: [
             { from: "events.rsvp", to: "the guest list: { studentId: { fullName, email, partySize, dietaryRestrictions } }, stored as text", state: "derived" },
-            { from: "individual.rsvp", to: "the same fact from the student's side: a list of event ids", state: "derived" },
+            { from: "individual.rsvp", to: "the same fact from the student's side: a list of event ids, written only after the guest list succeeds, with no transaction around the two", state: "derived" },
+          ],
+        },
+        {
+          kind: "sequence",
+          caption: "Two students join at once — the same three steps every writer takes",
+          actors: ["Phone A", "Supabase", "Phone B"],
+          rows: [
+            { from: "Phone A", to: "Supabase", label: "1. read the guest list", state: "derived" },
+            { from: "Phone B", to: "Supabase", label: "1. read the same guest list", state: "derived" },
+            { from: "Phone A", to: "Phone A", label: "2. add A's entry", state: "derived" },
+            { from: "Phone B", to: "Phone B", label: "2. add B's entry", state: "derived" },
+            { from: "Phone A", to: "Supabase", label: "3. write the whole string: A added", state: "derived" },
+            { from: "Phone B", to: "Supabase", label: "3. write the whole string: B added, A gone", note: "A believes they joined", state: "derived" },
           ],
         },
         {
@@ -220,7 +247,7 @@ For a student's join to succeed, Supabase must let a student update a row of \`e
         },
         {
           kind: "table",
-          caption: "Everything that writes the guest list",
+          caption: "Everything that writes the guest list — a student's join works only if Supabase lets students update an event row they don't own (see Access Rules Needed)",
           columns: ["Writer", "What it does", "Works?"],
           state: "derived",
           rows: [
@@ -234,7 +261,7 @@ For a student's join to succeed, Supabase must let a student update a row of \`e
         },
         {
           kind: "table",
-          caption: "Everything that reads it",
+          caption: "Everything that reads it — the database cannot look inside text, so each downloads the whole string and parses it on the phone",
           columns: ["Reader", "Uses"],
           state: "derived",
           rows: [
@@ -282,11 +309,7 @@ For a student's join to succeed, Supabase must let a student update a row of \`e
       state: "derived",
       col: 0,
       row: 2,
-      detail: `Undoing a join is written four times. The one that works is in \`joinButton.tsx\`: when the button believes you have joined it shows a red Cancel, which deletes your key from the guest list, then removes the event id from your own list, then flips the in-memory "joined" flag.
-
-The Saved tab's Cancel was written for an older format, when the guest list was a list of ids. It parses the string, gets an object, and calls \`.includes\` on it — which objects do not have. The resulting error is caught and logged, so the button looks dead: the student stays on the guest list and on their own list.
-
-The event page defines its own cancel, which runs both writes together, but nothing calls it — its Join button is the shared \`JoinButton\`. \`rsvpEvents.tsx\` holds a fourth copy with the Saved tab's bug, in a component nothing imports.`,
+      detail: "Undoing a join is written four times, and only one works: the red Cancel on cards and the event page. The Saved tab's Cancel throws, and the other two are never called.",
       code: [
         { file: "app/individual/index/components/joinButton.tsx", start: 28, end: 79, label: "The cancel that works" },
         { file: "app/individual/saved/index.tsx", start: 114, end: 153, label: "The Saved tab's cancel, which throws" },
@@ -301,9 +324,30 @@ The event page defines its own cancel, which runs both writes together, but noth
           state: "derived",
           rows: [
             ["joinButton.tsx", "an object — correct", "red Cancel on cards and the event page", "works"],
-            ["saved/index.tsx", "a list of ids", "Cancel on the Saved tab's RSVP list", "throws; nothing changes"],
-            ["eventdetails.tsx", "an object — correct", "nothing", "unused"],
-            ["rsvpEvents.tsx", "a list of ids", "nothing — never imported", "unused"],
+            ["saved/index.tsx", "a list of ids — an older format", "Cancel on the Saved tab's RSVP list", "throws; nothing changes"],
+            ["eventdetails.tsx", "an object — correct; runs both writes together", "nothing — the page uses the shared Join button", "unused"],
+            ["rsvpEvents.tsx", "a list of ids — the Saved tab's bug", "nothing — never imported", "unused"],
+          ],
+        },
+        {
+          kind: "sequence",
+          caption: "The Cancel that works (joinButton.tsx)",
+          actors: ["Phone", "Supabase"],
+          rows: [
+            { from: "Phone", to: "Supabase", label: "read the event's guest list", state: "derived" },
+            { from: "Phone", to: "Supabase", label: "write it back without my key", state: "derived" },
+            { from: "Phone", to: "Supabase", label: "read my rsvp list", state: "derived" },
+            { from: "Phone", to: "Supabase", label: "write it back without this event", state: "derived" },
+            { from: "Phone", to: "Phone", label: "flip the in-memory \"joined\" flag", note: "the button turns back to Join", state: "derived" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Where the working Cancel shows",
+          caption: "Home, right after Maya joins in this session",
+          shot: "/shots/explorify/rv-state-joined.png",
+          items: [
+            { type: "button", label: "Cancel", note: "red only while the button believes you joined — after a restart it says Join" },
           ],
         },
         {
@@ -314,7 +358,7 @@ gets:      { "3b7e…": { … }, "a91c…": { … } }      an object keyed by st
 
 rsvpArray.includes(userId)
 → TypeError: rsvpArray.includes is not a function
-→ caught, logged; neither list changes`,
+→ caught, logged; neither list changes — the button looks dead`,
         },
         {
           kind: "diagram",
@@ -359,11 +403,7 @@ rsvpArray.includes(userId)
       state: "derived",
       col: 0,
       row: 3,
-      detail: `Both buttons ask \`EventProvider\` — shared state at the app root — whether this event is in \`joinedEvents\` or \`savedEvents\`. Those lists start empty on every launch and only change when the student joins, cancels, saves or unsaves in this session. Nothing ever loads them from the database.
-
-The real lists are fetched: Home downloads \`individual.rsvp\` and \`saved_events\` and passes \`isRSVPd\` to every Join button. But \`JoinButton\` declares no such prop and ignores it; Home's saved list is never used at all. The Save button also queries the saved list when it appears, but only hands the answer to an \`onSaveStateChange\` callback nobody passes.
-
-So after a restart, every event shows Join and an empty bookmark, whatever is true. Joining again mostly just replaces your own entry, but Cancel is unreachable from these buttons, and Save, believing nothing is saved, appends the id a second time.`,
+      detail: "Join and the bookmark decide what to show from shared lists in memory that start empty on every launch. The real lists are downloaded but never reach the buttons.",
       code: [
         { file: "app/individual/index/components/eventContext.tsx", start: 17, end: 37, label: "Two lists that start empty" },
         { file: "app/individual/index/components/joinButton.tsx", start: 9, end: 26, label: "Join decides from memory; isRSVPd is not a prop" },
@@ -378,19 +418,23 @@ So after a restart, every event shows Join and an empty bookmark, whatever is tr
           boxes: [
             { id: "db", label: "Your profile row", sub: "rsvp, saved_events", col: 0, row: 0 },
             { id: "home", label: "Home's own state", sub: "fetched on first visit", col: 1, row: 0 },
-            { id: "prop", label: "isRSVPd prop", sub: "not declared, ignored", col: 2, row: 0, tone: "warn" },
-            { id: "ctx", label: "Shared button memory", sub: "empty at launch", col: 1, row: 2, tone: "warn" },
+            { id: "prop", label: "isRSVPd / isRSVP", sub: "props not declared, ignored", col: 2, row: 0, tone: "warn" },
+            { id: "hsaved", label: "Home's saved list", sub: "never used", col: 2, row: 1, tone: "warn" },
+            { id: "ctx", label: "Shared button memory", sub: "EventProvider, empty at launch", col: 1, row: 2, tone: "warn" },
             { id: "jb", label: "Join button", col: 3, row: 1 },
             { id: "sb", label: "Save button", col: 3, row: 2 },
+            { id: "sq", label: "Save's own query", sub: "to onSaveStateChange, never passed", col: 3, row: 3, tone: "warn" },
             { id: "acts", label: "Join, cancel, save", sub: "in this session", col: 0, row: 2 },
           ],
           arrows: [
             { from: "db", to: "home" },
             { from: "home", to: "prop" },
+            { from: "home", to: "hsaved" },
             { from: "prop", to: "jb", label: "dropped", tone: "warn" },
             { from: "acts", to: "ctx", label: "toggles" },
             { from: "ctx", to: "jb", label: "decides" },
             { from: "ctx", to: "sb", label: "decides" },
+            { from: "sb", to: "sq", label: "on appear", tone: "warn" },
           ],
         },
         {
@@ -400,10 +444,28 @@ So after a restart, every event shows Join and an empty bookmark, whatever is tr
           state: "derived",
           rows: [
             ["Joined in this session", "red Cancel", "cancels — works"],
-            ["Joined before this launch", "Join", "opens the drawer; joining again replaces your entry"],
+            ["Joined before this launch", "Join", "opens the drawer; joining again replaces your entry — Cancel is unreachable"],
             ["Saved in this session", "filled bookmark", "unsaves"],
             ["Saved before this launch", "empty bookmark", "adds the id again — a duplicate"],
             ["On the Saved tab's Saved list", "empty bookmark", "adds a duplicate instead of removing"],
+          ],
+        },
+        {
+          kind: "screen",
+          title: "After a fresh launch",
+          caption: "Maya joined Robotics Demo Night in an earlier session",
+          shot: "/shots/explorify/rv-state.png",
+          items: [
+            { type: "button", label: "Join", note: "both rows say Join although she is on the guest list" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "After joining again",
+          caption: "Same screen, once the drawer's Done is tapped",
+          shot: "/shots/explorify/rv-state-joined.png",
+          items: [
+            { type: "button", label: "Cancel", note: "the shared memory now holds this event, so every Join for it turns red" },
           ],
         },
       ],
@@ -430,11 +492,7 @@ So after a restart, every event shows Join and an empty bookmark, whatever is tr
       state: "derived",
       col: 0,
       row: 4,
-      detail: `The heart tab. Each time it comes into view it asks Supabase who is signed in, reads that student's \`rsvp\` and \`saved_events\` lists, and downloads every column of the events with those ids — one query per list. Unlike Home, it does not filter by university, by date or by \`published\`, so past events stay on these lists for good.
-
-Two tabs, "RSVPd Events" and "Saved Events", sit side by side; tap a title or swipe across. Each card shows the date, name, place and time. On the RSVP list the button is a red Cancel (the broken copy — see Cancelling A Join); on the Saved list it is the bookmark (see Join And Save Buttons).
-
-Tapping a card asks to open \`eventdetails\`, but the Saved tab's own stack has only this one screen, and that name belongs to the Home tab's stack.`,
+      detail: "The heart tab lists the events you joined and the events you bookmarked, side by side. Each visit downloads both lists fresh, with no university, date or draft filter.",
       code: [
         { file: "app/individual/saved/index.tsx", start: 46, end: 102, label: "Loading both lists" },
         { file: "app/individual/saved/index.tsx", start: 104, end: 112, label: "Reloading on focus; tapping a card" },
@@ -445,12 +503,23 @@ Tapping a card asks to open \`eventdetails\`, but the Saved tab's own stack has 
       anatomy: [
         {
           kind: "screen",
-          title: "Saved tab",
+          title: "RSVPd Events",
+          caption: "Maya's Saved tab: she joined Robotics Demo Night",
+          shot: "/shots/explorify/rv-saved.png",
           items: [
-            { type: "choice", label: "RSVPd Events  |  Saved Events", note: "tap or swipe between them" },
-            { type: "list", label: "Event cards", note: "date, name, place, time — past events included" },
-            { type: "button", label: "Cancel", note: "RSVP list; throws, does nothing" },
-            { type: "button", label: "Bookmark", note: "Saved list; starts empty-looking" },
+            { type: "choice", label: "RSVPd Events  |  Saved Events", note: "tap a title or swipe across" },
+            { type: "list", label: "Event card", note: "date, name, place, time — past events stay for good" },
+            { type: "button", label: "Cancel", note: "the broken copy: throws, changes nothing — see Cancelling A Join" },
+            { type: "button", label: "Tapping the card", note: "asks for eventdetails, a screen only the Home tab has" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Saved Events",
+          caption: "She bookmarked Lantern Festival",
+          shot: "/shots/explorify/rv-saved-bookmarks.png",
+          items: [
+            { type: "button", label: "Bookmark", note: "empty although the event is saved — tapping it adds the id again (see Join And Save Buttons)" },
           ],
         },
         {
@@ -460,7 +529,7 @@ Tapping a card asks to open \`eventdetails\`, but the Saved tab's own stack has 
           rows: [
             { from: "Phone", to: "Supabase", label: "who is signed in?", state: "derived" },
             { from: "Phone", to: "Supabase", label: "my rsvp and saved_events lists", state: "derived" },
-            { from: "Phone", to: "Supabase", label: "every column of my joined events", state: "derived" },
+            { from: "Phone", to: "Supabase", label: "every column of my joined events", note: "one query per list; no university, date or published filter", state: "derived" },
             { from: "Phone", to: "Supabase", label: "every column of my saved events", state: "derived" },
           ],
         },

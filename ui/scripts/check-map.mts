@@ -7,6 +7,7 @@
 //   - `table` rows match their columns; `sequence` endpoints are actors
 //   - titles start with a capital and are at most 4 words; detail ≤ 3 paragraphs
 //   - ids unique; E0 endpoints are roots; LINKS owners exist
+/* eslint-disable @typescript-eslint/no-explicit-any -- walks any fixture module, typed or not */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 

@@ -17,11 +17,7 @@ export const signup: Node = {
     "The code only reaches the inbox if the live Supabase project has email confirmation switched on and its email template contains the six-digit code. Both are set in the Supabase dashboard, not in this repo — and the repo's own local settings (`supabase/config.toml`) have confirmation switched off, which would skip the email entirely.",
   col: 0,
   row: 0,
-  detail: `The login screen's "Don't have an account? Sign Up" link asks one question — Organization or Individual — and opens one of two sign-up screens. Each is a single screen that steps through five stages under a five-segment progress bar: a name, an email, the code from that email, a password, and 2 to 5 categories. The back arrow steps back one stage, or returns to login from the first.
-
-Almost nothing is saved until the very last tap. Stage 2 creates the Supabase login account straight away, with a made-up password, only so that Supabase emails a code. Stage 3 checks the code, which signs the person in. The final tap sets the real password and writes the profile row — into \`individual\` for a student, \`organizations\` for an organisation — with the row's \`id\` set to the account's id. That shared id is how the app later tells which kind of user someone is (see Opening The App).
-
-\`registerIndividual.tsx\` and \`registerOrg.tsx\` are near line-for-line copies, so a fix made to one has to be made to the other by hand.`,
+  detail: "A new user chooses Organization or Individual, then steps through five stages on one screen. The login account is made at stage 2, the profile row only at the last tap.",
   code: [
     { file: "app/(auth)/login.tsx", start: 134, end: 150, label: "Login asks: organisation or individual?" },
     { file: "app/(auth)/registerIndividual.tsx", start: 40, end: 50, label: "Everything the sign-up screen remembers" },
@@ -34,7 +30,7 @@ Almost nothing is saved until the very last tap. Stage 2 creates the Supabase lo
       caption: "From the login screen to a home screen. The account is created before the profile row; the campus picker is never reached.",
       boxes: [
         { id: "login", label: "Login screen", sub: "\"Sign Up\" link", col: 0, row: 1 },
-        { id: "choice", label: "Which kind?", sub: "Organization / Individual", col: 1, row: 1 },
+        { id: "choice", label: "Which kind?", sub: "an alert: Organization / Individual", col: 1, row: 1 },
         { id: "student", label: "Student sign-up", sub: "5 stages", col: 2, row: 0 },
         { id: "org", label: "Organisation sign-up", sub: "5 stages", col: 2, row: 2 },
         { id: "ind", label: "individual table", sub: "student profile row", col: 3, row: 0 },
@@ -67,7 +63,14 @@ Almost nothing is saved until the very last tap. Stage 2 creates the Supabase lo
         ["2. Email", "\"What's your email address?\" and Send Verification Code", "Creates the Supabase account with a made-up password; Supabase emails a code."],
         ["3. Code", "\"Verify Your Email\" and a 6-digit box", "Checks the code. The person is now signed in."],
         ["4. Password", "\"Set your password\"", "Checked on the phone: 8+ characters, a capital, a digit. Not sent yet."],
-        ["5. Interests", "\"Let's select your interests\"", "Pick 2 to 5. Complete Registration saves the password and the profile row, then opens the home screen."],
+        ["5. Interests", "\"Let's select your interests\"", "Pick 2 to 5. Complete Registration saves the real password and the profile row, then opens the home screen."],
+      ],
+    },
+    {
+      kind: "facts",
+      rows: [
+        { label: "Before the last tap", value: "almost nothing is saved: the account exists from stage 2, with a made-up password, only so that Supabase emails a code", state: "derived" },
+        { label: "Profile row id", value: "set to the login account's id — the only link between them, and how Opening The App tells a student from an organisation", state: "derived" },
       ],
     },
   ],
@@ -89,19 +92,30 @@ Almost nothing is saved until the very last tap. Stage 2 creates the Supabase lo
       state: "derived",
       col: 0,
       row: 0,
-      detail: `One screen, \`RegisterIndividualScreen\`, holds a \`stage\` number from 1 to 5 and draws a different form for each. Everything typed is kept in the screen's memory until it is needed, so leaving the screen loses it.
-
-Two calls to Supabase Auth happen in the middle — create the account at stage 2, check the emailed code at stage 3. Three things happen on the last tap: the real password replaces the made-up one, a row goes into \`individual\`, and that row is copied onto the phone as \`user\` before the student home opens.
-
-The sequence below is the whole conversation, in order. Each stage that talks to Supabase has its own page underneath.`,
+      detail: "One screen, `RegisterIndividualScreen`, draws a different form for each of the five stages. Everything typed waits in the screen's memory until it is needed, so leaving the screen loses it.",
       code: [
         { file: "app/(auth)/registerIndividual.tsx", start: 40, end: 50, label: "What the screen keeps in memory" },
         { file: "app/(auth)/registerIndividual.tsx", start: 198, end: 234, label: "One form per stage: stage 1, the name" },
+        { file: "app/(auth)/registerIndividual.tsx", start: 186, end: 192, label: "Back steps one stage, or returns to login" },
+        { file: "app/(auth)/registerIndividual.tsx", start: 451, end: 460, label: "The five-segment progress bar" },
       ],
       anatomy: [
         {
+          kind: "screen",
+          title: "Stage 1 of 5",
+          caption: "Stage 1, with a name typed",
+          shot: "/shots/explorify/su-student.png",
+          items: [
+            { type: "button", label: "Back arrow", note: "one stage back; on stage 1, back to the login screen" },
+            { type: "image", label: "Progress bar", note: "five segments, lit up to the current stage" },
+            { type: "heading", label: "What's your full name?", note: "hint: \"Check your passport if you forgot 😬\"" },
+            { type: "field", label: "Full Name", note: "kept in memory only; nothing is sent" },
+            { type: "button", label: "Continue", note: "grey until a name is typed, blue as here" },
+          ],
+        },
+        {
           kind: "sequence",
-          caption: "A student signing up, start to finish",
+          caption: "A student signing up, start to finish: two calls in the middle, three things on the last tap",
           actors: ["Phone", "Supabase Auth", "Email inbox", "Database"],
           rows: [
             { from: "Phone", to: "Phone", label: "name typed, kept in memory", state: "derived" },
@@ -128,11 +142,7 @@ The sequence below is the whole conversation, in order. Each stage that talks to
             "Whether the email holds a six-digit code — rather than a link, or nothing at all — depends on the Supabase project's email confirmation setting and email template, which live in the Supabase dashboard. The repo's local `supabase/config.toml` has `enable_confirmations = false`.",
           col: 0,
           row: 0,
-          detail: `Supabase's \`signUp\` needs both an email and a password, but the app does not ask for a password until stage 4. So \`sendOTP\` invents one — "Temp", then random letters, then the current time in milliseconds — and calls \`signUp\` with it. The Supabase account exists from this moment.
-
-With email confirmation switched on in the project, Supabase then sends a confirmation email, which the app expects to contain a 6-digit code. The made-up password is saved on the phone under the key \`tempPassword\` — though nothing ever reads it back — and the screen moves to stage 3 with the alert "Please check your email for the verification code."
-
-The made-up password is replaced at the final stage. If the person never gets there, it stays the account's password, and nobody knows it.`,
+          detail: "Supabase's `signUp` needs a password, but the app only asks for one at stage 4. So it invents one and creates the account now, so that Supabase emails a code.",
           code: [
             { file: "app/(auth)/registerIndividual.tsx", start: 57, end: 83, label: "Stage 2: create the account and send the code" },
             { file: "app/(auth)/registerIndividual.tsx", start: 85, end: 87, label: "How the made-up password is built" },
@@ -143,11 +153,23 @@ The made-up password is replaced at the final stage. If the person never gets th
             {
               kind: "screen",
               title: "Stage 2 of 5",
+              caption: "Stage 2, with an email typed",
+              shot: "/shots/explorify/su-email.png",
               items: [
-                { type: "heading", label: "What's your email address?" },
-                { type: "text", label: "Feel free to use your personal or school email!" },
+                { type: "heading", label: "What's your email address?", note: "hint: \"Feel free to use your personal or school email!\"" },
                 { type: "field", label: "Email address", note: "email keyboard, no auto-capitals; spaces at the ends are trimmed before sending" },
-                { type: "button", label: "Send Verification Code", note: "grey until something is typed; creates the account and asks Supabase to send the code" },
+                { type: "button", label: "Send Verification Code", note: "grey until something is typed; creates the account, then alerts \"Please check your email for the verification code.\" and opens stage 3" },
+              ],
+            },
+            {
+              kind: "sequence",
+              caption: "Tapping Send Verification Code",
+              actors: ["Phone", "Supabase Auth", "Email inbox"],
+              rows: [
+                { from: "Phone", to: "Phone", label: "invent a password", state: "derived" },
+                { from: "Phone", to: "Supabase Auth", label: "sign up: email + made-up password", note: "the account exists from here", state: "derived" },
+                { from: "Supabase Auth", to: "Email inbox", label: "a confirmation email, expected to hold a 6-digit code", note: "needs email confirmation on", state: "partial" },
+                { from: "Phone", to: "Phone", label: "save the made-up password as \"tempPassword\"", state: "derived" },
               ],
             },
             {
@@ -158,7 +180,8 @@ The made-up password is replaced at the final stage. If the person never gets th
                 { label: "Temp", value: "always the same start", state: "derived" },
                 { label: "q8f3k2l9x0m", value: "Math.random() written in base 36 — not a secure random source", state: "derived" },
                 { label: "1712345678901", value: "the time it was made, in milliseconds", state: "derived" },
-                { label: "Kept at", value: "phone storage key tempPassword, as plain text", state: "derived" },
+                { label: "Kept at", value: "phone storage key tempPassword, as plain text; nothing reads it back", state: "derived" },
+                { label: "Replaced", value: "by the real password at the last tap — or never, if the person stops before it", state: "derived" },
               ],
             },
           ],
@@ -184,11 +207,7 @@ The made-up password is replaced at the final stage. If the person never gets th
           state: "derived",
           col: 0,
           row: 1,
-          detail: `The box takes digits only, at most six, and Verify Code stays grey until exactly six are typed. \`verifyOTP\` sends the email and the code to Supabase Auth with type \`signup\`.
-
-A correct code returns a session: the person is now signed in on this phone, and the Supabase client keeps that session in phone storage so it survives a restart. The screen holds the session in memory for the final stage and saves the account id on the phone as \`uuid\` — the key later screens use to know who is signed in.
-
-A wrong or expired code shows Supabase's own error message, or "Invalid verification code. Please try again." if there is none. There is no resend button: going back to stage 2 and tapping Send again calls \`signUp\` a second time, with a new made-up password.`,
+          detail: "Verify Code sends the email and the six digits back to Supabase Auth. A match returns a session, so the person is signed in on this phone from here on.",
           code: [
             { file: "app/(auth)/registerIndividual.tsx", start: 89, end: 112, label: "Stage 3: check the code and save the id" },
             { file: "app/(auth)/registerIndividual.tsx", start: 278, end: 316, label: "What stage 3 shows" },
@@ -198,11 +217,35 @@ A wrong or expired code shows Supabase's own error message, or "Invalid verifica
             {
               kind: "screen",
               title: "Stage 3 of 5",
+              caption: "Stage 3, with a code typed",
+              shot: "/shots/explorify/su-code.png",
               items: [
-                { type: "heading", label: "Verify Your Email" },
-                { type: "text", label: "Make sure to check your spam!" },
+                { type: "heading", label: "Verify Your Email", note: "hint: \"Make sure to check your spam!\"" },
                 { type: "field", label: "6-digit Verification Code", note: "number pad, at most 6 digits" },
                 { type: "button", label: "Verify Code", note: "grey until 6 digits are typed; a match signs the person in" },
+              ],
+            },
+            {
+              kind: "sequence",
+              caption: "A correct code",
+              actors: ["Phone", "Supabase Auth", "Phone storage"],
+              rows: [
+                { from: "Phone", to: "Supabase Auth", label: "verify: email + code, type \"signup\"", state: "derived" },
+                { from: "Supabase Auth", to: "Phone", label: "a session: signed in", state: "derived" },
+                { from: "Phone", to: "Phone storage", label: "the session, kept by the Supabase client", note: "survives a restart", state: "derived" },
+                { from: "Phone", to: "Phone storage", label: "the account id, as \"uuid\"", note: "how later screens know who is signed in", state: "derived" },
+                { from: "Phone", to: "Phone", label: "the session, held in memory for stage 5", state: "derived" },
+              ],
+            },
+            {
+              kind: "table",
+              caption: "What each outcome shows",
+              columns: ["Code", "What happens"],
+              state: "derived",
+              rows: [
+                ["Right", "Signed in; stage 4 opens"],
+                ["Wrong or expired", "Supabase's own error message, or \"Invalid verification code. Please try again.\" if it gives none"],
+                ["Never arrived", "No resend button. Back, then Send again, calls signUp a second time with a new made-up password"],
               ],
             },
           ],
@@ -214,11 +257,7 @@ A wrong or expired code shows Supabase's own error message, or "Invalid verifica
           state: "derived",
           col: 0,
           row: 2,
-          detail: `The rule is one regular expression in \`isPasswordValid\`: at least 8 characters, at least one capital letter and at least one digit. Continue stays grey until it passes, and the eye icon shows or hides what is typed.
-
-Nothing is sent to Supabase here. The password waits in the screen's memory and is set with \`updateUser\` on the final tap — so until then, the account's password is still the made-up one from stage 2.
-
-The rule lives only in this screen and its organisation copy. Resetting A Password does not check it, so a password changed there can be anything Supabase itself accepts.`,
+          detail: "Continue unlocks once the password has 8+ characters, a capital and a digit. Nothing is sent yet: the password waits in memory until the final tap.",
           code: [
             { file: "app/(auth)/registerIndividual.tsx", start: 52, end: 55, label: "The password rule" },
             { file: "app/(auth)/registerIndividual.tsx", start: 318, end: 365, label: "What stage 4 shows" },
@@ -226,7 +265,7 @@ The rule lives only in this screen and its organisation copy. Resetting A Passwo
           anatomy: [
             {
               kind: "table",
-              caption: "The password rule",
+              caption: "The password rule: one regular expression in isPasswordValid, checked on the phone",
               columns: ["Rule", "Fails", "Passes"],
               state: "derived",
               rows: [
@@ -238,12 +277,21 @@ The rule lives only in this screen and its organisation copy. Resetting A Passwo
             {
               kind: "screen",
               title: "Stage 4 of 5",
+              caption: "Stage 4, with a valid password typed",
+              shot: "/shots/explorify/su-password.png",
               items: [
-                { type: "heading", label: "Set your password" },
-                { type: "text", label: "It needs to be at least 8 characters long, with at least one number and one capital letter" },
+                { type: "heading", label: "Set your password", note: "the hint under it states the rule" },
                 { type: "field", label: "Password", note: "hidden; the eye icon shows it" },
-                { type: "button", label: "Continue", note: "grey until the rule passes; nothing is sent yet" },
+                { type: "button", label: "Continue", note: "grey until the rule passes; nothing is sent, so the account keeps the made-up password until the final tap" },
               ],
+            },
+          ],
+          issues: [
+            {
+              title: "Reset skips this rule",
+              detail:
+                "The rule lives only in this screen and its organisation copy. Resetting A Password does not check it, so a password changed there can be anything Supabase itself accepts.",
+              where: "app/(auth)/resetPassword.tsx:113",
             },
           ],
         },
@@ -254,11 +302,7 @@ The rule lives only in this screen and its organisation copy. Resetting A Passwo
           state: "derived",
           col: 0,
           row: 3,
-          detail: `Stage 5 is where the categories are picked (see Interest Categories). Complete Registration stays grey until two are chosen. Then \`signUpWithEmail\` runs the steps below in order, stopping with a "Registration Failed" alert at the first error.
-
-The row's \`id\` is set to the Supabase account id. That equality is the only link between a login and its profile, and it is what Opening The App looks up on every launch to decide student or organisation.
-
-Two steps do less than they appear to. The row returned by the insert is cached, then immediately fetched again and cached again. And the first feed is fetched for the campus "UIUC", which matches no event because events store the university's full name — harmless only because the home screen fetches again for the real campus.`,
+          detail: "Complete Registration sets the real password, writes the profile row and opens the student home, in that order. The first error stops it with a \"Registration Failed\" alert.",
           code: [
             { file: "app/(auth)/registerIndividual.tsx", start: 114, end: 175, label: "The final tap, start to finish" },
             { file: "app/(auth)/registerIndividual.tsx", start: 121, end: 140, label: "Set the password, then insert the row" },
@@ -269,11 +313,11 @@ Two steps do less than they appear to. The row returned by the insert is cached,
             {
               kind: "screen",
               title: "Stage 5 of 5",
+              caption: "Stage 5, with two categories picked",
+              shot: "/shots/explorify/su-finish.png",
               items: [
-                { type: "heading", label: "Let's select your interests" },
-                { type: "text", label: "Select up to 5 categories to proceed, this will help us personalize your experience!" },
-                { type: "choice", label: "Social 👫", note: "one of the 8 categories; tap to select, tap again to remove, a sixth is ignored" },
-                { type: "choice", label: "STEM 🔬" },
+                { type: "heading", label: "Let's select your interests", note: "the 8 categories (see Interest Categories)" },
+                { type: "choice", label: "Social 👫 · STEM 🔬", note: "picked, in blue; tap again to remove, a sixth is ignored" },
                 { type: "button", label: "Complete Registration", note: "grey until 2 are chosen; runs the steps below" },
               ],
             },
@@ -282,9 +326,9 @@ Two steps do less than they appear to. The row returned by the insert is cached,
               rows: [
                 { n: 1, title: "Set the real password", detail: "`updateUser` replaces the made-up password with the one from stage 4.", state: "derived" },
                 { n: 2, title: "Write the profile row", detail: "Insert into `individual`: id, email, full_name, interests. The database hands back the new row.", state: "derived" },
-                { n: 3, title: "Copy it onto the phone", detail: "Saved as `user`, then fetched again from the database and saved again.", state: "derived" },
+                { n: 3, title: "Copy it onto the phone", detail: "Saved as `user`, then fetched again from the database and saved again — the second copy adds nothing.", state: "derived" },
                 { n: 4, title: "Clean up", detail: "Removes `tempPassword`, and `registrationInProgress` — a key nothing ever sets.", state: "derived" },
-                { n: 5, title: "Fetch a first feed", detail: "Upcoming events for campus \"UIUC\". None match, so an empty list is cached.", state: "derived" },
+                { n: 5, title: "Fetch a first feed", detail: "Upcoming events for campus \"UIUC\". None match, so an empty list is cached; harmless only because the home screen fetches again for the real campus.", state: "derived" },
                 { n: 6, title: "Open the student home", detail: "`router.replace(\"/individual\")`, so Back cannot return to sign-up.", state: "derived" },
               ],
             },
@@ -299,6 +343,7 @@ Two steps do less than they appear to. The row returned by the insert is cached,
   "interests": ["stem", "social"]
 }`,
               notes: [
+                { label: "id", value: "the login account's id — the only link between a login and its profile, looked up by Opening The App on every launch", state: "derived" },
                 { label: "Organisations", value: "an organizations row instead: id, email, org_name, type (the categories)", state: "derived" },
               ],
             },
@@ -322,25 +367,45 @@ Two steps do less than they appear to. The row returned by the insert is cached,
       state: "derived",
       col: 0,
       row: 1,
-      detail: `\`registerOrg.tsx\` is a copy of the student sign-up with names changed. The stages, the code check, the password rule, the clean-up and even the "UIUC" first feed are identical; the table below lists every difference.
-
-An organisation's categories are saved in a column called \`type\` and describe the organisation itself. Each event gets its own categories when it is created.
-
-One thing an organisation needs is never asked: its campus. The Other Events tab reads \`campus\` from the organisation's profile to decide which events to show, and nothing reachable in the app ever writes it. A screen for choosing it exists, but nothing opens it.`,
+      detail: "`registerOrg.tsx` is the student sign-up copied with the wording and the table changed. It never asks for a campus, which the Other Events tab needs.",
       code: [
         { file: "app/(auth)/registerOrg.tsx", start: 117, end: 127, label: "The organisations row: no campus" },
         { file: "app/(auth)/registerOrg.tsx", start: 187, end: 199, label: "Stage 1, worded for an organisation" },
+        { file: "app/(auth)/registerOrg.tsx", start: 356, end: 415, label: "Stage 5, worded for an organisation" },
         { file: "app/org/otherevents/index.tsx", start: 40, end: 58, label: "Other Events needs a campus on the profile" },
       ],
       anatomy: [
         {
+          kind: "screen",
+          title: "Stage 1 of 5 (organisation)",
+          caption: "Stage 1, with a name typed",
+          shot: "/shots/explorify/su-org.png",
+          items: [
+            { type: "heading", label: "What's your organization name?", note: "hint: \"Enter the official name of your organization\"" },
+            { type: "field", label: "Organization Name", note: "saved as org_name at the final tap" },
+          ],
+        },
+        {
+          kind: "screen",
+          title: "Stage 5 of 5 (organisation)",
+          caption: "Stage 5, with two categories picked",
+          shot: "/shots/explorify/su-org-categories.png",
+          items: [
+            { type: "heading", label: "Select your organization's categories", note: "saved in organizations.type; they describe the organisation, and each event gets its own when it is created" },
+            { type: "button", label: "Complete Registration", note: "writes id, email, org_name and type — no campus — then opens /org" },
+          ],
+        },
+        {
           kind: "table",
-          caption: "Everything that differs from the student sign-up",
+          caption: "Everything that differs from the student sign-up. The stages, code check, password rule, clean-up and \"UIUC\" first feed are identical.",
           columns: ["What", "Student", "Organisation"],
           state: "derived",
           rows: [
             ["Stage 1 asks", "What's your full name?", "What's your organization name?"],
+            ["Stage 1 hint", "Check your passport if you forgot 😬", "Enter the official name of your organization"],
+            ["Stage 2 asks", "What's your email address?", "What's your organization email?"],
             ["Stage 2 hint", "Feel free to use your personal or school email!", "Use your official organization email"],
+            ["Stage 3 hint", "Make sure to check your spam!", "Make sure to check your spam folder!"],
             ["Stage 5 asks", "Let's select your interests", "Select your organization's categories"],
             ["Row written to", "individual", "organizations"],
             ["Name column", "full_name", "org_name"],
@@ -383,11 +448,7 @@ One thing an organisation needs is never asked: its campus. The Other Events tab
           state: "derived",
           col: 0,
           row: 0,
-          detail: `\`campusSelection.tsx\` lists the universities from the shared university list, with a search box that matches either the name or the abbreviation. Tapping one writes that university's full name into \`organizations.campus\` for the signed-in organisation and opens the organisation home.
-
-It was written as a piece of a sign-up screen: it expects \`stage\`, \`session\`, \`supabase\` and \`router\` to be handed to it, and no file hands them over. Because it sits in the \`app/\` folder, Expo Router still treats it as a page at \`/campusSelection\`, but nothing links there — and opened directly it would fail at the first tap, because \`session\` and \`supabase\` are missing.
-
-If the search matches nothing, it says "Don't see your university? Email us at explorifydev@gmail.com".`,
+          detail: "A finished screen for saving an organisation's university, written as a piece of a sign-up screen that no file uses. Opened directly at /campusSelection it draws, but the first tap would fail.",
           code: [
             { file: "app/(auth)/campusSelection.tsx", start: 14, end: 21, label: "What it expects to be handed, and never is" },
             { file: "app/(auth)/campusSelection.tsx", start: 38, end: 54, label: "Saving the chosen campus" },
@@ -398,12 +459,33 @@ If the search matches nothing, it says "Don't see your university? Email us at e
             {
               kind: "screen",
               title: "Choose your campus",
+              caption: "Opened directly at /campusSelection — nothing in the app links here",
+              shot: "/shots/explorify/su-campus.png",
               items: [
-                { type: "heading", label: "Choose your campus" },
-                { type: "text", label: "Select the university where your organization is based" },
+                { type: "heading", label: "Choose your campus", note: "subtitle: \"Select the university where your organization is based\"" },
                 { type: "field", label: "Search for a university...", note: "matches the name or the abbreviation" },
-                { type: "list", label: "University of Illinois Urbana-Champaign · UIUC", note: "tap: saves the full name as the campus, then opens /org" },
+                { type: "list", label: "University of Illinois Urbana-Champaign · UIUC", note: "every university in the shared list; a tap would save the full name as organizations.campus, then open /org" },
+              ],
+            },
+            {
+              kind: "screen",
+              title: "No match",
+              caption: "A search that matches nothing",
+              shot: "/shots/explorify/su-campus-none.png",
+              items: [
                 { type: "text", label: "Don't see your university? Email us at explorifydev@gmail.com", note: "shown only when nothing matches" },
+              ],
+            },
+            {
+              kind: "table",
+              caption: "What it expects to be handed, as a piece of a sign-up screen — and gets as a page of its own",
+              columns: ["Expects", "Used for", "Opened as a page"],
+              state: "derived",
+              rows: [
+                ["session", "the signed-in organisation's id", "missing: the first tap throws"],
+                ["supabase", "the update to organizations", "missing"],
+                ["router", "opening /org afterwards", "missing"],
+                ["stage, setStage, loading", "nothing in this file", "missing, and unused"],
               ],
             },
           ],
@@ -411,7 +493,7 @@ If the search matches nothing, it says "Don't see your university? Email us at e
             {
               title: "Nothing opens this screen",
               detail:
-                "No file imports or links to it, so organisations are never asked for a campus and Other Events stays empty for them.",
+                "No file imports or links to it. Expo Router still serves it at /campusSelection because it sits in the app/ folder, but organisations are never sent there, so they are never asked for a campus and Other Events stays empty for them.",
               where: "app/(auth)/campusSelection.tsx:14",
             },
             {
@@ -524,11 +606,7 @@ events.type           = ["stem", "business, law & policy"]`,
         "What Supabase does when the same email signs up a second time — send a fresh code, or report the address as taken — depends on project settings in the Supabase dashboard, which are not in this repo.",
       col: 0,
       row: 3,
-      detail: `The Supabase login account is created at stage 2 and the profile row only at stage 5. Anyone who closes the app in between — or whose final tap fails — is left with a login that has no profile row and a made-up password nobody knows.
-
-Every way back in looks for that profile row, so every one fails. Opening the app finds a signed-in user in neither profile table and goes nowhere. Logging in needs the password. Reset Password looks the email up in the two profile tables, finds nothing, and says "No account found with this email. Please create an account first." Nothing in the app removes the half-made account.
-
-Signing up again with the same email calls \`signUp\` again; what Supabase does then is not decided in this repo.`,
+      detail: "Anyone who leaves between stage 2 and the last tap keeps a login with no profile row, and usually a password nobody knows. Every way back in looks for that row, so every one fails.",
       code: [
         { file: "app/(auth)/registerIndividual.tsx", start: 57, end: 68, label: "The login is created at stage 2" },
         { file: "app/(auth)/registerIndividual.tsx", start: 128, end: 140, label: "The profile row only at stage 5" },
@@ -561,8 +639,9 @@ Signing up again with the same email calls \`signUp\` again; what Supabase does 
           columns: ["Left after", "Next time they open the app", "Reset Password"],
           state: "derived",
           rows: [
-            ["Stage 2 (code sent)", "Login screen — not signed in, and the password is the made-up one", "\"No account found with this email\""],
-            ["Stage 3 or 4 (code checked)", "Signed in but in neither table: nothing opens", "\"No account found with this email\""],
+            ["Stage 2 (code sent)", "Login screen — not signed in, and the password is the made-up one", "\"No account found with this email. Please create an account first.\""],
+            ["Stage 3 or 4 (code checked)", "Signed in but in neither table: nothing opens", "\"No account found with this email. Please create an account first.\""],
+            ["The last tap, if it failed", "Signed in but in neither table: nothing opens", "\"No account found with this email. Please create an account first.\""],
           ],
         },
       ],
@@ -570,7 +649,7 @@ Signing up again with the same email calls \`signUp\` again; what Supabase does 
         {
           title: "Half-made accounts are stuck for good",
           detail:
-            "The login is created before the profile, and no screen can recover a login without one. The person cannot get in, cannot reset, and has to rely on whatever Supabase does with a second sign-up for the same email.",
+            "The login is created before the profile, and no screen can recover or remove a login without one. The person cannot get in, cannot reset, and has to rely on whatever Supabase does when the same email calls signUp again.",
           where: "app/(auth)/registerIndividual.tsx:61",
         },
       ],

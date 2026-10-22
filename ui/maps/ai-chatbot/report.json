@@ -8,11 +8,11 @@
   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
  },
  "elapsed": {
-  "summarize": 0,
-  "cut": 0,
+  "summarize": 80,
+  "cut": 380,
   "author": 465,
   "verify": 128,
-  "total": 593
+  "total": 1053
  },
  "usd": 9.57,
  "fullUsd": 17.88,

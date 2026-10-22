@@ -22,6 +22,12 @@ export async function main(args: string[]) {
   const repo = resolve(args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"))!);
   const inv = inventory(repo);
   const name = opt("--name") ?? inv.name.toLowerCase();
+  // --scope maps part of a large repo; the rest stays readable to the authors.
+  const scope = opt("--scope")?.split(",");
+  if (scope) {
+    inv.scope = { paths: scope, focus: opt("--focus") ?? "" };
+    for (const f of inv.files) if (!scope.some((p) => f.path === p || f.path.startsWith(p.replace(/\/?$/, "/")))) Object.assign(f, { code: false, outside: true });
+  }
   const only = opt("--roots")?.split(",");
   const stopAfter = opt("--stop-after");
   const pick = (env: string | undefined) => MODELS[(env ?? "opus") as keyof typeof MODELS] ?? MODELS.opus;

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Slice, WriteResult } from "@/lib/repo";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
 import { useMap } from "@/components/map-context";
+import { readSource, SOURCE_URL } from "@/lib/source";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -867,19 +868,9 @@ export function SourceView({
    */
   const read = useCallback(
     async (signal?: AbortSignal) => {
-      const q = new URLSearchParams({
-        map,
-        file: block.file,
-        start: String(block.start),
-        end: String(end),
-        fixture: quoted,
-      });
       try {
-        const res = await fetch(`/api/source?${q}`, { signal });
-        const body = await res.json();
-        return res.ok
-          ? { slice: body as Slice, failed: null }
-          : { slice: null, failed: (body.refused as string) ?? "unreadable" };
+        const r = await readSource({ map, file: block.file, start: block.start, end, fixture: quoted }, signal);
+        return "slice" in r ? { slice: r.slice, failed: null } : { slice: null, failed: r.refused };
       } catch {
         return { slice: null, failed: "unreachable" };
       }
@@ -974,23 +965,36 @@ export function SourceView({
           </span>
         ) : null}
         <CopyPath text={`${block.file}:${block.start}`} />
-        {/* Read-only is the default. Editing is a control you go and press. */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setDraft(shown);
-            setSaved(null);
-            setEditing((v) => !v);
-          }}
-          className={cn(
-            "shrink-0 rounded-[4px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
-            editing
-              ? "border-deep-green bg-deep-green text-pure-white"
-              : "border-border-strong text-muted-slate hover:text-on-surface",
-          )}
-        >
-          {editing ? "cancel" : "edit"}
-        </button>
+        {/* A static export has no repository to write to: it links to the code host instead. */}
+        {SOURCE_URL ? (
+          <a
+            href={`${SOURCE_URL}/${block.file}#L${block.start}-L${end}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 rounded-[4px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+          >
+            github ↗
+          </a>
+        ) : (
+          /* Read-only is the default. Editing is a control you go and press. */
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDraft(shown);
+              setSaved(null);
+              setEditing((v) => !v);
+            }}
+            className={cn(
+              "shrink-0 rounded-[4px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
+              editing
+                ? "border-deep-green bg-deep-green text-pure-white"
+                : "border-border-strong text-muted-slate hover:text-on-surface",
+            )}
+          >
+            {editing ? "cancel" : "edit"}
+          </button>
+        )}
       </div>
 
       {/* The finding, stated before the code it is about. */}

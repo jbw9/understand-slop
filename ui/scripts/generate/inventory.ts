@@ -21,6 +21,8 @@ export interface RepoFile {
   code: boolean;
   /** A test, fixture or story: listed and citable, never summarised or required in a root. */
   test: boolean;
+  /** Outside a --scope: readable and citable, but no root owns it. */
+  outside?: boolean;
 }
 
 export interface Inventory {
@@ -33,13 +35,15 @@ export interface Inventory {
   deps: string[];
   /** Brand marks this repo has a real dependency for (D25). */
   marks: string[];
+  /** A map of part of a large repo: the paths it covers and what a reader of it does. */
+  scope?: { paths: string[]; focus: string };
   /** TS/JS only: repo-relative imports per file. */
   imports: Record<string, string[]>;
 }
 
 const CODE = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro",
-  ".py", ".go", ".rb", ".rs", ".java", ".kt", ".swift", ".php", ".cs", ".ex", ".exs",
+  ".py", ".go", ".rb", ".rs", ".java", ".kt", ".scala", ".swift", ".php", ".cs", ".ex", ".exs",
   ".sql", ".prisma", ".graphql", ".gql", ".proto",
 ]);
 const SKIP = [

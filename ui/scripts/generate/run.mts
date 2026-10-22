@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/generate/run.mts <repo dir> [--name x] [--fresh] [--roots a,b] [--stop-after summarize|cut]
+// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/generate/run.mts <repo dir> [--name x] [--fresh] [--roots a,b] [--stop-after summarize|cut] [--scope path,dir/ --focus "who reads it"]
 //   writes maps/<name>/map.json and maps/<name>/report.json; model replies are cached in maps/<name>/.cache/
 //   SLOP_CUT / SLOP_AUTHOR = haiku|sonnet|opus pick the model for those stages (default opus).
 //   AWS credentials come from ui/.env.local when it exists (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,

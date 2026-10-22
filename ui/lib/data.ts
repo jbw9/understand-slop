@@ -209,6 +209,12 @@ export interface DiagramArrow {
   /** A few words on the line: "not found", "publishes". */
   label?: string;
   tone?: "plain" | "good" | "warn";
+  /**
+   * `file:line` where this path happens in the code. Not drawn — the generator
+   * must cite one and the checker confirms the line exists, so "every arrow is
+   * a real path" (D19) is checked rather than trusted.
+   */
+  at?: string;
 }
 
 export type Anatomy =
@@ -1040,6 +1046,10 @@ export interface Run {
   commit: string;
   files: number;
   elapsed: string;
+  /** Absolute path of the mapped checkout. Set by the generator; overrides `repo`. */
+  root?: string;
+  /** Which model ran each generator stage. Absent on hand-authored maps. */
+  models?: Record<string, string>;
 }
 
 /** Stable id for an anatomy row, so a wire can anchor to it. */

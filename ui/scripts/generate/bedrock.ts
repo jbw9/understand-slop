@@ -11,7 +11,7 @@
  * identical, and `--fresh` measures how far a new sample drifts.
  */
 
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient, InvokeModelWithResponseStreamCommand } from "@aws-sdk/client-bedrock-runtime";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -160,10 +160,12 @@ export async function invoke(req: Request): Promise<Reply> {
     for (let attempt = 0; ; attempt++) {
       try {
         if (coolUntil > Date.now()) await sleep(coolUntil - Date.now());
+        // Streamed, as VisuLearn does: a long author turn left a plain
+        // request waiting minutes with nothing on the wire, and it timed out.
         const res = await client.send(
-          new InvokeModelCommand({ modelId: req.model, contentType: "application/json", accept: "application/json", body: json }),
+          new InvokeModelWithResponseStreamCommand({ modelId: req.model, contentType: "application/json", accept: "application/json", body: json }),
         );
-        return JSON.parse(new TextDecoder().decode(res.body)) as Reply;
+        return await assemble(res.body!);
       } catch (e) {
         const msg = `${(e as Error).name}: ${(e as Error).message}`;
         // A daily cap does not lift in minutes; retrying only burns them.
@@ -185,6 +187,40 @@ export async function invoke(req: Request): Promise<Reply> {
   charge(req.stage, req.model, r, false);
   if (file) writeFileSync(file, JSON.stringify(r));
   return r;
+}
+
+type StreamEvent = { chunk?: { bytes?: Uint8Array } };
+
+/** The whole reply from its stream events, shaped exactly as a plain call returns it. */
+async function assemble(stream: AsyncIterable<StreamEvent>): Promise<Reply> {
+  const reply: Reply = { content: [], stop_reason: "", usage: { input_tokens: 0, output_tokens: 0 } };
+  const json: Record<number, string> = {};
+  for await (const e of stream) {
+    if (!e.chunk?.bytes) continue;
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic stream events */
+    const ev: any = JSON.parse(new TextDecoder().decode(e.chunk.bytes));
+    if (ev.type === "message_start") reply.usage = { ...ev.message.usage };
+    else if (ev.type === "content_block_start") reply.content[ev.index] = { ...ev.content_block };
+    else if (ev.type === "content_block_delta") {
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- block being built */
+      const b: any = reply.content[ev.index];
+      const d = ev.delta;
+      if (d.type === "text_delta") b.text = (b.text ?? "") + d.text;
+      else if (d.type === "input_json_delta") json[ev.index] = (json[ev.index] ?? "") + d.partial_json;
+      else if (d.type === "thinking_delta") b.thinking = (b.thinking ?? "") + d.thinking;
+      else if (d.type === "signature_delta") b.signature = (b.signature ?? "") + d.signature;
+    } else if (ev.type === "content_block_stop" && json[ev.index] !== undefined) {
+      // A reply cut off at max_tokens can end mid-JSON; the callers already
+      // treat a max_tokens stop as a turn to redo, so its input is just empty.
+      let input: unknown = {};
+      try { input = json[ev.index] ? JSON.parse(json[ev.index]) : {}; } catch { /* cut off */ }
+      (reply.content[ev.index] as { input: unknown }).input = input;
+    } else if (ev.type === "message_delta") {
+      reply.stop_reason = ev.delta.stop_reason ?? reply.stop_reason;
+      if (ev.usage?.output_tokens != null) reply.usage.output_tokens = ev.usage.output_tokens;
+    }
+  }
+  return reply;
 }
 
 /** The text of a reply, thinking dropped. */

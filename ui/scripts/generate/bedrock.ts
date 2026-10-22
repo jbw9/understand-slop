@@ -89,10 +89,12 @@ export interface Request {
 /** `usd` is spent this run; `fullUsd` and the token counts are the whole work, replayed calls included, so a replayed map still reports its size and price. */
 export const bill: Record<string, { calls: number; cached: number; input: number; output: number; cacheRead: number; usd: number; fullUsd: number }> = {};
 
-function charge(stage: string, model: string, r: Reply, fromCache: boolean) {
+const charge = (stage: string, model: string, r: Reply, fromCache: boolean) => chargeUsage(stage, model, r.usage, fromCache);
+
+/** Bills one call's tokens at the API list price, whichever backend made it, so the two compare. */
+export function chargeUsage(stage: string, model: string, u: Reply["usage"], fromCache: boolean) {
   const b = (bill[stage] ??= { calls: 0, cached: 0, input: 0, output: 0, cacheRead: 0, usd: 0, fullUsd: 0 });
   b.calls++;
-  const u = r.usage;
   const p = priceOf(model);
   const write = u.cache_creation_input_tokens ?? 0;
   const read = u.cache_read_input_tokens ?? 0;
@@ -116,10 +118,18 @@ export function cacheIn(dir: string, opts: { fresh?: boolean } = {}) {
   mkdirSync(dir, { recursive: true });
 }
 
+/** Where a reply with this key is cached; `replay` false asks only where to write it (a --fresh run reads nothing). */
+export function cacheFile(key: string, replay = true): string | null {
+  return cacheDir && !(replay && fresh) ? join(cacheDir, `${key}.json`) : null;
+}
+
+/** Which door the calls go through: an AWS account (default) or the reader's own Claude Code. */
+export const BACKEND = process.env.SLOP_BACKEND === "claude-code" ? "claude-code" : "bedrock";
+
 const LIMIT = Number(process.env.SLOP_CONCURRENCY ?? 8);
 let running = 0;
 const queue: (() => void)[] = [];
-async function slot<T>(fn: () => Promise<T>): Promise<T> {
+export async function slot<T>(fn: () => Promise<T>): Promise<T> {
   if (running >= LIMIT) await new Promise<void>((r) => queue.push(r));
   running++;
   try {
@@ -254,6 +264,7 @@ function shapeOf(tool: Tool, input: Record<string, unknown>): string | null {
 }
 
 export async function ask<T>(req: Omit<Request, "tools"> & { tool: Tool }): Promise<T> {
+  if (BACKEND === "claude-code") return (await import("./claude-code")).ccAsk<T>(req);
   const messages = [...req.messages];
   for (let attempt = 0; attempt < 3; attempt++) {
     const r = await invoke({ ...req, messages, tools: [req.tool] });

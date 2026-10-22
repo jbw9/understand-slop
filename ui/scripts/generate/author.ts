@@ -11,7 +11,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
-import { invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
+import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
+import { ccAgent, type Handled } from "./claude-code";
 import { check } from "./check";
 import type { Cut, Root } from "./cut";
 import { owners } from "./cut";
@@ -148,10 +149,36 @@ export async function authorRoot(
   log: (s: string) => void,
 ): Promise<Authored> {
   const known = new Set(inv.files.map((f) => f.path));
-  const messages: Message[] = [{ role: "user", content: brief(root, cut, inv, sums) }];
   const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [] };
   const MAX_TURNS = 45;
 
+  /** One tool call, answered the same way whichever backend made it. */
+  const handle = (name: string, input: any): Handled => {
+    if (name !== "submit") {
+      res.reads++;
+      return { content: runTool({ name, input }, inv, known) };
+    }
+    res.submits++;
+    const node = input?.root;
+    if (node && typeof node === "object" && node.id !== root.id) node.id = root.id;
+    const problems = shapeProblems(node, root.prefix);
+    if (!problems.length) problems.push(...check({ AUTHORED: [node], E0: [], LINKS: [] }, inv.repo, { generated: true }).problems);
+    res.problems = problems;
+    log(`${root.id}: submit ${res.submits} — ${problems.length ? `${problems.length} problems` : "clean"}`);
+    if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { node, reads: res.reads, submits: res.submits } };
+    return { content: `Not accepted. Fix every one of these and submit the whole root again:\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
+  };
+
+  if (BACKEND === "claude-code") {
+    const r = await ccAgent<{ node: Node; reads: number; submits: number }>({
+      model, system: system(), prompt: brief(root, cut, inv, sums), tools: TOOLS, handle, effort: "high", stage: "author",
+      maxTurns: MAX_TURNS, nudge: "Continue: use the tools, and finish by calling submit.",
+    });
+    // A replayed run calls no tools, so its counts come from the cache.
+    return { ...res, root: r.value?.node ?? null, turns: r.turns, reads: r.value?.reads ?? res.reads, submits: r.value?.submits ?? res.submits };
+  }
+
+  const messages: Message[] = [{ role: "user", content: brief(root, cut, inv, sums) }];
   for (; res.turns < MAX_TURNS; res.turns++) {
     const r = await invoke({ model, stage: "author", effort: "high", maxTokens: 64000, system: system(), messages: withCacheMark(messages), tools: TOOLS });
     messages.push({ role: "assistant", content: r.content });
@@ -162,23 +189,13 @@ export async function authorRoot(
     }
     const results: Block[] = [];
     for (const c of calls) {
-      if (c.name !== "submit") {
-        res.reads++;
-        results.push({ type: "tool_result", tool_use_id: c.id, content: runTool(c as any, inv, known) });
-        continue;
-      }
-      res.submits++;
-      const node = (c.input as any)?.root;
-      if (node && typeof node === "object" && node.id !== root.id) node.id = root.id;
-      const problems = shapeProblems(node, root.prefix);
-      if (!problems.length) problems.push(...check({ AUTHORED: [node], E0: [], LINKS: [] }, inv.repo, { generated: true }).problems);
-      res.problems = problems;
-      log(`${root.id}: submit ${res.submits} — ${problems.length ? `${problems.length} problems` : "clean"}`);
-      if (!problems.length) {
-        res.root = node as Node;
+      const h = handle(c.name, c.input);
+      if (h.done) {
+        res.root = (h.done as { node: Node }).node;
         return res;
       }
-      results.push({ type: "tool_result", tool_use_id: c.id, is_error: true, content: `Not accepted. Fix every one of these and submit the whole root again:\n- ${problems.slice(0, 80).join("\n- ")}` });
+      // Key order as before, so the requests of maps already made still replay from cache.
+      results.push(h.isError ? { type: "tool_result", tool_use_id: c.id, is_error: true, content: h.content } : { type: "tool_result", tool_use_id: c.id, content: h.content });
     }
     if (res.turns === MAX_TURNS - 6) results.push({ type: "text", text: "You are almost out of turns. Submit the complete root now." });
     messages.push({ role: "user", content: results });

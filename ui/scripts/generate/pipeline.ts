@@ -9,7 +9,8 @@ import { resolve } from "node:path";
 import type { Edge, Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { authorRoot, type Authored } from "./author";
-import { bill, MODELS, cacheIn, throttle } from "./bedrock";
+import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
+import { ccClose } from "./claude-code";
 import { check } from "./check";
 import { cutRepo, type Cut } from "./cut";
 import { inventory } from "./inventory";
@@ -140,6 +141,9 @@ export async function main(args: string[]) {
   const report = {
     repo: inv.name,
     commit: inv.commit,
+    // Through Claude Code, `usd` is what the same tokens cost at the API list
+    // price; on a Claude plan they come out of the plan's usage instead.
+    backend: BACKEND,
     models,
     // A --roots repair is not what the map costs to make: the full run's
     // time and price stand, and the repair is listed beside them.
@@ -171,4 +175,5 @@ export async function main(args: string[]) {
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1) + "\n");
   console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));
+  await ccClose();
 }

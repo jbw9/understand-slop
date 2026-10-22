@@ -7,6 +7,7 @@ import { SourceView, type RowCtx } from "@/components/anatomy";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
+import { readSource } from "@/lib/source";
 import { BOX_H, CUE_ROOM, layoutDiagram } from "@/lib/diagram";
 
 /**
@@ -631,10 +632,9 @@ function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: Ro
   const toggle = async () => {
     setShown((v) => !v);
     if (slice) return;
-    const q = new URLSearchParams({ map, file: code.file, start: String(code.start), end: String(code.end) });
     try {
-      const res = await fetch(`/api/source?${q}`);
-      setSlice(res.ok ? ((await res.json()) as RepoSlice) : "failed");
+      const r = await readSource({ map, file: code.file, start: code.start, end: code.end });
+      setSlice("slice" in r ? r.slice : "failed");
     } catch {
       setSlice("failed");
     }

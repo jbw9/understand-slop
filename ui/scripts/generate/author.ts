@@ -90,6 +90,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
   return [
     `# Repository: ${inv.name} @ ${inv.commit}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
+    ...(inv.scope ? [`## Scope\nThis map covers only part of the repository. Its reader: ${inv.scope.focus} Files outside it can still be read and cited.`] : []),
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
     `## Your root\nid: ${root.id}\ntitle: ${root.title}\nsub: ${root.sub}\nscope: ${root.why}\nEvery node id under it starts with "${root.prefix}-".`,
     `Brand marks you may use: ${inv.marks.length ? inv.marks.join(", ") : "none"}.`,

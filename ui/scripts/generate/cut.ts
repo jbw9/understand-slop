@@ -134,13 +134,14 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
     .filter((f) => f.code && !f.test)
     .map((f) => (sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`))
     .join("\n");
-  const other = inv.files.filter((f) => !f.code || f.test).map((f) => f.path);
+  const other = inv.files.filter((f) => (!f.code || f.test) && !f.outside).map((f) => f.path);
   const messages: Message[] = [
     {
       role: "user",
       content: [
         `# Repository: ${inv.name} @ ${inv.commit}`,
         `## README\n${inv.readme || "(none)"}`,
+        ...(inv.scope ? [`## Scope\nThis map covers only part of the repository: ${inv.scope.paths.join(", ")}. Its reader: ${inv.scope.focus} Cut the roots by what that reader does with this part. Code outside the scope is not listed and needs no root.`] : []),
         `## Dependencies\n${inv.deps.join(", ") || "(none)"}`,
         `## Source files (${inv.files.filter((f) => f.code && !f.test).length}), one line each\n${listing}`,
         `## Other files (tests, config, docs, assets) — need no root\n${other.slice(0, 400).join("\n")}${other.length > 400 ? `\n… and ${other.length - 400} more` : ""}`,

@@ -21,16 +21,29 @@ import { join } from "node:path";
  * listed in us-east-1 but every one answers AccessDeniedException.
  */
 export const MODELS = {
-  haiku: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-  sonnet: "us.anthropic.claude-sonnet-4-6",
-  opus: "us.anthropic.claude-opus-4-6-v1",
+  haiku: "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  sonnet: "global.anthropic.claude-sonnet-4-6",
+  opus: "global.anthropic.claude-opus-4-6-v1",
 } as const;
 
-/** $ per million tokens, first-party list prices — Bedrock bills separately, so this is an estimate. */
+/** The model without its routing prefix: `us.` and `global.` run the same model on the same request. */
+const bare = (model: string) => model.replace(/^(us|eu|apac|global)\./, "");
+
+/**
+ * $ per million tokens through a `global.` profile, which Bedrock prices at
+ * the list price; a geographic one (`us.`) costs about 10% more on input and
+ * output. Times the tokens Bedrock reports, this is the bill to within its
+ * rounding — Cost Explorer shows the same charge a day later, per service.
+ */
 const PRICE: Record<string, { in: number; out: number; cacheRead: number }> = {
-  [MODELS.haiku]: { in: 1, out: 5, cacheRead: 0.1 },
-  [MODELS.sonnet]: { in: 3, out: 15, cacheRead: 0.3 },
-  [MODELS.opus]: { in: 5, out: 25, cacheRead: 0.5 },
+  [bare(MODELS.haiku)]: { in: 1, out: 5, cacheRead: 0.1 },
+  [bare(MODELS.sonnet)]: { in: 3, out: 15, cacheRead: 0.3 },
+  [bare(MODELS.opus)]: { in: 5, out: 25, cacheRead: 0.5 },
+};
+const priceOf = (model: string) => {
+  const p = PRICE[bare(model)];
+  const k = model.startsWith("global.") ? 1 : 1.1;
+  return { in: p.in * k, out: p.out * k, cacheRead: p.cacheRead * k };
 };
 
 const client = new BedrockRuntimeClient({ region: process.env.AWS_REGION || "us-east-1" });
@@ -80,7 +93,7 @@ function charge(stage: string, model: string, r: Reply, fromCache: boolean) {
   const b = (bill[stage] ??= { calls: 0, cached: 0, input: 0, output: 0, cacheRead: 0, usd: 0, fullUsd: 0 });
   b.calls++;
   const u = r.usage;
-  const p = PRICE[model];
+  const p = priceOf(model);
   const write = u.cache_creation_input_tokens ?? 0;
   const read = u.cache_read_input_tokens ?? 0;
   const usd = (u.input_tokens * p.in + write * p.in * 1.25 + read * p.cacheRead + u.output_tokens * p.out) / 1e6;
@@ -129,7 +142,9 @@ export async function invoke(req: Request): Promise<Reply> {
     ...(req.effort ? { thinking: { type: "adaptive" }, output_config: { effort: req.effort } } : { temperature: 0 }),
   };
   const json = JSON.stringify(body);
-  const key = createHash("sha256").update(req.model + "\n" + json).digest("hex");
+  // Keyed on one spelling of the model whatever the routing — the `us.` one
+  // the first maps were cached under — so a routing switch replays them.
+  const key = createHash("sha256").update(`us.${bare(req.model)}\n${json}`).digest("hex");
   const file = cacheDir ? join(cacheDir, `${key}.json`) : null;
   if (file && !fresh && existsSync(file)) {
     const r = JSON.parse(readFileSync(file, "utf8")) as Reply;

@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import type { Edge, Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { authorRoot, type Authored } from "./author";
-import { bill, MODELS, cacheIn } from "./bedrock";
+import { bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { check } from "./check";
 import { cutRepo, type Cut } from "./cut";
 import { inventory } from "./inventory";
@@ -136,6 +136,7 @@ export async function main(args: string[]) {
     ...(only && last
       ? { elapsed: last.elapsed, usd: last.usd, fullUsd: last.fullUsd, bill: last.bill, repairs: [...(last.repairs ?? []), { roots: only, seconds: total, usd: Math.round(usd * 100) / 100, bill }] }
       : { elapsed: { ...elapsed, total }, usd: Math.round(usd * 100) / 100, fullUsd: Math.round(fullUsd * 100) / 100, bill }),
+    throttled: { waits: throttle.waits, seconds: Math.round(throttle.seconds) },
     files: { listed: inv.files.length, summarised: code.length, unassigned: leftover },
     excluded: cut.excluded,
     roots: cut.roots.map((r) => ({

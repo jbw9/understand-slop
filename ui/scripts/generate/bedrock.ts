@@ -131,6 +131,8 @@ async function slot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 let coolUntil = 0;
+/** Seconds of request time spent waiting out throttles, summed over calls — the account's quota, not the work. */
+export const throttle = { waits: 0, seconds: 0 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RETRYABLE = /Throttling|TooManyRequests|ServiceUnavailable|ModelNotReady|InternalServer|ModelError|timeout|ECONNRESET|socket hang up/i;
 
@@ -169,7 +171,11 @@ export async function invoke(req: Request): Promise<Reply> {
         const wait = Math.min(60_000, 2000 * 2 ** attempt) * (0.5 + Math.random());
         // A throttle is the account's quota, not this request: every call
         // waits it out, or the rest keep hitting the limit and burn retries.
-        if (throttled) coolUntil = Math.max(coolUntil, Date.now() + wait);
+        if (throttled) {
+          coolUntil = Math.max(coolUntil, Date.now() + wait);
+          throttle.waits++;
+          throttle.seconds += wait / 1000;
+        }
         await sleep(wait);
       }
     }

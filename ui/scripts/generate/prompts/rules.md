@@ -48,6 +48,8 @@ The level itself, `node` open:
 5. `issues`: real problems a developer should know before touching this, shown as "Watch out".
    - Each is a few-word title, then 1–3 sentences on what goes wrong, for whom, and when, with `where` as `file:line`.
    - Only report what the code shows: a race, an unchecked input, a missing auth check, a dead path, a secret in source. Never report style nits.
+   - An issue is something that goes wrong: wrong behaviour, lost data, a security hole, a failure that misleads whoever hits it. Behaviour the code means to have — a documented rule, a deliberate error for misuse, a language's standard behaviour, a typing choice — is not an issue, however surprising; if a reader must know it, say it in `detail`.
+   - No issue is better than a weak one. Mature code often has none on most levels; never add one to fill the section.
    - Don't quote secrets. Name the line instead.
 6. `children`: its parts, and `edges` among them only when `group.ordering` is `sequence`.
 

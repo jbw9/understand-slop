@@ -126,7 +126,10 @@ function problems(cut: Cut, inv: Inventory): string[] {
 }
 
 export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>, model: string): Promise<{ cut: Cut; leftover: string[] }> {
-  const rules = readFileSync("scripts/generate/prompts/rules.md", "utf8");
+  // Only what bears on the cut: rules for writing a level change often, and
+  // each change would otherwise re-cut every repository and rename its roots.
+  const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
+  const rules = all.slice(0, all.indexOf("## What a level shows"));
   const listing = inv.files
     .filter((f) => f.code && !f.test)
     .map((f) => (sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`))

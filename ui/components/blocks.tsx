@@ -7,6 +7,7 @@ import { SourceView, type RowCtx } from "@/components/anatomy";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
+import { BOX_H, CUE_ROOM, layoutDiagram } from "@/lib/diagram";
 
 /**
  * The blocks a reader learns from without opening code (round 3, D34): the
@@ -59,13 +60,6 @@ function Caption({ children }: { children?: string }) {
 
 /* ── diagram ─────────────────────────────────────────────────── */
 
-const BOX_H = 58;
-/** Width a corner badge needs beside the longest label on a live box. */
-const CUE_ROOM = 26;
-const ROW_GAP = 40;
-const COL_GAP = 76;
-const PAD = 18;
-
 const TONE = {
   plain: { stroke: "var(--color-border-strong)", fill: "var(--color-pure-white)", ink: "var(--color-ink)", line: "var(--color-wire)" },
   good: { stroke: "var(--color-deep-green)", fill: "var(--color-mint-success)", ink: "var(--color-ink)", line: "var(--color-deep-green)" },
@@ -86,52 +80,7 @@ function Diagram({
   onOpen?: (id: string) => void;
   hrefFor?: (id: string) => string;
 }) {
-  const cols = Math.max(...block.boxes.map((b) => b.col)) + 1;
-  const rows = Math.max(...block.boxes.map((b) => b.row)) + 1;
-  // Each column is as wide as its longest label — estimated from character
-  // counts, which is close enough at these two fixed sizes. A box that opens
-  // a part also has to fit its badge in the top-right corner, so it reserves
-  // the room rather than letting the badge sit on the label.
-  const colW = Array.from({ length: cols }, (_, c) =>
-    Math.max(
-      150,
-      ...block.boxes
-        .filter((b) => b.col === c)
-        .map(
-          (b) =>
-            Math.max(b.label.length * 8.4 + (b.opens ? CUE_ROOM : 0), (b.sub?.length ?? 0) * 6.6) +
-            32,
-        ),
-    ),
-  );
-  // The gap between columns is as wide as the longest straight-across label
-  // that has to sit in it; a fixed 76px clipped any label past ten characters
-  // under the next box. Elbow labels sit between rows, clear of the boxes, so
-  // they need no room here. Capped, so one label cannot push the picture off
-  // the page.
-  const gap = Math.min(
-    260,
-    Math.max(
-      COL_GAP,
-      ...block.arrows.map((a) => {
-        const f = block.boxes.find((b) => b.id === a.from);
-        const t = block.boxes.find((b) => b.id === a.to);
-        if (!a.label || !f || !t || f.col === t.col || f.row !== t.row) return 0;
-        return a.label.length * 6.6 + 28;
-      }),
-    ),
-  );
-  const colX = colW.map((_, c) => PAD + colW.slice(0, c).reduce((a, w) => a + w + gap, 0));
-  const W = colX[cols - 1] + colW[cols - 1] + PAD;
-  const H = PAD * 2 + rows * BOX_H + (rows - 1) * ROW_GAP;
-  const at = new Map(
-    block.boxes.map((b) => [
-      b.id,
-      { x: colX[b.col], y: PAD + b.row * (BOX_H + ROW_GAP), w: colW[b.col], b },
-    ]),
-  );
-
-  const lanes = laneOffsets(block.arrows, at);
+  const { W, H, boxes, arrows } = layoutDiagram(block);
   // Only a picture that actually leads somewhere dims its scenery: on a
   // diagram where nothing opens, every box is equally "inert" and dimming
   // them all would just make the picture grey.
@@ -168,31 +117,34 @@ function Diagram({
               </marker>
             ))}
           </defs>
-          {block.arrows.map((a, i) => {
-            const f = at.get(a.from);
-            const t = at.get(a.to);
-            if (!f || !t) return null;
-            const tone = a.tone ?? "plain";
-            const { d, lx, ly, anchor } = route(f, t, gap, lanes.get(i) ?? 0);
-            return (
-              <g key={i}>
-                <path
-                  d={d}
-                  fill="none"
-                  stroke={TONE[tone].line}
-                  strokeWidth="1.5"
-                  strokeDasharray={tone === "warn" ? "5 4" : undefined}
-                  markerEnd={`url(#dg-${tone})`}
-                />
-                {a.label ? (
-                  <text x={lx} y={ly} textAnchor={anchor} fontSize="12" fill="var(--color-muted-slate)">
-                    {a.label}
-                  </text>
-                ) : null}
-              </g>
-            );
-          })}
-          {[...at.values()].map(({ x, y, w, b }) => {
+          {arrows.map(({ d, tone, label }, i) => (
+            <g key={i}>
+              <path
+                d={d}
+                fill="none"
+                stroke={TONE[tone].line}
+                strokeWidth="1.5"
+                strokeDasharray={tone === "warn" ? "5 4" : undefined}
+                markerEnd={`url(#dg-${tone})`}
+              />
+              {label ? (
+                <text
+                  x={label.x}
+                  y={label.y}
+                  textAnchor={label.anchor}
+                  fontSize="12"
+                  fill="var(--color-muted-slate)"
+                  stroke="var(--color-warm-cream)"
+                  strokeWidth="4"
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
+                >
+                  {label.text}
+                </text>
+              ) : null}
+            </g>
+          ))}
+          {boxes.map(({ x, y, w, b }) => {
             const t = TONE[b.tone ?? "plain"];
             // Live only where the author named the part this box belongs to.
             const go = b.opens && onOpen ? () => onOpen(b.opens!) : undefined;
@@ -308,69 +260,6 @@ function Box({
       {children}
     </a>
   );
-}
-
-type Placed = { x: number; y: number; w: number };
-
-const LANE_GAP = 12;
-
-/**
- * Elbow arrows that run down the same gap between columns would draw on top
- * of each other. A fan-out from one box, or a fan-in to one box, SHOULD share
- * its trunk — that is what makes it read as one bundle — so arrows are
- * grouped into bundles per gap and each bundle gets its own lane.
- */
-function laneOffsets(arrows: { from: string; to: string }[], at: Map<string, Placed>) {
-  const gaps = new Map<string, { i: number; from: string; to: string }[]>();
-  arrows.forEach((a, i) => {
-    const f = at.get(a.from);
-    const t = at.get(a.to);
-    if (!f || !t || f.x === t.x || f.y === t.y) return;
-    const key = t.x > f.x ? `r${f.x + f.w}` : `l${f.x}`;
-    gaps.set(key, [...(gaps.get(key) ?? []), { i, from: a.from, to: a.to }]);
-  });
-  const out = new Map<number, number>();
-  for (const list of gaps.values()) {
-    const count = (k: "from" | "to", v: string) => list.filter((x) => x[k] === v).length;
-    const bundleOf = (x: { from: string; to: string }) =>
-      count("from", x.from) > 1 ? `f:${x.from}` : count("to", x.to) > 1 ? `t:${x.to}` : `a:${x.from}>${x.to}`;
-    const bundles = [...new Set(list.map(bundleOf))];
-    for (const x of list) {
-      const b = bundles.indexOf(bundleOf(x));
-      out.set(x.i, (b - (bundles.length - 1) / 2) * LANE_GAP);
-    }
-  }
-  return out;
-}
-
-/**
- * Right-angled paths between two boxes. Same column: straight down (or up).
- * Otherwise out of the facing side, along the gap between columns, and in —
- * so lines never cut through a box in the columns they connect.
- */
-function route(f: Placed, t: Placed, gap: number, lane = 0) {
-  const fy = f.y + BOX_H / 2;
-  const ty = t.y + BOX_H / 2;
-  if (f.x === t.x) {
-    const down = t.y > f.y;
-    const y1 = down ? f.y + BOX_H : f.y;
-    const y2 = down ? t.y - 2 : t.y + BOX_H + 2;
-    const cx = f.x + f.w / 2;
-    return { d: `M${cx} ${y1}V${y2}`, lx: cx + 8, ly: (y1 + y2) / 2 + 4, anchor: "start" as const };
-  }
-  const right = t.x > f.x;
-  const x1 = right ? f.x + f.w : f.x;
-  const x2 = right ? t.x - 2 : t.x + t.w + 2;
-  if (fy === ty) {
-    return { d: `M${x1} ${fy}H${x2}`, lx: (x1 + x2) / 2, ly: fy - 8, anchor: "middle" as const };
-  }
-  const mx = (right ? x1 + gap / 2 : x1 - gap / 2) + lane;
-  return {
-    d: `M${x1} ${fy}H${mx}V${ty}H${x2}`,
-    lx: mx + (right ? 8 : -8),
-    ly: (fy + ty) / 2 + 4,
-    anchor: right ? ("start" as const) : ("end" as const),
-  };
 }
 
 /* ── table ───────────────────────────────────────────────────── */

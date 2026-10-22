@@ -59,6 +59,8 @@ function Caption({ children }: { children?: string }) {
 /* ── diagram ─────────────────────────────────────────────────── */
 
 const BOX_H = 58;
+/** Width a corner badge needs beside the longest label on a live box. */
+const CUE_ROOM = 26;
 const ROW_GAP = 40;
 const COL_GAP = 76;
 const PAD = 18;
@@ -86,13 +88,19 @@ function Diagram({
   const cols = Math.max(...block.boxes.map((b) => b.col)) + 1;
   const rows = Math.max(...block.boxes.map((b) => b.row)) + 1;
   // Each column is as wide as its longest label — estimated from character
-  // counts, which is close enough at these two fixed sizes.
+  // counts, which is close enough at these two fixed sizes. A box that opens
+  // a part also has to fit its badge in the top-right corner, so it reserves
+  // the room rather than letting the badge sit on the label.
   const colW = Array.from({ length: cols }, (_, c) =>
     Math.max(
       150,
       ...block.boxes
         .filter((b) => b.col === c)
-        .map((b) => Math.max(b.label.length * 8.4, (b.sub?.length ?? 0) * 6.6) + 32),
+        .map(
+          (b) =>
+            Math.max(b.label.length * 8.4 + (b.opens ? CUE_ROOM : 0), (b.sub?.length ?? 0) * 6.6) +
+            32,
+        ),
     ),
   );
   const colX = colW.map((_, c) => PAD + colW.slice(0, c).reduce((a, w) => a + w + COL_GAP, 0));
@@ -106,6 +114,10 @@ function Diagram({
   );
 
   const lanes = laneOffsets(block.arrows, at);
+  // Only a picture that actually leads somewhere dims its scenery: on a
+  // diagram where nothing opens, every box is equally "inert" and dimming
+  // them all would just make the picture grey.
+  const navigable = Boolean(onOpen) && block.boxes.some((b) => b.opens);
 
   return (
     <figure className="min-w-0">
@@ -119,7 +131,7 @@ function Diagram({
           viewBox={`0 0 ${W} ${H}`}
           role="img"
           aria-label={block.caption}
-          className="block h-auto"
+          className={navigable ? "dg-nav block h-auto" : "block h-auto"}
           style={{ width: "100%", maxWidth: W, minWidth: W * 0.7 }}
         >
           <defs>
@@ -185,8 +197,10 @@ function Diagram({
                   strokeWidth="1.5"
                   strokeDasharray={b.tone === "warn" ? "5 4" : undefined}
                 />
+                {/* The label centres in the space left of the badge, so a
+                    long one never runs under it. */}
                 <text
-                  x={x + w / 2}
+                  x={x + (w - (b.opens ? CUE_ROOM : 0)) / 2}
                   y={b.sub ? y + 25 : y + BOX_H / 2 + 5}
                   textAnchor="middle"
                   fontSize="14.5"
@@ -200,19 +214,28 @@ function Diagram({
                     {b.sub}
                   </text>
                 ) : null}
-                {/* The cue that this box goes somewhere, in the corner so it
-                    never collides with the label. */}
+                {/* The cue that this box goes somewhere. A filled disc in the
+                    corner rather than a bare character: at rest a lone "›"
+                    read as decoration, so the click was only discoverable by
+                    hovering (D43). */}
                 {go ? (
-                  <text
-                    className="dg-cue"
-                    x={x + w - 11}
-                    y={y + 16}
-                    textAnchor="middle"
-                    fontSize="11"
-                    fill={t.stroke}
-                  >
-                    ›
-                  </text>
+                  <g className="dg-cue" aria-hidden>
+                    {/* Green, not the box's own stroke: the accent colour is
+                        what reads as "this does something" everywhere else
+                        on the page, and it stays legible on a warn-tinted
+                        box where the stroke is amber. */}
+                    <circle cx={x + w - 15} cy={y + 15} r="8.5" fill="var(--color-deep-green)" />
+                    <text
+                      x={x + w - 15}
+                      y={y + 19}
+                      textAnchor="middle"
+                      fontSize="11"
+                      fontWeight="700"
+                      fill="var(--color-pure-white)"
+                    >
+                      ›
+                    </text>
+                  </g>
                 ) : null}
               </Box>
             );
@@ -517,12 +540,16 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
           </div>
         )}
         {noted.length ? (
-          <ol className="flex min-w-[240px] flex-1 flex-col gap-2.5 pt-10">
+          // Reading size, not caption size (D44). This list sits beside a
+          // ~700px phone with room to spare, so it was set small and tight
+          // against a column of empty space. It is the explanation of the
+          // screen — the main text of the block — and is typeset as such.
+          <ol className="flex min-w-[280px] max-w-[760px] flex-1 flex-col gap-4 pt-10">
             {noted.map((it, k) => (
-              <li key={it.i} className="flex gap-2.5 text-[13.5px] leading-snug">
+              <li key={it.i} className="flex gap-3 text-[15.5px] leading-relaxed">
                 <Badge n={k + 1} />
                 <span>
-                  <span className="font-medium text-ink">{it.label}</span>
+                  <span className="font-semibold text-ink">{it.label}</span>
                   <span className="text-on-surface-variant">
                     {" — "}
                     <Prose text={it.note ?? ""} />
@@ -539,7 +566,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
 
 function Badge({ n }: { n: number }) {
   return (
-    <span className="mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[10px] font-semibold text-pure-white">
+    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[11px] font-semibold text-pure-white">
       {n}
     </span>
   );

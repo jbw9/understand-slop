@@ -105,9 +105,18 @@
   .dg-live {
     cursor: pointer;
   }
-  .dg-live .dg-cue {
-    opacity: 0.45;
-    transition: opacity 150ms ease;
+  /* Most boxes on a parent level are live (measured: 8 of 10, 9 of 11), so
+     the signal is carried by the INERT ones receding rather than the live
+     ones shouting — otherwise the whole picture shouts (D43). Dimming only
+     happens on a diagram that leads somewhere. */
+  .dg-nav > g:not(.dg-live) rect,
+  .dg-nav > g:not(.dg-live) text {
+    opacity: 0.55;
+  }
+  .dg-cue {
+    transition: transform 150ms ease;
+    transform-origin: center;
+    transform-box: fill-box;
   }
   .dg-live rect {
     transition:
@@ -116,12 +125,11 @@
   }
   .dg-live:hover rect,
   .dg-live:focus-visible rect {
-    stroke-width: 2.25;
-    filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.1));
+    stroke-width: 2.5;
+    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.14));
   }
-  .dg-live:hover .dg-cue,
-  .dg-live:focus-visible .dg-cue {
-    opacity: 1;
+  .dg-live:hover .dg-cue {
+    transform: scale(1.18);
   }
   /* SVG ignores `outline`, so the focus ring is the box's own stroke,
      thickened and recoloured — visible against every tone. */

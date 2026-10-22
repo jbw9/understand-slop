@@ -37,7 +37,8 @@ The level itself, `node` open:
 4. `anatomy`: blocks drawn as the thing they describe. Use whichever fit; most levels have 1–3:
    - `diagram`: how the pieces connect. This is the main picture of a level.
      - Boxes sit on a grid (`col` left to right, `row` top to bottom, from 0). Never put two boxes in one cell. Keep it to about 5 columns and about 10 boxes.
-     - A box is a thing at runtime ("users table", "Login screen", "Stripe webhook").
+     - A box is a thing at runtime ("users table", "Login screen", "Stripe webhook"). Its `sub` is a few words (about 25 characters at most): "row with this id", not a sentence — a long sub widens its whole column.
+     - The checker lays the picture out as the page will and rejects one that is too wide to read, has a label drawn on another label or a box, or a line through a box it does not connect. Fix those by rearranging: put boxes an arrow joins next to each other, use more rows and fewer columns, and do not run an arrow across a box in between.
      - A box that a child explains carries `opens: "<child id>"`, which makes the picture the way down. Link every child that has a box. Boxes with nothing to open are scenery.
    - `sequence`: who talks to whom, in order. Every `from`/`to` must be one of `actors`.
    - `table`: real values, such as the categories, the env vars, the fields a form sends, the routes. Every row must have exactly as many cells as `columns`.

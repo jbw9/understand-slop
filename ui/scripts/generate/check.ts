@@ -8,6 +8,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildMap, type MapFile } from "@/lib/map";
 import { MARK_IDS } from "@/components/shapes";
+import type { Anatomy } from "@/lib/data";
+import { layoutDiagram, overlaps, segmentsOf } from "@/lib/diagram";
 
 export interface CheckResult {
   problems: string[];
@@ -94,6 +96,8 @@ export function check(
             else if (!inRange(m[1], +m[2], +(m[3] ?? m[2]))) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites ${a.at}, which does not exist`);
           }
         }
+        if (gen && b.arrows.every((a: any) => b.boxes.some((x: any) => x.id === a.from) && b.boxes.some((x: any) => x.id === a.to)))
+          problems.push(...layoutProblems(b).problems.map((p) => `LAYOUT ${owner} ${p}`));
       }
       if (b.kind === "sequence")
         for (const m of b.rows) for (const a of [m.from, m.to])
@@ -151,4 +155,37 @@ export function check(
     }
   }
   return { problems, roots, refs, sources };
+}
+
+/** Widest a diagram may lay out — the explorify benchmark's widest is 1523. Past it the page holds the picture at its 70% floor and it scrolls far. */
+export const MAX_DIAGRAM_W = 1550;
+
+/**
+ * What the page would draw badly: text on text, text on a box, a line through
+ * a box it does not connect, a picture too wide to read. A label across
+ * another line is only counted — it is drawn with a halo and stays legible.
+ */
+export function layoutProblems(block: Extract<Anatomy, { kind: "diagram" }>) {
+  const L = layoutDiagram(block);
+  const problems: string[] = [];
+  if (L.W > MAX_DIAGRAM_W)
+    problems.push(`is ${Math.round(L.W)}px wide (max ${MAX_DIAGRAM_W}) — shorten box subs, or use fewer columns and more rows`);
+  const runs = L.arrows.map((a) => segmentsOf(a.d.slice(1).split("L").map((p) => p.split(" ").map(Number) as [number, number])));
+  const labelled = L.arrows.filter((a) => a.label);
+  let crossings = 0;
+  labelled.forEach((a, i) => {
+    const r = L.labels[i];
+    L.boxes.forEach((p, j) => { if (overlaps(r, L.boxRects[j])) problems.push(`label "${a.label!.text}" sits on box "${p.b.label}"`); });
+    labelled.slice(i + 1).forEach((o, k) => { if (overlaps(r, L.labels[i + 1 + k])) problems.push(`label "${a.label!.text}" sits on label "${o.label!.text}"`); });
+    L.arrows.forEach((o, k) => { if (o !== a && runs[k].some((s) => overlaps(r, s))) crossings++; });
+  });
+  L.arrows.forEach((a, k) => {
+    for (const s of runs[k])
+      L.boxes.forEach((p, j) => {
+        if (p.b.id === a.from || p.b.id === a.to) return;
+        const b = L.boxRects[j];
+        if (overlaps(s, { x: b.x + 1, y: b.y + 1, w: b.w - 2, h: b.h - 2 })) problems.push(`line ${a.from}→${a.to} runs through box "${p.b.label}"`);
+      });
+  });
+  return { problems: [...new Set(problems)], crossings };
 }

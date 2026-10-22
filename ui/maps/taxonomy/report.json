@@ -8,7 +8,7 @@
   "verify": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
  },
  "elapsed": {
-  "summarize": 0,
+  "summarize": 51,
   "cut": 0,
   "author": 0,
   "verify": 59,
@@ -65,19 +65,19 @@
  "excluded": [
   {
    "path": "components/ui/",
-   "reason": "Vendored shadcn/ui component library — thin wrappers around Radix UI primitives with Tailwind styling, not product-specific logic."
+   "reason": "Vendored shadcn/ui component library \u2014 thin wrappers around Radix UI primitives with Tailwind styling, not product-specific logic."
   },
   {
    "path": "postcss.config.js",
-   "reason": "Pure build tooling — PostCSS plugin configuration."
+   "reason": "Pure build tooling \u2014 PostCSS plugin configuration."
   },
   {
    "path": "prettier.config.js",
-   "reason": "Pure tooling — code formatting configuration."
+   "reason": "Pure tooling \u2014 code formatting configuration."
   },
   {
    "path": "tailwind.config.js",
-   "reason": "Pure build tooling — Tailwind CSS theme and plugin configuration."
+   "reason": "Pure build tooling \u2014 Tailwind CSS theme and plugin configuration."
   }
  ],
  "roots": [
@@ -96,8 +96,8 @@
      {
       "id": "mk-content",
       "claims": [
-       "Author document type: title, avatar, twitter — contradicted: Lines 109-122 show title, avatar, and twitter, but line 113-114 also shows a 'description' field that is not mentioned in the code label.",
-       "Mdx component: useMDXComponent renders code with styled components — partially_supported: Lines 159-167 show `useMDXComponent(code)` being called and components being passed (line 164), but the code does not show whether those components are 'styled components' specifically—only that they are passed as `components` prop."
+       "Author document type: title, avatar, twitter \u2014 contradicted: Lines 109-122 show title, avatar, and twitter, but line 113-114 also shows a 'description' field that is not mentioned in the code label.",
+       "Mdx component: useMDXComponent renders code with styled components \u2014 partially_supported: Lines 159-167 show `useMDXComponent(code)` being called and components being passed (line 164), but the code does not show whether those components are 'styled components' specifically\u2014only that they are passed as `components` prop."
       ]
      }
     ],
@@ -126,8 +126,8 @@
      {
       "id": "au-session",
       "claims": [
-       "Every server component and API route that needs the authenticated user imports this single function — not_shown: The cited code only shows the implementation of getCurrentUser. It does not show how many places import this function or whether all server components and API routes that need the authenticated user actually use it.",
-       "Server-side getCurrentUser function used by dashboard and API routes — not_shown: The code shows the function is server-side (async function using getServerSession), but the cited code does not show it being used by dashboard or API routes specifically."
+       "Every server component and API route that needs the authenticated user imports this single function \u2014 not_shown: The cited code only shows the implementation of getCurrentUser. It does not show how many places import this function or whether all server components and API routes that need the authenticated user actually use it.",
+       "Server-side getCurrentUser function used by dashboard and API routes \u2014 not_shown: The code shows the function is server-side (async function using getServerSession), but the cited code does not show it being used by dashboard or API routes specifically."
       ]
      }
     ],
@@ -181,7 +181,7 @@
      {
       "id": "bl-session",
       "claims": [
-       "retrieves the user's subscription plan — not_shown: The cited code does not show where subscriptionPlan is retrieved. It appears on line 24 but the retrieval logic is not included in the cited lines."
+       "retrieves the user's subscription plan \u2014 not_shown: The cited code does not show where subscriptionPlan is retrieved. It appears on line 24 but the retrieval logic is not included in the cited lines."
       ]
      }
     ],

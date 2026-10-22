@@ -45,6 +45,8 @@ export function evaluate(name: string, map: MapFile) {
     problems,
     "verify %": report?.verifyPassRate ?? "",
     usd: report?.fullUsd ?? "",
+    // Tokens sent and received over the whole run, cached prompt reads included (in thousands).
+    "k tokens": report ? Math.round(Object.values(report.bill as Record<string, { input: number; output: number; cacheRead: number }>).reduce((a, b) => a + b.input + b.output + b.cacheRead, 0) / 1000) : "",
     min: report ? Math.round(report.elapsed.total / 60) : "",
   };
 }

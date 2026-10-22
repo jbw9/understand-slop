@@ -134,9 +134,8 @@ export async function main(args: string[]) {
     // A --roots repair is not what the map costs to make: the full run's
     // time and price stand, and the repair is listed beside them.
     ...(only && last
-      ? { elapsed: last.elapsed, usd: last.usd, fullUsd: last.fullUsd, repairs: [...(last.repairs ?? []), { roots: only, seconds: total, usd: Math.round(usd * 100) / 100 }] }
-      : { elapsed: { ...elapsed, total }, usd: Math.round(usd * 100) / 100, fullUsd: Math.round(fullUsd * 100) / 100 }),
-    bill,
+      ? { elapsed: last.elapsed, usd: last.usd, fullUsd: last.fullUsd, bill: last.bill, repairs: [...(last.repairs ?? []), { roots: only, seconds: total, usd: Math.round(usd * 100) / 100, bill }] }
+      : { elapsed: { ...elapsed, total }, usd: Math.round(usd * 100) / 100, fullUsd: Math.round(fullUsd * 100) / 100, bill }),
     files: { listed: inv.files.length, summarised: code.length, unassigned: leftover },
     excluded: cut.excluded,
     roots: cut.roots.map((r) => ({

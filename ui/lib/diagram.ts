@@ -139,6 +139,7 @@ export function layoutDiagram(block: Block) {
   // A label that lands on a box, another label or another arrow's line
   // moves until it is clear, to the nearest spot still beside its own line.
   const taken: Rect[] = [];
+  const W0 = W;
   const runsOf = routes.map((r) => segmentsOf(r.pts));
   arrows.forEach((a, i) => {
     if (!a.label) return;
@@ -147,7 +148,9 @@ export function layoutDiagram(block: Block) {
     // with a halo and stays legible, so it is only a mild cost.
     const clashes = (r: Rect) => {
       const room = { x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 };
-      const out = r.y < 0 || r.y + r.h > H || r.x < 0 ? 1000 : 0;
+      // Past the right edge widens the picture, which can push it into a
+      // scroll that hides the label's end: better on the line's other side.
+      const out = (r.y < 0 || r.y + r.h > H || r.x < 0 ? 1000 : 0) + (r.x + r.w + PAD > W0 ? 50 : 0);
       return out + 100 * [...boxRects, ...taken].filter((o) => overlaps(room, o)).length + others.filter((o) => overlaps(room, o)).length;
     };
     // A run another arrow also draws — a fan-in's trunk — names none of them,

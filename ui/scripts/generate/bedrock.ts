@@ -86,7 +86,7 @@ export interface Request {
 
 /* ── the bill ───────────────────────────────────────────────── */
 
-/** `usd` is spent this run; `fullUsd` is what the same work costs uncached, so a replayed map still reports its price. */
+/** `usd` is spent this run; `fullUsd` and the token counts are the whole work, replayed calls included, so a replayed map still reports its size and price. */
 export const bill: Record<string, { calls: number; cached: number; input: number; output: number; cacheRead: number; usd: number; fullUsd: number }> = {};
 
 function charge(stage: string, model: string, r: Reply, fromCache: boolean) {
@@ -98,10 +98,11 @@ function charge(stage: string, model: string, r: Reply, fromCache: boolean) {
   const read = u.cache_read_input_tokens ?? 0;
   const usd = (u.input_tokens * p.in + write * p.in * 1.25 + read * p.cacheRead + u.output_tokens * p.out) / 1e6;
   b.fullUsd += usd;
-  if (fromCache) { b.cached++; return; }
+  // Tokens are the work the map takes, so a replayed call counts too.
   b.input += u.input_tokens + write;
   b.output += u.output_tokens;
   b.cacheRead += read;
+  if (fromCache) { b.cached++; return; }
   b.usd += usd;
 }
 

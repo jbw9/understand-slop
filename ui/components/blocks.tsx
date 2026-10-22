@@ -104,7 +104,24 @@ function Diagram({
         ),
     ),
   );
-  const colX = colW.map((_, c) => PAD + colW.slice(0, c).reduce((a, w) => a + w + COL_GAP, 0));
+  // The gap between columns is as wide as the longest straight-across label
+  // that has to sit in it; a fixed 76px clipped any label past ten characters
+  // under the next box. Elbow labels sit between rows, clear of the boxes, so
+  // they need no room here. Capped, so one label cannot push the picture off
+  // the page.
+  const gap = Math.min(
+    260,
+    Math.max(
+      COL_GAP,
+      ...block.arrows.map((a) => {
+        const f = block.boxes.find((b) => b.id === a.from);
+        const t = block.boxes.find((b) => b.id === a.to);
+        if (!a.label || !f || !t || f.col === t.col || f.row !== t.row) return 0;
+        return a.label.length * 6.6 + 28;
+      }),
+    ),
+  );
+  const colX = colW.map((_, c) => PAD + colW.slice(0, c).reduce((a, w) => a + w + gap, 0));
   const W = colX[cols - 1] + colW[cols - 1] + PAD;
   const H = PAD * 2 + rows * BOX_H + (rows - 1) * ROW_GAP;
   const at = new Map(
@@ -156,7 +173,7 @@ function Diagram({
             const t = at.get(a.to);
             if (!f || !t) return null;
             const tone = a.tone ?? "plain";
-            const { d, lx, ly, anchor } = route(f, t, lanes.get(i) ?? 0);
+            const { d, lx, ly, anchor } = route(f, t, gap, lanes.get(i) ?? 0);
             return (
               <g key={i}>
                 <path
@@ -331,7 +348,7 @@ function laneOffsets(arrows: { from: string; to: string }[], at: Map<string, Pla
  * Otherwise out of the facing side, along the gap between columns, and in —
  * so lines never cut through a box in the columns they connect.
  */
-function route(f: Placed, t: Placed, lane = 0) {
+function route(f: Placed, t: Placed, gap: number, lane = 0) {
   const fy = f.y + BOX_H / 2;
   const ty = t.y + BOX_H / 2;
   if (f.x === t.x) {
@@ -347,7 +364,7 @@ function route(f: Placed, t: Placed, lane = 0) {
   if (fy === ty) {
     return { d: `M${x1} ${fy}H${x2}`, lx: (x1 + x2) / 2, ly: fy - 8, anchor: "middle" as const };
   }
-  const mx = (right ? x1 + COL_GAP / 2 : x1 - COL_GAP / 2) + lane;
+  const mx = (right ? x1 + gap / 2 : x1 - gap / 2) + lane;
   return {
     d: `M${x1} ${fy}H${mx}V${ty}H${x2}`,
     lx: mx + (right ? 8 : -8),

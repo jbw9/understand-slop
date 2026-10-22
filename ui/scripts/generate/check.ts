@@ -87,6 +87,7 @@ export function check(
         for (const a of b.arrows) {
           for (const e of [a.from, a.to])
             if (!b.boxes.some((x: any) => x.id === e)) problems.push(`DIAGRAM ${owner} arrow end "${e}" is not a box`);
+          if (gen && (a.label ?? "").length > 24) problems.push(`ARROW ${owner} ${a.from}→${a.to} label "${a.label}" is over 24 characters — a few words on the line`);
           if (gen) {
             const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(a.at ?? "");
             if (!m) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites no line — give \`at\` as file:line where this path happens`);

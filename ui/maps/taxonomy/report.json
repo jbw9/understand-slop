@@ -1,0 +1,263 @@
+{
+ "repo": "taxonomy",
+ "commit": "298a885",
+ "models": {
+  "summarize": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "us.anthropic.claude-opus-4-6-v1",
+  "author": "us.anthropic.claude-opus-4-6-v1",
+  "verify": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 0,
+  "cut": 0,
+  "author": 0,
+  "verify": 59,
+  "total": 59
+ },
+ "usd": 1.98,
+ "bill": {
+  "summarize": {
+   "calls": 132,
+   "cached": 132,
+   "input": 0,
+   "output": 0,
+   "cacheRead": 0,
+   "usd": 0
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 1,
+   "input": 0,
+   "output": 0,
+   "cacheRead": 0,
+   "usd": 0
+  },
+  "author": {
+   "calls": 78,
+   "cached": 78,
+   "input": 0,
+   "output": 0,
+   "cacheRead": 0,
+   "usd": 0
+  },
+  "verify": {
+   "calls": 54,
+   "cached": 54,
+   "input": 0,
+   "output": 0,
+   "cacheRead": 0,
+   "usd": 0
+  },
+  "verify-review": {
+   "calls": 80,
+   "cached": 0,
+   "input": 291370,
+   "output": 20952,
+   "cacheRead": 0,
+   "usd": 1.9806500000000002
+  }
+ },
+ "files": {
+  "listed": 165,
+  "summarised": 132,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "components/ui/",
+   "reason": "Vendored shadcn/ui component library — thin wrappers around Radix UI primitives with Tailwind styling, not product-specific logic."
+  },
+  {
+   "path": "postcss.config.js",
+   "reason": "Pure build tooling — PostCSS plugin configuration."
+  },
+  {
+   "path": "prettier.config.js",
+   "reason": "Pure tooling — code formatting configuration."
+  },
+  {
+   "path": "tailwind.config.js",
+   "reason": "Pure build tooling — Tailwind CSS theme and plugin configuration."
+  }
+ ],
+ "roots": [
+  {
+   "id": "marketing",
+   "title": "Marketing Site",
+   "accepted": true,
+   "turns": 13,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 8,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "mk-content",
+      "claims": [
+       "Author document type: title, avatar, twitter — contradicted: Lines 109-122 show title, avatar, and twitter, but line 113-114 also shows a 'description' field that is not mentioned in the code label.",
+       "Mdx component: useMDXComponent renders code with styled components — partially_supported: Lines 159-167 show `useMDXComponent(code)` being called and components being passed (line 164), but the code does not show whether those components are 'styled components' specifically—only that they are passed as `components` prop."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "auth",
+   "title": "Authentication",
+   "accepted": true,
+   "turns": 8,
+   "reads": 15,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "au-nextauth",
+      "claims": [
+       "not_shown: The code shows the JWT callback exists and runs a DB query, and line 19 confirms JWT strategy is used, but the code does not show how frequently the callback is invoked or demonstrate the absence of a cache layer.",
+       "not_shown: Line 16 cites the issue URL but the code does not show whether the issue is closed or whether the cast is removable."
+      ]
+     },
+     {
+      "id": "au-session",
+      "claims": [
+       "Every server component and API route that needs the authenticated user imports this single function — not_shown: The cited code only shows the implementation of getCurrentUser. It does not show how many places import this function or whether all server components and API routes that need the authenticated user actually use it.",
+       "Server-side getCurrentUser function used by dashboard and API routes — not_shown: The code shows the function is server-side (async function using getServerSession), but the cited code does not show it being used by dashboard or API routes specifically."
+      ]
+     }
+    ],
+    "downgraded": [
+     "au-nextauth"
+    ]
+   }
+  },
+  {
+   "id": "dashboard",
+   "title": "Post Dashboard",
+   "accepted": true,
+   "turns": 9,
+   "reads": 23,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "flagged": 4,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "post-editor",
+   "title": "Post Editor",
+   "accepted": true,
+   "turns": 6,
+   "reads": 11,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "flagged": 4,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "billing",
+   "title": "Billing & Subscriptions",
+   "accepted": true,
+   "turns": 19,
+   "reads": 27,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 8,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "bl-session",
+      "claims": [
+       "retrieves the user's subscription plan — not_shown: The cited code does not show where subscriptionPlan is retrieved. It appears on line 24 but the retrieval logic is not included in the cited lines."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "docs-guides",
+   "title": "Documentation & Guides",
+   "accepted": true,
+   "turns": 11,
+   "reads": 23,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "flagged": 6,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "app-shell",
+   "title": "App Shell",
+   "accepted": true,
+   "turns": 12,
+   "reads": 30,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "flagged": 4,
+    "rewritten": [],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "marketing",
+    "depth": 3,
+    "nodes": 8
+   },
+   {
+    "id": "auth",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "dashboard",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "post-editor",
+    "depth": 3,
+    "nodes": 6
+   },
+   {
+    "id": "billing",
+    "depth": 3,
+    "nodes": 8
+   },
+   {
+    "id": "docs-guides",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "app-shell",
+    "depth": 2,
+    "nodes": 7
+   }
+  ]
+ },
+ "verifyPassRate": 98
+}

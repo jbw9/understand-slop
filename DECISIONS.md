@@ -1079,3 +1079,38 @@ write the path of the file. I really don't think we need that since we can go
 deeper into that anyway and then later you can show the file path itself."
 **Cost accepted:** to learn where a part lives you must open it — one extra
 click, which is the point. **At scale:** unchanged.
+
+## D43 — The scenery recedes; the live box wears a badge
+
+**Chose:** a live diagram box carries a filled green disc with a chevron,
+drawn at rest, and on a navigable diagram the boxes that open nothing drop to
+0.55 opacity. Hover adds a lift and grows the badge.
+**Beat:** a bare `›` at 0.45 opacity in the corner (D40), which the user could
+not see: "the diagram is not that obvious that i can click on it". A lone
+chevron at rest read as decoration, so the affordance was only discoverable by
+hovering — which you only do if you already suspect it is clickable.
+**Why the scenery dims rather than the live boxes shouting:** measured, most
+boxes on a parent level are live — 8 of 10 on `feed`, 8 of 12 on `rsvp`, 9 of
+11 on `supabase`. Making every live box loud would make the whole picture
+loud and signal nothing. Fading the 2-3 inert ones is the cheaper, quieter
+signal and leaves the live boxes at full contrast.
+**Why green, not the box's own stroke:** the accent reads as "this does
+something" everywhere else on the page, and it stays legible on a `warn` box
+whose stroke is amber (`feed`'s `guests` box is both warn and live).
+**Cost accepted:** a live box reserves 26px of width for its badge and
+centres its label in what is left, so the label and its `sub` are no longer
+centred on exactly the same axis. Measured imperceptible; verified 0 label
+and badge overlaps across all 13 diagram levels.
+**At scale:** per-box, no layout pass.
+
+## D44 — A screen's callouts are body text, not captions
+
+**Chose:** the numbered notes beside a `screen` shot are 15.5px with relaxed
+leading and a 4-unit gap, in a column up to 760px wide.
+**Beat:** 13.5px, snug leading, `gap-2.5` and a 240px minimum, which the user
+called out: "there's so much empty space vertically. I don't get why you don't
+make the text any bigger … it's so small and it's really squished together".
+The list sits beside a ~700px phone, so it was set tiny against a column of
+dead space.
+**Cost accepted:** a screen with many long notes is now taller than its phone
+rather than shorter. **At scale:** unchanged.

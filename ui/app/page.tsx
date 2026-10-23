@@ -29,7 +29,10 @@ export default async function Home({
   return (
     <MapProvider name={name} file={file} maps={STATIC_MAP ? [{ id: STATIC_MAP, label: STATIC_MAP, local: false }] : listMaps()}>
       <div className="flex h-full flex-col">
-        <Titlebar />
+        {/* The title bar reads the open level from the URL, as the map does. */}
+        <Suspense>
+          <Titlebar />
+        </Suspense>
         <div className="min-h-0 flex-1">
           <Suspense>
             {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}

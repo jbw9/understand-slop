@@ -3,17 +3,20 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { openSettings } from "@/lib/settings";
+import { MapSwitcher, Trail, goTo, useLocation } from "@/components/chrome";
+import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
 import { toggleTerminal } from "@/components/terminal";
 import { openClaude } from "@/lib/context";
-import { openSettings } from "@/lib/settings";
-import { useMap } from "@/components/map-context";
 import { cn } from "@/lib/utils";
 
 /**
  * The window's own title bar. The native one is off (`decorations: false` in
- * tauri.conf.json), so this draws the name, the drag area and the window
- * buttons in the page's palette rather than the desktop's.
+ * tauri.conf.json), so this draws where you are — the map switcher and the
+ * trail of levels below it — the drag area and the window buttons, in the
+ * page's palette rather than the desktop's. The map below has no header of its
+ * own in the desktop app.
  *
  * Everything marked `data-tauri-drag-region` moves the window, and a double
  * click on it maximizes, as a native bar does. Buttons sit outside those
@@ -26,7 +29,8 @@ const noSubscribe = () => () => {};
 
 export function Titlebar() {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
-  const { RUN } = useMap();
+  const { name, maps } = useMap();
+  const { path, crumbs } = useLocation();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -47,13 +51,34 @@ export function Titlebar() {
   return (
     <header
       data-tauri-drag-region
-      className="flex h-9 shrink-0 select-none items-center border-b border-border-gray bg-surface-container-low pl-3.5"
+      className="flex h-9 shrink-0 select-none items-center border-b border-border-gray bg-surface-container-low pl-1.5"
     >
-      <span data-tauri-drag-region className="font-mono text-[11.5px] font-semibold text-ink">
-        understand-slop
-      </span>
-      <span data-tauri-drag-region className="ml-2 font-mono text-[11.5px] text-faint">
-        {RUN.repo}
+      {/* Outside the drag region, so a click opens it rather than moving the window. */}
+      <label className="relative flex items-center">
+        <MapSwitcher
+          map={name}
+          maps={maps}
+          className="cursor-pointer appearance-none rounded-[5px] bg-transparent py-1 pl-2 pr-6 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
+        />
+        <svg
+          aria-hidden
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          className="pointer-events-none absolute right-2 text-faint"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m2.5 4 2.5 2.5L7.5 4" />
+        </svg>
+      </label>
+      <Trail crumbs={crumbs} onJump={(d) => goTo(path.slice(0, d))} />
+      <span data-tauri-drag-region className="ml-3 flex shrink-0 items-center gap-2 font-mono text-[10.5px] text-faint">
+        <Hint k="esc">back</Hint>
+        <Hint k="0">top</Hint>
       </span>
       <div data-tauri-drag-region className="h-full flex-1" />
       <Control label="Projects — import one, or switch maps" onClick={openProjects}>
@@ -123,5 +148,14 @@ function Control({
         {children}
       </svg>
     </button>
+  );
+}
+
+function Hint({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <span data-tauri-drag-region className="flex items-center gap-1">
+      <kbd className="rounded-[3px] border border-border-gray bg-surface px-1 text-[10px] text-muted-slate">{k}</kbd>
+      {children}
+    </span>
   );
 }

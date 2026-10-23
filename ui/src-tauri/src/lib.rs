@@ -5,6 +5,10 @@ use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
+        // The folder picker for importing a project; nothing else.
+        .plugin(tauri_plugin_dialog::init())
+        // The terminal's copy and paste (Ctrl+Shift+C / V): plain text only.
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(pty::Ptys::default())
         .invoke_handler(tauri::generate_handler![
             pty::pty_spawn,

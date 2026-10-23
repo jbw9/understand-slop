@@ -1,11 +1,19 @@
 import { Suspense } from "react";
 import { Canvas } from "@/components/canvas";
 import { MapProvider } from "@/components/map-context";
-import { listMaps, loadMap, remoteOf } from "@/lib/maps";
+import { ProjectsDialog } from "@/components/projects";
+import { SettingsDialog } from "@/components/settings";
+import { Titlebar } from "@/components/titlebar";
+import { Workspace } from "@/components/workspace";
+import { listMaps, loadMap, remoteOf, rootOf } from "@/lib/maps";
 import { STATIC_MAP } from "@/lib/source";
 
 // The open level lives in the URL, and `useSearchParams` needs a Suspense
-// boundary to prerender. `?map=` picks which repository's map is read.
+// boundary to prerender. `?map=` picks which repository's map is read. In the
+// desktop app the title bar sits above the map, which takes the rest of the
+// height; the workspace (Claude Code and terminal tabs) floats over it on the
+// right. All of them live inside the provider, so they know which map (and
+// checkout) is open.
 export default async function Home({
   searchParams,
 }: {
@@ -16,13 +24,26 @@ export default async function Home({
   const { name, file } = loadMap(typeof asked === "string" ? asked : undefined);
   file.RUN.url ??= remoteOf(file.RUN);
   // A published page has no checkout to read, and must not carry this machine's paths.
+  // The desktop app's tabs start in the checkout, so it is named in full.
   if (STATIC_MAP) delete file.RUN.root;
+  else file.RUN.root = rootOf(file.RUN);
   return (
-    <MapProvider name={name} file={file} maps={STATIC_MAP ? [STATIC_MAP] : listMaps()}>
-      <Suspense>
-        {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}
-        <Canvas key={name} />
-      </Suspense>
+    <MapProvider name={name} file={file} maps={STATIC_MAP ? [{ id: STATIC_MAP, label: STATIC_MAP, local: false }] : listMaps()}>
+      <div className="flex h-full flex-col">
+        {/* The title bar reads the open level from the URL, as the map does. */}
+        <Suspense>
+          <Titlebar />
+        </Suspense>
+        <div className="min-h-0 flex-1">
+          <Suspense>
+            {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}
+            <Canvas key={name} />
+          </Suspense>
+        </div>
+        <Workspace />
+        <SettingsDialog />
+        <ProjectsDialog />
+      </div>
     </MapProvider>
   );
 }

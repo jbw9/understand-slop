@@ -1,17 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
-import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { CodeDrawer, ExplainedBlock, WatchOut, isExplained } from "@/components/blocks";
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { Crumbs } from "@/components/chrome";
+import { Crumbs, goTo, useLocation } from "@/components/chrome";
+import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
-import type { Edge, Node } from "@/lib/data";
+import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
+import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
+import { codeAt, describeElement, describeProblems, type BuiltMap } from "@/lib/map";
+import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
 /**
@@ -81,26 +85,19 @@ function setNote(node: Node): string | null {
 }
 
 export function Canvas() {
-  const { LINKS, RUN, levelAt, nodeAt, stepOf, name, maps } = useMap();
+  const map = useMap();
+  const { LINKS, RUN, levelAt, nodeAt, name, maps } = map;
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { nodes, anchor, version } = useWireAnchors();
 
   /**
-   * The open path, root-first, read from the URL (`?at=engine&at=eng-math`).
-   * `[]` is the repo; depth is its length.
-   *
-   * The URL rather than state because every level is then a history entry:
-   * the browser's back button and the trackpad's two-finger swipe step back
-   * the way they do everywhere else, and a level can be linked or reloaded.
-   * Clicking empty space used to go back, and an accidental click on the
-   * background threw away where you were.
+   * The open path, root-first, read from the URL (useLocation in
+   * components/chrome.tsx); depth is its length. Clicking empty space used to
+   * go back, and an accidental click on the background threw away where you
+   * were.
    */
-  const params = useSearchParams();
-  const path = useMemo(() => {
-    const asked = params.getAll("at");
-    return asked.length && nodeAt(asked) ? asked : [];
-  }, [params, nodeAt]);
+  const { path, crumbs } = useLocation();
   const key = path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
@@ -120,15 +117,7 @@ export function Canvas() {
     [key],
   );
 
-  // Native pushState is integrated with the App Router: `useSearchParams`
-  // follows it, and so does back/forward.
-  const go = useCallback((next: string[]) => {
-    const q = new URLSearchParams();
-    const map = new URLSearchParams(window.location.search).get("map");
-    if (map) q.set("map", map);
-    for (const id of next) q.append("at", id);
-    window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
-  }, []);
+  const go = goTo;
 
   // A new level starts at its top, not wherever the last one was scrolled to.
   useLayoutEffect(() => {
@@ -223,17 +212,38 @@ export function Canvas() {
     return () => window.removeEventListener("keydown", onKey);
   }, [traced, setTraced, path, go]);
 
-  const crumbs = path
-    .map((_, i) => nodeAt(path.slice(0, i + 1)))
-    .filter((n): n is Node => n !== null)
-    .map((n) => ({ id: n.id, title: n.title, step: stepOf(n.id)?.n }));
-
   const open = (next: string[]) => go(next);
 
+  /* ── handing a section to Claude ──────────────────────────── */
+
+  // Right-click offers Claude the nearest thing under the pointer: a card or
+  // the open level's header (`data-path`, a whole section), else a row, box,
+  // block or line of code (`data-row`, `data-pick`). Desktop only: the browser
+  // keeps its own menu, and there is no Claude tab to hand anything to.
+  const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const [menu, setMenu] = useState<{ x: number; y: number; target: Target } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const onContextMenu = (e: React.MouseEvent) => {
+    // Anything else on the level — a caption, the space between blocks — is
+    // part of the section you are in, so that is what it offers.
+    const el = (e.target as Element).closest<HTMLElement | SVGElement>(PICKABLE);
+    const target = el ? targetOf(map, el, path) : section(map, path);
+    if (!target) return;
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, target });
+  };
+
   return (
-    <div className="flex h-dvh w-screen overflow-hidden bg-warm-cream">
+    <div
+      className="flex h-full w-full overflow-hidden bg-warm-cream"
+      onContextMenu={desktop ? onContextMenu : undefined}
+    >
+      {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
       <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
-        <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        {/* In the desktop app the title bar carries where you are. */}
+        {desktop ? null : (
+          <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        )}
         <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
           <WireLayer
             canvasRef={contentRef}
@@ -270,6 +280,119 @@ export function Canvas() {
 }
 
 
+const noSubscribe = () => () => {};
+
+const PICKABLE = "[data-path], [data-row], [data-pick]";
+
+/**
+ * What a right-clicked element hands to Claude. An element's words are what
+ * is on screen — `data-pick-text` where the screen leaves something out, like
+ * a table row's column names — and its code is the nearest `data-pick-code`.
+ */
+function targetOf(map: BuiltMap, el: HTMLElement | SVGElement, level: string[]): Target | null {
+  const d = el.dataset;
+  if (d.path !== undefined) {
+    const at: string[] = JSON.parse(d.path);
+    return at.length && !map.nodeAt(at) ? null : section(map, at);
+  }
+  const shown = ("innerText" in el ? el.innerText : (el.textContent ?? "")).trim();
+  const label = (d.pick || shown.split("\n")[0] || "").trim().slice(0, 80);
+  if (!label) return null;
+  const id = d.row ?? d.pick ?? label;
+  return {
+    key: `${sectionKey(level)}#${id}`,
+    title: label,
+    text: describeElement(map, level, label, d.pickText ?? shown, el.closest<HTMLElement>("[data-pick-code]")?.dataset.pickCode),
+  };
+}
+
+function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
+  const status = usePicked(target.key);
+  return (
+    <Menu
+      x={x}
+      y={y}
+      title={target.title}
+      onClose={onClose}
+      items={[
+        status === "queued"
+          ? { label: "Waiting for your next prompt", disabled: true }
+          : { label: status === "sent" ? "Send to Claude again" : "Add to Claude context", onClick: () => pick(target) },
+        {
+          label: "Add and open Claude",
+          onClick: () => {
+            if (status !== "queued") pick(target);
+            openClaude();
+          },
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * Asks the default agent (Settings) about a section's problems, all of them,
+ * straight away: Claude takes them as context with the question, and the
+ * button follows them there; another agent gets them in its prompt with the
+ * question, sent. Desktop only, where the agents run.
+ */
+function HandProblems({ node, path }: { node: Node; path: string[] }) {
+  const map = useMap();
+  const { main } = useAgents();
+  const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const key = `${sectionKey(path)}#problems`;
+  const status = usePicked(key);
+  const [pasted, setPasted] = useState(false);
+  useEffect(() => {
+    if (!pasted) return;
+    const timer = setTimeout(() => setPasted(false), 2500);
+    return () => clearTimeout(timer);
+  }, [pasted]);
+  if (!desktop) return null;
+  const claude = main.id === CLAUDE.id;
+  const label = claude
+    ? status === "queued"
+      ? "Asking Claude…"
+      : status === "sent"
+        ? "Sent to Claude — ask again"
+        : "Ask Claude"
+    : pasted
+      ? `Sent to ${main.label}`
+      : `Ask ${main.label}`;
+  return (
+    <button
+      type="button"
+      disabled={claude && status === "queued"}
+      onClick={() => {
+        handTo(
+          main.id,
+          { key, title: `Problems in ${node.title}`, text: describeProblems(map, path) },
+          `Look into the problems in "${node.title}" from the map: check each against the code, explain what goes wrong, and suggest a fix.`,
+        );
+        if (!claude) setPasted(true);
+      }}
+      title={
+        claude
+          ? "Asks Claude about every problem here, with its section and code"
+          : `Asks ${main.label} about every problem here, with its section and code`
+      }
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-clay-line bg-pure-white px-2.5 py-1 font-mono text-[11px] text-clay-ink transition-colors hover:bg-clay-surface disabled:cursor-default disabled:opacity-70"
+    >
+      <AgentIcon id={main.id} />
+      {label}
+    </button>
+  );
+}
+
+/** What a whole block is called when it is handed over. */
+function blockLabel(b: Anatomy): string {
+  if ("caption" in b && b.caption) return b.caption;
+  if (b.kind === "screen") return `The ${b.title} screen`;
+  if (b.kind === "schema") return `The ${b.table} table`;
+  if (b.kind === "source") return b.file;
+  return BLOCK_NOUN[b.kind] ? `The ${BLOCK_NOUN[b.kind]}` : b.kind;
+}
+
 /* ── levels ──────────────────────────────────────────────────── */
 
 /**
@@ -286,6 +409,7 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
   return (
     <>
       <Header
+        path={[]}
         eyebrow="Repository"
         title={RUN.repo}
         sub={RUN.about}
@@ -355,7 +479,8 @@ function Level({
   ctx: RowCtx;
   onOpen: (p: string[]) => void;
 }) {
-  const { RUN, nodeAt, stepOf } = useMap();
+  const map = useMap();
+  const { RUN, nodeAt, stepOf } = map;
   const kids = authored(node);
   const parent = path.length > 1 ? nodeAt(path.slice(0, -1)) : null;
   const step = path.length === 1 ? stepOf(node.id) : undefined;
@@ -371,19 +496,13 @@ function Level({
       .map((box) => box.opens)
       .filter((id): id is string => Boolean(id) && kids.some((k) => k.id === id)),
   );
-  // A row-built level has no refs of its own; the code of the nearest level
-  // above it is still the code behind it.
-  const code =
-    node.code ??
-    path
-      .map((_, i) => nodeAt(path.slice(0, path.length - 1 - i))?.code)
-      .find((c) => c?.length) ??
-    [];
+  const code = codeAt(map, path);
   const [codeOpen, setCodeOpen] = useState(false);
 
   return (
     <>
       <Header
+        path={path}
         back={{
           label: parent?.title ?? RUN.repo,
           onClick: () => onOpen(path.slice(0, -1)),
@@ -423,33 +542,43 @@ function Level({
         }
       />
 
-      <div className="flex flex-col gap-12">
+      {/* One hairline between every block, the full width of the level, so it
+          is plain where one thing ends and the next begins — a picture under
+          a table is its own thing, not more of the table. Each block's width
+          cap is on an inner box, so the line never stops at a ragged edge. */}
+      <div className="flex flex-col [&>*+*]:mt-10 [&>*+*]:border-t [&>*+*]:border-border-gray [&>*+*]:pt-10">
         {/* The picture is the main thing on the level, not a thumbnail in
             the header's corner. */}
         {figure ? (
-          <div className="max-w-[540px]">
-            <ShapeView shape={figure} />
+          <div data-pick="The picture">
+            <div className="max-w-[540px]">
+              <ShapeView shape={figure} />
+            </div>
           </div>
         ) : null}
 
         {blocks.map((b, i) =>
           isExplained(b) ? (
-            <div key={i} className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
-              <ExplainedBlock
-                block={b}
-                onOpen={(id) =>
-                  kids.some((k) => k.id === id) ? onOpen([...path, id]) : undefined
-                }
-                hrefFor={(id) =>
-                  `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
-                }
-              />
+            <div key={i} data-pick={blockLabel(b)}>
+              <div className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
+                <ExplainedBlock
+                  block={b}
+                  onOpen={(id) =>
+                    kids.some((k) => k.id === id) ? onOpen([...path, id]) : undefined
+                  }
+                  hrefFor={(id) =>
+                    `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
+                  }
+                />
+              </div>
             </div>
           ) : (
             // The older blocks are typeset for a 340px card (11px rows); zoom
             // lifts them to reading size without forking their type scale.
-            <div key={i} className="max-w-[900px] [zoom:1.18]">
-              <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
+            <div key={i} data-pick={blockLabel(b)}>
+              <div className="max-w-[900px] [zoom:1.18]">
+                <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
+              </div>
             </div>
           ),
         )}
@@ -483,20 +612,24 @@ function Level({
         ) : null}
 
         {node.issues?.length ? (
-          <div className="max-w-[820px]">
-            <WatchOut issues={node.issues} />
+          <div>
+            <div className="max-w-[820px]">
+              <WatchOut issues={node.issues} action={<HandProblems node={node} path={path} />} />
+            </div>
           </div>
         ) : null}
 
         {code.length ? (
-          <div className="max-w-[1000px]">
-            <CodeDrawer
-              owner={node.id}
-              refs={code}
-              ctx={ctx}
-              open={codeOpen}
-              onToggle={() => setCodeOpen((v) => !v)}
-            />
+          <div>
+            <div className="max-w-[1000px]">
+              <CodeDrawer
+                owner={node.id}
+                refs={code}
+                ctx={ctx}
+                open={codeOpen}
+                onToggle={() => setCodeOpen((v) => !v)}
+              />
+            </div>
           </div>
         ) : null}
       </div>
@@ -626,10 +759,11 @@ function List({
           <li key={n.id}>
             <button
               data-node-id={n.id}
+              data-path={JSON.stringify([...at, n.id])}
               onClick={go}
               disabled={!go}
               className={cn(
-                "group flex w-full items-center gap-2.5 rounded-[8px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
+                "group flex w-full items-center gap-2.5 rounded-[5px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
                 go && "hover:bg-surface-container-low",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
               )}
@@ -677,6 +811,7 @@ function Note({ children }: { children: React.ReactNode }) {
 /* ── the node you are in ─────────────────────────────────────── */
 
 function Header({
+  path,
   back,
   eyebrow,
   title,
@@ -690,6 +825,8 @@ function Header({
   shape,
   onCode,
 }: {
+  /** Where this level is, so it can be handed to Claude from its header. */
+  path: string[];
   /** The level above, named — so "back" says where it goes. */
   back?: { label: string; onClick: () => void };
   eyebrow: string;
@@ -707,12 +844,12 @@ function Header({
   onCode?: () => void;
 }) {
   return (
-    <header className="mb-8 border-b border-border-gray pb-7">
+    <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
       <div className="min-w-0 max-w-[660px]">
         {back ? (
           <button
             onClick={back.onClick}
-            className="-ml-2 mb-4 flex items-center gap-1.5 rounded-full px-2 py-1 text-[12.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+            className="-ml-2 mb-4 flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
           >
             <span aria-hidden>←</span>
             {back.label}
@@ -726,7 +863,7 @@ function Header({
           {state ? <StateChip state={state} alarm={alarm} /> : null}
           {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
           {shape?.kind === "count" ? (
-            <span className="rounded-full border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
+            <span className="rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
               <span className="tnum font-semibold text-ink">{shape.value}</span> {shape.unit}
             </span>
           ) : null}
@@ -742,7 +879,7 @@ function Header({
             ))
           : null}
         {unsure ? (
-          <p className="mt-4 rounded-[10px] border border-dashed border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] leading-snug text-amber-ink">
+          <p className="mt-4 rounded-[6px] border border-dashed border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] leading-snug text-amber-ink">
             <span className="font-semibold">Not certain: </span>
             <Prose text={unsure} />
           </p>
@@ -823,10 +960,11 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
   return (
     <button
       data-node-id={node.id}
+      data-path={JSON.stringify([...at, node.id])}
       onClick={go}
       disabled={!go}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-[12px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
+        "group flex w-full items-start gap-3 rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
         go && "hover:border-border-strong hover:shadow-panel",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
@@ -839,7 +977,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
           </span>
           <StateChip state={node.state} alarm={node.alarm} />
           {node.issues?.length ? (
-            <span className="shrink-0 rounded-full border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
+            <span className="shrink-0 rounded-[6px] border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
               ⚠ {node.issues.length} {node.issues.length === 1 ? "problem" : "problems"}
             </span>
           ) : null}

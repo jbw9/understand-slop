@@ -1,0 +1,258 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useSyncExternalStore } from "react";
+import { describe, type BuiltMap } from "@/lib/map";
+
+/**
+ * What the user has handed to Claude from the map: whole sections, or any one
+ * thing on a level — a row, a box, a message, a line of the screen, a problem,
+ * a place in the code.
+ *
+ * Every workspace tab has its own queue (src-tauri/src/claude.rs): a pick is
+ * written there and goes out with the next prompt to Claude in that tab.
+ * Picks go to the tab the workspace names, one running Claude
+ * (components/workspace.tsx). With none, the pick waits, a tab is opened
+ * (it starts in Claude), and it is queued as soon as the tab has started.
+ *
+ * Delivery is seen, not assumed: while anything is queued its queue is polled,
+ * and the moment the prompt hook has taken it the pick shows as sent.
+ */
+
+/** Something that can be handed over, and the text Claude gets for it. */
+export interface Target {
+  /** A section's path as the URL carries it; an element's adds `#` and its identity. */
+  key: string;
+  title: string;
+  text: string;
+}
+
+export interface Pick extends Target {
+  status: "queued" | "sent";
+}
+
+interface State {
+  /** The Claude tab picks go to: its pty id. */
+  target: number | null;
+  picks: Record<number, Pick[]>;
+}
+
+let state: State = { target: null, picks: {} };
+const listeners = new Set<() => void>();
+const set = (next: State) => {
+  state = next;
+  listeners.forEach((f) => f());
+};
+const subscribe = (f: () => void) => {
+  listeners.add(f);
+  return () => listeners.delete(f);
+};
+
+export const sectionKey = (path: string[]) => path.join("/");
+
+export const section = (m: BuiltMap, path: string[]): Target => ({
+  key: sectionKey(path),
+  title: path.length ? (m.nodeAt(path)?.title ?? sectionKey(path)) : m.RUN.repo,
+  text: describe(m, path),
+});
+const withPicks = (pty: number, picks: Pick[]) => set({ ...state, picks: { ...state.picks, [pty]: picks } });
+
+/** Picked before any Claude tab existed; queued once one starts. */
+let waiting: Target[] = [];
+/** Of those, what to ask about them once Claude is up (ask), by key. */
+let asking = new Map<string, string>();
+
+/* ── tabs coming and going (components/workspace.tsx) ─────────── */
+
+/** Anything can ask for Claude: shows a tab running it, or opens one. */
+const OPEN = "slop:claude";
+export const openClaude = () => window.dispatchEvent(new Event(OPEN));
+export const onOpenClaude = (f: () => void) => {
+  window.addEventListener(OPEN, f);
+  return () => window.removeEventListener(OPEN, f);
+};
+
+/**
+ * A tab has its pty, so it can hold picks. One starting in Claude takes the
+ * picks that were waiting for it, and the next ones; a plain shell waits until
+ * Claude runs in it (retarget).
+ */
+export function tabStarted(pty: number, claude: boolean) {
+  set({ target: claude ? pty : state.target, picks: { ...state.picks, [pty]: [] } });
+  if (!claude) return;
+  const queued = waiting;
+  const toAsk = queued.flatMap((p) => asking.get(p.key) ?? []);
+  waiting = [];
+  asking = new Map();
+  for (const p of queued) void add(pty, p);
+  if (toAsk.length) void whenUp(pty).then(() => prompt(pty, toAsk.join(" ")), () => {});
+}
+
+/**
+ * The tab picks go to now: the one in view in the open project if Claude runs
+ * there, else the newest one running it. None
+ * when the project has no Claude tab, so a pick opens one there rather than
+ * reaching a session in another project.
+ */
+export function retarget(pty: number | null) {
+  if (pty !== null && !(pty in state.picks)) return;
+  if (state.target !== pty) set({ ...state, target: pty });
+}
+
+export function tabEnded(pty: number) {
+  const picks = { ...state.picks };
+  delete picks[pty];
+  set({ target: state.target === pty ? null : state.target, picks });
+}
+
+/* ── picking ──────────────────────────────────────────────────── */
+
+/** Hand something to Claude. Opens a tab first if none is running Claude. */
+export function pick(t: Target) {
+  if (state.target === null) {
+    if (!waiting.some((w) => w.key === t.key)) waiting.push(t);
+    openClaude();
+    return;
+  }
+  void add(state.target, t);
+}
+
+/**
+ * Hand something to Claude and ask about it straight away: the pick is
+ * queued, then a prompt is typed and sent, so the hook takes the pick with
+ * it. A tab opened for it is asked once Claude has drawn its prompt.
+ */
+export function ask(t: Target, question: string) {
+  if (state.target === null) {
+    asking.set(t.key, question);
+    pick(t);
+    return;
+  }
+  const pty = state.target;
+  openClaude();
+  void add(pty, t).then(() => prompt(pty, question));
+}
+
+/** Typed into a program's prompt as a paste, then Enter, a moment later so it is not part of the paste. */
+export function prompt(pty: number, text: string) {
+  void invoke("pty_write", { id: pty, data: `\x1b[200~${text}\x1b[201~` });
+  setTimeout(() => void invoke("pty_write", { id: pty, data: "\r" }), 150);
+}
+
+/** Resolves once Claude runs in the tab and has had a moment to draw its prompt. */
+async function whenUp(pty: number) {
+  for (let i = 0; i < 60; i++) {
+    const s = await invoke<{ claude: boolean }>("pty_state", { id: pty }).catch(() => null);
+    if (!s) return Promise.reject();
+    if (s.claude) return new Promise<void>((done) => setTimeout(done, 1500));
+    await new Promise((done) => setTimeout(done, 500));
+  }
+  return Promise.reject();
+}
+
+async function add(pty: number, t: Target) {
+  const mine = state.picks[pty] ?? [];
+  if (mine.some((p) => p.key === t.key && p.status === "queued")) return;
+  await invoke("context_add", { id: pty, text: t.text });
+  // A sent pick picked again goes again: it moves to the end, queued.
+  const rest = (state.picks[pty] ?? []).filter((p) => p.key !== t.key);
+  withPicks(pty, [...rest, { ...t, status: "queued" }]);
+  watch();
+}
+
+/** Take back a pick that has not gone out yet. One already sent is only dropped from view. */
+export async function unpick(pty: number, key: string) {
+  const mine = state.picks[pty] ?? [];
+  const gone = mine.find((p) => p.key === key);
+  if (!gone) return;
+  if (gone.status === "queued" && (await invoke<boolean>("context_pending", { id: pty }))) {
+    const keep = mine.filter((p) => p.status === "queued" && p.key !== key);
+    await invoke("context_set", { id: pty, text: keep.map((p) => p.text).join("\n\n") });
+  }
+  withPicks(pty, (state.picks[pty] ?? []).filter((p) => p.key !== key));
+}
+
+export async function clearPicks(pty: number) {
+  await invoke("context_set", { id: pty, text: "" });
+  withPicks(pty, []);
+}
+
+/* ── handing to any agent ─────────────────────────────────────── */
+
+const HAND = "slop:hand";
+
+/**
+ * Hand something to a coding agent by id (components/agents.tsx). Claude
+ * takes it as a pick, with its next prompt; another agent has no hook to
+ * read it, so the workspace pastes it into that agent's prompt instead,
+ * opening a tab for it if none runs it. With a question, it is asked at
+ * once; without, the ask is left to the user.
+ */
+export function handTo(agent: string, t: Target, question?: string) {
+  if (agent === "claude") {
+    if (question) return ask(t, question);
+    // With no tab to take it, pick opens one; with one, bring it forward.
+    const had = state.target !== null;
+    pick(t);
+    if (had) openClaude();
+    return;
+  }
+  window.dispatchEvent(new CustomEvent<Handed>(HAND, { detail: { agent, target: t, question } }));
+}
+
+interface Handed {
+  agent: string;
+  target: Target;
+  question?: string;
+}
+
+export const onHand = (f: (agent: string, t: Target, question?: string) => void) => {
+  const on = (e: Event) => {
+    const { agent, target, question } = (e as CustomEvent<Handed>).detail;
+    f(agent, target, question);
+  };
+  window.addEventListener(HAND, on);
+  return () => window.removeEventListener(HAND, on);
+};
+
+/* ── seeing delivery ──────────────────────────────────────────── */
+
+let timer: ReturnType<typeof setInterval> | null = null;
+
+function watch() {
+  if (timer) return;
+  timer = setInterval(async () => {
+    const live = Object.entries(state.picks).filter(([, ps]) => ps.some((p) => p.status === "queued"));
+    if (!live.length) {
+      clearInterval(timer!);
+      timer = null;
+      return;
+    }
+    for (const [id, ps] of live) {
+      const pty = Number(id);
+      const pending = await invoke<boolean>("context_pending", { id: pty }).catch(() => false);
+      if (pending || state.picks[pty] !== ps) continue;
+      withPicks(pty, ps.map((p) => ({ ...p, status: "sent" as const })));
+    }
+  }, 1000);
+}
+
+/* ── reading it ───────────────────────────────────────────────── */
+
+const NONE: Pick[] = [];
+
+/** One tab's picks, or the current target's when no tab is named. */
+export function usePicks(pty?: number | null): Pick[] {
+  return useSyncExternalStore(
+    subscribe,
+    () => state.picks[pty ?? state.target ?? -1] ?? NONE,
+    () => NONE,
+  );
+}
+
+/** How a pick, by key, stands with the Claude tab picks go to. */
+export function usePicked(key: string): Pick["status"] | null {
+  return useSyncExternalStore(
+    subscribe,
+    () => (state.picks[state.target ?? -1] ?? NONE).find((p) => p.key === key)?.status ?? null,
+    () => null,
+  );
+}

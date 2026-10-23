@@ -162,7 +162,7 @@ function Diagram({
                   y={y}
                   width={w}
                   height={BOX_H}
-                  rx="10"
+                  rx="6"
                   fill={t.fill}
                   stroke={t.stroke}
                   strokeWidth="1.5"
@@ -238,9 +238,10 @@ function Box({
   label: string;
   children: React.ReactNode;
 }) {
-  if (!live) return <g>{children}</g>;
+  if (!live) return <g data-pick={label}>{children}</g>;
   return (
     <a
+      data-pick={label}
       className="dg-live"
       href={href}
       aria-label={`${label} — open this part`}
@@ -273,7 +274,7 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[12px] border border-border-gray bg-pure-white">
+      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white">
         <table className="w-full border-collapse text-left text-[13.5px]">
           <thead>
             <tr className="border-b border-border-gray bg-surface">
@@ -286,7 +287,12 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className="border-b border-border-gray last:border-0">
+              <tr
+                key={i}
+                data-pick={r[0]}
+                data-pick-text={block.columns.map((c, j) => `${c}: ${r[j] ?? ""}`).join("\n")}
+                className="border-b border-border-gray last:border-0"
+              >
                 {r.map((cell, j) => (
                   <td
                     key={j}
@@ -328,7 +334,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[14px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
+      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
         <div className="relative" style={{ minWidth: n * 150 }}>
           {/* lifelines */}
           {block.actors.map((a) => (
@@ -342,7 +348,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
           <div className="relative flex">
             {block.actors.map((a) => (
               <div key={a} className="flex flex-1 justify-center">
-                <span className="rounded-[8px] border border-border-strong bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink">
+                <span className="rounded-[5px] border border-border-strong bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink">
                   {a}
                 </span>
               </div>
@@ -357,11 +363,16 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
               const width = Math.abs(b - a);
               const warn = m.state !== "derived";
               return (
-                <li key={i} className="relative h-[76px]">
+                <li
+                  key={i}
+                  data-pick={m.label}
+                  data-pick-text={`${m.from} → ${m.to}: ${m.label}${m.note ? ` (${m.note})` : ""}`}
+                  className="relative h-[76px]"
+                >
                   <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">{i + 1}</span>
                   {self ? (
                     <div
-                      className="absolute top-[8px] -translate-x-1/2 rounded-[8px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
+                      className="absolute top-[8px] -translate-x-1/2 rounded-[5px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
                       style={{ left: `${a}%`, maxWidth: `${100 / n}%` }}
                     >
                       {m.label}
@@ -420,15 +431,15 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             {/* A bezel, and a blank strip above and below the capture: the web
                 build has no status bar, so without them the rounded corners
                 cut into the app's own title and tab bar. */}
-            <div className="rounded-[44px] bg-ink p-[9px] shadow-panel">
-              <div className="overflow-hidden rounded-[36px] bg-pure-white">
+            <div className="rounded-[44px] bg-night p-[9px] shadow-panel">
+              <div className="overflow-hidden rounded-[36px] bg-white">
                 <div className="flex h-8 items-center justify-center">
-                  <div className="h-[18px] w-[84px] rounded-full bg-ink" />
+                  <div className="h-[18px] w-[84px] rounded-full bg-night" />
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element -- a static capture at its own size; next/image adds nothing here */}
                 <img src={block.shot} alt={block.title} className="block h-auto w-full" />
                 <div className="flex h-6 items-center justify-center">
-                  <div className="h-[4px] w-24 rounded-full bg-ink/80" />
+                  <div className="h-[4px] w-24 rounded-full bg-night/80" />
                 </div>
               </div>
             </div>
@@ -442,7 +453,9 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             <p className="mb-3 px-2 text-center text-[13px] font-semibold text-ink">{block.title}</p>
             <div className="flex flex-col gap-2 px-2 pb-3">
               {block.items.map((it, i) => (
-                <ScreenThing key={i} type={it.type} label={it.label} n={num.get(i)} />
+                <div key={i} data-pick={it.label}>
+                  <ScreenThing type={it.type} label={it.label} n={num.get(i)} />
+                </div>
               ))}
             </div>
           </div>
@@ -454,7 +467,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
           // screen — the main text of the block — and is typeset as such.
           <ol className="flex min-w-[280px] max-w-[760px] flex-1 flex-col gap-4 pt-10">
             {noted.map((it, k) => (
-              <li key={it.i} className="flex gap-3 text-[15.5px] leading-relaxed">
+              <li key={it.i} data-pick={it.label} className="flex gap-3 text-[15.5px] leading-relaxed">
                 <Badge n={k + 1} />
                 <span>
                   <span className="font-semibold text-ink">{it.label}</span>
@@ -474,7 +487,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
 
 function Badge({ n }: { n: number }) {
   return (
-    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[11px] font-semibold text-pure-white">
+    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[11px] font-semibold text-white">
       {n}
     </span>
   );
@@ -494,38 +507,38 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
       return <p className={cn(base, "text-muted-slate")}>{label}{badge}</p>;
     case "field":
       return (
-        <div className={cn(base, "rounded-[8px] border border-border-strong px-2.5 py-2 text-faint")}>
+        <div className={cn(base, "rounded-[5px] border border-border-strong px-2.5 py-2 text-faint")}>
           {label}
           {badge}
         </div>
       );
     case "choice":
       return (
-        <div className={cn(base, "rounded-full border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
+        <div className={cn(base, "rounded-[6px] border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
           {label}
           {badge}
         </div>
       );
     case "button":
       return (
-        <div className={cn(base, "rounded-full bg-deep-green px-3 py-2 text-center font-medium text-pure-white")}>
+        <div className={cn(base, "rounded-[6px] bg-deep-green px-3 py-2 text-center font-medium text-white")}>
           {label}
           {badge}
         </div>
       );
     case "image":
       return (
-        <div className={cn(base, "flex h-20 items-center justify-center rounded-[8px] bg-surface-container text-faint")}>
+        <div className={cn(base, "flex h-20 items-center justify-center rounded-[5px] bg-surface-container text-faint")}>
           {label}
           {badge}
         </div>
       );
     default:
       return (
-        <div className={cn(base, "flex flex-col gap-1 rounded-[8px] border border-border-gray p-2 text-on-surface-variant")}>
+        <div className={cn(base, "flex flex-col gap-1 rounded-[5px] border border-border-gray p-2 text-on-surface-variant")}>
           {label}
-          <span className="h-2 w-4/5 rounded bg-surface-container" />
-          <span className="h-2 w-3/5 rounded bg-surface-container" />
+          <span className="h-2 w-4/5 rounded-[3px] bg-surface-container" />
+          <span className="h-2 w-3/5 rounded-[3px] bg-surface-container" />
           {badge}
         </div>
       );
@@ -538,18 +551,18 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
   return (
     <div className="min-w-0">
       <div className="mb-2.5 flex items-center gap-2">
-        <span className="rounded-full border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
+        <span className="rounded-[6px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
           example
         </span>
         <span className="text-[13px] font-medium text-on-surface-variant">{block.caption}</span>
       </div>
-      <pre className="overflow-x-auto rounded-[12px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
+      <pre className="overflow-x-auto rounded-[8px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
         {block.value}
       </pre>
       {block.notes?.length ? (
         <dl className="mt-2.5 flex flex-col gap-1.5">
           {block.notes.map((p) => (
-            <div key={p.label} className="flex gap-3 text-[13px] leading-snug">
+            <div key={p.label} data-pick={p.label} className="flex gap-3 text-[13px] leading-snug">
               <dt className="w-[160px] shrink-0 font-mono text-[12px] text-ink">{p.label}</dt>
               <dd className="text-on-surface-variant">
                 <Prose text={p.value} />
@@ -564,13 +577,20 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
 
 /* ── watch out ───────────────────────────────────────────────── */
 
-export function WatchOut({ issues }: { issues: Issue[] }) {
+export function WatchOut({ issues, action }: { issues: Issue[]; action?: React.ReactNode }) {
   return (
-    <section>
-      <Eyebrow className="text-clay-ink">Watch out</Eyebrow>
+    <section data-pick="Watch out">
+      <div className="flex items-center justify-between gap-3">
+        <Eyebrow className="text-clay-ink">Watch out</Eyebrow>
+        {action}
+      </div>
       <ul className="mt-3 flex flex-col gap-2.5">
         {issues.map((it) => (
-          <li key={it.title} className="rounded-[12px] border border-clay-line bg-clay-surface/60 px-4 py-3">
+          <li
+            key={it.title}
+            data-pick={it.title}
+            className="rounded-[8px] border border-clay-line bg-clay-surface/60 px-4 py-3"
+          >
             <p className="text-[14px] font-semibold text-clay-ink">{it.title}</p>
             <p className="mt-1 text-[13.5px] leading-relaxed text-on-surface">
               <Prose text={it.detail} />
@@ -604,11 +624,16 @@ export function CodeDrawer({
   onToggle: () => void;
 }) {
   return (
-    <section id="code" className="scroll-mt-16">
+    <section
+      id="code"
+      data-pick="The code behind this"
+      data-pick-text={refs.map((r) => `${r.file}:${r.start}-${r.end} — ${r.label}`).join("\n")}
+      className="scroll-mt-16"
+    >
       <button
         onClick={onToggle}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-full border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
+        className="flex items-center gap-2 rounded-[6px] border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
       >
         <span className="font-mono text-[12px]">{"</>"}</span>
         {open ? "Hide the code" : `The code behind this · ${refs.length} ${refs.length === 1 ? "place" : "places"}`}
@@ -641,7 +666,11 @@ function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: Ro
   };
 
   return (
-    <li className="rounded-[12px] border border-border-gray bg-pure-white">
+    <li
+      data-pick={code.label}
+      data-pick-code={`${code.file}:${code.start}-${code.end}`}
+      className="rounded-[8px] border border-border-gray bg-pure-white"
+    >
       <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
         <span className="text-[13.5px] text-ink">{code.label}</span>
         <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">

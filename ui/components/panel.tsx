@@ -19,7 +19,7 @@ export function Panel({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-[20px] border border-border-gray bg-pure-white shadow-panel",
+        "overflow-hidden rounded-[12px] border border-border-gray bg-pure-white shadow-panel",
         !flush && "p-5",
         className,
       )}
@@ -115,7 +115,7 @@ export function Chip({
   return (
     <span
       className={cn(
-        "tnum inline-flex shrink-0 items-center rounded-full px-3 py-[5px]",
+        "tnum inline-flex shrink-0 items-center rounded-[6px] px-3 py-[5px]",
         "font-mono text-[12.5px] leading-none",
         emphasis === "normal" &&
           "border border-border-gray bg-pure-white text-on-surface",

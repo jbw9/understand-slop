@@ -15,6 +15,8 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_kill,
+            pty::pty_state,
+            pty::pty_which,
             pty::context_add,
             pty::context_set,
             pty::context_pending,

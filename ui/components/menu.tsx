@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 
 export interface MenuItem {
   label: string;
+  /** Drawn before the label, at text size. */
+  icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
 }
@@ -83,10 +85,11 @@ export function Menu({
             onClose();
           }}
           className={cn(
-            "block w-full px-3 py-1.5 text-left text-[13px] text-ink",
+            "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink",
             item.disabled ? "text-faint" : "cursor-pointer hover:bg-surface-container-low",
           )}
         >
+          {item.icon}
           {item.label}
         </button>
       ))}

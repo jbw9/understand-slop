@@ -1,19 +1,22 @@
-//! Claude Code in a terminal tab. The user's own `claude` runs on a pty like
-//! any shell (pty.rs); what this module adds is finding that binary and the
-//! launch config that lets the map hand it context.
+//! Claude Code in the workspace's tabs. Every tab is the user's shell on a
+//! pty (pty.rs); a new one starts their own `claude` in it first, so it looks
+//! and behaves exactly as it does in their terminal, and quitting Claude leaves
+//! the shell behind. What this module adds is finding that binary, and the
+//! launcher that lets the map hand it context.
 //!
-//! The hand-off is a file. Each Claude tab gets its own queue under the temp
-//! dir, named in `$SLOP_CONTEXT`. Picking on the map appends a block to it —
+//! The launcher is a small script, `slop-claude`, on each tab's PATH. It runs
+//! the user's `claude` with `--settings` carrying a `UserPromptSubmit` hook,
+//! and while it runs it keeps a `.live` marker beside the tab's queue: that is
+//! how the UI knows Claude is in front in a tab, and able to take context.
+//! `--settings` adds to the user's own settings, so their login, hooks, MCP
+//! servers, theme and status line all still apply.
+//!
+//! The hand-off is a file. Each tab has its own queue under the temp dir,
+//! named in `$SLOP_CONTEXT`. Picking on the map appends a block to it —
 //! `[Map section: …]` for a whole section, `[Map element: …]` for one thing on
-//! a level — and a `UserPromptSubmit` hook passed in with
-//! `--settings` drains it on the next prompt: whatever a prompt hook prints is
-//! added to that prompt's context. The file being gone is how the UI knows a
-//! pick was delivered. `--settings` adds to the user's own settings, so their
-//! login, hooks and MCP servers all still apply.
-//!
-//! The same settings give the tab a status line under Claude's prompt saying
-//! what is waiting and what just went, so the hand-off is visible where the
-//! user is typing. It replaces their own status line, in these tabs only.
+//! a level — and the hook drains it on the next prompt: whatever a prompt hook
+//! prints is added to that prompt's context. The file being gone is how the
+//! UI knows a pick was delivered (components/workspace.tsx shows it).
 
 use portable_pty::CommandBuilder;
 use std::io::Write;
@@ -21,14 +24,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Drains the queue: the `mv` is atomic, so a pick appended while Claude reads
-/// lands in a fresh file for the next prompt rather than being lost. What went
-/// stays in `.sent` for the status line, until a prompt goes without any.
-const HOOK: &str = r#"f="$SLOP_CONTEXT"; [ -s "$f" ] || { rm -f "$f.sent"; exit 0; }; mv "$f" "$f.sent" && cat "$f.sent""#;
-
-/// One line: the sections waiting for the next prompt, else the ones the last
-/// prompt took, each by the last name in its trail. Never blank — with nothing
-/// either way it says how to add some, so the line is there to be found.
-const STATUS: &str = r#"f="$SLOP_CONTEXT"; names() { sed -n 's/^\[Map [a-z]*: //p' "$1" | sed 's/ ([^()]*)$//; s/.* › //' | paste -sd '|' - | sed 's/|/, /g'; }; if [ -s "$f" ]; then n=$(grep -c '^\[Map [a-z]*:' "$f"); [ "$n" = 1 ] && w="item from the map goes" || w="items from the map go"; printf '◷ %s %s with your next prompt: %s\n' "$n" "$w" "$(names "$f")"; elif [ -s "$f.sent" ]; then printf '✓ Sent from the map: %s\n' "$(names "$f.sent")"; else printf '◇ No map context — right-click a card on the map to add it\n'; fi"#;
+/// lands in a fresh file for the next prompt rather than being lost.
+const HOOK: &str = r#"f="$SLOP_CONTEXT"; [ -s "$f" ] || exit 0; mv "$f" "$f.sent" && cat "$f.sent""#;
 
 const SYSTEM: &str = "This session was opened from understand-slop, an app that maps this \
 repository as a tree of sections (user journey, data flow, the code behind each). The user \
@@ -43,6 +40,16 @@ pub struct Launch {
     path: String,
     model: Option<String>,
 }
+
+/// Runs Claude with the hook, and marks the tab live while it does. The marker
+/// goes on any exit — a quit, a crash, Ctrl+C — and the script's status is
+/// Claude's.
+const LAUNCHER: &str = r#"#!/bin/sh
+# Claude Code with understand-slop's map-context hook (src-tauri/src/claude.rs).
+trap 'rm -f "$SLOP_CONTEXT.live"' EXIT INT TERM HUP
+: > "$SLOP_CONTEXT.live"
+"$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} "$@"
+"#;
 
 #[derive(serde::Serialize)]
 pub struct Detected {
@@ -113,22 +120,58 @@ pub fn queue(id: u32) -> PathBuf {
 pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue);
     let _ = std::fs::remove_file(queue.with_extension("md.sent"));
+    let _ = std::fs::remove_file(live(queue));
 }
 
-/// The command for a Claude tab, with its queue named in the environment.
-pub fn command(launch: &Launch, queue: &Path) -> CommandBuilder {
-    let settings = serde_json::json!({
-        "hooks": { "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }] }] },
-        // Picks land while Claude sits idle, when no event would redraw it.
-        "statusLine": { "type": "command", "command": STATUS, "refreshInterval": 1 }
-    });
-    let mut cmd = CommandBuilder::new(&launch.path);
-    cmd.args(["--settings", &settings.to_string(), "--append-system-prompt", SYSTEM]);
-    if let Some(m) = launch.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
-        cmd.args(["--model", m]);
+/// Present while the launcher's Claude runs in the tab that owns `queue`.
+fn live(queue: &Path) -> PathBuf {
+    queue.with_extension("md.live")
+}
+
+pub fn running(queue: &Path) -> bool {
+    live(queue).exists()
+}
+
+/// The launcher, written where every tab's PATH can find it. Rewritten only
+/// when it differs, so an upgrade of the app replaces an old one.
+fn launcher() -> std::io::Result<PathBuf> {
+    let dir = std::env::temp_dir().join("understand-slop").join("bin");
+    let path = dir.join("slop-claude");
+    if std::fs::read_to_string(&path).ok().as_deref() != Some(LAUNCHER) {
+        std::fs::create_dir_all(&dir)?;
+        std::fs::write(&path, LAUNCHER)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
+        }
     }
+    Ok(path)
+}
+
+/// What a tab's shell needs so that the launcher works in it: the user's
+/// `claude`, the hook, the system prompt, and the launcher on PATH. Returns
+/// the launcher's own path, for starting Claude without relying on PATH.
+pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path) -> std::io::Result<PathBuf> {
+    let path = launcher()?;
+    let settings = serde_json::json!({
+        "hooks": { "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }] }] }
+    });
     cmd.env("SLOP_CONTEXT", queue);
-    cmd
+    cmd.env("SLOP_LAUNCHER", &path);
+    cmd.env("SLOP_CLAUDE_BIN", &launch.path);
+    cmd.env("SLOP_CLAUDE_SETTINGS", settings.to_string());
+    cmd.env("SLOP_CLAUDE_SYSTEM", SYSTEM);
+    if let Some(m) = launch.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
+        cmd.env("SLOP_CLAUDE_MODEL", m);
+    }
+    if let Some(dir) = path.parent() {
+        let rest = std::env::var_os("PATH").unwrap_or_default();
+        let joined = std::env::join_paths(std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&rest)))
+            .map_err(std::io::Error::other)?;
+        cmd.env("PATH", joined);
+    }
+    Ok(path)
 }
 
 /// Adds one block to the queue, after anything not yet delivered.
@@ -182,10 +225,7 @@ mod tests {
         assert_eq!(find(Some("  "), Some(dir.path())), Some(local.join("claude")));
     }
 
-    #[cfg(unix)]
-    const IDLE: &str = "◇ No map context — right-click a card on the map to add it\n";
-
-    /// Runs a hook or status command the way Claude Code does, against `queue`.
+    /// Runs the hook the way Claude Code does, against `queue`.
     #[cfg(unix)]
     fn run(cmd: &str, queue: &Path) -> String {
         let out = Command::new("sh").args(["-c", cmd]).env("SLOP_CONTEXT", queue).output().unwrap();
@@ -194,27 +234,50 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn status_line_follows_the_queue() {
+    fn the_hook_delivers_once() {
         let dir = tempfile::tempdir().unwrap();
         let q = dir.path().join("context-1.md");
-        assert_eq!(run(STATUS, &q), IDLE);
+        assert_eq!(run(HOOK, &q), "");
 
         append(&q, "[Map section: Signing Up › Student Sign-Up (explorify)\nFive stages.]").unwrap();
-        assert_eq!(run(STATUS, &q), "◷ 1 item from the map goes with your next prompt: Student Sign-Up\n");
-        append(&q, "[Map element: Signing Up › Student Sign-Up › Email field (explorify)\nType: field]").unwrap();
-        assert_eq!(
-            run(STATUS, &q),
-            "◷ 2 items from the map go with your next prompt: Student Sign-Up, Email field\n"
-        );
-
-        // A prompt takes them: Claude gets the blocks, the line says they went.
+        assert!(pending(&q));
+        // A prompt takes it: Claude gets the block, and the queue is empty.
         assert!(run(HOOK, &q).contains("Five stages."));
         assert!(!pending(&q));
-        assert_eq!(run(STATUS, &q), "✓ Sent from the map: Student Sign-Up, Email field\n");
-
-        // The next prompt goes without any, and the line rests again.
+        // The next prompt goes without it.
         assert_eq!(run(HOOK, &q), "");
-        assert_eq!(run(STATUS, &q), IDLE);
+    }
+
+    /// The launcher as a tab runs it, with `bin` standing in for Claude.
+    #[cfg(unix)]
+    fn launch(queue: &Path, bin: &str) -> std::process::ExitStatus {
+        Command::new(launcher().unwrap())
+            .env("SLOP_CONTEXT", queue)
+            .env("SLOP_CLAUDE_BIN", bin)
+            .env("SLOP_CLAUDE_SETTINGS", "{}")
+            .env("SLOP_CLAUDE_SYSTEM", "")
+            .status()
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_launcher_marks_the_tab_live_while_claude_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        // A stand-in Claude that reports whether the marker is there.
+        let probe = dir.path().join("probe");
+        std::fs::write(&probe, format!("#!/bin/sh\n[ -e '{}' ] && exit 7\nexit 3\n", live(&q).display())).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&probe, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(!running(&q));
+        // Live while it ran (7), and Claude's own status comes back.
+        assert_eq!(launch(&q, probe.to_str().unwrap()).code(), Some(7));
+        assert!(!running(&q));
+        // Gone after a failing exit too.
+        assert!(!launch(&q, "/bin/false").success());
+        assert!(!running(&q));
     }
 
     #[test]

@@ -5,7 +5,7 @@ import { DARK, SETTINGS_KEY } from "@/lib/theme";
  * What the user can change, kept per machine in localStorage like the
  * terminal's height. Blank means "work it out": the `claude` binary is found
  * by the app (src-tauri/src/claude.rs), the model is Claude Code's own
- * default, and the theme follows the system.
+ * default, the theme follows the system, and new tabs open in Claude Code.
  */
 export type Theme = "system" | "light" | "dark";
 
@@ -13,12 +13,14 @@ export interface Settings {
   claudePath: string;
   model: string;
   theme: Theme;
+  /** The agent a tab opens into when the app opens one for you (components/agents.tsx). */
+  agent: string;
 }
 
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system" };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude" };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));

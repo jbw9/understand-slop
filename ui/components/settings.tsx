@@ -3,14 +3,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
+import { AgentIcon, CLAUDE, useInstalled } from "@/components/agents";
 import { PanelHead } from "@/components/panel";
 import { cn } from "@/lib/utils";
 import { applyTheme, followTheme, onOpenSettings, readSettings, saveSettings, type Settings, type Theme } from "@/lib/settings";
 
 /**
  * Settings, as a dialog over the map. There is little to set: the theme,
- * where Claude Code is when it was not found by itself, and which model it
- * runs. A theme picked here shows at once, and Cancel puts the saved one back.
+ * the agent new tabs open into, where Claude Code is when it was not found by
+ * itself, and which model it runs. A theme picked here shows at once, and Cancel puts the saved one back.
  */
 
 const THEMES: { value: Theme; label: string }[] = [
@@ -26,6 +27,7 @@ export function SettingsDialog() {
   const [draft, setDraft] = useState<Settings>(readSettings);
   // undefined while looking.
   const [found, setFound] = useState<Found | undefined>(undefined);
+  const agents = [CLAUDE, ...useInstalled()];
 
   const detect = useCallback((claudePath: string) => {
     setFound(undefined);
@@ -69,7 +71,7 @@ export function SettingsDialog() {
         }}
         className={cn(DIALOG, "max-w-[520px]")}
       >
-        <PanelHead title="Settings" note="How the app looks, and Claude Code as its tabs run it." />
+        <PanelHead title="Settings" note="How the app looks, which agent tabs open into, and how Claude Code runs." />
         <div className="flex flex-col gap-5 px-5 py-5">
           <Field label="Theme" hint="System follows your desktop's light or dark setting.">
             <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
@@ -89,6 +91,29 @@ export function SettingsDialog() {
                   )}
                 >
                   {t.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field
+            label="Default agent"
+            hint="What a tab opens into when the app opens one for you: Ctrl+`, Ctrl+Shift+T, the title bar, or the first in the + menu. Map context goes to Claude either way."
+          >
+            <div role="radiogroup" aria-label="Default agent" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+              {agents.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.agent === a.id}
+                  onClick={() => setDraft({ ...draft, agent: a.id })}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-1.5 rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.agent === a.id ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  <AgentIcon id={a.id} />
+                  {a.label}
                 </button>
               ))}
             </div>

@@ -117,8 +117,13 @@ function resolveImport(from: string, spec: string, known: Set<string>, alias: [s
   return tries.find((t) => known.has(t)) ?? null;
 }
 
-export function inventory(repo: string): Inventory {
-  const listed = git(repo, "ls-files").split("\n").filter(Boolean).sort();
+/**
+ * `untracked` adds files git does not know yet (not ignored): an update maps
+ * the working tree as an agent leaves it, new files included.
+ */
+export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inventory {
+  const args = opts.untracked ? ["ls-files", "--cached", "--others", "--exclude-standard"] : ["ls-files"];
+  const listed = [...new Set(git(repo, ...args).split("\n").filter(Boolean))].sort();
   const files: RepoFile[] = [];
   for (const path of listed) {
     if (SKIP.some((r) => r.test(path))) continue;

@@ -9,6 +9,10 @@
  *   <vault>/projects/<id>/report.json what generating it took
  *   <vault>/projects/<id>/generate.log the generator's output, for progress and errors
  *   <vault>/projects/<id>/.cache/     model replies, so a regenerate is cheap
+ *   <vault>/projects/<id>/base.json   the code as the last update saw it (scripts/generate/update.ts)
+ *   <vault>/projects/<id>/update.json what the last update did
+ *   <vault>/projects/<id>/update.log  its output
+ *   <vault>/projects/<id>/turns.json  agents' turns waiting for the next update to take them
  *
  * The directory is the one Tauri names for this app (`app_data_dir`: the OS
  * data directory plus the bundle identifier), so the desktop app and this
@@ -59,6 +63,22 @@ export interface Project {
     usd?: number;
     seconds?: number;
     /** The last lines of the log, when it failed. */
+    error?: string;
+  };
+  /**
+   * Keeping the map up with the code: after an agent's turn edits it, only
+   * the sections the edits touched are redone (scripts/generate/update.ts).
+   */
+  update?: {
+    status: "running" | "done" | "failed";
+    startedAt: string;
+    finishedAt?: string;
+    pid?: number;
+    /** Another turn ended while this ran: run again once it is done. */
+    again?: boolean;
+    changed?: string[];
+    /** The sections redone, by title. */
+    sections?: string[];
     error?: string;
   };
 }
@@ -165,6 +185,10 @@ export function listProjects(): Project[] {
   const v = readVault();
   let changed = false;
   for (const p of v.projects) {
+    if (p.update?.status === "running" && !(p.update.pid && alive(p.update.pid))) {
+      updated(p);
+      changed = true;
+    }
     if (p.map.status !== "generating" || (p.map.pid && alive(p.map.pid))) continue;
     const map = join(projectDir(p.id), "map.json");
     const ok = existsSync(map) && statSync(map).mtimeMs > Date.parse(p.map.startedAt);
@@ -222,6 +246,9 @@ export function generate(id: string, claude?: string): Project | undefined {
   if (p.map.status === "generating" && p.map.pid && alive(p.map.pid)) return p;
   const dir = projectDir(id);
   mkdirSync(dir, { recursive: true });
+  // A fresh map starts from the code as it is; what earlier updates saw goes.
+  rmSync(join(dir, "base.json"), { force: true });
+  rmSync(join(dir, "update.json"), { force: true });
   const log = openSync(join(dir, "generate.log"), "w");
   const child = spawn(
     "npx",
@@ -238,6 +265,7 @@ export function generate(id: string, claude?: string): Project | undefined {
   const startedAt = new Date().toISOString();
   update(id, (q) => {
     q.map = { ...q.map, status: "generating", startedAt, pid: child.pid, finishedAt: undefined, error: undefined };
+    q.update = undefined;
   });
   child.on("exit", (code) => update(id, (q) => finished(q, code === 0)));
   child.on("error", (e) =>
@@ -268,6 +296,92 @@ export function removeProject(id: string) {
   v.projects = v.projects.filter((p) => p.id !== id);
   writeVault(v);
   rmSync(projectDir(id), { recursive: true, force: true });
+}
+
+/** What a finished update left in update.json. */
+function updated(p: Project) {
+  const u = p.update!;
+  u.pid = undefined;
+  u.finishedAt = new Date().toISOString();
+  try {
+    const r = JSON.parse(readFileSync(join(projectDir(p.id), "update.json"), "utf8"));
+    if (Date.parse(r.finishedAt) < Date.parse(u.startedAt)) throw new Error("stale");
+    u.status = r.ok ? "done" : "failed";
+    u.changed = r.changed;
+    u.sections = (r.sections ?? []).map((s: { title: string }) => s.title);
+    u.error = r.error;
+  } catch {
+    u.status = "failed";
+    u.error = (() => {
+      try {
+        return readFileSync(join(projectDir(p.id), "update.log"), "utf8").trimEnd().split("\n").slice(-12).join("\n");
+      } catch {
+        return "";
+      }
+    })() || "The update stopped without saying why.";
+  }
+}
+
+/** An agent's turn the map follows: what it did and why (its transcript), and where it found the map wrong. */
+export interface Turn {
+  transcript?: string;
+  corrections: { section: string; note: string }[];
+}
+
+/**
+ * Bring a project's map up to the code in its checkout, redoing only what
+ * changed or what an agent found wrong (scripts/generate/update.ts). Asked
+ * for when an agent in the app finishes a turn that edited the checkout at
+ * `root`, or reported the map wrong; the turn waits in turns.json for the
+ * update to take it. A map still being made, or not made, is left alone; one
+ * already updating runs again after.
+ */
+export function updateMap(root: string, claude?: string, turn?: Turn): Project | undefined {
+  const p = listProjects().find((x) => x.root === root);
+  if (!p || p.map.status !== "ready" || !mapFileOf(p.id)) return p;
+  if (turn) {
+    const file = join(projectDir(p.id), "turns.json");
+    let waiting: Turn[] = [];
+    try {
+      waiting = JSON.parse(readFileSync(file, "utf8"));
+    } catch {
+      /* none waiting */
+    }
+    writeFileSync(file, JSON.stringify([...waiting, turn]) + "\n");
+  }
+  if (p.update?.status === "running") {
+    update(p.id, (q) => (q.update!.again = true));
+    return getProject(p.id);
+  }
+  const dir = projectDir(p.id);
+  const log = openSync(join(dir, "update.log"), "w");
+  const child = spawn(
+    "npx",
+    ["-y", "tsx", "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--update", "--out", dir],
+    {
+      cwd: process.cwd(),
+      detached: true,
+      stdio: ["ignore", log, log],
+      env: { ...process.env, SLOP_BACKEND: "claude-code", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
+    },
+  );
+  closeSync(log);
+  child.unref();
+  update(p.id, (q) => (q.update = { status: "running", startedAt: new Date().toISOString(), pid: child.pid }));
+  child.on("exit", () => {
+    let again = false;
+    update(p.id, (q) => {
+      again = Boolean(q.update?.again);
+      updated(q);
+    });
+    if (again) updateMap(root, claude);
+  });
+  child.on("error", (e) =>
+    update(p.id, (q) => {
+      q.update = { ...q.update!, status: "failed", pid: undefined, error: String(e) };
+    }),
+  );
+  return getProject(p.id);
 }
 
 /** The project's map file, if one has been made. */

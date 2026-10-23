@@ -209,6 +209,8 @@ fn queue_of(ptys: &Ptys, id: u32) -> Result<PathBuf, String> {
 pub struct State {
     claude: bool,
     busy: bool,
+    /// Claude finished a turn the map should follow; reported once.
+    turn: Option<claude::Turn>,
 }
 
 #[tauri::command]
@@ -225,7 +227,7 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
     };
     #[cfg(not(unix))]
     let busy = false;
-    Ok(State { claude: claude::running(&p.context), busy })
+    Ok(State { claude: claude::running(&p.context), busy, turn: claude::take_turn(&p.context) })
 }
 
 /// Queues a section for the next prompt to Claude in this tab.

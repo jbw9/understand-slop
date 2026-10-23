@@ -2,12 +2,13 @@
 
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openSettings } from "@/lib/settings";
 import { MapSwitcher, Trail, goTo, useLocation } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
-import { toggleWorkspace } from "@/components/workspace";
+import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,7 +29,7 @@ const noSubscribe = () => () => {};
 
 export function Titlebar() {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
-  const { name, maps } = useMap();
+  const { name, maps, RUN } = useMap();
   const { path, crumbs } = useLocation();
   const [maximized, setMaximized] = useState(false);
 
@@ -80,7 +81,8 @@ export function Titlebar() {
         <Hint k="0">top</Hint>
       </span>
       <div data-tauri-drag-region className="h-full flex-1" />
-      <Control label="Projects — import one, or switch maps" onClick={openProjects}>
+      <MapUpdates key={name} id={name} root={RUN.root} local={maps.some((m) => m.id === name && m.local)} />
+      <Control label="Projects — import one, or switch maps" onClick={() => openProjects()}>
         <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
       </Control>
       <Control label="Claude Code & terminal (Ctrl+`)" onClick={toggleWorkspace}>
@@ -152,6 +154,106 @@ function Hint({ k, children }: { k: string; children: React.ReactNode }) {
     <span data-tauri-drag-region className="flex items-center gap-1">
       <kbd className="rounded-[3px] border border-border-gray bg-surface px-1 text-[10px] text-muted-slate">{k}</kbd>
       {children}
+    </span>
+  );
+}
+
+interface Update {
+  status: "running" | "done" | "failed";
+  finishedAt?: string;
+  changed?: string[];
+  sections?: string[];
+  error?: string;
+}
+
+/**
+ * Follows the open map while an agent changes its code: an update redoing
+ * the touched sections (lib/vault.ts) shows here while it runs, and the map
+ * reloads the moment it is done. Only the user's own projects update; an
+ * example describes some other copy of its code, so when an agent edits its
+ * checkout this says so and offers to import it.
+ */
+function MapUpdates({ id, root, local }: { id: string; root?: string; local: boolean }) {
+  const router = useRouter();
+  const [u, setU] = useState<Update | null>(null);
+  const [unfollowed, setUnfollowed] = useState(false);
+
+  useEffect(() => {
+    const on = (e: Event) => (e as CustomEvent<string>).detail === root && setUnfollowed(true);
+    window.addEventListener(UNFOLLOWED, on);
+    return () => window.removeEventListener(UNFOLLOWED, on);
+  }, [root]);
+  // The last finished update already on screen, so only a new one reloads.
+  const seen = useRef<string | undefined>(undefined);
+  const [fresh, setFresh] = useState(false);
+
+  useEffect(() => {
+    if (!local) return;
+    let first = true;
+    const tick = () =>
+      fetch(`/api/projects?id=${encodeURIComponent(id)}`)
+        .then((r) => r.json())
+        .then((p: { update: Update | null } | null) => {
+          const next = p?.update ?? null;
+          setU(next);
+          const done = next?.status !== "running" ? next?.finishedAt : undefined;
+          if (!first && done && done !== seen.current) {
+            router.refresh();
+            setFresh(true);
+          }
+          if (done) seen.current = done;
+          first = false;
+        })
+        .catch(() => {});
+    void tick();
+    const timer = setInterval(tick, 2000);
+    return () => clearInterval(timer);
+  }, [id, local, router]);
+
+  useEffect(() => {
+    if (!fresh) return;
+    const t = setTimeout(() => setFresh(false), 6000);
+    return () => clearTimeout(t);
+  }, [fresh]);
+
+  if (unfollowed && root)
+    return (
+      <span data-tauri-drag-region className="mr-2 flex min-w-0 items-center gap-2 font-mono text-[10.5px] text-amber-ink">
+        <span className="truncate" title="This map was made from another copy of the code, so it cannot follow edits here.">
+          This map doesn&apos;t follow edits
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setUnfollowed(false);
+            openProjects(root);
+          }}
+          className="shrink-0 cursor-pointer text-deep-green underline"
+        >
+          Import to keep it updated
+        </button>
+        <button type="button" onClick={() => setUnfollowed(false)} aria-label="Dismiss" className="shrink-0 cursor-pointer text-faint hover:text-ink">
+          ×
+        </button>
+      </span>
+    );
+  // A turn that changed nothing the map covers passes silently.
+  if (!u || (u.status === "done" && (!fresh || !u.sections?.length))) return null;
+  const what = u.sections?.length ? u.sections.join(", ") : u.changed?.join(", ");
+  return (
+    <span
+      data-tauri-drag-region
+      title={u.status === "failed" ? u.error : what}
+      className={cn(
+        "mr-2 max-w-[320px] truncate font-mono text-[10.5px]",
+        u.status === "failed" ? "text-clay-ink" : u.status === "running" ? "text-amber-ink" : "text-deep-green",
+      )}
+    >
+      {u.status === "running"
+        ? "◷ Updating the map to what the agent changed or found…"
+        : u.status === "failed"
+          ? "✗ Map update failed"
+          : `✓ Map updated: ${u.sections!.join(", ")}`}
     </span>
   );
 }

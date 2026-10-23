@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
-import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { CodeDrawer, ExplainedBlock, WatchOut, isExplained } from "@/components/blocks";
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { Crumbs } from "@/components/chrome";
+import { Crumbs, goTo, useLocation } from "@/components/chrome";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
 import { openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
@@ -86,26 +85,18 @@ function setNote(node: Node): string | null {
 
 export function Canvas() {
   const map = useMap();
-  const { LINKS, RUN, levelAt, nodeAt, stepOf, name, maps } = map;
+  const { LINKS, RUN, levelAt, nodeAt, name, maps } = map;
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { nodes, anchor, version } = useWireAnchors();
 
   /**
-   * The open path, root-first, read from the URL (`?at=engine&at=eng-math`).
-   * `[]` is the repo; depth is its length.
-   *
-   * The URL rather than state because every level is then a history entry:
-   * the browser's back button and the trackpad's two-finger swipe step back
-   * the way they do everywhere else, and a level can be linked or reloaded.
-   * Clicking empty space used to go back, and an accidental click on the
-   * background threw away where you were.
+   * The open path, root-first, read from the URL (useLocation in
+   * components/chrome.tsx); depth is its length. Clicking empty space used to
+   * go back, and an accidental click on the background threw away where you
+   * were.
    */
-  const params = useSearchParams();
-  const path = useMemo(() => {
-    const asked = params.getAll("at");
-    return asked.length && nodeAt(asked) ? asked : [];
-  }, [params, nodeAt]);
+  const { path, crumbs } = useLocation();
   const key = path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
@@ -125,15 +116,7 @@ export function Canvas() {
     [key],
   );
 
-  // Native pushState is integrated with the App Router: `useSearchParams`
-  // follows it, and so does back/forward.
-  const go = useCallback((next: string[]) => {
-    const q = new URLSearchParams();
-    const map = new URLSearchParams(window.location.search).get("map");
-    if (map) q.set("map", map);
-    for (const id of next) q.append("at", id);
-    window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
-  }, []);
+  const go = goTo;
 
   // A new level starts at its top, not wherever the last one was scrolled to.
   useLayoutEffect(() => {
@@ -228,11 +211,6 @@ export function Canvas() {
     return () => window.removeEventListener("keydown", onKey);
   }, [traced, setTraced, path, go]);
 
-  const crumbs = path
-    .map((_, i) => nodeAt(path.slice(0, i + 1)))
-    .filter((n): n is Node => n !== null)
-    .map((n) => ({ id: n.id, title: n.title, step: stepOf(n.id)?.n }));
-
   const open = (next: string[]) => go(next);
 
   /* ── handing a section to Claude ──────────────────────────── */
@@ -261,7 +239,10 @@ export function Canvas() {
     >
       {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
       <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
-        <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        {/* In the desktop app the title bar carries where you are. */}
+        {desktop ? null : (
+          <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        )}
         <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
           <WireLayer
             canvasRef={contentRef}

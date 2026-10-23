@@ -1,6 +1,7 @@
 {
  "repo": "flask",
  "commit": "d086db8",
+ "backend": "bedrock",
  "models": {
   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
   "cut": "global.anthropic.claude-opus-4-6-v1",
@@ -75,7 +76,7 @@
  "excluded": [
   {
    "path": "docs/conf.py",
-   "reason": "Sphinx documentation build configuration \u2014 pure tooling, not part of the framework."
+   "reason": "Sphinx documentation build configuration — pure tooling, not part of the framework."
   }
  ],
  "roots": [
@@ -95,8 +96,8 @@
      {
       "id": "creating-app",
       "claims": [
-       "Flask's constructor builds a `Config` dict with 26 defaults \u2014 not_shown: Line 317 shows `self.config = self.make_config(instance_relative_config)` but the cited code does not show the Config class definition or its 26 defaults",
-       "Flask's constructor wires up the Jinja environment \u2014 not_shown: The cited code does not show any Jinja environment setup in the __init__ methods shown"
+       "Flask's constructor builds a `Config` dict with 26 defaults — not_shown: Line 317 shows `self.config = self.make_config(instance_relative_config)` but the cited code does not show the Config class definition or its 26 defaults",
+       "Flask's constructor wires up the Jinja environment — not_shown: The cited code does not show any Jinja environment setup in the __init__ methods shown"
       ]
      }
     ],
@@ -119,14 +120,14 @@
      {
       "id": "rt-scaffold",
       "claims": [
-       "only `App` implements it \u2014 not_shown: The cited code does not show the `App` class or its implementation of `add_url_rule`. This claim cannot be verified from the provided code."
+       "only `App` implements it — not_shown: The cited code does not show the `App` class or its implementation of `add_url_rule`. This claim cannot be verified from the provided code."
       ]
      },
      {
       "id": "rt-scaffold-error",
       "claims": [
-       "@errorhandler decorator calls _get_exc_class_and_code to normalise its argument \u2014 not_shown",
-       "@errorhandler decorator stores the handler in error_handler_spec dict \u2014 not_shown"
+       "@errorhandler decorator calls _get_exc_class_and_code to normalise its argument — not_shown",
+       "@errorhandler decorator stores the handler in error_handler_spec dict — not_shown"
       ]
      }
     ],
@@ -181,8 +182,8 @@
      {
       "id": "ru-dotenv",
       "claims": [
-       "If python-dotenv is not installed and no .env/.flaskenv files exist in the working directory, load_dotenv silently returns False \u2014 contradicted: Lines 735-741 show that if python-dotenv is not installed, the function checks `if path or os.path.isfile(\".env\") or os.path.isfile(\".flaskenv\")` and if any of these conditions are true, it prints a yellow warning message via `click.secho`. It only returns False silently if none of these conditions are met. So it is not silent when .env or .flaskenv files exist.",
-       "A developer expecting FLASK_APP from .flaskenv gets a confusing 'Could not locate a Flask application' error instead \u2014 not_shown: The cited code does not show what error message a developer would receive or demonstrate the scenario where FLASK_APP is expected from .flaskenv but not found. The code only shows that load_dotenv returns False and potentially prints a tip message."
+       "If python-dotenv is not installed and no .env/.flaskenv files exist in the working directory, load_dotenv silently returns False — contradicted: Lines 735-741 show that if python-dotenv is not installed, the function checks `if path or os.path.isfile(\".env\") or os.path.isfile(\".flaskenv\")` and if any of these conditions are true, it prints a yellow warning message via `click.secho`. It only returns False silently if none of these conditions are met. So it is not silent when .env or .flaskenv files exist.",
+       "A developer expecting FLASK_APP from .flaskenv gets a confusing 'Could not locate a Flask application' error instead — not_shown: The cited code does not show what error message a developer would receive or demonstrate the scenario where FLASK_APP is expected from .flaskenv but not found. The code only shows that load_dotenv returns False and potentially prints a tip message."
       ]
      }
     ],
@@ -211,7 +212,7 @@
      {
       "id": "ex-celery-tasks",
       "claims": [
-       "`block` uses the global default (ignored) \u2014 not_shown: Line 12 shows `@shared_task()` with no parameters specified for block. The detail claims this uses the global default for ignore_result, but the code does not show what the global default is or confirm that results are ignored."
+       "`block` uses the global default (ignored) — not_shown: Line 12 shows `@shared_task()` with no parameters specified for block. The detail claims this uses the global default for ignore_result, but the code does not show what the global default is or confirm that results are ignored."
       ]
      }
     ],

@@ -1,0 +1,764 @@
+{
+ "repo": "documenso",
+ "commit": "7ce827b",
+ "backend": "bedrock",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 1118,
+  "cut": 1236,
+  "author": 681,
+  "verify": 194,
+  "total": 3230
+ },
+ "usd": 40.37,
+ "fullUsd": 40.37,
+ "bill": {
+  "summarize": {
+   "calls": 2243,
+   "cached": 0,
+   "input": 5272619,
+   "output": 981702,
+   "cacheRead": 0,
+   "usd": 10.181129,
+   "fullUsd": 10.181129
+  },
+  "cut": {
+   "calls": 4,
+   "cached": 0,
+   "input": 848629,
+   "output": 89911,
+   "cacheRead": 0,
+   "usd": 6.49092,
+   "fullUsd": 6.49092
+  },
+  "author": {
+   "calls": 111,
+   "cached": 0,
+   "input": 997592,
+   "output": 206007,
+   "cacheRead": 8972621,
+   "usd": 15.871276750000002,
+   "fullUsd": 15.871276750000002
+  },
+  "verify": {
+   "calls": 72,
+   "cached": 0,
+   "input": 271215,
+   "output": 60084,
+   "cacheRead": 0,
+   "usd": 0.5716349999999999,
+   "fullUsd": 0.5716349999999999
+  },
+  "verify-review": {
+   "calls": 188,
+   "cached": 0,
+   "input": 1231815,
+   "output": 43729,
+   "cacheRead": 0,
+   "usd": 7.252300000000003,
+   "fullUsd": 7.252300000000003
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 2773,
+  "summarised": 2230,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "apps/docs/",
+   "reason": "Standalone documentation site built with Fumadocs and Next.js"
+  },
+  {
+   "path": "apps/openpage-api/",
+   "reason": "Public GitHub and growth statistics API, tangential to core product"
+  },
+  {
+   "path": "packages/prisma/migrations/",
+   "reason": "Generated database migration SQL files"
+  },
+  {
+   "path": "packages/prisma/seed/",
+   "reason": "Development-only seed data scripts"
+  },
+  {
+   "path": "packages/prisma/seed-database.ts",
+   "reason": "Development-only seed entry script"
+  },
+  {
+   "path": "packages/tailwind-config/",
+   "reason": "Shared Tailwind CSS preset, pure styling tooling"
+  },
+  {
+   "path": "packages/email/preview/",
+   "reason": "Developer-only email template preview application"
+  },
+  {
+   "path": "packages/app-tests/",
+   "reason": "E2E and integration test suite"
+  },
+  {
+   "path": "commitlint.config.cjs",
+   "reason": "Commit message linting configuration"
+  },
+  {
+   "path": "lingui.config.ts",
+   "reason": "i18n extraction and compilation tooling"
+  },
+  {
+   "path": "lint-staged.config.cjs",
+   "reason": "Pre-commit lint configuration"
+  },
+  {
+   "path": "apps/remix/react-router.config.ts",
+   "reason": "React Router framework configuration"
+  },
+  {
+   "path": "apps/remix/rollup.config.mjs",
+   "reason": "Server Rollup bundler configuration"
+  },
+  {
+   "path": "apps/remix/tailwind.config.ts",
+   "reason": "App-level Tailwind CSS configuration"
+  },
+  {
+   "path": "apps/remix/vite.config.ts",
+   "reason": "Vite dev server and build configuration"
+  },
+  {
+   "path": "apps/remix/app/entry.client.tsx",
+   "reason": "React hydration bootstrap entry point"
+  },
+  {
+   "path": "apps/remix/app/entry.server.tsx",
+   "reason": "Server-side rendering entry point"
+  },
+  {
+   "path": "apps/remix/app/root.tsx",
+   "reason": "Root layout shell with global providers and theme"
+  },
+  {
+   "path": "apps/remix/app/routes.ts",
+   "reason": "Flat route manifest configuration"
+  },
+  {
+   "path": "apps/remix/app/types/",
+   "reason": "Empty placeholder module"
+  },
+  {
+   "path": "apps/remix/server/context.ts",
+   "reason": "Hono context middleware plumbing"
+  },
+  {
+   "path": "apps/remix/server/load-context.ts",
+   "reason": "React Router context loader plumbing"
+  },
+  {
+   "path": "apps/remix/server/main.js",
+   "reason": "Node HTTP server entry point"
+  },
+  {
+   "path": "apps/remix/server/middleware.ts",
+   "reason": "Redirect and cookie middleware plumbing"
+  },
+  {
+   "path": "apps/remix/server/redirects.ts",
+   "reason": "Parent-path redirect handlers"
+  },
+  {
+   "path": "apps/remix/server/router.ts",
+   "reason": "Hono route aggregation configuration"
+  },
+  {
+   "path": "apps/remix/server/trpc/",
+   "reason": "tRPC-to-Hono adapter plumbing"
+  },
+  {
+   "path": "apps/remix/server/utils/",
+   "reason": "Server session utility wrapper"
+  },
+  {
+   "path": "apps/remix/app/middleware/nonce.ts",
+   "reason": "CSP nonce injection infrastructure"
+  },
+  {
+   "path": "apps/remix/app/routes/_redirects+/ingest.$.tsx",
+   "reason": "PostHog analytics reverse proxy"
+  },
+  {
+   "path": "apps/remix/app/routes/api+/health.ts",
+   "reason": "Infrastructure health check endpoint"
+  },
+  {
+   "path": "apps/remix/app/routes/api+/locale.tsx",
+   "reason": "Language cookie setter utility"
+  },
+  {
+   "path": "apps/remix/app/routes/api+/theme.tsx",
+   "reason": "Theme session persistence utility"
+  },
+  {
+   "path": "apps/remix/app/utils/meta.ts",
+   "reason": "SEO meta tag generation utility"
+  },
+  {
+   "path": "apps/remix/app/utils/nonce.ts",
+   "reason": "CSP nonce client utility"
+  },
+  {
+   "path": "apps/remix/app/utils/polyfills/",
+   "reason": "Promise.withResolvers polyfill"
+  },
+  {
+   "path": "apps/remix/app/utils/super-json-loader.ts",
+   "reason": "SuperJSON serialization helper"
+  },
+  {
+   "path": "apps/remix/app/utils/truncate-title.ts",
+   "reason": "Generic string truncation utility"
+  },
+  {
+   "path": "apps/remix/app/components/general/generic-error-layout.tsx",
+   "reason": "Shared error page layout used across all roots"
+  },
+  {
+   "path": "packages/trpc/server/router.ts",
+   "reason": "tRPC router aggregation"
+  },
+  {
+   "path": "packages/trpc/server/trpc.ts",
+   "reason": "tRPC initialization and middleware setup"
+  },
+  {
+   "path": "packages/trpc/server/context.ts",
+   "reason": "tRPC context creation plumbing"
+  },
+  {
+   "path": "packages/trpc/server/schema.ts",
+   "reason": "Shared tRPC response schema"
+  },
+  {
+   "path": "packages/trpc/server/index.ts",
+   "reason": "tRPC re-exports"
+  },
+  {
+   "path": "packages/trpc/client/",
+   "reason": "tRPC HTTP client setup, used by all features"
+  },
+  {
+   "path": "packages/trpc/react/",
+   "reason": "tRPC React Query integration, used by all features"
+  },
+  {
+   "path": "packages/trpc/utils/",
+   "reason": "tRPC error handler, data transformer, and OpenAPI adapter"
+  },
+  {
+   "path": "packages/trpc/index.ts",
+   "reason": "Empty package entry"
+  },
+  {
+   "path": "packages/prisma/client.ts",
+   "reason": "Prisma client type re-export"
+  },
+  {
+   "path": "packages/prisma/helper.ts",
+   "reason": "Database URL resolution utility"
+  },
+  {
+   "path": "packages/prisma/index.ts",
+   "reason": "Prisma client with read-replica setup"
+  },
+  {
+   "path": "packages/prisma/utils/",
+   "reason": "Generic memoization utility"
+  },
+  {
+   "path": "packages/ee/index.ts",
+   "reason": "Empty package entry"
+  },
+  {
+   "path": "packages/lib/errors/",
+   "reason": "Shared error types used across all features"
+  },
+  {
+   "path": "packages/lib/schemas/",
+   "reason": "Shared validation schemas"
+  },
+  {
+   "path": "packages/lib/index.ts",
+   "reason": "Empty package entry"
+  },
+  {
+   "path": "packages/lib/vitest.config.ts",
+   "reason": "Test runner configuration"
+  },
+  {
+   "path": "packages/ui/icons/",
+   "reason": "Generic icon components"
+  },
+  {
+   "path": "packages/ui/index.ts",
+   "reason": "Empty package entry"
+  },
+  {
+   "path": "packages/ui/tailwind.config.cjs",
+   "reason": "UI Tailwind CSS configuration"
+  },
+  {
+   "path": "packages/ui/primitives/accordion.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/alert-dialog.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/alert.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/aspect-ratio.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/avatar.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/badge.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/button.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/calendar.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/card.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/checkbox.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/collapsible.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/color-picker.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/combobox.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/command.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/context-menu.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/data-table-pagination.tsx",
+   "reason": "Generic table pagination"
+  },
+  {
+   "path": "packages/ui/primitives/data-table.tsx",
+   "reason": "Generic data table"
+  },
+  {
+   "path": "packages/ui/primitives/dialog.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/dropdown-menu.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/element-visible.tsx",
+   "reason": "Generic DOM utility"
+  },
+  {
+   "path": "packages/ui/primitives/form/",
+   "reason": "Generic form components"
+  },
+  {
+   "path": "packages/ui/primitives/hover-card.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/input.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/label.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/menubar.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/multi-select-combobox.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/multiselect.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/navigation-menu.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/password-input.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/pin-input.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/popover.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/progress.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/radio-group.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/scroll-area.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/select.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/separator.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/sheet.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/skeleton.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/slider.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/spinner.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/switch.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/table.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/tabs.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/textarea.tsx",
+   "reason": "Generic UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/theme-switcher.tsx",
+   "reason": "Generic theme toggle"
+  },
+  {
+   "path": "packages/ui/primitives/toast.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/toaster.tsx",
+   "reason": "Generic toast container"
+  },
+  {
+   "path": "packages/ui/primitives/toggle.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/tooltip.tsx",
+   "reason": "Generic Radix UI primitive"
+  },
+  {
+   "path": "packages/ui/primitives/use-toast.ts",
+   "reason": "Generic toast state hook"
+  },
+  {
+   "path": "packages/ui/lib/use-debounce.ts",
+   "reason": "Generic debounce hook"
+  },
+  {
+   "path": "packages/ui/lib/use-hydrated.ts",
+   "reason": "Generic hydration hook"
+  },
+  {
+   "path": "packages/ui/lib/utils.ts",
+   "reason": "Generic class-merge utility"
+  },
+  {
+   "path": "scripts/",
+   "reason": "Build helper scripts"
+  }
+ ],
+ "roots": [
+  {
+   "id": "authoring",
+   "title": "Authoring Documents",
+   "accepted": true,
+   "turns": 14,
+   "reads": 23,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 8,
+    "ok": 8,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "au-api",
+      "claims": [
+       "All 18 V1 endpoints are deprecated — undefined: The cited contract shows getDocuments, getDocument, downloadSignedDocument, createDocument, and createTemplate all marked with `deprecated: true` (lines 60, 73, 87, 101, 115). However, the contract excerpt only shows 5 endpoints; the full contract is not shown, so we cannot verify the count of 18."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "signing",
+   "title": "Signing Documents",
+   "accepted": true,
+   "turns": 15,
+   "reads": 29,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 5,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "signing",
+      "claims": [
+       "Recipients reach signing from email or their inbox — not_shown",
+       "The loader renders a PDF with interactive fields — not_shown",
+       "The recipient fills fields before submitting — not_shown"
+      ]
+     },
+     {
+      "id": "sg-fields",
+      "claims": [
+       "Fields are rendered as overlays on the PDF viewer — not_shown: The cited code shows server-side field signing logic and a React component for auto-signing, but does not show how fields are rendered as overlays on the PDF viewer."
+      ]
+     }
+    ],
+    "downgraded": [
+     "signing"
+    ]
+   }
+  },
+  {
+   "id": "sealing",
+   "title": "Sealing & Certificates",
+   "accepted": true,
+   "turns": 13,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 9,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "sc-csc",
+      "claims": [
+       "The recipient must restart the entire OAuth flow from scratch — not_shown: The cited code does not show what happens after the error is thrown or what recovery steps a recipient must take."
+      ]
+     }
+    ],
+    "downgraded": [
+     "sc-csc"
+    ]
+   }
+  },
+  {
+   "id": "templates",
+   "title": "Templates & Reuse",
+   "accepted": true,
+   "turns": 12,
+   "reads": 23,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "tp-edit-recipients",
+      "claims": [
+       "Assistant role forces sequential signing — not_shown: The code does not show that assistant role forces sequential signing. Line 118-120 shows that sequential sorting happens when `signingOrder === DocumentSigningOrder.SEQUENTIAL`, but this is independent of role. The assistant role is only checked in onDragEnd (line 299) to warn if it's the last signer, not to force sequential signing."
+      ]
+     },
+     {
+      "id": "tp-edit-fields",
+      "claims": [
+       "Supports 10 types including Signature, Text, Radio, Checkbox, and Dropdown — not_shown: Line 10 shows the type field uses a FieldType enum, but the code does not show the enum definition or list the specific types supported. The detail claims 10 types including specific ones, but this cannot be verified from the cited code."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "org-teams",
+   "title": "Organisation & Teams",
+   "accepted": true,
+   "turns": 12,
+   "reads": 19,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 3,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "embedding",
+   "title": "Embedding",
+   "accepted": true,
+   "turns": 16,
+   "reads": 26,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 6,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "platform-admin",
+   "title": "Platform Admin",
+   "accepted": true,
+   "turns": 15,
+   "reads": 27,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 13,
+    "ok": 13,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "pa-users",
+      "claims": [
+       "Disabling accounts immediately expires all webhooks — contradicted: Lines 39-44 show webhooks are disabled (enabled: false) rather than expired. The detail says 'expiring all API tokens and webhooks' but webhooks are disabled, not expired.",
+       "Disable user expires all webhooks — contradicted: Lines 39-44 show webhooks are disabled by setting `enabled: false`, not expired. The detail claims webhooks are 'expired' but the code disables them instead."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "auth-account",
+   "title": "Auth & Account",
+   "accepted": true,
+   "turns": 14,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 9,
+    "rewritten": [],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "authoring",
+    "depth": 2,
+    "nodes": 8
+   },
+   {
+    "id": "signing",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "sealing",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "templates",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "org-teams",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "embedding",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "platform-admin",
+    "depth": 3,
+    "nodes": 13
+   },
+   {
+    "id": "auth-account",
+    "depth": 3,
+    "nodes": 11
+   }
+  ]
+ },
+ "verifyPassRate": 97
+}

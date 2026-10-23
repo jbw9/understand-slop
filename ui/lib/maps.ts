@@ -1,35 +1,74 @@
 /**
- * Server-side: the map files under `ui/maps/<name>/map.json`, and the repo
- * each one reads its code from.
+ * Server-side: every map the app can open, and the repo each one reads its
+ * code from. Two kinds: the examples committed under `ui/maps/<name>/map.json`,
+ * and the reader's own projects in the vault (lib/vault.ts), which stay on
+ * their machine.
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
+import { listProjects, mapFileOf, markOpened } from "@/lib/vault";
 
 const MAPS = join(process.cwd(), "maps");
 export const DEFAULT_MAP = "explorify";
 
-export function listMaps(): string[] {
+/** One entry in the map picker. */
+export interface MapEntry {
+  id: string;
+  label: string;
+  /** Imported from this machine, not one of the committed examples. */
+  local: boolean;
+}
+
+/** The committed examples. */
+export function listExamples(): string[] {
   return readdirSync(MAPS).filter((d) => existsSync(join(MAPS, d, "map.json"))).sort();
 }
 
-/** `name` arrives from the URL, so only a listed map is ever read. */
-export function loadMap(name: string | undefined): { name: string; file: MapFile } {
-  const pick = name && listMaps().includes(name) ? name : DEFAULT_MAP;
-  return { name: pick, file: JSON.parse(readFileSync(join(MAPS, pick, "map.json"), "utf8")) };
+/** Every map that can be opened: the reader's projects that have one, then the examples. */
+export function listMaps(): MapEntry[] {
+  const mine = listProjects()
+    .filter((p) => mapFileOf(p.id))
+    .map((p) => ({ id: p.id, label: p.name, local: true }));
+  return [...mine, ...listExamples().map((id) => ({ id, label: id, local: false }))];
 }
 
 /**
+ * `name` arrives from the URL, so only a listed map is ever read. A project's
+ * map is given the project's directory as its root: that is where the reader
+ * keeps it, whatever the generator recorded.
+ */
+export function loadMap(name: string | undefined): { name: string; file: MapFile } {
+  const project = name ? listProjects().find((p) => p.id === name) : undefined;
+  const file = project && mapFileOf(project.id);
+  if (project && file) {
+    markOpened(project.id);
+    const map: MapFile = JSON.parse(readFileSync(file, "utf8"));
+    map.RUN.root = project.root;
+    return { name: project.id, file: map };
+  }
+  const pick = name && listExamples().includes(name) ? name : DEFAULT_MAP;
+  return { name: pick, file: JSON.parse(readFileSync(join(MAPS, pick, "map.json"), "utf8")) };
+}
+
+/** Where checkouts usually live, under home, in the order they are tried. */
+const CODE_DIRS = ["Desktop/Code", "projects", "Projects", "code", "Code", "src", "dev", "repos", "git"];
+
+/**
  * Where a map's code lives. A generated map records its absolute root; a
- * hand-authored one names a directory under ~/Desktop/Code, so a literal
- * `/Users/<name>/…` is never baked into a fixture.
+ * hand-authored one names only its repo, so a literal `/Users/<name>/…` is
+ * never baked into a fixture, and is looked for in the usual folders. With no
+ * checkout found it stays at ~/Desktop/Code, where the examples were made.
  */
 export function rootOf(run: Run): string {
-  return run.root ?? process.env.SLOP_REPO_ROOT ?? resolve(homedir(), "Desktop/Code", run.repo);
+  if (run.root) return run.root;
+  if (process.env.SLOP_REPO_ROOT) return process.env.SLOP_REPO_ROOT;
+  const tried = CODE_DIRS.map((d) => resolve(homedir(), d, run.repo));
+  return tried.find((d) => existsSync(d) && statSync(d).isDirectory()) ?? tried[0];
 }
 
 /** The checkout's `origin` as a web address (`git@host:o/r.git` → `https://host/o/r`), if it has one. */

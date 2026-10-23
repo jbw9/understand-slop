@@ -3,6 +3,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { openProjects } from "@/components/projects";
 import { toggleTerminal } from "@/components/terminal";
 import { openClaude } from "@/lib/context";
 import { openSettings } from "@/lib/settings";
@@ -55,6 +56,9 @@ export function Titlebar() {
         {RUN.repo}
       </span>
       <div data-tauri-drag-region className="h-full flex-1" />
+      <Control label="Projects — import one, or switch maps" onClick={openProjects}>
+        <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
+      </Control>
       <Control label="Claude Code — right-click a card to hand it over" onClick={openClaude}>
         <path d="M8 2.5v11M2.5 8h11M4.1 4.1l7.8 7.8m0-7.8-7.8 7.8" />
       </Control>

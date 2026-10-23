@@ -1039,7 +1039,7 @@ export interface Link {
 /** One mapping run: which repository, at which commit, and how it is cut. */
 export interface Run {
   command: string;
-  /** Directory name under ~/Desktop/Code — also where the code level reads. */
+  /** The checkout's directory name, looked for under the usual code folders (rootOf in lib/maps.ts) — also where the code level reads. */
   repo: string;
   /** One sentence: what the top level is cut by, and why that order. */
   about: string;

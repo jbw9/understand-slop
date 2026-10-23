@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { useRouter } from "next/navigation";
+import type { MapEntry } from "@/lib/maps";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,7 +25,7 @@ export function Crumbs({
   repo: string;
   /** The open map and every map on disk; a switcher shows when there are two. */
   map: string;
-  maps: string[];
+  maps: MapEntry[];
   /** One entry per level below the repo, outermost first. */
   crumbs: { id: string; title: string; step?: number }[];
   /** Jump to depth `n` — 0 is the repo. */
@@ -47,11 +48,20 @@ export function Crumbs({
               onChange={(e) => router.push(`?map=${encodeURIComponent(e.target.value)}`)}
               className="rounded-[7px] border border-border-strong bg-pure-white px-2 py-1 text-[12.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
             >
-              {maps.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
+              {[
+                { label: "Your projects", entries: maps.filter((m) => m.local) },
+                { label: "Examples", entries: maps.filter((m) => !m.local) },
+              ].map((g) =>
+                g.entries.length ? (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.entries.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null,
+              )}
             </select>
           </label>
         ) : null}

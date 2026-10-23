@@ -34,7 +34,9 @@ export async function main(args: string[]) {
   const pick = (env: string | undefined) => MODELS[(env ?? "opus") as keyof typeof MODELS] ?? MODELS.opus;
   const models = { summarize: MODELS.haiku, cut: pick(process.env.SLOP_CUT), author: pick(process.env.SLOP_AUTHOR), verify: MODELS.haiku };
 
-  const out = `maps/${name}`;
+  // --out puts the map elsewhere: the app's project vault (lib/vault.ts), so an
+  // imported project's map never lands in this repo's committed examples.
+  const out = opt("--out") ?? `maps/${name}`;
   mkdirSync(out, { recursive: true });
   cacheIn(`${out}/.cache`, { fresh: args.includes("--fresh") });
   const t0 = Date.now();

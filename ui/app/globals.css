@@ -13,6 +13,8 @@
 
   /* ── ink ───────────────────────────────────────────────── */
   --color-ink: #1a1a2e;
+  /* The phone bezel around app screenshots, and the veil behind a dialog: dark in either theme. */
+  --color-night: #1a1a2e;
   --color-on-surface: #1a1c1b;
   --color-on-surface-variant: #404945;
   --color-muted-slate: #6b7280;
@@ -35,15 +37,16 @@
   --color-clay-surface: #fbede9;
   --color-clay-line: #e0b3a5;
 
+
   /* ── lines ─────────────────────────────────────────────── */
   --color-border-gray: #e7e5e0;
   --color-border-strong: #d6d3cc;
   --color-wire: #b9b6ae;
 
   /* ── shape ─────────────────────────────────────────────── */
-  --radius-panel: 20px;
-  --radius-row: 12px;
-  --radius-chip: 999px;
+  --radius-panel: 12px;
+  --radius-row: 8px;
+  --radius-chip: 6px;
 
   /* ── elevation ─────────────────────────────────────────── */
   --shadow-panel: 0 1px 2px rgba(26, 26, 46, 0.04);
@@ -64,6 +67,49 @@
   --text-label--line-height: 1;
   --text-label--letter-spacing: 0.08em;
   --text-label--font-weight: 600;
+}
+
+/* Dark: the same tokens, pointed at night colours, so every class and every
+   diagram that reads them follows. <html data-theme> is set before first
+   paint by the script in app/layout.tsx, from Settings or the system. Text on
+   a filled green button is `text-white`, which does not flip. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-warm-cream: #121317;
+  --color-pure-white: #1b1d23;
+  --color-surface: #17191e;
+  --color-surface-container-low: #1f2128;
+  --color-surface-container: #262932;
+  --color-surface-dim: #30343e;
+
+  --color-ink: #ececf1;
+  --color-on-surface: #e3e3e6;
+  --color-on-surface-variant: #b7bcc4;
+  --color-muted-slate: #9aa1ad;
+  --color-faint: #6e7581;
+
+  --color-deep-green: #3f8f76;
+  --color-brand: #4fa088;
+  --color-forest-green: #6cc28a;
+  --color-mint-success: #16302a;
+  --color-mint-line: #2c5446;
+
+  --color-amber-ink: #e2c77e;
+  --color-amber-surface: #2b2414;
+  --color-amber-line: #6b5520;
+
+  --color-clay-ink: #f0a58e;
+  --color-clay-surface: #331f1a;
+  --color-clay-line: #7a4436;
+
+
+  --color-border-gray: #2b2e37;
+  --color-border-strong: #3a3e4a;
+  --color-wire: #4a4f5c;
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.5);
 }
 
 @layer base {

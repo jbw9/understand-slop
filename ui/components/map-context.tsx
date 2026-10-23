@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useMemo } from "react";
 import { buildMap, type BuiltMap, type MapFile } from "@/lib/map";
+import type { MapEntry } from "@/lib/maps";
 
-const MapContext = createContext<(BuiltMap & { maps: string[] }) | null>(null);
+const MapContext = createContext<(BuiltMap & { maps: MapEntry[] }) | null>(null);
 
 /** The map on screen. Read on the server, built once here. */
 export function MapProvider({
@@ -14,7 +15,7 @@ export function MapProvider({
 }: {
   name: string;
   file: MapFile;
-  maps: string[];
+  maps: MapEntry[];
   children: React.ReactNode;
 }) {
   const value = useMemo(() => ({ ...buildMap(file, name), maps }), [file, name, maps]);

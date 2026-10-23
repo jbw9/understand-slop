@@ -7,7 +7,7 @@
  * file, not a copy of the tree plumbing.
  */
 
-import type { Anatomy, Edge, Link, Node, Run } from "@/lib/data";
+import type { Anatomy, CodeRef, Edge, Link, Node, Run } from "@/lib/data";
 import { rowId } from "@/lib/data";
 
 export interface MapFile {
@@ -170,4 +170,100 @@ export type BuiltMap = ReturnType<typeof buildMap>;
 /** Every node in the tree, flattened. Used for id lookups and audits. */
 export function allNodes(nodes: Node[]): Node[] {
   return nodes.flatMap((n) => [n, ...allNodes(n.children ?? [])]);
+}
+
+/**
+ * The code behind a level. A row-built level has no refs of its own; the code
+ * of the nearest level above it is still the code behind it.
+ */
+export function codeAt({ nodeAt }: BuiltMap, path: string[]): CodeRef[] {
+  for (let i = path.length; i > 0; i--) {
+    const code = nodeAt(path.slice(0, i))?.code;
+    if (code?.length) return code;
+  }
+  return [];
+}
+
+/** Past this a pick reads as the whole card pasted in, not a pointer to it. */
+const DETAIL_CAP = 1500;
+
+const cap = (text: string) => (text.length > DETAIL_CAP ? `${text.slice(0, DETAIL_CAP)}…` : text);
+
+const trail = ({ nodeAt }: BuiltMap, path: string[]) =>
+  path
+    .map((_, i) => nodeAt(path.slice(0, i + 1))?.title)
+    .filter(Boolean)
+    .join(" › ");
+
+/**
+ * One section of the map as text for Claude: where it sits, what it says, and
+ * the code behind it — the last so Claude reads the real thing, not only the
+ * map's account of it. `[]` is the repository as a whole.
+ */
+export function describe(m: BuiltMap, path: string[]): string {
+  const { RUN, L0, nodeAt } = m;
+  const node = path.length ? nodeAt(path) : null;
+  if (!node) {
+    return [
+      `[Map section: the whole repository (${RUN.repo})`,
+      RUN.about,
+      `Its top-level sections: ${L0.map((n) => n.title).join(", ")}]`,
+    ].join("\n");
+  }
+  const where = trail(m, path);
+  const detail = node.detail && cap(node.detail);
+  const code = codeAt(m, path);
+  return [
+    `[Map section: ${where} (${RUN.repo})`,
+    node.sub,
+    detail,
+    node.unsure ? `Not certain: ${node.unsure}` : "",
+    node.issues?.length ? `Problems: ${node.issues.map((i) => i.title).join("; ")}` : "",
+    code.length ? `Code:\n${code.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .concat("]");
+}
+
+/**
+ * One thing on a level — a row, a box, a line of a screen — as text for
+ * Claude: what it says, where on the map it sits, and its code. With no code
+ * of its own, the code behind its section is named instead.
+ */
+export function describeElement(m: BuiltMap, path: string[], label: string, text: string, code?: string): string {
+  const where = path.length ? `${trail(m, path)} › ${label}` : label;
+  const behind = code ? [] : codeAt(m, path);
+  return [
+    `[Map element: ${where} (${m.RUN.repo})`,
+    cap(text.trim()),
+    code ? `Code: ${code}` : "",
+    behind.length
+      ? `Code behind its section:\n${behind.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .concat("]");
+}
+
+/**
+ * A section's problems as text for an agent: every one in full — what goes
+ * wrong and where — then the section they belong to and its code, so the
+ * agent can go and look. The ask is left to the user.
+ */
+export function describeProblems(m: BuiltMap, path: string[]): string {
+  const node = path.length ? m.nodeAt(path) : null;
+  const issues = node?.issues ?? [];
+  const code = codeAt(m, path);
+  return [
+    `[Map problems: ${trail(m, path)} (${m.RUN.repo})`,
+    `The map found ${issues.length} ${issues.length === 1 ? "problem" : "problems"} here:`,
+    ...issues.map((it, i) => `${i + 1}. ${it.title} — ${it.detail}${it.where ? ` (${it.where})` : ""}`),
+    node?.sub ? `The section: ${node.sub}` : "",
+    code.length ? `Code:\n${code.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .concat("]");
 }

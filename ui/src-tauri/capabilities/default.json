@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window. Core IPC plus the window calls the custom title bar makes; the terminal and the Claude tabs are reached through this app's own commands, never a general fs or shell plugin. The dialog plugin may only open a picker, to choose a project's folder, and the clipboard is read and written as plain text, for the terminal's copy and paste.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-is-maximized",
+    "dialog:allow-open",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
+  ]
+}

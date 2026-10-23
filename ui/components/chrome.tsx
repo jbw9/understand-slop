@@ -160,7 +160,7 @@ export function Crumbs({
   return (
     <nav
       aria-label="Location"
-      className="sticky top-0 z-20 bg-warm-cream/85 backdrop-blur-sm"
+      className="sticky left-0 top-0 z-20 bg-warm-cream/85 backdrop-blur-sm"
     >
       <div className="mx-auto flex max-w-[1220px] items-start gap-6 px-10 py-3">
         {/* In the desktop app the switcher lives in the title bar. */}

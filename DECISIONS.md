@@ -1114,3 +1114,45 @@ The list sits beside a ~700px phone, so it was set tiny against a column of
 dead space.
 **Cost accepted:** a screen with many long notes is now taller than its phone
 rather than shorter. **At scale:** unchanged.
+
+## D45 — Zoom magnifies the level; it does not reflow it
+
+**Chose:** pinch, ⌘/Ctrl-scroll and ⌘ +/−/0 scale the open level with a
+`transform` (100–400%) around the point under the cursor, the level keeping
+its 100% layout and growing past the window to be scrolled around
+(`components/zoom.tsx`). A pill with −/%/+ shows only while zoomed.
+**Beat:** page zoom (CSS `zoom`, or the browser's own). It reflows, and a
+diagram is already `width: 100%` up to its natural size, so reflowing left it
+exactly as small as it was: the one thing the user wanted bigger. CSS `zoom`
+on a pinned width would magnify too, but getBoundingClientRect inside it means
+different things in Chrome and WebKit, and the wires measure with it; a
+transform reads the same in both, and `WireLayer` already divides by `scale`.
+**Cost accepted:** a pinch re-rasterises every frame. Zoom is not kept across
+reloads, and does not go below 100% (a transform leaves the unscaled layout
+box behind, so zooming out would leave dead scroll space).
+**At scale:** one transform on one element, nothing re-renders but the wires.
+
+## D46 — Native traffic lights on a Mac, drawn buttons elsewhere
+
+**Chose:** `tauri.macos.conf.json` turns decorations back on with
+`titleBarStyle: Overlay` and a hidden title, so macOS draws its own traffic
+lights over our title bar; the bar leaves 78px for them and drops its own
+minimize/maximize/close. Other platforms keep the drawn buttons.
+**Beat:** drawing traffic lights in HTML: they would look right, but lose the
+native hover glyphs, ⌥-click zoom, the fullscreen menu, and dimming when the
+window is inactive.
+**Cost accepted:** the lights' vertical position (`trafficLightPosition`) is
+tuned by eye to the 36px bar. The override file repeats the whole window
+object, because a merge patch replaces arrays wholesale.
+
+## D47 — The light terminal floors contrast instead of re-theming Claude
+
+**Chose:** on the light palette xterm's `minimumContrastRatio` is 4.5, so a
+foreground too faint for its cell is darkened (or lightened, on a dark cell).
+**Beat:** making Claude Code itself draw light. Its theme lives only in the
+user's global `~/.claude.json` (default `dark`), with no flag or env var, and
+it picks its colours in RGB, which no palette reaches. Its own `auto` theme
+asks the terminal (OSC 11, which xterm answers), but switching to it is the
+user's global choice, not the app's.
+**Cost accepted:** Claude's dark-theme prompt row is still a dark bar in a
+light terminal; it is readable, not pretty.

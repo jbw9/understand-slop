@@ -131,6 +131,14 @@ function zoom(by: number | null) {
 const palette = () => (document.documentElement.dataset.theme === "dark" ? DARK : LIGHT);
 
 /**
+ * Programs that assume a dark terminal pick their own colours in RGB, which no
+ * palette reaches: Claude Code in its default dark theme draws white bullets,
+ * pale links and dim grey on paper. On the light palette xterm lifts any
+ * foreground below this contrast with the cell it sits on, so they still read.
+ */
+const contrast = () => (document.documentElement.dataset.theme === "dark" ? 1 : 4.5);
+
+/**
  * One tab's terminal: the user's shell on a pty, an xterm drawing it. Lives as
  * long as its tab. With Claude Code found (as Settings says, or wherever it is
  * installed), the shell can run it through the app's launcher, and with
@@ -204,6 +212,7 @@ export function Shell({
       if (gone || !el.current) return;
       const term = new Terminal({
         theme: palette(),
+        minimumContrastRatio: contrast(),
         fontFamily: `${family}, ui-monospace, monospace`,
         // A whole pixel size: a fractional one gives fractional cells, which
         // drift out of line across a row.
@@ -297,7 +306,10 @@ export function Shell({
       };
       show.current();
       // The theme can change under a running shell: Settings, or the system's.
-      const themed = new MutationObserver(() => (term.options.theme = palette()));
+      const themed = new MutationObserver(() => {
+        term.options.theme = palette();
+        term.options.minimumContrastRatio = contrast();
+      });
       themed.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       // Zoom in one tab, and every tab follows; the grid is re-fitted to the new cells.
       const onZoom = (e: Event) => {

@@ -9,6 +9,7 @@ import { CodeDrawer, ExplainedBlock, WatchOut, isExplained } from "@/components/
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
+import { Zoom, useZoomScale } from "@/components/zoom";
 import { Crumbs, goTo, useLocation } from "@/components/chrome";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
@@ -16,6 +17,7 @@ import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
 import { readSource } from "@/lib/source";
+import { useSettings, type Ground } from "@/lib/settings";
 import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
@@ -222,6 +224,7 @@ export function Canvas() {
   // block or line of code (`data-row`, `data-pick`). Desktop only: the browser
   // keeps its own menu, and there is no Claude tab to hand anything to.
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const { ground } = useSettings();
   const [menu, setMenu] = useState<{ x: number; y: number; target: Target } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const onContextMenu = (e: React.MouseEvent) => {
@@ -240,13 +243,14 @@ export function Canvas() {
       onContextMenu={desktop ? onContextMenu : undefined}
     >
       {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
-      <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
+      <main ref={scrollRef} className={cn(GROUND[ground], "relative min-w-0 flex-1 overflow-auto")}>
         {/* In the desktop app the title bar carries where you are. */}
         {desktop ? null : (
           <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
         )}
+        <Zoom scrollRef={scrollRef}>
         <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
-          <WireLayer
+          <ZoomedWires
             canvasRef={contentRef}
             nodes={nodes}
             wires={wires}
@@ -275,11 +279,19 @@ export function Canvas() {
             </motion.div>
           </AnimatePresence>
         </div>
+        </Zoom>
       </main>
     </div>
   );
 }
 
+
+/** The wires measure in screen pixels, so they need the magnification they are drawn under. */
+function ZoomedWires(props: Omit<Parameters<typeof WireLayer>[0], "scale">) {
+  return <WireLayer {...props} scale={useZoomScale()} />;
+}
+
+const GROUND: Record<Ground, string> = { dots: "dotfield", squares: "gridfield", plain: "" };
 
 const noSubscribe = () => () => {};
 

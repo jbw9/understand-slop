@@ -431,7 +431,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             {/* A bezel, and a blank strip above and below the capture: the web
                 build has no status bar, so without them the rounded corners
                 cut into the app's own title and tab bar. */}
-            <div className="rounded-[44px] bg-night p-[9px] shadow-panel">
+            <div className="rounded-[44px] bg-bezel p-[9px] shadow-panel">
               <div className="overflow-hidden rounded-[36px] bg-white">
                 <div className="flex h-8 items-center justify-center">
                   <div className="h-[18px] w-[84px] rounded-full bg-night" />

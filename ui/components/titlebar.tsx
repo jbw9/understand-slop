@@ -23,6 +23,10 @@ import { cn } from "@/lib/utils";
  * regions so a click on one is never read as the start of a drag. Outside the
  * desktop app (plain `next dev` in a browser) there is no window to drive, so
  * nothing is drawn.
+ *
+ * On a Mac the window keeps its own traffic lights (tauri.macos.conf.json
+ * overlays them on this bar), so the bar leaves room for them on the left and
+ * draws no buttons of its own on the right.
  */
 
 const noSubscribe = () => () => {};
@@ -32,6 +36,8 @@ export function Titlebar() {
   const { name, maps, RUN } = useMap();
   const { path, crumbs } = useLocation();
   const [maximized, setMaximized] = useState(false);
+  // Only read once `desktop` is true, which is never on the server.
+  const mac = desktop && /Mac/.test(navigator.userAgent);
 
   useEffect(() => {
     if (!desktop) return;
@@ -51,7 +57,10 @@ export function Titlebar() {
   return (
     <header
       data-tauri-drag-region
-      className="flex h-9 shrink-0 select-none items-center border-b border-border-gray bg-surface-container-low pl-1.5"
+      className={cn(
+        "flex h-9 shrink-0 select-none items-center border-b border-border-gray bg-surface-container-low",
+        mac ? "pl-[78px]" : "pl-1.5",
+      )}
     >
       {/* Outside the drag region, so a click opens it rather than moving the window. */}
       <label className="relative flex items-center">
@@ -97,14 +106,16 @@ export function Titlebar() {
           <circle cx="12" cy="12" r="3" />
         </g>
       </Control>
-      <Control label="Minimize" onClick={() => win.minimize()}>
-        <path d="M4 8h8" />
-      </Control>
-      <Control label={maximized ? "Restore" : "Maximize"} onClick={() => win.toggleMaximize()}>
-        {maximized ? (
-          <>
-            <rect x="3.5" y="5.5" width="7" height="7" rx="1" />
-            <path d="M6 5.5V4.5a1 1 0 0 1 1-1h4.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1h-1" />
+      {mac ? null : (
+        <>
+          <Control label="Minimize" onClick={() => win.minimize()}>
+            <path d="M4 8h8" />
+          </Control>
+          <Control label={maximized ? "Restore" : "Maximize"} onClick={() => win.toggleMaximize()}>
+            {maximized ? (
+              <>
+                <rect x="3.5" y="5.5" width="7" height="7" rx="1" />
+                <path d="M6 5.5V4.5a1 1 0 0 1 1-1h4.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1h-1" />
           </>
         ) : (
           <rect x="4" y="4" width="8" height="8" rx="1" />
@@ -113,6 +124,8 @@ export function Titlebar() {
       <Control label="Close" onClick={() => win.close()} danger>
         <path d="m4.5 4.5 7 7m0-7-7 7" />
       </Control>
+        </>
+      )}
     </header>
   );
 }

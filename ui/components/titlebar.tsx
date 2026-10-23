@@ -111,7 +111,7 @@ function Control({
       title={label}
       className={cn(
         "flex h-full w-11 cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
-        danger ? "hover:bg-clay-ink hover:text-pure-white" : "hover:bg-surface-container hover:text-ink",
+        danger ? "hover:bg-clay-ink hover:text-white" : "hover:bg-surface-container hover:text-ink",
         className,
       )}
     >

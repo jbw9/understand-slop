@@ -431,15 +431,15 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             {/* A bezel, and a blank strip above and below the capture: the web
                 build has no status bar, so without them the rounded corners
                 cut into the app's own title and tab bar. */}
-            <div className="rounded-[44px] bg-ink p-[9px] shadow-panel">
-              <div className="overflow-hidden rounded-[36px] bg-pure-white">
+            <div className="rounded-[44px] bg-night p-[9px] shadow-panel">
+              <div className="overflow-hidden rounded-[36px] bg-white">
                 <div className="flex h-8 items-center justify-center">
-                  <div className="h-[18px] w-[84px] rounded-full bg-ink" />
+                  <div className="h-[18px] w-[84px] rounded-full bg-night" />
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element -- a static capture at its own size; next/image adds nothing here */}
                 <img src={block.shot} alt={block.title} className="block h-auto w-full" />
                 <div className="flex h-6 items-center justify-center">
-                  <div className="h-[4px] w-24 rounded-full bg-ink/80" />
+                  <div className="h-[4px] w-24 rounded-full bg-night/80" />
                 </div>
               </div>
             </div>
@@ -487,7 +487,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
 
 function Badge({ n }: { n: number }) {
   return (
-    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[11px] font-semibold text-pure-white">
+    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[11px] font-semibold text-white">
       {n}
     </span>
   );
@@ -521,7 +521,7 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
       );
     case "button":
       return (
-        <div className={cn(base, "rounded-full bg-deep-green px-3 py-2 text-center font-medium text-pure-white")}>
+        <div className={cn(base, "rounded-[6px] bg-deep-green px-3 py-2 text-center font-medium text-white")}>
           {label}
           {badge}
         </div>

@@ -162,7 +162,7 @@ function Diagram({
                   y={y}
                   width={w}
                   height={BOX_H}
-                  rx="10"
+                  rx="6"
                   fill={t.fill}
                   stroke={t.stroke}
                   strokeWidth="1.5"
@@ -274,7 +274,7 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[12px] border border-border-gray bg-pure-white">
+      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white">
         <table className="w-full border-collapse text-left text-[13.5px]">
           <thead>
             <tr className="border-b border-border-gray bg-surface">
@@ -334,7 +334,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[14px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
+      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
         <div className="relative" style={{ minWidth: n * 150 }}>
           {/* lifelines */}
           {block.actors.map((a) => (
@@ -348,7 +348,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
           <div className="relative flex">
             {block.actors.map((a) => (
               <div key={a} className="flex flex-1 justify-center">
-                <span className="rounded-[8px] border border-border-strong bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink">
+                <span className="rounded-[5px] border border-border-strong bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink">
                   {a}
                 </span>
               </div>
@@ -372,7 +372,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
                   <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">{i + 1}</span>
                   {self ? (
                     <div
-                      className="absolute top-[8px] -translate-x-1/2 rounded-[8px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
+                      className="absolute top-[8px] -translate-x-1/2 rounded-[5px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
                       style={{ left: `${a}%`, maxWidth: `${100 / n}%` }}
                     >
                       {m.label}
@@ -507,14 +507,14 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
       return <p className={cn(base, "text-muted-slate")}>{label}{badge}</p>;
     case "field":
       return (
-        <div className={cn(base, "rounded-[8px] border border-border-strong px-2.5 py-2 text-faint")}>
+        <div className={cn(base, "rounded-[5px] border border-border-strong px-2.5 py-2 text-faint")}>
           {label}
           {badge}
         </div>
       );
     case "choice":
       return (
-        <div className={cn(base, "rounded-full border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
+        <div className={cn(base, "rounded-[6px] border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
           {label}
           {badge}
         </div>
@@ -528,17 +528,17 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
       );
     case "image":
       return (
-        <div className={cn(base, "flex h-20 items-center justify-center rounded-[8px] bg-surface-container text-faint")}>
+        <div className={cn(base, "flex h-20 items-center justify-center rounded-[5px] bg-surface-container text-faint")}>
           {label}
           {badge}
         </div>
       );
     default:
       return (
-        <div className={cn(base, "flex flex-col gap-1 rounded-[8px] border border-border-gray p-2 text-on-surface-variant")}>
+        <div className={cn(base, "flex flex-col gap-1 rounded-[5px] border border-border-gray p-2 text-on-surface-variant")}>
           {label}
-          <span className="h-2 w-4/5 rounded bg-surface-container" />
-          <span className="h-2 w-3/5 rounded bg-surface-container" />
+          <span className="h-2 w-4/5 rounded-[3px] bg-surface-container" />
+          <span className="h-2 w-3/5 rounded-[3px] bg-surface-container" />
           {badge}
         </div>
       );
@@ -551,12 +551,12 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
   return (
     <div className="min-w-0">
       <div className="mb-2.5 flex items-center gap-2">
-        <span className="rounded-full border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
+        <span className="rounded-[6px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
           example
         </span>
         <span className="text-[13px] font-medium text-on-surface-variant">{block.caption}</span>
       </div>
-      <pre className="overflow-x-auto rounded-[12px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
+      <pre className="overflow-x-auto rounded-[8px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
         {block.value}
       </pre>
       {block.notes?.length ? (
@@ -586,7 +586,7 @@ export function WatchOut({ issues }: { issues: Issue[] }) {
           <li
             key={it.title}
             data-pick={it.title}
-            className="rounded-[12px] border border-clay-line bg-clay-surface/60 px-4 py-3"
+            className="rounded-[8px] border border-clay-line bg-clay-surface/60 px-4 py-3"
           >
             <p className="text-[14px] font-semibold text-clay-ink">{it.title}</p>
             <p className="mt-1 text-[13.5px] leading-relaxed text-on-surface">
@@ -630,7 +630,7 @@ export function CodeDrawer({
       <button
         onClick={onToggle}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-full border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
+        className="flex items-center gap-2 rounded-[6px] border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
       >
         <span className="font-mono text-[12px]">{"</>"}</span>
         {open ? "Hide the code" : `The code behind this · ${refs.length} ${refs.length === 1 ? "place" : "places"}`}
@@ -666,7 +666,7 @@ function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: Ro
     <li
       data-pick={code.label}
       data-pick-code={`${code.file}:${code.start}-${code.end}`}
-      className="rounded-[12px] border border-border-gray bg-pure-white"
+      className="rounded-[8px] border border-border-gray bg-pure-white"
     >
       <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
         <span className="text-[13.5px] text-ink">{code.label}</span>

@@ -727,7 +727,7 @@ function List({
               onClick={go}
               disabled={!go}
               className={cn(
-                "group flex w-full items-center gap-2.5 rounded-[8px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
+                "group flex w-full items-center gap-2.5 rounded-[5px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
                 go && "hover:bg-surface-container-low",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
               )}
@@ -813,7 +813,7 @@ function Header({
         {back ? (
           <button
             onClick={back.onClick}
-            className="-ml-2 mb-4 flex items-center gap-1.5 rounded-full px-2 py-1 text-[12.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+            className="-ml-2 mb-4 flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
           >
             <span aria-hidden>←</span>
             {back.label}
@@ -827,7 +827,7 @@ function Header({
           {state ? <StateChip state={state} alarm={alarm} /> : null}
           {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
           {shape?.kind === "count" ? (
-            <span className="rounded-full border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
+            <span className="rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
               <span className="tnum font-semibold text-ink">{shape.value}</span> {shape.unit}
             </span>
           ) : null}
@@ -843,7 +843,7 @@ function Header({
             ))
           : null}
         {unsure ? (
-          <p className="mt-4 rounded-[10px] border border-dashed border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] leading-snug text-amber-ink">
+          <p className="mt-4 rounded-[6px] border border-dashed border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] leading-snug text-amber-ink">
             <span className="font-semibold">Not certain: </span>
             <Prose text={unsure} />
           </p>
@@ -928,7 +928,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
       onClick={go}
       disabled={!go}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-[12px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
+        "group flex w-full items-start gap-3 rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
         go && "hover:border-border-strong hover:shadow-panel",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
@@ -941,7 +941,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
           </span>
           <StateChip state={node.state} alarm={node.alarm} />
           {node.issues?.length ? (
-            <span className="shrink-0 rounded-full border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
+            <span className="shrink-0 rounded-[6px] border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
               ⚠ {node.issues.length} {node.issues.length === 1 ? "problem" : "problems"}
             </span>
           ) : null}

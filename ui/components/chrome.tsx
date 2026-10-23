@@ -71,7 +71,7 @@ export function Crumbs({
                     disabled={here}
                     aria-current={here ? "page" : undefined}
                     className={cn(
-                      "rounded-[7px] px-1.5 py-0.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
+                      "rounded-[5px] px-1.5 py-0.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
                       i === 0 && "font-mono text-[12.5px]",
                       here ? "font-semibold text-ink" : "text-muted-slate hover:bg-surface-container-low hover:text-ink",
                     )}
@@ -96,7 +96,7 @@ export function Crumbs({
 function Hint({ k, children }: { k: string; children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1">
-      <kbd className="rounded border border-border-gray bg-surface px-1.5 py-0.5 text-[10px] text-muted-slate">
+      <kbd className="rounded-[3px] border border-border-gray bg-surface px-1.5 py-0.5 text-[10px] text-muted-slate">
         {k}
       </kbd>
       {children}

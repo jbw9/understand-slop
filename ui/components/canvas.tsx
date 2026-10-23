@@ -14,7 +14,8 @@ import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
-import { codeAt, describeElement, describeProblems, type BuiltMap } from "@/lib/map";
+import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
+import { readSource } from "@/lib/source";
 import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
@@ -363,11 +364,22 @@ function HandProblems({ node, path }: { node: Node; path: string[] }) {
     <button
       type="button"
       disabled={claude && status === "queued"}
-      onClick={() => {
+      onClick={async () => {
+        // The code goes along, so the agent answers from it instead of
+        // spending calls finding it; a file it cannot read is left out.
+        const read = await Promise.all(
+          problemSpans(map, path).map(async (s) => {
+            const r = await readSource({ map: map.name, ...s }).catch(() => null);
+            return r && "slice" in r ? { ...s, end: s.start + r.slice.code.split("\n").length - 1, code: r.slice.code } : null;
+          }),
+        );
+        const source = read.filter((s) => s !== null);
         handTo(
           main.id,
-          { key, title: `Problems in ${node.title}`, text: describeProblems(map, path) },
-          `Look into the problems in "${node.title}" from the map: check each against the code, explain what goes wrong, and suggest a fix.`,
+          { key, title: `Problems in ${node.title}`, text: describeProblems(map, path, source) },
+          source.length
+            ? `Look into the problems in "${node.title}" from the map. The code each one points at is attached: check each against it, explain what goes wrong, and suggest a fix. Read more of the repo only if what is attached is not enough.`
+            : `Look into the problems in "${node.title}" from the map: check each against the code, explain what goes wrong, and suggest a fix.`,
         );
         if (!claude) setPasted(true);
       }}

@@ -247,16 +247,68 @@ export function describeElement(m: BuiltMap, path: string[], label: string, text
     .concat("]");
 }
 
+/** Lines of code to send along with a section's problems. */
+export interface Span {
+  file: string;
+  start: number;
+  end: number;
+}
+
+/** Around a problem's line: enough to see the function it sits in. */
+const BEFORE = 10;
+const AFTER = 20;
+/** One code ref, and everything sent at once. */
+const SPAN_CAP = 80;
+const TOTAL_CAP = 600;
+/**
+ * Claude Code puts a prompt hook's output in the prompt only under about
+ * 10,000 characters; past that it saves it to a file, and reading it back is
+ * the call this was meant to save. Measured: 9,800 went inline, 10,200 did not.
+ */
+const INLINE_CAP = 9000;
+
+/**
+ * The code a section's problems point at, so it can go with them: each
+ * problem's line with some around it, then the section's own code, each
+ * file's ranges merged where they meet, within TOTAL_CAP lines.
+ */
+export function problemSpans(m: BuiltMap, path: string[]): Span[] {
+  const node = path.length ? m.nodeAt(path) : null;
+  const wanted: Span[] = [];
+  for (const it of node?.issues ?? []) {
+    const at = it.where?.match(/^(.+?):(\d+)(?:-(\d+))?$/);
+    if (at) wanted.push({ file: at[1], start: Math.max(1, Number(at[2]) - BEFORE), end: Number(at[3] ?? at[2]) + AFTER });
+  }
+  for (const c of codeAt(m, path)) wanted.push({ file: c.file, start: c.start, end: Math.min(c.end, c.start + SPAN_CAP - 1) });
+  const merged: Span[] = [];
+  let total = 0;
+  for (const s of wanted) {
+    const same = merged.find((x) => x.file === s.file && s.start <= x.end + 1 && x.start <= s.end + 1);
+    if (same) {
+      const grown = Math.max(same.end, s.end) - Math.min(same.start, s.start) + 1;
+      if (total - (same.end - same.start + 1) + grown > TOTAL_CAP) continue;
+      total += grown - (same.end - same.start + 1);
+      same.start = Math.min(same.start, s.start);
+      same.end = Math.max(same.end, s.end);
+    } else if (total + (s.end - s.start + 1) <= TOTAL_CAP) {
+      merged.push({ ...s });
+      total += s.end - s.start + 1;
+    }
+  }
+  return merged;
+}
+
 /**
  * A section's problems as text for an agent: every one in full — what goes
- * wrong and where — then the section they belong to and its code, so the
- * agent can go and look. The ask is left to the user.
+ * wrong and where — then the section they belong to and its code. With the
+ * code itself (`source`, read from problemSpans), it goes along numbered, so
+ * the agent can answer from it rather than spend calls finding it.
  */
-export function describeProblems(m: BuiltMap, path: string[]): string {
+export function describeProblems(m: BuiltMap, path: string[], source: (Span & { code: string })[] = []): string {
   const node = path.length ? m.nodeAt(path) : null;
   const issues = node?.issues ?? [];
   const code = codeAt(m, path);
-  return [
+  const head = [
     `[Map problems: ${trail(m, path)} (${m.RUN.repo})`,
     `The map found ${issues.length} ${issues.length === 1 ? "problem" : "problems"} here:`,
     ...issues.map((it, i) => `${i + 1}. ${it.title} — ${it.detail}${it.where ? ` (${it.where})` : ""}`),
@@ -264,6 +316,23 @@ export function describeProblems(m: BuiltMap, path: string[]): string {
     code.length ? `Code:\n${code.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
   ]
     .filter(Boolean)
-    .join("\n")
-    .concat("]");
+    .join("\n");
+  // The code, in order — problems' lines first — while it stays inline; the
+  // range that would cross the line is cut short, and the rest left out.
+  let room = INLINE_CAP - head.length - 60;
+  const blocks: string[] = [];
+  for (const s of source) {
+    const lines = s.code.split("\n").map((l, i) => `${String(s.start + i).padStart(5)}  ${l}`);
+    const kept: string[] = [];
+    for (const l of lines) {
+      if (l.length + 1 > room - s.file.length - 30) break;
+      kept.push(l);
+      room -= l.length + 1;
+    }
+    if (!kept.length) break;
+    blocks.push(`${s.file}:${s.start}-${s.start + kept.length - 1}\n\`\`\`\n${kept.join("\n")}\n\`\`\``);
+    room -= s.file.length + 30;
+    if (kept.length < lines.length) break;
+  }
+  return (blocks.length ? `${head}\nThe code they point at, as it is now:\n${blocks.join("\n")}` : head).concat("]");
 }

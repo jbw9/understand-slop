@@ -7,7 +7,7 @@ import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } fro
 import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
-import { clearPicks, onOpenClaude, retarget, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
+import { clearPicks, onHand, onOpenClaude, prompt, retarget, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
 import { openSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
@@ -91,6 +91,9 @@ export function Workspace() {
   const { agents, others, main: mainAgent } = useAgents();
   const main = mainAgent.id;
   const aside = useRef<HTMLElement>(null);
+  // Text waiting to be pasted into a new tab's agent once it is up, by tab;
+  // sent, not only pasted, when it carries a question.
+  const [toPaste, setToPaste] = useState<Record<number, { text: string; send: boolean }>>({});
 
   const patch = (key: number, next: Partial<Tab>) =>
     setTabs((all) => all.map((x) => (x.key === key ? { ...x, ...next } : x)));
@@ -134,6 +137,22 @@ export function Workspace() {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [started]);
+
+  // A new tab's agent is up once something is in front of its shell; give it
+  // a moment to draw its prompt, then paste what was handed to it.
+  useEffect(() => {
+    const ready = tabs.filter((t) => t.busy && t.pty !== undefined && toPaste[t.key] !== undefined);
+    if (!ready.length) return;
+    const timer = setTimeout(() => {
+      for (const t of ready) (toPaste[t.key].send ? prompt : paste)(t.pty!, toPaste[t.key].text);
+      setToPaste((all) => {
+        const rest = { ...all };
+        for (const t of ready) delete rest[t.key];
+        return rest;
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [tabs, toPaste]);
 
   // Picks go to the tab in view if Claude runs there, else this project's
   // newest tab running it; with none, a pick opens a tab (lib/context.ts).
@@ -202,13 +221,29 @@ export function Workspace() {
       e.stopPropagation();
       toggle();
     };
+    // Handed to an agent other than Claude: pasted into a tab running it,
+    // or into a new one once it is up; with a question, sent as a prompt.
+    const toAgent = (agent: string, t: { text: string }, question?: string) => {
+      const text = question ? `${t.text}\n\n${question}` : t.text;
+      const running = mine.find((x) => x.pty !== undefined && inFront(x)?.id === agent);
+      if (running) {
+        (question ? prompt : paste)(running.pty!, text);
+        select(running.key);
+        show(true);
+        return;
+      }
+      const key = add(agent);
+      setToPaste((all) => ({ ...all, [key]: { text, send: !!question } }));
+    };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener(TOGGLE, toggle);
     const off = onOpenClaude(toClaude);
+    const offHand = onHand(toAgent);
     return () => {
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener(TOGGLE, toggle);
       off();
+      offHand();
     };
   }, [open, mine, current, main, add, close, select, show]);
 
@@ -358,6 +393,15 @@ export function Workspace() {
       </div>
     </motion.aside>
   );
+}
+
+/**
+ * Puts text in a program's prompt as a paste, without pressing Enter: agents'
+ * TUIs ask for bracketed paste, so it lands as one block they can tell from
+ * typing.
+ */
+function paste(pty: number, text: string) {
+  void invoke("pty_write", { id: pty, data: `\x1b[200~${text}\x1b[201~` });
 }
 
 /**

@@ -57,6 +57,8 @@ const withPicks = (pty: number, picks: Pick[]) => set({ ...state, picks: { ...st
 
 /** Picked before any Claude tab existed; queued once one starts. */
 let waiting: Target[] = [];
+/** Of those, what to ask about them once Claude is up (ask), by key. */
+let asking = new Map<string, string>();
 
 /* ── tabs coming and going (components/workspace.tsx) ─────────── */
 
@@ -77,8 +79,11 @@ export function tabStarted(pty: number, claude: boolean) {
   set({ target: claude ? pty : state.target, picks: { ...state.picks, [pty]: [] } });
   if (!claude) return;
   const queued = waiting;
+  const toAsk = queued.flatMap((p) => asking.get(p.key) ?? []);
   waiting = [];
+  asking = new Map();
   for (const p of queued) void add(pty, p);
+  if (toAsk.length) void whenUp(pty).then(() => prompt(pty, toAsk.join(" ")), () => {});
 }
 
 /**
@@ -110,6 +115,39 @@ export function pick(t: Target) {
   void add(state.target, t);
 }
 
+/**
+ * Hand something to Claude and ask about it straight away: the pick is
+ * queued, then a prompt is typed and sent, so the hook takes the pick with
+ * it. A tab opened for it is asked once Claude has drawn its prompt.
+ */
+export function ask(t: Target, question: string) {
+  if (state.target === null) {
+    asking.set(t.key, question);
+    pick(t);
+    return;
+  }
+  const pty = state.target;
+  openClaude();
+  void add(pty, t).then(() => prompt(pty, question));
+}
+
+/** Typed into a program's prompt as a paste, then Enter, a moment later so it is not part of the paste. */
+export function prompt(pty: number, text: string) {
+  void invoke("pty_write", { id: pty, data: `\x1b[200~${text}\x1b[201~` });
+  setTimeout(() => void invoke("pty_write", { id: pty, data: "\r" }), 150);
+}
+
+/** Resolves once Claude runs in the tab and has had a moment to draw its prompt. */
+async function whenUp(pty: number) {
+  for (let i = 0; i < 60; i++) {
+    const s = await invoke<{ claude: boolean }>("pty_state", { id: pty }).catch(() => null);
+    if (!s) return Promise.reject();
+    if (s.claude) return new Promise<void>((done) => setTimeout(done, 1500));
+    await new Promise((done) => setTimeout(done, 500));
+  }
+  return Promise.reject();
+}
+
 async function add(pty: number, t: Target) {
   const mine = state.picks[pty] ?? [];
   if (mine.some((p) => p.key === t.key && p.status === "queued")) return;
@@ -136,6 +174,44 @@ export async function clearPicks(pty: number) {
   await invoke("context_set", { id: pty, text: "" });
   withPicks(pty, []);
 }
+
+/* ── handing to any agent ─────────────────────────────────────── */
+
+const HAND = "slop:hand";
+
+/**
+ * Hand something to a coding agent by id (components/agents.tsx). Claude
+ * takes it as a pick, with its next prompt; another agent has no hook to
+ * read it, so the workspace pastes it into that agent's prompt instead,
+ * opening a tab for it if none runs it. With a question, it is asked at
+ * once; without, the ask is left to the user.
+ */
+export function handTo(agent: string, t: Target, question?: string) {
+  if (agent === "claude") {
+    if (question) return ask(t, question);
+    // With no tab to take it, pick opens one; with one, bring it forward.
+    const had = state.target !== null;
+    pick(t);
+    if (had) openClaude();
+    return;
+  }
+  window.dispatchEvent(new CustomEvent<Handed>(HAND, { detail: { agent, target: t, question } }));
+}
+
+interface Handed {
+  agent: string;
+  target: Target;
+  question?: string;
+}
+
+export const onHand = (f: (agent: string, t: Target, question?: string) => void) => {
+  const on = (e: Event) => {
+    const { agent, target, question } = (e as CustomEvent<Handed>).detail;
+    f(agent, target, question);
+  };
+  window.addEventListener(HAND, on);
+  return () => window.removeEventListener(HAND, on);
+};
 
 /* ── seeing delivery ──────────────────────────────────────────── */
 

@@ -12,8 +12,9 @@ import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wir
 import { Crumbs, goTo, useLocation } from "@/components/chrome";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
-import { openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
-import { codeAt, describeElement, type BuiltMap } from "@/lib/map";
+import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
+import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
+import { codeAt, describeElement, describeProblems, type BuiltMap } from "@/lib/map";
 import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
@@ -329,6 +330,60 @@ function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Tar
   );
 }
 
+/**
+ * Asks the default agent (Settings) about a section's problems, all of them,
+ * straight away: Claude takes them as context with the question, and the
+ * button follows them there; another agent gets them in its prompt with the
+ * question, sent. Desktop only, where the agents run.
+ */
+function HandProblems({ node, path }: { node: Node; path: string[] }) {
+  const map = useMap();
+  const { main } = useAgents();
+  const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const key = `${sectionKey(path)}#problems`;
+  const status = usePicked(key);
+  const [pasted, setPasted] = useState(false);
+  useEffect(() => {
+    if (!pasted) return;
+    const timer = setTimeout(() => setPasted(false), 2500);
+    return () => clearTimeout(timer);
+  }, [pasted]);
+  if (!desktop) return null;
+  const claude = main.id === CLAUDE.id;
+  const label = claude
+    ? status === "queued"
+      ? "Asking Claude…"
+      : status === "sent"
+        ? "Sent to Claude — ask again"
+        : "Ask Claude"
+    : pasted
+      ? `Sent to ${main.label}`
+      : `Ask ${main.label}`;
+  return (
+    <button
+      type="button"
+      disabled={claude && status === "queued"}
+      onClick={() => {
+        handTo(
+          main.id,
+          { key, title: `Problems in ${node.title}`, text: describeProblems(map, path) },
+          `Look into the problems in "${node.title}" from the map: check each against the code, explain what goes wrong, and suggest a fix.`,
+        );
+        if (!claude) setPasted(true);
+      }}
+      title={
+        claude
+          ? "Asks Claude about every problem here, with its section and code"
+          : `Asks ${main.label} about every problem here, with its section and code`
+      }
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-clay-line bg-pure-white px-2.5 py-1 font-mono text-[11px] text-clay-ink transition-colors hover:bg-clay-surface disabled:cursor-default disabled:opacity-70"
+    >
+      <AgentIcon id={main.id} />
+      {label}
+    </button>
+  );
+}
+
 /** What a whole block is called when it is handed over. */
 function blockLabel(b: Anatomy): string {
   if ("caption" in b && b.caption) return b.caption;
@@ -559,7 +614,7 @@ function Level({
         {node.issues?.length ? (
           <div>
             <div className="max-w-[820px]">
-              <WatchOut issues={node.issues} />
+              <WatchOut issues={node.issues} action={<HandProblems node={node} path={path} />} />
             </div>
           </div>
         ) : null}

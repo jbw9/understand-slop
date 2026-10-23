@@ -2,13 +2,22 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
 import { PanelHead } from "@/components/panel";
-import { onOpenSettings, readSettings, saveSettings, type Settings } from "@/lib/settings";
+import { cn } from "@/lib/utils";
+import { applyTheme, followTheme, onOpenSettings, readSettings, saveSettings, type Settings, type Theme } from "@/lib/settings";
 
 /**
- * Settings, as a dialog over the map. There is little to set: where Claude
- * Code is, when it was not found by itself, and which model it runs.
+ * Settings, as a dialog over the map. There is little to set: the theme,
+ * where Claude Code is when it was not found by itself, and which model it
+ * runs. A theme picked here shows at once, and Cancel puts the saved one back.
  */
+
+const THEMES: { value: Theme; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 type Found = { path: string; version: string | null } | null;
 
@@ -36,28 +45,21 @@ export function SettingsDialog() {
     [detect],
   );
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [open]);
+  // Mounted for the app's whole life, so this keeps the page on the saved theme.
+  useEffect(followTheme, []);
 
   if (!open) return null;
+  const close = () => {
+    applyTheme(readSettings().theme);
+    setOpen(false);
+  };
   const save = () => {
-    saveSettings({ claudePath: draft.claudePath.trim(), model: draft.model.trim() });
+    saveSettings({ ...draft, claudePath: draft.claudePath.trim(), model: draft.model.trim() });
     setOpen(false);
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/20 p-6"
-      onPointerDown={(e) => e.target === e.currentTarget && setOpen(false)}
-    >
+    <Overlay onClose={close}>
       <form
         role="dialog"
         aria-label="Settings"
@@ -65,10 +67,32 @@ export function SettingsDialog() {
           e.preventDefault();
           save();
         }}
-        className="w-full max-w-[520px] overflow-hidden rounded-[20px] border border-border-gray bg-pure-white shadow-lift"
+        className={cn(DIALOG, "max-w-[520px]")}
       >
-        <PanelHead title="Settings" note="Claude Code, as the terminal's Claude tabs run it." />
+        <PanelHead title="Settings" note="How the app looks, and Claude Code as its tabs run it." />
         <div className="flex flex-col gap-5 px-5 py-5">
+          <Field label="Theme" hint="System follows your desktop's light or dark setting.">
+            <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+              {THEMES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.theme === t.value}
+                  onClick={() => {
+                    setDraft({ ...draft, theme: t.value });
+                    applyTheme(t.value);
+                  }}
+                  className={cn(
+                    "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.theme === t.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </Field>
           <Field label="Claude Code" hint="Leave blank to find it automatically.">
             <input
               value={draft.claudePath}
@@ -109,37 +133,24 @@ export function SettingsDialog() {
               className={INPUT}
             />
           </Field>
-          <p className="text-[12px] text-faint">Changes apply to Claude tabs opened after saving.</p>
+          <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened after saving.</p>
         </div>
         <div className="flex justify-end gap-2 border-t border-border-gray bg-surface px-5 py-3">
           <button
             type="button"
-            onClick={() => setOpen(false)}
-            className="cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+            onClick={close}
+            className={QUIET}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="cursor-pointer rounded-full bg-deep-green px-3.5 py-1.5 text-[13px] font-medium text-pure-white hover:bg-brand"
+            className={PRIMARY}
           >
             Save
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-const INPUT =
-  "w-full rounded-[10px] border border-border-gray bg-pure-white px-3 py-2 font-mono text-[12.5px] text-ink placeholder:text-faint focus:border-deep-green focus:outline-none";
-
-function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-[13px] font-semibold text-ink">{label}</span>
-      <span className="mb-2 mt-0.5 block text-[12px] text-muted-slate">{hint}</span>
-      {children}
-    </label>
+    </Overlay>
   );
 }

@@ -372,7 +372,7 @@ function Block({
                   "rounded-[4px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
                   ctx.tracing && !isLit && "opacity-55",
                   isLit
-                    ? "border-deep-green bg-deep-green text-pure-white"
+                    ? "border-deep-green bg-deep-green text-white"
                     : c.state === "derived"
                       ? "border-mint-line bg-mint-success text-deep-green"
                       : "border-amber-line bg-amber-surface text-amber-ink",
@@ -429,7 +429,7 @@ function Block({
                       className={cn(
                         "min-w-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px]",
                         isLit || isOpen
-                          ? "bg-deep-green text-pure-white"
+                          ? "bg-deep-green text-white"
                           : "bg-surface-container text-on-surface",
                       )}
                     >
@@ -655,7 +655,7 @@ function Block({
                   className={cn(
                     "flex size-[18px] shrink-0 items-center justify-center rounded-full border font-mono text-[9px] font-semibold transition-colors",
                     isLit
-                      ? "border-deep-green bg-deep-green text-pure-white"
+                      ? "border-deep-green bg-deep-green text-white"
                       : s.state === "derived"
                         ? "border-mint-line bg-mint-success text-deep-green"
                         : "border-amber-line bg-amber-surface text-amber-ink",
@@ -990,7 +990,7 @@ export function SourceView({
             className={cn(
               "shrink-0 rounded-[3px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
               editing
-                ? "border-deep-green bg-deep-green text-pure-white"
+                ? "border-deep-green bg-deep-green text-white"
                 : "border-border-strong text-muted-slate hover:text-on-surface",
             )}
           >
@@ -1032,7 +1032,7 @@ export function SourceView({
                 void save();
               }}
               disabled={draft === shown}
-              className="rounded-[5px] bg-deep-green px-2 py-1 font-mono text-[10px] text-pure-white disabled:opacity-40"
+              className="rounded-[3px] bg-deep-green px-2 py-1 font-mono text-[10px] text-white disabled:opacity-40"
             >
               save to disk
             </button>

@@ -7,9 +7,9 @@
  * the tree plumbing.
  */
 
-import type { Anatomy, Node } from "@/lib/data";
+import type { Anatomy, CodeRef, Node } from "@/lib/data";
 import { rowId } from "@/lib/data";
-import { AUTHORED } from "@/lib/explorify";
+import { AUTHORED, RUN } from "@/lib/explorify";
 
 export { RUN, E0, LINKS } from "@/lib/explorify";
 
@@ -121,4 +121,78 @@ export function levelAt(path: string[]): Node[] {
 /** Every node in the tree, flattened. Used for id lookups and audits. */
 export function allNodes(nodes: Node[] = L0): Node[] {
   return nodes.flatMap((n) => [n, ...allNodes(n.children ?? [])]);
+}
+
+/**
+ * The code behind a level. A row-built level has no refs of its own; the code
+ * of the nearest level above it is still the code behind it.
+ */
+export function codeAt(path: string[]): CodeRef[] {
+  for (let i = path.length; i > 0; i--) {
+    const code = nodeAt(path.slice(0, i))?.code;
+    if (code?.length) return code;
+  }
+  return [];
+}
+
+/** Past this a pick reads as the whole card pasted in, not a pointer to it. */
+const DETAIL_CAP = 1500;
+
+const cap = (text: string) => (text.length > DETAIL_CAP ? `${text.slice(0, DETAIL_CAP)}…` : text);
+
+const trail = (path: string[]) =>
+  path
+    .map((_, i) => nodeAt(path.slice(0, i + 1))?.title)
+    .filter(Boolean)
+    .join(" › ");
+
+/**
+ * One section of the map as text for Claude: where it sits, what it says, and
+ * the code behind it — the last so Claude reads the real thing, not only the
+ * map's account of it. `[]` is the repository as a whole.
+ */
+export function describe(path: string[]): string {
+  const node = path.length ? nodeAt(path) : null;
+  if (!node) {
+    return [
+      `[Map section: the whole repository (${RUN.repo})`,
+      RUN.about,
+      `Its top-level sections: ${L0.map((n) => n.title).join(", ")}]`,
+    ].join("\n");
+  }
+  const where = trail(path);
+  const detail = node.detail && cap(node.detail);
+  const code = codeAt(path);
+  return [
+    `[Map section: ${where} (${RUN.repo})`,
+    node.sub,
+    detail,
+    node.unsure ? `Not certain: ${node.unsure}` : "",
+    node.issues?.length ? `Problems: ${node.issues.map((i) => i.title).join("; ")}` : "",
+    code.length ? `Code:\n${code.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .concat("]");
+}
+
+/**
+ * One thing on a level — a row, a box, a line of a screen — as text for
+ * Claude: what it says, where on the map it sits, and its code. With no code
+ * of its own, the code behind its section is named instead.
+ */
+export function describeElement(path: string[], label: string, text: string, code?: string): string {
+  const where = path.length ? `${trail(path)} › ${label}` : label;
+  const behind = code ? [] : codeAt(path);
+  return [
+    `[Map element: ${where} (${RUN.repo})`,
+    cap(text.trim()),
+    code ? `Code: ${code}` : "",
+    behind.length
+      ? `Code behind its section:\n${behind.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .concat("]");
 }

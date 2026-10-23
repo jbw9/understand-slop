@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -10,8 +11,10 @@ import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Crumbs } from "@/components/chrome";
-import { E0, L0, LINKS, RUN, levelAt, nodeAt } from "@/lib/map";
-import type { Edge, Node } from "@/lib/data";
+import { Menu } from "@/components/menu";
+import { openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
+import { E0, L0, LINKS, RUN, codeAt, describeElement, levelAt, nodeAt } from "@/lib/map";
+import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
 /**
@@ -263,8 +266,31 @@ export function Canvas() {
 
   const open = (next: string[]) => go(next);
 
+  /* ── handing a section to Claude ──────────────────────────── */
+
+  // Right-click offers Claude the nearest thing under the pointer: a card or
+  // the open level's header (`data-path`, a whole section), else a row, box,
+  // block or line of code (`data-row`, `data-pick`). Desktop only: the browser
+  // keeps its own menu, and there is no Claude tab to hand anything to.
+  const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const [menu, setMenu] = useState<{ x: number; y: number; target: Target } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const onContextMenu = (e: React.MouseEvent) => {
+    // Anything else on the level — a caption, the space between blocks — is
+    // part of the section you are in, so that is what it offers.
+    const el = (e.target as Element).closest<HTMLElement | SVGElement>(PICKABLE);
+    const target = el ? targetOf(el, path) : section(path);
+    if (!target) return;
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, target });
+  };
+
   return (
-    <div className="flex h-dvh w-screen overflow-hidden bg-warm-cream">
+    <div
+      className="flex h-full w-full overflow-hidden bg-warm-cream"
+      onContextMenu={desktop ? onContextMenu : undefined}
+    >
+      {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
       <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
         <Crumbs repo={RUN.repo} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
         <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
@@ -303,6 +329,65 @@ export function Canvas() {
 }
 
 
+const noSubscribe = () => () => {};
+
+const PICKABLE = "[data-path], [data-row], [data-pick]";
+
+/**
+ * What a right-clicked element hands to Claude. An element's words are what
+ * is on screen — `data-pick-text` where the screen leaves something out, like
+ * a table row's column names — and its code is the nearest `data-pick-code`.
+ */
+function targetOf(el: HTMLElement | SVGElement, level: string[]): Target | null {
+  const d = el.dataset;
+  if (d.path !== undefined) {
+    const at: string[] = JSON.parse(d.path);
+    return at.length && !nodeAt(at) ? null : section(at);
+  }
+  const shown = ("innerText" in el ? el.innerText : (el.textContent ?? "")).trim();
+  const label = (d.pick || shown.split("\n")[0] || "").trim().slice(0, 80);
+  if (!label) return null;
+  const id = d.row ?? d.pick ?? label;
+  return {
+    key: `${sectionKey(level)}#${id}`,
+    title: label,
+    text: describeElement(level, label, d.pickText ?? shown, el.closest<HTMLElement>("[data-pick-code]")?.dataset.pickCode),
+  };
+}
+
+function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
+  const status = usePicked(target.key);
+  return (
+    <Menu
+      x={x}
+      y={y}
+      title={target.title}
+      onClose={onClose}
+      items={[
+        status === "queued"
+          ? { label: "Waiting for your next prompt", disabled: true }
+          : { label: status === "sent" ? "Send to Claude again" : "Add to Claude context", onClick: () => pick(target) },
+        {
+          label: "Add and open Claude",
+          onClick: () => {
+            if (status !== "queued") pick(target);
+            openClaude();
+          },
+        },
+      ]}
+    />
+  );
+}
+
+/** What a whole block is called when it is handed over. */
+function blockLabel(b: Anatomy): string {
+  if ("caption" in b && b.caption) return b.caption;
+  if (b.kind === "screen") return `The ${b.title} screen`;
+  if (b.kind === "schema") return `The ${b.table} table`;
+  if (b.kind === "source") return b.file;
+  return BLOCK_NOUN[b.kind] ? `The ${BLOCK_NOUN[b.kind]}` : b.kind;
+}
+
 /* ── levels ──────────────────────────────────────────────────── */
 
 /**
@@ -318,6 +403,7 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
   return (
     <>
       <Header
+        path={[]}
         eyebrow="Repository"
         title={RUN.repo}
         sub={RUN.about}
@@ -401,19 +487,13 @@ function Level({
       .map((box) => box.opens)
       .filter((id): id is string => Boolean(id) && kids.some((k) => k.id === id)),
   );
-  // A row-built level has no refs of its own; the code of the nearest level
-  // above it is still the code behind it.
-  const code =
-    node.code ??
-    path
-      .map((_, i) => nodeAt(path.slice(0, path.length - 1 - i))?.code)
-      .find((c) => c?.length) ??
-    [];
+  const code = codeAt(path);
   const [codeOpen, setCodeOpen] = useState(false);
 
   return (
     <>
       <Header
+        path={path}
         back={{
           label: parent?.title ?? RUN.repo,
           onClick: () => onOpen(path.slice(0, -1)),
@@ -457,14 +537,14 @@ function Level({
         {/* The picture is the main thing on the level, not a thumbnail in
             the header's corner. */}
         {figure ? (
-          <div className="max-w-[540px]">
+          <div data-pick="The picture" className="max-w-[540px]">
             <ShapeView shape={figure} />
           </div>
         ) : null}
 
         {blocks.map((b, i) =>
           isExplained(b) ? (
-            <div key={i} className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
+            <div key={i} data-pick={blockLabel(b)} className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
               <ExplainedBlock
                 block={b}
                 onOpen={(id) =>
@@ -478,7 +558,7 @@ function Level({
           ) : (
             // The older blocks are typeset for a 340px card (11px rows); zoom
             // lifts them to reading size without forking their type scale.
-            <div key={i} className="max-w-[900px] [zoom:1.18]">
+            <div key={i} data-pick={blockLabel(b)} className="max-w-[900px] [zoom:1.18]">
               <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
             </div>
           ),
@@ -655,6 +735,7 @@ function List({
           <li key={n.id}>
             <button
               data-node-id={n.id}
+              data-path={JSON.stringify([...at, n.id])}
               onClick={go}
               disabled={!go}
               className={cn(
@@ -706,6 +787,7 @@ function Note({ children }: { children: React.ReactNode }) {
 /* ── the node you are in ─────────────────────────────────────── */
 
 function Header({
+  path,
   back,
   eyebrow,
   title,
@@ -718,6 +800,8 @@ function Header({
   shape,
   onCode,
 }: {
+  /** Where this level is, so it can be handed to Claude from its header. */
+  path: string[];
   /** The level above, named — so "back" says where it goes. */
   back?: { label: string; onClick: () => void };
   eyebrow: string;
@@ -733,7 +817,7 @@ function Header({
   onCode?: () => void;
 }) {
   return (
-    <header className="mb-8 border-b border-border-gray pb-7">
+    <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
       <div className="min-w-0 max-w-[660px]">
         {back ? (
           <button
@@ -844,6 +928,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
   return (
     <button
       data-node-id={node.id}
+      data-path={JSON.stringify([...at, node.id])}
       onClick={go}
       disabled={!go}
       className={cn(

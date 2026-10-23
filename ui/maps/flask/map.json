@@ -5,7 +5,7 @@
   "about": "Cut by the developer journey of building a Flask web app — you create and configure the application, wire up routes and blueprints, handle incoming requests at runtime, render templates and JSON, then run and test it — the order every Flask project follows.",
   "commit": "d086db8",
   "files": 227,
-  "elapsed": "1 min",
+  "elapsed": "15 min",
   "root": "/Users/jonathanmacmini/Desktop/Code/slop-eval/flask",
   "models": {
    "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",

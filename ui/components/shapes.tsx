@@ -228,7 +228,7 @@ export function InlineMarks({ ids, note }: { ids: string[]; note?: string }) {
         return (
           <span
             key={id}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] font-medium text-on-surface-variant"
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] font-medium text-on-surface-variant"
           >
             {mark ? (
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden className="shrink-0">
@@ -333,7 +333,7 @@ function Box({
         y={y}
         width={w}
         height={h}
-        rx="4"
+        rx="3"
         fill={fill}
         stroke={stroke}
         strokeWidth="1"

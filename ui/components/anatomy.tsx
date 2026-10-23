@@ -203,7 +203,7 @@ function Block({
 }) {
   if (block.kind === "schema") {
     return (
-      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
         <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
           <TableGlyph />
           <span className="font-mono text-[11px] font-semibold text-ink">
@@ -287,7 +287,7 @@ function Block({
 
   if (block.kind === "routes") {
     return (
-      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
         {block.rows.map((r) => {
           const id = rowId(owner, `${r.method} ${r.path}`);
           const isLit = ctx.lit.has(id);
@@ -351,7 +351,7 @@ function Block({
 
   if (block.kind === "chips") {
     return (
-      <div className="rounded-[10px] border border-border-gray bg-pure-white px-3 py-2.5">
+      <div className="rounded-[6px] border border-border-gray bg-pure-white px-3 py-2.5">
         {block.caption ? (
           <p className="mb-2 font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
             {block.caption}
@@ -369,7 +369,7 @@ function Block({
                 onClick={() => ctx.onTrace(id)}
                 title={c.note}
                 className={cn(
-                  "rounded-[6px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
+                  "rounded-[4px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
                   ctx.tracing && !isLit && "opacity-55",
                   isLit
                     ? "border-deep-green bg-deep-green text-pure-white"
@@ -389,7 +389,7 @@ function Block({
 
   if (block.kind === "map") {
     return (
-      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
         {block.caption ? (
           <div className="border-b border-border-gray bg-surface px-3 py-1.5">
             <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
@@ -427,7 +427,7 @@ function Block({
                   <span className={cn(PAIR_LABEL, "flex items-start gap-2")}>
                     <span
                       className={cn(
-                        "min-w-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]",
+                        "min-w-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px]",
                         isLit || isOpen
                           ? "bg-deep-green text-pure-white"
                           : "bg-surface-container text-on-surface",
@@ -481,7 +481,7 @@ function Block({
     // that land the way a length does.
     const total = block.rows.reduce((sum, p) => sum + p.weight, 0) || 1;
     return (
-      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
         <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
           <span className="font-mono text-[11px] font-semibold text-ink">
             {block.total}
@@ -491,7 +491,7 @@ function Block({
           </span>
         </div>
         <div className="px-3 pb-2.5 pt-2.5">
-          <div className="flex h-[22px] w-full overflow-hidden rounded-[5px]">
+          <div className="flex h-[22px] w-full overflow-hidden rounded-[3px]">
             {block.rows.map((p, at) => {
               const id = rowId(owner, p.label);
               const isLit = ctx.lit.has(id);
@@ -577,7 +577,7 @@ function Block({
     // between an anonymous and a premium quota is visible rather than stated.
     const max = Math.max(...block.rows.map((b) => b.value), 1);
     return (
-      <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
         <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
           <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
             {block.unit}
@@ -593,7 +593,7 @@ function Block({
                 ref={ctx.anchor(id)}
                 data-row={id}
                 onClick={() => ctx.onTrace(id)}
-                className={rowClass(id, ctx, cn(PAIR_SCOPE, "rounded-[5px]"))}
+                className={rowClass(id, ctx, cn(PAIR_SCOPE, "rounded-[3px]"))}
               >
                 {/* The label was `w-[92px]` and the figure `w-[108px]`: 200px
                     of fixed furniture either side of the bar, so on a narrow
@@ -613,11 +613,11 @@ function Block({
                   <span className={cn(PAIR_VALUE, "flex items-center gap-2")}>
                     {/* The track is the scale. Without it a short bar reads as
                         a small number rather than a small share. */}
-                    <span className="h-[9px] min-w-0 flex-1 rounded-[3px] bg-surface-container">
+                    <span className="h-[9px] min-w-0 flex-1 rounded-[2px] bg-surface-container">
                       <span
                         style={{ width: `${Math.max((b.value / max) * 100, 2)}%` }}
                         className={cn(
-                          "block h-full rounded-[3px] transition-all duration-200",
+                          "block h-full rounded-[2px] transition-all duration-200",
                           isLit
                             ? "bg-deep-green"
                             : b.state === "derived"
@@ -680,7 +680,7 @@ function Block({
                   id,
                   ctx,
                   cn(
-                    "min-w-0 flex-1 rounded-[6px] px-1.5 py-0.5",
+                    "min-w-0 flex-1 rounded-[4px] px-1.5 py-0.5",
                     i < block.rows.length - 1 && "mb-2.5",
                   ),
                 )}
@@ -754,7 +754,7 @@ function Facts({
   const hidden = block.rows.length - rows.length;
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-border-gray bg-pure-white">
+    <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
       {rows.map((p) => {
         const id = rowId(owner, p.label);
         const isLit = ctx.lit.has(id);
@@ -930,7 +930,7 @@ export function SourceView({
       data-pick={`${block.file}:${block.start}`}
       data-pick-code={`${block.file}:${block.start}-${end}`}
       className={cn(
-        "overflow-hidden rounded-[10px] border bg-pure-white",
+        "overflow-hidden rounded-[6px] border bg-pure-white",
         drifted ? "border-amber-line" : isLit ? "border-deep-green" : "border-border-gray",
       )}
     >
@@ -944,7 +944,7 @@ export function SourceView({
           ref={ctx.anchor(id)}
           data-row={id}
           onClick={() => ctx.onTrace(id)}
-          className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2 rounded-[5px]")}
+          className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2 rounded-[3px]")}
         >
           <FileGlyph />
           {/* file:line as one addressable string, not a path with a number
@@ -974,7 +974,7 @@ export function SourceView({
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 rounded-[4px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+            className="shrink-0 rounded-[3px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
           >
             github ↗
           </a>
@@ -988,7 +988,7 @@ export function SourceView({
               setEditing((v) => !v);
             }}
             className={cn(
-              "shrink-0 rounded-[4px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
+              "shrink-0 rounded-[3px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
               editing
                 ? "border-deep-green bg-deep-green text-pure-white"
                 : "border-border-strong text-muted-slate hover:text-on-surface",
@@ -1021,7 +1021,7 @@ export function SourceView({
             onChange={(e) => setDraft(e.target.value)}
             spellCheck={false}
             rows={Math.min(lines.length + 2, 24)}
-            className="w-full resize-y rounded-[6px] border border-border-strong bg-surface-container-low p-2 font-mono text-[11.5px] leading-[1.55] text-on-surface outline-none focus:border-deep-green"
+            className="w-full resize-y rounded-[4px] border border-border-strong bg-surface-container-low p-2 font-mono text-[11.5px] leading-[1.55] text-on-surface outline-none focus:border-deep-green"
           />
           {/* The diff is shown BEFORE the write, and the write needs this
               click. There is no other path to disk. */}
@@ -1093,7 +1093,7 @@ function DraftDiff({ before, after }: { before: string; after: string }) {
   const b = before.split("\n");
   const a = after.split("\n");
   return (
-    <pre className="mt-2 overflow-x-auto rounded-[6px] border border-border-gray bg-pure-white py-1.5 font-mono text-[10.5px] leading-[1.5]">
+    <pre className="mt-2 overflow-x-auto rounded-[4px] border border-border-gray bg-pure-white py-1.5 font-mono text-[10.5px] leading-[1.5]">
       {b.map((l, i) => (
         <div key={`b${i}`} className="bg-clay-surface px-3 text-clay-ink">
           <span className="select-none">- </span>
@@ -1124,7 +1124,7 @@ function CopyPath({ text }: { text: string }) {
         timer.current = setTimeout(() => setDone(false), 1200);
       }}
       title={`Copy ${text}`}
-      className="shrink-0 rounded-[4px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+      className="shrink-0 rounded-[3px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
     >
       {done ? "copied" : "copy path"}
     </button>
@@ -1135,7 +1135,7 @@ function KeyTag({ k, lit }: { k: "PK" | "FK" | "UQ"; lit?: boolean }) {
   return (
     <span
       className={cn(
-        "shrink-0 rounded-[4px] px-1 py-px font-mono text-[8.5px] font-semibold leading-none",
+        "shrink-0 rounded-[3px] px-1 py-px font-mono text-[8.5px] font-semibold leading-none",
         lit
           ? "bg-pure-white text-deep-green ring-1 ring-deep-green/45"
           : k === "PK"
@@ -1159,7 +1159,7 @@ function Method({ method }: { method: string }) {
   return (
     <span
       className={cn(
-        "w-[42px] shrink-0 rounded-[4px] px-1 py-px text-center font-mono text-[8.5px] font-semibold leading-[1.4]",
+        "w-[42px] shrink-0 rounded-[3px] px-1 py-px text-center font-mono text-[8.5px] font-semibold leading-[1.4]",
         METHOD_TONE[method],
       )}
     >

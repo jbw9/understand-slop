@@ -1,0 +1,302 @@
+{
+ "repo": "PersonalWebsite",
+ "commit": "274ddc0",
+ "backend": "bedrock",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 50,
+  "cut": 132,
+  "author": 1251,
+  "verify": 205,
+  "total": 1638
+ },
+ "usd": 24.94,
+ "fullUsd": 25.81,
+ "bill": {
+  "summarize": {
+   "calls": 64,
+   "cached": 64,
+   "input": 402092,
+   "output": 41742,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.6108020000000001
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 1,
+   "input": 7679,
+   "output": 9039,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.26437
+  },
+  "author": {
+   "calls": 100,
+   "cached": 0,
+   "input": 844087,
+   "output": 345713,
+   "cacheRead": 3910661,
+   "usd": 15.873556749999999,
+   "fullUsd": 15.873556749999999
+  },
+  "verify": {
+   "calls": 71,
+   "cached": 0,
+   "input": 233300,
+   "output": 56946,
+   "cacheRead": 0,
+   "usd": 0.5180300000000001,
+   "fullUsd": 0.5180300000000001
+  },
+  "verify-review": {
+   "calls": 222,
+   "cached": 0,
+   "input": 1466045,
+   "output": 48643,
+   "cacheRead": 0,
+   "usd": 8.5463,
+   "fullUsd": 8.5463
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 92,
+  "summarised": 64,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "src/reportWebVitals.ts",
+   "reason": "Pure tooling — optional Core Web Vitals reporting, not part of any feature."
+  },
+  {
+   "path": "tailwind.config.js",
+   "reason": "Pure config — Tailwind CSS theme and design-token definitions, no runtime logic."
+  }
+ ],
+ "roots": [
+  {
+   "id": "viewing-portfolio",
+   "title": "Viewing the Portfolio",
+   "accepted": true,
+   "turns": 15,
+   "reads": 30,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 13,
+    "ok": 13,
+    "flagged": 9,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "reading-detail",
+   "title": "Reading a Detail Page",
+   "accepted": true,
+   "turns": 9,
+   "reads": 18,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 8,
+    "ok": 8,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "rd-project",
+      "claims": [
+       "Finds a project by URL `id` param in a 12-item static array"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "asking-alfred",
+   "title": "Asking Alfred",
+   "accepted": true,
+   "turns": 11,
+   "reads": 14,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 5,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "al-lambda",
+      "claims": [
+       "which can make Claude misidentify ongoing vs. finished roles — not_shown: The code does not show what Claude does with the date or how it might misidentify roles. This is a consequence claim about Claude's behavior, not shown in the code."
+      ]
+     }
+    ],
+    "downgraded": [
+     "al-lambda"
+    ]
+   }
+  },
+  {
+   "id": "flying-globe",
+   "title": "Flying the Globe",
+   "accepted": true,
+   "turns": 23,
+   "reads": 33,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "fg-world",
+      "claims": [
+       "the route has gate arches — not_shown: The code shows gate rings (torus geometry) and halos, but does not show arch geometry or structures that would be called 'arches'."
+      ]
+     },
+     {
+      "id": "fg-events",
+      "claims": [
+       "Only the last toast renders; earlier milestones vanish unseen — undefined: The code shows multiple `emit()` calls in one loop iteration, but the cited lines do not show React batching behaviour or toast rendering logic—this is a consequence claim about React's state batching, not directly shown in the code."
+      ]
+     },
+     {
+      "id": "fg-screen",
+      "claims": [
+       "The `Game` component holds five state variables (flying, passed, card, toast, fin) — contradicted: Lines 25-29 show six state variables: flying, passed, card, toast, fin, and noGl. Line 31 also shows a seventh: stick."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "playing-bowling",
+   "title": "Playing Bowling",
+   "accepted": true,
+   "turns": 11,
+   "reads": 20,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "bw-ui",
+      "claims": [
+       "The final screen compares scores against the 240 qualifying threshold — not_shown: Line 302 references `QUALIFY` but the code does not show what value QUALIFY holds or that it is 240. The comparison logic at line 302 checks if `yourTotal > REAL_TOTAL`, not against a 240 threshold."
+      ]
+     },
+     {
+      "id": "bw-anim",
+      "claims": [
+       "for collision stability — not_shown"
+      ]
+     },
+     {
+      "id": "bw-sim",
+      "claims": [
+       "settled: quiet > 0.5s or t > 5s — contradicted: Line 151 shows the condition is `s.quiet > 0.5 || s.t > L / Math.hypot(s.ball.vx, s.ball.vy) + 5`. The second part is not simply `t > 5s` but rather `t > L / speed + 5`, which is a dynamic threshold based on ball speed."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "browsing-archive",
+   "title": "Browsing the Archive",
+   "accepted": true,
+   "turns": 16,
+   "reads": 30,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 15,
+    "ok": 15,
+    "flagged": 12,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "portfolio-data",
+   "title": "Portfolio Data",
+   "accepted": true,
+   "turns": 15,
+   "reads": 27,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "portfolio-data",
+      "claims": [
+       "The `Experience` interface declares only 5 fields (title, company, companyIcon, period, description) — contradicted: The interface at [0] lines 1-8 declares 6 fields: title, company, companyIcon, period, description, and website (optional). The detail counts only 5 and omits website."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "viewing-portfolio",
+    "depth": 3,
+    "nodes": 13
+   },
+   {
+    "id": "reading-detail",
+    "depth": 3,
+    "nodes": 8
+   },
+   {
+    "id": "asking-alfred",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "flying-globe",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "playing-bowling",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "browsing-archive",
+    "depth": 3,
+    "nodes": 15
+   },
+   {
+    "id": "portfolio-data",
+    "depth": 2,
+    "nodes": 6
+   }
+  ]
+ },
+ "verifyPassRate": 99
+}

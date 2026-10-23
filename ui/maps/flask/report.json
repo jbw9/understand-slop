@@ -1,0 +1,260 @@
+{
+ "repo": "flask",
+ "commit": "d086db8",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 200,
+  "cut": 90,
+  "author": 549,
+  "verify": 68,
+  "total": 907
+ },
+ "usd": 2.36,
+ "fullUsd": 12.55,
+ "bill": {
+  "summarize": {
+   "calls": 36,
+   "cached": 36,
+   "input": 160904,
+   "output": 23768,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.279744
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 1,
+   "input": 7772,
+   "output": 6136,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.19226
+  },
+  "author": {
+   "calls": 87,
+   "cached": 87,
+   "input": 592209,
+   "output": 175355,
+   "cacheRead": 2579905,
+   "usd": 0,
+   "fullUsd": 9.37501
+  },
+  "verify": {
+   "calls": 65,
+   "cached": 58,
+   "input": 163302,
+   "output": 41503,
+   "cacheRead": 0,
+   "usd": 0.032581,
+   "fullUsd": 0.37081699999999995
+  },
+  "verify-review": {
+   "calls": 83,
+   "cached": 0,
+   "input": 358160,
+   "output": 21582,
+   "cacheRead": 0,
+   "usd": 2.330350000000001,
+   "fullUsd": 2.330350000000001
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 227,
+  "summarised": 36,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "docs/conf.py",
+   "reason": "Sphinx documentation build configuration \u2014 pure tooling, not part of the framework."
+  }
+ ],
+ "roots": [
+  {
+   "id": "creating-app",
+   "title": "Creating the App",
+   "accepted": true,
+   "turns": 14,
+   "reads": 20,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "creating-app",
+      "claims": [
+       "Flask's constructor builds a `Config` dict with 26 defaults \u2014 not_shown: Line 317 shows `self.config = self.make_config(instance_relative_config)` but the cited code does not show the Config class definition or its 26 defaults",
+       "Flask's constructor wires up the Jinja environment \u2014 not_shown: The cited code does not show any Jinja environment setup in the __init__ methods shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "defining-routes",
+   "title": "Defining Routes",
+   "accepted": true,
+   "turns": 15,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 16,
+    "ok": 16,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "rt-scaffold",
+      "claims": [
+       "only `App` implements it \u2014 not_shown: The cited code does not show the `App` class or its implementation of `add_url_rule`. This claim cannot be verified from the provided code."
+      ]
+     },
+     {
+      "id": "rt-scaffold-error",
+      "claims": [
+       "@errorhandler decorator calls _get_exc_class_and_code to normalise its argument \u2014 not_shown",
+       "@errorhandler decorator stores the handler in error_handler_spec dict \u2014 not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "handling-requests",
+   "title": "Handling Requests",
+   "accepted": true,
+   "turns": 12,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 2,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "rendering-responses",
+   "title": "Rendering Responses",
+   "accepted": true,
+   "turns": 16,
+   "reads": 23,
+   "submits": 4,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "ok": 12,
+    "flagged": 5,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "running-testing",
+   "title": "Running & Testing",
+   "accepted": true,
+   "turns": 18,
+   "reads": 22,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 2,
+    "rewritten": [
+     {
+      "id": "ru-dotenv",
+      "claims": [
+       "If python-dotenv is not installed and no .env/.flaskenv files exist in the working directory, load_dotenv silently returns False \u2014 contradicted: Lines 735-741 show that if python-dotenv is not installed, the function checks `if path or os.path.isfile(\".env\") or os.path.isfile(\".flaskenv\")` and if any of these conditions are true, it prints a yellow warning message via `click.secho`. It only returns False silently if none of these conditions are met. So it is not silent when .env or .flaskenv files exist.",
+       "A developer expecting FLASK_APP from .flaskenv gets a confusing 'Could not locate a Flask application' error instead \u2014 not_shown: The cited code does not show what error message a developer would receive or demonstrate the scenario where FLASK_APP is expected from .flaskenv but not found. The code only shows that load_dotenv returns False and potentially prints a tip message."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "example-apps",
+   "title": "Example Applications",
+   "accepted": true,
+   "turns": 12,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 9,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "example-apps",
+      "claims": [
+       "Each has its own test suite"
+      ]
+     },
+     {
+      "id": "ex-celery-tasks",
+      "claims": [
+       "`block` uses the global default (ignored) \u2014 not_shown: Line 12 shows `@shared_task()` with no parameters specified for block. The detail claims this uses the global default for ignore_result, but the code does not show what the global default is or confirm that results are ignored."
+      ]
+     }
+    ],
+    "downgraded": [
+     "ex-celery-tasks"
+    ]
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "creating-app",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "defining-routes",
+    "depth": 3,
+    "nodes": 16
+   },
+   {
+    "id": "handling-requests",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "rendering-responses",
+    "depth": 3,
+    "nodes": 12
+   },
+   {
+    "id": "running-testing",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "example-apps",
+    "depth": 3,
+    "nodes": 10
+   }
+  ]
+ },
+ "verifyPassRate": 98
+}

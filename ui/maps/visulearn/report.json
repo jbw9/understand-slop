@@ -1,0 +1,308 @@
+{
+ "repo": "VisuLearn",
+ "commit": "9d559b2",
+ "backend": "bedrock",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 72,
+  "cut": 243,
+  "author": 971,
+  "verify": 170,
+  "total": 1457
+ },
+ "usd": 19.36,
+ "fullUsd": 19.36,
+ "bill": {
+  "summarize": {
+   "calls": 114,
+   "cached": 0,
+   "input": 387968,
+   "output": 60571,
+   "cacheRead": 0,
+   "usd": 0.6908229999999999,
+   "fullUsd": 0.6908229999999999
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 0,
+   "input": 23601,
+   "output": 19667,
+   "cacheRead": 0,
+   "usd": 0.60968,
+   "fullUsd": 0.60968
+  },
+  "author": {
+   "calls": 98,
+   "cached": 0,
+   "input": 611844,
+   "output": 263154,
+   "cacheRead": 3681962,
+   "usd": 12.243716,
+   "fullUsd": 12.243716
+  },
+  "verify": {
+   "calls": 57,
+   "cached": 0,
+   "input": 176852,
+   "output": 43242,
+   "cacheRead": 0,
+   "usd": 0.39306199999999986,
+   "fullUsd": 0.39306199999999986
+  },
+  "verify-review": {
+   "calls": 149,
+   "cached": 0,
+   "input": 892127,
+   "output": 38584,
+   "cacheRead": 0,
+   "usd": 5.425235,
+   "fullUsd": 5.425235
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 385,
+  "summarised": 114,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "video/",
+   "reason": "Standalone Remotion promotional videos; not part of the web application runtime."
+  },
+  {
+   "path": "next.config.js",
+   "reason": "Next.js build configuration."
+  },
+  {
+   "path": "next.config.ts",
+   "reason": "Next.js build configuration (TypeScript variant)."
+  },
+  {
+   "path": "postcss.config.mjs",
+   "reason": "PostCSS/Tailwind build tooling."
+  },
+  {
+   "path": "tailwind.config.ts",
+   "reason": "Tailwind CSS design token configuration."
+  }
+ ],
+ "roots": [
+  {
+   "id": "signing-up",
+   "title": "Signing Up",
+   "accepted": true,
+   "turns": 11,
+   "reads": 22,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 7,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "asking-questions",
+   "title": "Asking Questions",
+   "accepted": true,
+   "turns": 14,
+   "reads": 28,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "aq-call-a",
+      "claims": [
+       "Uses a lightweight 600-byte `HAIKU_EXPLANATION_PROMPT` — not_shown: The cited code [1] shows the prompt content but does not indicate its byte size. The actual prompt text is not measured in the code."
+      ]
+     },
+     {
+      "id": "aq-test",
+      "claims": [
+       "Hint text from Call A is available within ~3s — not_shown",
+       "Both Call A and Call B complete in ~15-25s — not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "generating-pdfs",
+   "title": "Generating PDFs",
+   "accepted": true,
+   "turns": 13,
+   "reads": 23,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "generating-pdfs",
+      "claims": [
+       "PdfBlock makes two independent Claude calls for worksheets: step 1 for questions-only and step 2 for solutions",
+       "Each call generates a completely new document, so the answer key's questions won't match the worksheet's questions"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "browsing-history",
+   "title": "Browsing History",
+   "accepted": true,
+   "turns": 12,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 5,
+    "ok": 5,
+    "flagged": 3,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "tracking-usage",
+   "title": "Tracking Usage",
+   "accepted": true,
+   "turns": 21,
+   "reads": 30,
+   "submits": 4,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 8,
+    "ok": 8,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "tracking-usage",
+      "claims": [
+       "PDF generation is gated by daily and hourly limits — contradicted: Code [1] shows PDF_RATE_LIMITS with only pdfsPerDay; there are no hourly limits for PDFs."
+      ]
+     },
+     {
+      "id": "tu-feedback",
+      "claims": [
+       "Both use the same per-IP rate limiter. — contradicted: Code [0] calls checkFeedbackRateLimit (line 19) and code [1] calls checkContactRateLimit (line 17). These are two different rate limiter functions, not the same one."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "admin-dashboard",
+   "title": "Admin Dashboard",
+   "accepted": true,
+   "turns": 11,
+   "reads": 26,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "ad-geo-store",
+      "claims": [
+       "Each geo event writes three items via atomic ADD — contradicted: Lines 47-72 show three UpdateCommand operations sent via `Promise.all()`, which executes them in parallel, not atomically. DynamoDB does not provide atomic multi-item writes across separate items; these are best-effort parallel operations with individual error handling (lines 68-70)."
+      ]
+     },
+     {
+      "id": "ad-feedback",
+      "claims": [
+       "Animation feedback table includes a 'Conversation' column — not_shown: The detail and code labels do not mention a 'Conversation' column, but line 414 shows it is present in the actual table (conversationId)."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "ops-and-monitoring",
+   "title": "Ops & Monitoring",
+   "accepted": true,
+   "turns": 16,
+   "reads": 31,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "om-table-scripts",
+      "claims": [
+       "bypassing the shared `docClient` to create their own DynamoDB clients with credentials from environment variables — not_shown: The cited code does not show how the DynamoDB client is instantiated, what credentials it uses, or whether it bypasses a shared docClient. The code shows `client.send()` calls but not the client initialization."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "signing-up",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "asking-questions",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "generating-pdfs",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "browsing-history",
+    "depth": 2,
+    "nodes": 5
+   },
+   {
+    "id": "tracking-usage",
+    "depth": 3,
+    "nodes": 8
+   },
+   {
+    "id": "admin-dashboard",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "ops-and-monitoring",
+    "depth": 3,
+    "nodes": 9
+   }
+  ]
+ },
+ "verifyPassRate": 100
+}

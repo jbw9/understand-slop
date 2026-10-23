@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useSyncExternalStore } from "react";
-import { describe, nodeAt, RUN } from "@/lib/map";
+import { describe, type BuiltMap } from "@/lib/map";
 
 /**
  * What the user has handed to Claude from the map: whole sections, or any one
@@ -47,10 +47,10 @@ const subscribe = (f: () => void) => {
 
 export const sectionKey = (path: string[]) => path.join("/");
 
-export const section = (path: string[]): Target => ({
+export const section = (m: BuiltMap, path: string[]): Target => ({
   key: sectionKey(path),
-  title: path.length ? (nodeAt(path)?.title ?? sectionKey(path)) : RUN.repo,
-  text: describe(path),
+  title: path.length ? (m.nodeAt(path)?.title ?? sectionKey(path)) : m.RUN.repo,
+  text: describe(m, path),
 });
 const withPicks = (pty: number, picks: Pick[]) => set({ ...state, picks: { ...state.picks, [pty]: picks } });
 

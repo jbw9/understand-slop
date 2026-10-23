@@ -6,7 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toggleTerminal } from "@/components/terminal";
 import { openClaude } from "@/lib/context";
 import { openSettings } from "@/lib/settings";
-import { RUN } from "@/lib/map";
+import { useMap } from "@/components/map-context";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,6 +25,7 @@ const noSubscribe = () => () => {};
 
 export function Titlebar() {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const { RUN } = useMap();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {

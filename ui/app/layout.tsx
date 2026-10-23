@@ -15,7 +15,8 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "understand-slop",
+  // A published export is one map, and its tab says which.
+  title: process.env.NEXT_PUBLIC_STATIC_MAP ?? "understand-slop",
   description:
     "See what an agent actually changed in your codebase — and what the analysis could not prove.",
 };
@@ -23,7 +24,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} ${mono.variable} h-full antialiased`}>
-      <body className="h-full overflow-hidden">{children}</body>
+      {/* Browser extensions stamp attributes on <body> before React loads. */}
+      <body className="h-full overflow-hidden" suppressHydrationWarning>{children}</body>
     </html>
   );
 }

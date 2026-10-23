@@ -1,0 +1,344 @@
+{
+ "repo": "flask",
+ "commit": "d086db8",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-sonnet-4-6",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "review": "global.anthropic.claude-sonnet-4-6"
+ },
+ "elapsed": {
+  "summarize": 200,
+  "cut": 90,
+  "author": 743,
+  "verify": 1368,
+  "total": 2401
+ },
+ "usd": 12.31,
+ "fullUsd": 14.96,
+ "bill": {
+  "summarize": {
+   "calls": 36,
+   "cached": 36,
+   "input": 160904,
+   "output": 23768,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.279744
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 1,
+   "input": 7772,
+   "output": 6136,
+   "cacheRead": 0,
+   "usd": 0,
+   "fullUsd": 0.19226
+  },
+  "author": {
+   "calls": 82,
+   "cached": 52,
+   "input": 660024,
+   "output": 479504,
+   "cacheRead": 3245696,
+   "usd": 8.460704100000001,
+   "fullUsd": 10.6412853
+  },
+  "verify": {
+   "calls": 68,
+   "cached": 0,
+   "input": 204974,
+   "output": 51853,
+   "cacheRead": 0,
+   "usd": 0.46423900000000007,
+   "fullUsd": 0.46423900000000007
+  },
+  "verify-review": {
+   "calls": 155,
+   "cached": 0,
+   "input": 797413,
+   "output": 66333,
+   "cacheRead": 0,
+   "usd": 3.387234000000001,
+   "fullUsd": 3.387234000000001
+  }
+ },
+ "throttled": {
+  "waits": 297,
+  "seconds": 2560
+ },
+ "files": {
+  "listed": 227,
+  "summarised": 36,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "docs/conf.py",
+   "reason": "Sphinx documentation build configuration — pure tooling, not part of the framework."
+  }
+ ],
+ "roots": [
+  {
+   "id": "creating-app",
+   "title": "Creating the App",
+   "accepted": true,
+   "turns": 12,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "ca-instantiation",
+      "claims": [
+       "jinja_env is a @cached_property — not_shown",
+       "The first code path that accesses jinja_env — including app.debug = True — freezes the Jinja environment — not_shown",
+       "Any change to app.jinja_options after that access is silently ignored — not_shown",
+       "Every registration method (@app.route, @app.before_request, @app.errorhandler, etc.) is wrapped by @setupmethod — not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "defining-routes",
+   "title": "Defining Routes",
+   "accepted": true,
+   "turns": 13,
+   "reads": 18,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "ok": 12,
+    "flagged": 9,
+    "rewritten": [
+     {
+      "id": "defining-routes",
+      "claims": [
+       "Blueprints defer every registration to a lambda list"
+      ]
+     },
+     {
+      "id": "rt-scaffold",
+      "claims": [
+       "endpoint() is defined here — not_shown"
+      ]
+     },
+     {
+      "id": "rt-bp-deferred",
+      "claims": [
+       "_got_registered_once is set — not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "handling-requests",
+   "title": "Handling Requests",
+   "accepted": true,
+   "turns": 19,
+   "reads": 27,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "ok": 11,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "rq-globals",
+      "claims": [
+       "All four proxies resolve against `_cv_app`, a `ContextVar[AppContext]` — contradicted: The code shows five proxies, not four: app_ctx, current_app, g, request, and session. All five resolve against _cv_app."
+      ]
+     },
+     {
+      "id": "rq-wrappers",
+      "claims": [
+       "not_shown: The cited code shows that MAX_CONTENT_LENGTH defaults to None and that no limit is enforced when it is None, but does not demonstrate or show the consequence of unbounded memory consumption from reading a large upload."
+      ]
+     },
+     {
+      "id": "rq-helpers",
+      "claims": [
+       "Session changes lost in streaming generator — intended"
+      ]
+     }
+    ],
+    "downgraded": [
+     "rq-globals"
+    ]
+   }
+  },
+  {
+   "id": "rendering-responses",
+   "title": "Rendering Responses",
+   "accepted": true,
+   "turns": 17,
+   "reads": 25,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 9,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "ro-loader",
+      "claims": [
+       "Blueprint templates should be namespaced under a subdirectory to avoid the collision — not_shown: This is a recommendation/best practice, not something shown in the code itself. The code demonstrates the collision behavior but does not show or enforce namespacing."
+      ]
+     },
+     {
+      "id": "ro-provider",
+      "claims": [
+       "sort comparison between mixed types fails — not_shown"
+      ]
+     },
+     {
+      "id": "ro-pubfuncs",
+      "claims": [
+       "dump and load check for an active app context and delegate to the provider — not_shown",
+       "dump and load fall back to stdlib json — not_shown"
+      ]
+     },
+     {
+      "id": "ro-tags",
+      "claims": [
+       "http_date carries only whole seconds — not_shown",
+       "A datetime with microseconds stored in a session cookie is silently restored without them on the next request — not_shown"
+      ]
+     }
+    ],
+    "downgraded": [
+     "ro-provider",
+     "ro-tags"
+    ]
+   }
+  },
+  {
+   "id": "running-testing",
+   "title": "Running & Testing",
+   "accepted": true,
+   "turns": 7,
+   "reads": 8,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 14,
+    "ok": 14,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "ru-client-session",
+      "claims": [
+       "Flask's built-in cookie session works fine"
+      ]
+     },
+     {
+      "id": "ru-client-ctx",
+      "claims": [
+       "Werkzeug calls it to hand the live context back to the test after each response — not_shown: The code shows the callback is injected and later contexts are re-pushed (lines 243-244), but the cited code does not show Werkzeug calling the callback or the mechanism by which it hands the context back."
+      ]
+     },
+     {
+      "id": "ru-clirunner",
+      "claims": [
+       "Any app.run() call later in the same process silently does nothing"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "example-apps",
+   "title": "Example Applications",
+   "accepted": true,
+   "turns": 14,
+   "reads": 29,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "ok": 9,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "ex-flaskr-db",
+      "claims": [
+       "The issue title describes a problem (data loss without confirmation) — intended: The code is designed to clear existing data as stated in the docstring at [2]:34 'Clear existing data and create new tables.' This is deliberate behaviour, not a bug, though it is a risky design pattern."
+      ]
+     },
+     {
+      "id": "ex-celery-setup",
+      "claims": [
+       "wrapping gives workers access to `current_app` and context locals — not_shown: The code shows the context manager is used, but does not demonstrate or show that this provides access to `current_app` or context locals. This is a consequence of Flask's app context behavior, not shown in the cited lines."
+      ]
+     },
+     {
+      "id": "ex-celery-api",
+      "claims": [
+       "When a task fails, ready=True but result.get() re-raises the exception by default"
+      ]
+     },
+     {
+      "id": "ex-js-routes",
+      "claims": [
+       "not_shown"
+      ]
+     }
+    ],
+    "downgraded": [
+     "ex-celery-setup",
+     "ex-celery-api",
+     "ex-js-routes"
+    ]
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "creating-app",
+    "depth": 3,
+    "nodes": 7
+   },
+   {
+    "id": "defining-routes",
+    "depth": 3,
+    "nodes": 12
+   },
+   {
+    "id": "handling-requests",
+    "depth": 3,
+    "nodes": 12
+   },
+   {
+    "id": "rendering-responses",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "running-testing",
+    "depth": 3,
+    "nodes": 14
+   },
+   {
+    "id": "example-apps",
+    "depth": 3,
+    "nodes": 12
+   }
+  ]
+ },
+ "verifyPassRate": 91
+}

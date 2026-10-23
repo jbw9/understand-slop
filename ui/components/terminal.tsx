@@ -3,6 +3,7 @@
 import "@xterm/xterm/css/xterm.css";
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMap } from "@/components/map-context";
 import { claudeEnded, claudeFocused, claudeStarted, clearPicks, onOpenClaude, unpick, usePicks } from "@/lib/context";
 import { openSettings, readSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
  * A terminal along the bottom of the window, the way VS Code has one.
  *
  * Ctrl+` shows and hides it, Ctrl+Shift+` opens another shell. Shells run in
- * the mapped repo (src-tauri/src/pty.rs), so the code a card quotes is one
+ * the open map's checkout (src-tauri/src/pty.rs), so the code a card quotes is one
  * `cd`-free command away. Hiding the panel or switching tabs never ends a
  * shell — every tab stays mounted, only out of sight — so scrollback and a
  * running process survive a toggle. A shell ends when its tab is closed or it
@@ -75,6 +76,8 @@ function storedHeight() {
 }
 
 export function TerminalPanel() {
+  // New tabs start in the open map's checkout; ones already open stay put.
+  const cwd = useMap().RUN.root;
   const [shown, setShown] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [active, setActive] = useState<number | null>(null);
@@ -241,6 +244,7 @@ export function TerminalPanel() {
           <Shell
             key={t.key}
             kind={t.kind}
+            cwd={cwd}
             visible={shown && t.key === active}
             onTitle={(title) => setTabs((all) => all.map((x) => (x.key === t.key ? { ...x, title } : x)))}
             onSpawn={(pty) => {
@@ -300,12 +304,15 @@ function Tray({ pty }: { pty: number }) {
 /** One shell, or Claude Code: an xterm on a pty. Lives as long as its tab. */
 function Shell({
   kind,
+  cwd,
   visible,
   onTitle,
   onSpawn,
   onExit,
 }: {
   kind: Tab["kind"];
+  /** Where it starts. A tab keeps the one it was opened with. */
+  cwd?: string;
   visible: boolean;
   onTitle: (title: string) => void;
   onSpawn: (pty: number) => void;
@@ -410,6 +417,7 @@ function Shell({
           rows: term.rows,
           onData: out,
           claude,
+          cwd: cwd ?? null,
         });
         id = spawned.id;
         // Unmounted while the shell was starting: end it rather than leak it.
@@ -447,7 +455,9 @@ function Shell({
       show.current = null;
       cleanup();
     };
-    // A tab's kind never changes, so this still runs once per tab.
+    // A tab's kind never changes, and its directory is fixed at birth, so
+    // this still runs once per tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
   useEffect(() => {

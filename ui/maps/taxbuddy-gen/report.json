@@ -1,0 +1,354 @@
+{
+ "repo": "taxBuddy",
+ "commit": "4aab4d9",
+ "backend": "bedrock",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 223,
+  "cut": 456,
+  "author": 890,
+  "verify": 212,
+  "total": 1781
+ },
+ "usd": 26.29,
+ "fullUsd": 26.29,
+ "bill": {
+  "summarize": {
+   "calls": 333,
+   "cached": 0,
+   "input": 1165698,
+   "output": 161709,
+   "cacheRead": 0,
+   "usd": 1.9742430000000002,
+   "fullUsd": 1.9742430000000002
+  },
+  "cut": {
+   "calls": 2,
+   "cached": 0,
+   "input": 99291,
+   "output": 35864,
+   "cacheRead": 0,
+   "usd": 1.393055,
+   "fullUsd": 1.393055
+  },
+  "author": {
+   "calls": 101,
+   "cached": 0,
+   "input": 799059,
+   "output": 364484,
+   "cacheRead": 5318157,
+   "usd": 16.765151000000003,
+   "fullUsd": 16.765151000000003
+  },
+  "verify": {
+   "calls": 75,
+   "cached": 0,
+   "input": 269279,
+   "output": 63279,
+   "cacheRead": 0,
+   "usd": 0.5856740000000002,
+   "fullUsd": 0.5856740000000002
+  },
+  "verify-review": {
+   "calls": 151,
+   "cached": 0,
+   "input": 911917,
+   "output": 40661,
+   "cacheRead": 0,
+   "usd": 5.57611,
+   "fullUsd": 5.57611
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 425,
+  "summarised": 330,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "components/ui/",
+   "reason": "Generic shadcn UI primitives (button, card, input, etc.) — imported everywhere, contain no product logic."
+  },
+  {
+   "path": ".claude/statusline.py",
+   "reason": "Claude Code IDE status-line script — pure developer tooling."
+  },
+  {
+   "path": "eslint.config.mjs",
+   "reason": "ESLint configuration — pure tooling."
+  },
+  {
+   "path": "postcss.config.mjs",
+   "reason": "PostCSS/Tailwind build config — pure tooling."
+  },
+  {
+   "path": "next.config.ts",
+   "reason": "Next.js build configuration — pure tooling."
+  },
+  {
+   "path": "vitest.config.ts",
+   "reason": "Vitest test runner configuration — pure tooling."
+  },
+  {
+   "path": "vitest.synthetic.config.ts",
+   "reason": "Vitest config for synthetic scenario tests — pure tooling."
+  },
+  {
+   "path": "scripts/check-invariants.mjs",
+   "reason": "CI pre-commit invariant checker — pure tooling."
+  },
+  {
+   "path": "scripts/generate-sample-docs.mjs",
+   "reason": "One-off generator for reviewer demo documents — run by hand, not at build time."
+  },
+  {
+   "path": "scripts/synthetic/",
+   "reason": "End-to-end synthetic persona test harness — testing infrastructure, not product code."
+  },
+  {
+   "path": "scripts/treaty/",
+   "reason": "One-off pipeline to extract and author treaty JSON from IRS PDF sources — run by hand, not at build time."
+  }
+ ],
+ "roots": [
+  {
+   "id": "arriving",
+   "title": "Arriving & Signing Up",
+   "accepted": true,
+   "turns": 13,
+   "reads": 26,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 10,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "ar-landing",
+      "claims": [
+       "not_shown"
+      ]
+     },
+     {
+      "id": "ar-landing-contact",
+      "claims": [
+       "for investor demos — not_shown"
+      ]
+     },
+     {
+      "id": "ar-auth",
+      "claims": [
+       "The signup form enforces `minLength={8}` on the HTML input — not_shown"
+      ]
+     }
+    ],
+    "downgraded": [
+     "ar-auth"
+    ]
+   }
+  },
+  {
+   "id": "eligibility",
+   "title": "Proving Eligibility",
+   "accepted": true,
+   "turns": 13,
+   "reads": 23,
+   "submits": 4,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 4,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "extraction",
+   "title": "Reading Documents",
+   "accepted": true,
+   "turns": 10,
+   "reads": 20,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 12,
+    "ok": 12,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "rd-fallback",
+      "claims": [
+       "The issue that OpenAI receives tax data via scoring because AI_PROVIDER is unset and defaults to OpenAI — contradicted: Code label [2] shows that when AI_PROVIDER is unset, it defaults to \"bedrock\", not \"openai\". The condition is `process.env.AI_PROVIDER === \"openai\" ? \"openai\" : \"bedrock\"`, so an unset AI_PROVIDER would result in the bedrock path being taken."
+      ]
+     },
+     {
+      "id": "rd-specs",
+      "claims": [
+       "w2 spec: employer info and 13 numbered boxes"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "income-profile",
+   "title": "Collecting Income & Profile",
+   "accepted": true,
+   "turns": 11,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 5,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "computing",
+   "title": "Computing the Return",
+   "accepted": true,
+   "turns": 11,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "cr-forms",
+      "claims": [
+       "no arithmetic, every number is copied from `IncomeEngineResult` — contradicted"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "generating",
+   "title": "Generating & Filing",
+   "accepted": true,
+   "turns": 13,
+   "reads": 29,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 2,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "refund-check",
+   "title": "Checking a Return",
+   "accepted": true,
+   "turns": 13,
+   "reads": 22,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "ck-extract",
+      "claims": [
+       "maxDuration was raised to 300 for BDA's async polling — not_shown: The issue references line 42 of the route file, but the cited code only shows lines 53-178. Line 42 is not included in the citation.",
+       "one request holds a serverless function slot for up to five minutes with no identity and no rate limit — not_shown: The cited code does not show authentication checks, rate limiting, or the maxDuration configuration. The POST handler validates the file but the cited lines do not show identity verification or rate limiting mechanisms."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "admin-audit",
+   "title": "Admin & Audit",
+   "accepted": true,
+   "turns": 17,
+   "reads": 27,
+   "submits": 5,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "aa-provenance",
+      "claims": [
+       "ENGINE_FIELD_CONTRIBUTIONS: 15 fields mapped to document boxes — contradicted"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "arriving",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "eligibility",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "extraction",
+    "depth": 3,
+    "nodes": 12
+   },
+   {
+    "id": "income-profile",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "computing",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "generating",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "refund-check",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "admin-audit",
+    "depth": 3,
+    "nodes": 10
+   }
+  ]
+ },
+ "verifyPassRate": 99
+}

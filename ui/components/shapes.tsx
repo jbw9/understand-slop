@@ -212,6 +212,9 @@ const MARKS: Record<string, { name: string; draw: React.ReactNode }> = {
   },
 };
 
+/** The brand marks there is a drawing for — the only ids a generated map may use. */
+export const MARK_IDS = Object.keys(MARKS);
+
 /**
  * The technologies behind a level, inline in its title row (D39). They used to
  * own a 300px column beside the header — tiny glyphs in a big empty space —

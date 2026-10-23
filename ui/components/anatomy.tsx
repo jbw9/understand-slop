@@ -6,8 +6,10 @@ import { rowId, type Anatomy } from "@/lib/data";
 import { ShapeView } from "@/components/shapes";
 import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX, type Shape } from "@/lib/view";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readSlice, Refused, writeSlice, type Slice, type WriteResult } from "@/lib/repo";
+import type { Slice, WriteResult } from "@/lib/repo";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
+import { useMap } from "@/components/map-context";
+import { readSource, SOURCE_URL } from "@/lib/source";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -856,6 +858,7 @@ export function SourceView({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(quoted);
   const [saved, setSaved] = useState<WriteResult | null>(null);
+  const { name: map } = useMap();
 
   /**
    * One read of the repository, resolved to what the UI should show.
@@ -864,14 +867,15 @@ export function SourceView({
    * below subscribe to it rather than call setState in its own body.
    */
   const read = useCallback(
-    async () => {
+    async (signal?: AbortSignal) => {
       try {
-        return { slice: await readSlice({ file: block.file, start: block.start, end }, quoted), failed: null };
-      } catch (e) {
-        return { slice: null, failed: e instanceof Refused ? e.message : "unreachable" };
+        const r = await readSource({ map, file: block.file, start: block.start, end, fixture: quoted }, signal);
+        return "slice" in r ? { slice: r.slice, failed: null } : { slice: null, failed: r.refused };
+      } catch {
+        return { slice: null, failed: "unreachable" };
       }
     },
-    [block.file, block.start, end, quoted],
+    [map, block.file, block.start, end, quoted],
   );
 
   // Aborted on unmount and whenever the block changes, so a slow response for
@@ -895,15 +899,21 @@ export function SourceView({
   // reached from the save button's own handler. Never a blur, never a timer,
   // never navigation.
   async function save() {
-    const body = await writeSlice({
-      file: block.file,
-      start: block.start,
-      end,
-      code: draft,
-      // What we read is what we claim is there. A write built on anything
-      // else is the stale-read clobber the contract exists to refuse.
-      expected: shown,
+    const res = await fetch("/api/source", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        map,
+        file: block.file,
+        start: block.start,
+        end,
+        code: draft,
+        // What we read is what we claim is there. A write built on anything
+        // else is the stale-read clobber the contract exists to refuse.
+        expected: shown,
+      }),
     });
+    const body = (await res.json()) as WriteResult;
     setSaved(body);
     if (body.ok) {
       setEditing(false);
@@ -957,23 +967,36 @@ export function SourceView({
           </span>
         ) : null}
         <CopyPath text={`${block.file}:${block.start}`} />
-        {/* Read-only is the default. Editing is a control you go and press. */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setDraft(shown);
-            setSaved(null);
-            setEditing((v) => !v);
-          }}
-          className={cn(
-            "shrink-0 rounded-[4px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
-            editing
-              ? "border-deep-green bg-deep-green text-pure-white"
-              : "border-border-strong text-muted-slate hover:text-on-surface",
-          )}
-        >
-          {editing ? "cancel" : "edit"}
-        </button>
+        {/* A static export has no repository to write to: it links to the code host instead. */}
+        {SOURCE_URL ? (
+          <a
+            href={`${SOURCE_URL}/${block.file}#L${block.start}-L${end}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 rounded-[4px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+          >
+            github ↗
+          </a>
+        ) : (
+          /* Read-only is the default. Editing is a control you go and press. */
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDraft(shown);
+              setSaved(null);
+              setEditing((v) => !v);
+            }}
+            className={cn(
+              "shrink-0 rounded-[4px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
+              editing
+                ? "border-deep-green bg-deep-green text-pure-white"
+                : "border-border-strong text-muted-slate hover:text-on-surface",
+            )}
+          >
+            {editing ? "cancel" : "edit"}
+          </button>
+        )}
       </div>
 
       {/* The finding, stated before the code it is about. */}

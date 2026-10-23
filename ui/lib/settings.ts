@@ -8,6 +8,7 @@ import { DARK, SETTINGS_KEY } from "@/lib/theme";
  * default, the theme follows the system, and new tabs open in Claude Code.
  */
 export type Theme = "system" | "light" | "dark";
+export type Ground = "dots" | "plain" | "squares";
 
 export interface Settings {
   claudePath: string;
@@ -15,12 +16,14 @@ export interface Settings {
   theme: Theme;
   /** The agent a tab opens into when the app opens one for you (components/agents.tsx). */
   agent: string;
+  /** What the map is drawn on. */
+  ground: Ground;
 }
 
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude" };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "dots" };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));

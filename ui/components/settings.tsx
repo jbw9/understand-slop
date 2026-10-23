@@ -2,16 +2,17 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
-import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
+import { DIALOG, Field, INPUT, Overlay } from "@/components/dialog";
 import { AgentIcon, CLAUDE, useInstalled } from "@/components/agents";
 import { PanelHead } from "@/components/panel";
 import { cn } from "@/lib/utils";
-import { applyTheme, followTheme, onOpenSettings, readSettings, saveSettings, type Settings, type Theme } from "@/lib/settings";
+import { followTheme, onOpenSettings, readSettings, saveSettings, useSettings, type Ground, type Settings, type Theme } from "@/lib/settings";
 
 /**
  * Settings, as a dialog over the map. There is little to set: the theme,
  * the agent new tabs open into, where Claude Code is when it was not found by
- * itself, and which model it runs. A theme picked here shows at once, and Cancel puts the saved one back.
+ * itself, which model it runs, and what the map is drawn on. Every change is
+ * saved as it is made, so there is nothing to confirm and nothing to undo.
  */
 
 const THEMES: { value: Theme; label: string }[] = [
@@ -20,11 +21,18 @@ const THEMES: { value: Theme; label: string }[] = [
   { value: "dark", label: "Dark" },
 ];
 
+const GROUNDS: { value: Ground; label: string }[] = [
+  { value: "dots", label: "Dots" },
+  { value: "squares", label: "Squares" },
+  { value: "plain", label: "Plain" },
+];
+
 type Found = { path: string; version: string | null } | null;
 
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<Settings>(readSettings);
+  // What is on screen is what is saved: there is no draft to keep in step.
+  const draft = useSettings();
   // undefined while looking.
   const [found, setFound] = useState<Found | undefined>(undefined);
   const agents = [CLAUDE, ...useInstalled()];
@@ -39,10 +47,8 @@ export function SettingsDialog() {
   useEffect(
     () =>
       onOpenSettings(() => {
-        const now = readSettings();
-        setDraft(now);
         setOpen(true);
-        detect(now.claudePath);
+        detect(readSettings().claudePath);
       }),
     [detect],
   );
@@ -52,12 +58,14 @@ export function SettingsDialog() {
 
   if (!open) return null;
   const close = () => {
-    applyTheme(readSettings().theme);
+    tidy();
     setOpen(false);
   };
-  const save = () => {
-    saveSettings({ ...draft, claudePath: draft.claudePath.trim(), model: draft.model.trim() });
-    setOpen(false);
+  // Typing keeps its spaces until the field is left, so a trim never moves the caret.
+  const set = (next: Partial<Settings>) => saveSettings({ ...readSettings(), ...next });
+  const tidy = () => {
+    const now = readSettings();
+    set({ claudePath: now.claudePath.trim(), model: now.model.trim() });
   };
 
   return (
@@ -67,11 +75,26 @@ export function SettingsDialog() {
         aria-label="Settings"
         onSubmit={(e) => {
           e.preventDefault();
-          save();
+          close();
         }}
         className={cn(DIALOG, "max-w-[520px]")}
       >
-        <PanelHead title="Settings" note="How the app looks, which agent tabs open into, and how Claude Code runs." />
+        <PanelHead
+          title="Settings"
+          note="How the app looks, which agent tabs open into, and how Claude Code runs. Changes apply as you make them."
+          right={
+            <button
+              type="submit"
+              aria-label="Close"
+              title="Close (Esc)"
+              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[6px] text-muted-slate hover:bg-surface-container hover:text-ink"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
+                <path d="m4.5 4.5 7 7m0-7-7 7" />
+              </svg>
+            </button>
+          }
+        />
         <div className="flex flex-col gap-5 px-5 py-5">
           <Field label="Theme" hint="System follows your desktop's light or dark setting.">
             <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
@@ -81,16 +104,32 @@ export function SettingsDialog() {
                   type="button"
                   role="radio"
                   aria-checked={draft.theme === t.value}
-                  onClick={() => {
-                    setDraft({ ...draft, theme: t.value });
-                    applyTheme(t.value);
-                  }}
+                  onClick={() => set({ theme: t.value })}
                   className={cn(
                     "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
                     draft.theme === t.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {t.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Background" hint="What the map is drawn on.">
+            <div role="radiogroup" aria-label="Background" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+              {GROUNDS.map((g) => (
+                <button
+                  key={g.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.ground === g.value}
+                  onClick={() => set({ ground: g.value })}
+                  className={cn(
+                    "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.ground === g.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {g.label}
                 </button>
               ))}
             </div>
@@ -106,7 +145,7 @@ export function SettingsDialog() {
                   type="button"
                   role="radio"
                   aria-checked={draft.agent === a.id}
-                  onClick={() => setDraft({ ...draft, agent: a.id })}
+                  onClick={() => set({ agent: a.id })}
                   className={cn(
                     "flex cursor-pointer items-center gap-1.5 rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
                     draft.agent === a.id ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
@@ -121,8 +160,11 @@ export function SettingsDialog() {
           <Field label="Claude Code" hint="Leave blank to find it automatically.">
             <input
               value={draft.claudePath}
-              onChange={(e) => setDraft({ ...draft, claudePath: e.target.value })}
-              onBlur={() => detect(draft.claudePath)}
+              onChange={(e) => set({ claudePath: e.target.value })}
+              onBlur={() => {
+                tidy();
+                detect(draft.claudePath);
+              }}
               placeholder={found?.path ?? "~/.local/bin/claude"}
               spellCheck={false}
               className={INPUT}
@@ -152,28 +194,14 @@ export function SettingsDialog() {
           <Field label="Model" hint="Blank uses Claude Code's default. An alias like sonnet or opus, or a full model id.">
             <input
               value={draft.model}
-              onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+              onChange={(e) => set({ model: e.target.value })}
+              onBlur={tidy}
               placeholder="default"
               spellCheck={false}
               className={INPUT}
             />
           </Field>
-          <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened after saving.</p>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-border-gray bg-surface px-5 py-3">
-          <button
-            type="button"
-            onClick={close}
-            className={QUIET}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={PRIMARY}
-          >
-            Save
-          </button>
+          <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
         </div>
       </form>
     </Overlay>

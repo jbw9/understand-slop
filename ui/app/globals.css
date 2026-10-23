@@ -13,8 +13,11 @@
 
   /* ── ink ───────────────────────────────────────────────── */
   --color-ink: #1a1a2e;
-  /* The phone bezel around app screenshots, and the veil behind a dialog: dark in either theme. */
+  /* The veil behind a dialog, and a phone's notch: dark in either theme. */
   --color-night: #1a1a2e;
+  /* A phone's frame. Not `night`: in the dark theme that is the ground's own
+     colour, and the bezel vanished into it. */
+  --color-bezel: #1a1a2e;
   --color-on-surface: #1a1c1b;
   --color-on-surface-variant: #404945;
   --color-muted-slate: #6b7280;
@@ -107,6 +110,7 @@
   --color-border-gray: #2b2e37;
   --color-border-strong: #3a3e4a;
   --color-wire: #4a4f5c;
+  --color-bezel: #3b3f4a;
 
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.5);
@@ -139,6 +143,14 @@
       var(--color-surface-dim) 1px,
       transparent 1px
     );
+    background-size: 24px 24px;
+    background-position: -1px -1px;
+  }
+  /* The same 24px pitch as the dots, drawn as hairlines. */
+  .gridfield {
+    background-image:
+      linear-gradient(var(--color-border-gray) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-border-gray) 1px, transparent 1px);
     background-size: 24px 24px;
     background-position: -1px -1px;
   }

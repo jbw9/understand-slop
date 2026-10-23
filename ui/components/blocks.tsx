@@ -577,10 +577,13 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
 
 /* ── watch out ───────────────────────────────────────────────── */
 
-export function WatchOut({ issues }: { issues: Issue[] }) {
+export function WatchOut({ issues, action }: { issues: Issue[]; action?: React.ReactNode }) {
   return (
     <section data-pick="Watch out">
-      <Eyebrow className="text-clay-ink">Watch out</Eyebrow>
+      <div className="flex items-center justify-between gap-3">
+        <Eyebrow className="text-clay-ink">Watch out</Eyebrow>
+        {action}
+      </div>
       <ul className="mt-3 flex flex-col gap-2.5">
         {issues.map((it) => (
           <li

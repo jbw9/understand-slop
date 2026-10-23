@@ -246,3 +246,24 @@ export function describeElement(m: BuiltMap, path: string[], label: string, text
     .join("\n")
     .concat("]");
 }
+
+/**
+ * A section's problems as text for an agent: every one in full — what goes
+ * wrong and where — then the section they belong to and its code, so the
+ * agent can go and look. The ask is left to the user.
+ */
+export function describeProblems(m: BuiltMap, path: string[]): string {
+  const node = path.length ? m.nodeAt(path) : null;
+  const issues = node?.issues ?? [];
+  const code = codeAt(m, path);
+  return [
+    `[Map problems: ${trail(m, path)} (${m.RUN.repo})`,
+    `The map found ${issues.length} ${issues.length === 1 ? "problem" : "problems"} here:`,
+    ...issues.map((it, i) => `${i + 1}. ${it.title} — ${it.detail}${it.where ? ` (${it.where})` : ""}`),
+    node?.sub ? `The section: ${node.sub}` : "",
+    code.length ? `Code:\n${code.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .concat("]");
+}

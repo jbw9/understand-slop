@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Canvas } from "@/components/canvas";
 import { MapProvider } from "@/components/map-context";
+import { ProjectsDialog } from "@/components/projects";
 import { SettingsDialog } from "@/components/settings";
 import { TerminalPanel } from "@/components/terminal";
 import { Titlebar } from "@/components/titlebar";
@@ -26,7 +27,7 @@ export default async function Home({
   if (STATIC_MAP) delete file.RUN.root;
   else file.RUN.root = rootOf(file.RUN);
   return (
-    <MapProvider name={name} file={file} maps={STATIC_MAP ? [STATIC_MAP] : listMaps()}>
+    <MapProvider name={name} file={file} maps={STATIC_MAP ? [{ id: STATIC_MAP, label: STATIC_MAP, local: false }] : listMaps()}>
       <div className="flex h-full flex-col">
         <Titlebar />
         <div className="min-h-0 flex-1">
@@ -37,6 +38,7 @@ export default async function Home({
         </div>
         <TerminalPanel />
         <SettingsDialog />
+        <ProjectsDialog />
       </div>
     </MapProvider>
   );

@@ -78,7 +78,7 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
         delete env.CLAUDE_CODE_ENTRYPOINT;
         // No effort means no thinking, as on the API path; with one, thinking is capped (see ccEffort).
         env.MAX_THINKING_TOKENS = args.includes("--effort") ? THINKING : "0";
-        const p = spawn("claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...args], { cwd: cwd(), env });
+        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...args], { cwd: cwd(), env });
         let stdout = "", stderr = "";
         p.stdout.on("data", (d) => (stdout += d));
         p.stderr.on("data", (d) => (stderr += d));

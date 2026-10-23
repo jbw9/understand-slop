@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Eyebrow, Prose } from "@/components/state";
 import { SourceView, type RowCtx } from "@/components/anatomy";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
-import type { Slice as RepoSlice } from "@/lib/repo";
+import { readSlice, type Slice as RepoSlice } from "@/lib/repo";
 
 /**
  * The blocks a reader learns from without opening code (round 3, D34): the
@@ -267,9 +267,10 @@ function Box({
   label: string;
   children: React.ReactNode;
 }) {
-  if (!live) return <g>{children}</g>;
+  if (!live) return <g data-pick={label}>{children}</g>;
   return (
     <a
+      data-pick={label}
       className="dg-live"
       href={href}
       aria-label={`${label} — open this part`}
@@ -378,7 +379,12 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className="border-b border-border-gray last:border-0">
+              <tr
+                key={i}
+                data-pick={r[0]}
+                data-pick-text={block.columns.map((c, j) => `${c}: ${r[j] ?? ""}`).join("\n")}
+                className="border-b border-border-gray last:border-0"
+              >
                 {r.map((cell, j) => (
                   <td
                     key={j}
@@ -449,7 +455,12 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
               const width = Math.abs(b - a);
               const warn = m.state !== "derived";
               return (
-                <li key={i} className="relative h-[76px]">
+                <li
+                  key={i}
+                  data-pick={m.label}
+                  data-pick-text={`${m.from} → ${m.to}: ${m.label}${m.note ? ` (${m.note})` : ""}`}
+                  className="relative h-[76px]"
+                >
                   <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">{i + 1}</span>
                   {self ? (
                     <div
@@ -534,7 +545,9 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             <p className="mb-3 px-2 text-center text-[13px] font-semibold text-ink">{block.title}</p>
             <div className="flex flex-col gap-2 px-2 pb-3">
               {block.items.map((it, i) => (
-                <ScreenThing key={i} type={it.type} label={it.label} n={num.get(i)} />
+                <div key={i} data-pick={it.label}>
+                  <ScreenThing type={it.type} label={it.label} n={num.get(i)} />
+                </div>
               ))}
             </div>
           </div>
@@ -546,7 +559,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
           // screen — the main text of the block — and is typeset as such.
           <ol className="flex min-w-[280px] max-w-[760px] flex-1 flex-col gap-4 pt-10">
             {noted.map((it, k) => (
-              <li key={it.i} className="flex gap-3 text-[15.5px] leading-relaxed">
+              <li key={it.i} data-pick={it.label} className="flex gap-3 text-[15.5px] leading-relaxed">
                 <Badge n={k + 1} />
                 <span>
                   <span className="font-semibold text-ink">{it.label}</span>
@@ -641,7 +654,7 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
       {block.notes?.length ? (
         <dl className="mt-2.5 flex flex-col gap-1.5">
           {block.notes.map((p) => (
-            <div key={p.label} className="flex gap-3 text-[13px] leading-snug">
+            <div key={p.label} data-pick={p.label} className="flex gap-3 text-[13px] leading-snug">
               <dt className="w-[160px] shrink-0 font-mono text-[12px] text-ink">{p.label}</dt>
               <dd className="text-on-surface-variant">
                 <Prose text={p.value} />
@@ -658,11 +671,15 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
 
 export function WatchOut({ issues }: { issues: Issue[] }) {
   return (
-    <section>
+    <section data-pick="Watch out">
       <Eyebrow className="text-clay-ink">Watch out</Eyebrow>
       <ul className="mt-3 flex flex-col gap-2.5">
         {issues.map((it) => (
-          <li key={it.title} className="rounded-[12px] border border-clay-line bg-clay-surface/60 px-4 py-3">
+          <li
+            key={it.title}
+            data-pick={it.title}
+            className="rounded-[12px] border border-clay-line bg-clay-surface/60 px-4 py-3"
+          >
             <p className="text-[14px] font-semibold text-clay-ink">{it.title}</p>
             <p className="mt-1 text-[13.5px] leading-relaxed text-on-surface">
               <Prose text={it.detail} />
@@ -696,7 +713,12 @@ export function CodeDrawer({
   onToggle: () => void;
 }) {
   return (
-    <section id="code" className="scroll-mt-16">
+    <section
+      id="code"
+      data-pick="The code behind this"
+      data-pick-text={refs.map((r) => `${r.file}:${r.start}-${r.end} — ${r.label}`).join("\n")}
+      className="scroll-mt-16"
+    >
       <button
         onClick={onToggle}
         aria-expanded={open}
@@ -723,17 +745,19 @@ function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: Ro
   const toggle = async () => {
     setShown((v) => !v);
     if (slice) return;
-    const q = new URLSearchParams({ file: code.file, start: String(code.start), end: String(code.end) });
     try {
-      const res = await fetch(`/api/source?${q}`);
-      setSlice(res.ok ? ((await res.json()) as RepoSlice) : "failed");
+      setSlice(await readSlice({ file: code.file, start: code.start, end: code.end }));
     } catch {
       setSlice("failed");
     }
   };
 
   return (
-    <li className="rounded-[12px] border border-border-gray bg-pure-white">
+    <li
+      data-pick={code.label}
+      data-pick-code={`${code.file}:${code.start}-${code.end}`}
+      className="rounded-[12px] border border-border-gray bg-pure-white"
+    >
       <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
         <span className="text-[13.5px] text-ink">{code.label}</span>
         <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">

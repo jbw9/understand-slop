@@ -6,7 +6,7 @@ import { rowId, type Anatomy } from "@/lib/data";
 import { ShapeView } from "@/components/shapes";
 import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX, type Shape } from "@/lib/view";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Slice, WriteResult } from "@/lib/repo";
+import { readSlice, Refused, writeSlice, type Slice, type WriteResult } from "@/lib/repo";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
 
 /**
@@ -219,7 +219,7 @@ function Block({
               <button
                 key={c.name}
                 ref={ctx.anchor(id)}
-                data-row
+                data-row={id}
                 onClick={() => ctx.onTrace(id)}
                 className={rowClass(
                   id,
@@ -293,7 +293,7 @@ function Block({
             <button
               key={r.method + r.path}
               ref={ctx.anchor(id)}
-              data-row
+              data-row={id}
               onClick={() => ctx.onTrace(id)}
               className={rowClass(
                 id,
@@ -363,7 +363,7 @@ function Block({
               <button
                 key={c.label}
                 ref={ctx.anchor(id)}
-                data-row
+                data-row={id}
                 onClick={() => ctx.onTrace(id)}
                 title={c.note}
                 className={cn(
@@ -403,7 +403,7 @@ function Block({
             <div key={m.from} className="border-b border-border-gray last:border-b-0">
               <button
                 ref={ctx.anchor(id)}
-                data-row
+                data-row={id}
                 // A row that has somewhere to go opens it; one that does not
                 // keeps tracing. The same click does the thing the row can
                 // actually do, so there is no dead affordance either way.
@@ -497,7 +497,7 @@ function Block({
                 <button
                   key={p.label}
                   ref={ctx.anchor(id)}
-                  data-row
+                  data-row={id}
                   onClick={() => ctx.onTrace(id)}
                   title={`${p.label} — ${p.display}`}
                   // Floored at 6%: a slice worth naming has to be visible, and
@@ -589,7 +589,7 @@ function Block({
               <button
                 key={b.label}
                 ref={ctx.anchor(id)}
-                data-row
+                data-row={id}
                 onClick={() => ctx.onTrace(id)}
                 className={rowClass(id, ctx, cn(PAIR_SCOPE, "rounded-[5px]"))}
               >
@@ -667,7 +667,7 @@ function Block({
               </div>
               <button
                 ref={ctx.anchor(id)}
-                data-row
+                data-row={id}
                 // See the map row above: the click must not reach the card.
                 onClick={(e) => {
                   if (!s.under) return ctx.onTrace(id);
@@ -760,7 +760,7 @@ function Facts({
           <button
             key={p.label}
             ref={ctx.anchor(id)}
-            data-row
+            data-row={id}
             onClick={() => ctx.onTrace(id)}
             className={rowClass(
               id,
@@ -860,25 +860,15 @@ export function SourceView({
   /**
    * One read of the repository, resolved to what the UI should show.
    *
-   * Pure apart from the fetch: it sets no state, which is what lets the effect
+   * Pure apart from the read: it sets no state, which is what lets the effect
    * below subscribe to it rather than call setState in its own body.
    */
   const read = useCallback(
-    async (signal?: AbortSignal) => {
-      const q = new URLSearchParams({
-        file: block.file,
-        start: String(block.start),
-        end: String(end),
-        fixture: quoted,
-      });
+    async () => {
       try {
-        const res = await fetch(`/api/source?${q}`, { signal });
-        const body = await res.json();
-        return res.ok
-          ? { slice: body as Slice, failed: null }
-          : { slice: null, failed: (body.refused as string) ?? "unreadable" };
-      } catch {
-        return { slice: null, failed: "unreachable" };
+        return { slice: await readSlice({ file: block.file, start: block.start, end }, quoted), failed: null };
+      } catch (e) {
+        return { slice: null, failed: e instanceof Refused ? e.message : "unreachable" };
       }
     },
     [block.file, block.start, end, quoted],
@@ -888,7 +878,7 @@ export function SourceView({
   // one source block can never land as the state of a different one.
   useEffect(() => {
     const ac = new AbortController();
-    read(ac.signal).then((r) => {
+    read().then((r) => {
       if (ac.signal.aborted) return;
       setSlice(r.slice);
       setFailed(r.failed);
@@ -905,20 +895,15 @@ export function SourceView({
   // reached from the save button's own handler. Never a blur, never a timer,
   // never navigation.
   async function save() {
-    const res = await fetch("/api/source", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        file: block.file,
-        start: block.start,
-        end,
-        code: draft,
-        // What we read is what we claim is there. A write built on anything
-        // else is the stale-read clobber the contract exists to refuse.
-        expected: shown,
-      }),
+    const body = await writeSlice({
+      file: block.file,
+      start: block.start,
+      end,
+      code: draft,
+      // What we read is what we claim is there. A write built on anything
+      // else is the stale-read clobber the contract exists to refuse.
+      expected: shown,
     });
-    const body = (await res.json()) as WriteResult;
     setSaved(body);
     if (body.ok) {
       setEditing(false);
@@ -932,6 +917,8 @@ export function SourceView({
 
   return (
     <div
+      data-pick={`${block.file}:${block.start}`}
+      data-pick-code={`${block.file}:${block.start}-${end}`}
       className={cn(
         "overflow-hidden rounded-[10px] border bg-pure-white",
         drifted ? "border-amber-line" : isLit ? "border-deep-green" : "border-border-gray",
@@ -945,7 +932,7 @@ export function SourceView({
       >
         <button
           ref={ctx.anchor(id)}
-          data-row
+          data-row={id}
           onClick={() => ctx.onTrace(id)}
           className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2 rounded-[5px]")}
         >

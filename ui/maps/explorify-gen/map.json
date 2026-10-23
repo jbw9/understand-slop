@@ -1,0 +1,6251 @@
+{
+ "RUN": {
+  "command": "understand-slop map explorify",
+  "repo": "explorify",
+  "about": "Cut by the life of a campus event — both account types sign up first, then individuals discover and join events while organizations manage and create them.",
+  "commit": "304a512",
+  "files": 131,
+  "elapsed": "23 min",
+  "root": "/Users/jonathanmacmini/Desktop/Code/explorify",
+  "models": {
+   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+   "cut": "global.anthropic.claude-opus-4-6-v1",
+   "author": "global.anthropic.claude-opus-4-6-v1",
+   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+ },
+ "AUTHORED": [
+  {
+   "id": "signing-up",
+   "title": "Signing Up",
+   "sub": "Login, registration with OTP email verification, password reset, and campus selection for both individual and organization accounts",
+   "footprint": {
+    "dirs": [
+     "app/(auth)"
+    ],
+    "files": 5
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Four independent auth screens reachable from login; the user takes one path"
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "supabase",
+     "expo"
+    ]
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 0,
+   "detail": "An alert on the login screen picks the account type. Both registration flows create a Supabase auth user with a temporary password to trigger an OTP email, then replace it after verification.",
+   "code": [
+    {
+     "file": "app/(auth)/login.tsx",
+     "start": 134,
+     "end": 150,
+     "label": "Alert that branches to individual or org registration"
+    },
+    {
+     "file": "app/(auth)/registerIndividual.tsx",
+     "start": 57,
+     "end": 87,
+     "label": "Temp-password signup triggers OTP email (individual)"
+    },
+    {
+     "file": "app/(auth)/registerOrg.tsx",
+     "start": 46,
+     "end": 76,
+     "label": "Temp-password signup triggers OTP email (org)"
+    },
+    {
+     "file": "lib/supabase.ts",
+     "start": 5,
+     "end": 16,
+     "label": "Supabase client with AsyncStorage-backed sessions"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Auth screens and the tables each one writes to",
+     "boxes": [
+      {
+       "id": "login",
+       "label": "Login Screen",
+       "sub": "email + password sign-in",
+       "col": 1,
+       "row": 0,
+       "opens": "su-login"
+      },
+      {
+       "id": "reg-ind",
+       "label": "Individual Reg",
+       "sub": "5-stage flow",
+       "col": 0,
+       "row": 1,
+       "opens": "su-reg-individual"
+      },
+      {
+       "id": "reset",
+       "label": "Password Reset",
+       "sub": "2-step OTP flow",
+       "col": 1,
+       "row": 1,
+       "opens": "su-reset"
+      },
+      {
+       "id": "reg-org",
+       "label": "Organisation Reg",
+       "sub": "5-stage flow",
+       "col": 2,
+       "row": 1,
+       "opens": "su-reg-org"
+      },
+      {
+       "id": "ind-table",
+       "label": "individual table",
+       "sub": "profile row",
+       "col": 0,
+       "row": 2
+      },
+      {
+       "id": "org-table",
+       "label": "organizations table",
+       "sub": "profile row",
+       "col": 2,
+       "row": 2,
+       "tone": "warn"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "login",
+       "to": "reg-ind",
+       "label": "sign up",
+       "at": "app/(auth)/login.tsx:145"
+      },
+      {
+       "from": "login",
+       "to": "reg-org",
+       "label": "sign up",
+       "at": "app/(auth)/login.tsx:141"
+      },
+      {
+       "from": "login",
+       "to": "reset",
+       "label": "forgot password",
+       "at": "app/(auth)/login.tsx:127"
+      },
+      {
+       "from": "reg-ind",
+       "to": "ind-table",
+       "label": "inserts profile",
+       "at": "app/(auth)/registerIndividual.tsx:129"
+      },
+      {
+       "from": "reg-org",
+       "to": "org-table",
+       "label": "inserts profile",
+       "at": "app/(auth)/registerOrg.tsx:118"
+      },
+      {
+       "from": "reset",
+       "to": "org-table",
+       "label": "plaintext pwd",
+       "tone": "warn",
+       "at": "app/(auth)/resetPassword.tsx:161"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "What each auth flow writes",
+     "columns": [
+      "Flow",
+      "Supabase Auth",
+      "Database table",
+      "AsyncStorage"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "Login",
+       "signInWithPassword",
+       "reads individual or organizations",
+       "uuid, user profile"
+      ],
+      [
+       "Register individual",
+       "signUp + verifyOtp + updateUser",
+       "inserts into individual",
+       "uuid, user, events"
+      ],
+      [
+       "Register org",
+       "signUp + verifyOtp + updateUser",
+       "inserts into organizations",
+       "uuid, user, events"
+      ],
+      [
+       "Reset password",
+       "resetPasswordForEmail + verifyOtp + updateUser",
+       "updates organizations.password (plaintext)",
+       "—"
+      ]
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Campus selection screen is dead code",
+     "detail": "`CampusSelectionScreen` is exported but never imported anywhere in the codebase. After org registration the profile has no campus, yet both flows hardcode `fetchAllEvents(\"UIUC\")`.",
+     "where": "app/(auth)/campusSelection.tsx:134"
+    }
+   ],
+   "children": [
+    {
+     "id": "su-login",
+     "title": "Login Screen",
+     "sub": "Email and password sign-in that routes to the correct dashboard based on account type",
+     "footprint": {
+      "dirs": [
+       "app/(auth)/login.tsx"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "After Supabase authentication, queries the `individual` table first; if no row, queries `organizations`. The matching profile is cached in AsyncStorage before routing to `/individual` or `/org`.",
+     "code": [
+      {
+       "file": "app/(auth)/login.tsx",
+       "start": 39,
+       "end": 124,
+       "label": "signInWithEmail: authenticate then route by account type"
+      },
+      {
+       "file": "app/(auth)/login.tsx",
+       "start": 134,
+       "end": 150,
+       "label": "showSignUpTypeAlert: alert choosing org or individual"
+      },
+      {
+       "file": "app/(auth)/login.tsx",
+       "start": 152,
+       "end": 235,
+       "label": "Login form JSX with email, password, and links"
+      },
+      {
+       "file": "app/(auth)/login.tsx",
+       "start": 24,
+       "end": 30,
+       "label": "AppState listener: auto-refresh Supabase token"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Login",
+       "caption": "The first screen a returning user sees",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Welcome back!"
+        },
+        {
+         "type": "field",
+         "label": "Email",
+         "note": "email-address keyboard, auto-capitalize off"
+        },
+        {
+         "type": "field",
+         "label": "Password",
+         "note": "secure entry with eye toggle"
+        },
+        {
+         "type": "button",
+         "label": "Forgot password",
+         "note": "navigates to resetPassword screen"
+        },
+        {
+         "type": "button",
+         "label": "Login",
+         "note": "calls signInWithEmail"
+        },
+        {
+         "type": "button",
+         "label": "Don't have an account? Sign Up",
+         "note": "shows alert: Organisation or Individual"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "What happens when Login is tapped",
+       "actors": [
+        "Phone",
+        "Supabase",
+        "AsyncStorage"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "signInWithPassword(email, password)",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "AsyncStorage",
+         "label": "stores user.id as 'uuid'",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "select * from individual where id = user.id",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "if not found: select * from organizations",
+         "note": "error code PGRST116 means no rows, not a real error",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "AsyncStorage",
+         "label": "stores matching profile row as 'user'",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "fetchUserProfileIndividual or fetchUserProfileOrg",
+         "note": "re-reads and caches the same profile again",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Fetches all columns including plaintext password",
+       "detail": "`select(\"*\")` on the organizations table returns every column. After a password reset writes the new password in plaintext to the `password` column, login fetches it and caches it in AsyncStorage.",
+       "where": "app/(auth)/login.tsx:90"
+      }
+     ]
+    },
+    {
+     "id": "su-reg-individual",
+     "title": "Individual Registration",
+     "sub": "Five-stage sign-up: name, email, OTP verification, password, and interest selection",
+     "footprint": {
+      "dirs": [
+       "app/(auth)/registerIndividual.tsx"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "Creates a Supabase auth user with a random temporary password to trigger the OTP email, then replaces that password after verification. The profile row is inserted into `individual` with the user's chosen interests.",
+     "code": [
+      {
+       "file": "app/(auth)/registerIndividual.tsx",
+       "start": 57,
+       "end": 83,
+       "label": "sendOTP: signs up with temp password to trigger email"
+      },
+      {
+       "file": "app/(auth)/registerIndividual.tsx",
+       "start": 89,
+       "end": 112,
+       "label": "verifyOTP: confirms 6-digit code, stores session"
+      },
+      {
+       "file": "app/(auth)/registerIndividual.tsx",
+       "start": 114,
+       "end": 175,
+       "label": "signUpWithEmail: replaces password, creates profile, navigates"
+      },
+      {
+       "file": "app/(auth)/registerIndividual.tsx",
+       "start": 451,
+       "end": 459,
+       "label": "5-segment progress bar at the top of every stage"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Full name",
+         "detail": "Text input; Continue button disabled until the field is non-empty.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Email address",
+         "detail": "Pressing Send Verification Code calls `sendOTP`, which creates a Supabase auth user with a random temporary password. Supabase emails the OTP.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "OTP verification",
+         "detail": "6-digit code input. `verifyOtp` confirms it and stores the session and user id in AsyncStorage.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Set password",
+         "detail": "Must be 8+ characters with at least one uppercase letter and one digit. The real password replaces the temp one via `updateUser`.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Interest selection",
+         "detail": "Pick 2–5 from 8 categories. Completing calls `signUpWithEmail`, which inserts the `individual` profile row and navigates to `/individual`.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "The 8 interest categories (shared with org registration)",
+       "rows": [
+        {
+         "label": "Social 👫",
+         "state": "derived"
+        },
+        {
+         "label": "Cultural 🎭",
+         "state": "derived"
+        },
+        {
+         "label": "STEM 🔬",
+         "state": "derived"
+        },
+        {
+         "label": "Sports & Recreation 🎯",
+         "state": "derived"
+        },
+        {
+         "label": "Business, Law & Policy 🏛️",
+         "state": "derived"
+        },
+        {
+         "label": "Education & Social Service 🎓",
+         "state": "derived"
+        },
+        {
+         "label": "Religion & Philosophy 🤔",
+         "state": "derived"
+        },
+        {
+         "label": "Health & Wellbeing 💪",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Supabase calls across the five stages",
+       "actors": [
+        "Phone",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "auth.signUp with temp password",
+         "note": "triggers OTP email to the address",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "auth.verifyOtp(email, token, 'signup')",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "session with user id",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "auth.updateUser({ password })",
+         "note": "replaces the temp password",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "insert into individual table",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "fetchAllEvents('UIUC')",
+         "note": "campus is hardcoded",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "screen",
+       "title": "Stage 5: Interests",
+       "caption": "The final registration step before the profile is created",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Let's select your interests"
+        },
+        {
+         "type": "text",
+         "label": "Select up to 5 categories to proceed"
+        },
+        {
+         "type": "list",
+         "label": "8 category chips",
+         "note": "tap to toggle; selected chips turn accent blue"
+        },
+        {
+         "type": "button",
+         "label": "Complete Registration",
+         "note": "enabled only when 2–5 categories selected"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Unused interestsList shadows real categories",
+       "detail": "Lines 29–38 define a local `interestsList` that is never referenced. Stage 5 renders from the `categories` import instead, which has different labels. Editing the wrong list has no effect.",
+       "where": "app/(auth)/registerIndividual.tsx:29"
+      },
+      {
+       "title": "Events fetched only for UIUC",
+       "detail": "`fetchAllEvents(\"UIUC\")` is hardcoded. Individual users at any other campus see no events after registration.",
+       "where": "app/(auth)/registerIndividual.tsx:161"
+      }
+     ]
+    },
+    {
+     "id": "su-reg-org",
+     "title": "Organisation Registration",
+     "sub": "Five-stage sign-up: org name, email, OTP verification, password, and category selection",
+     "footprint": {
+      "dirs": [
+       "app/(auth)/registerOrg.tsx"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Nearly identical to individual registration: same OTP + temp-password mechanism and same 8 categories. The profile row goes into `organizations` with `org_name` and `type` instead of `full_name` and `interests`.",
+     "code": [
+      {
+       "file": "app/(auth)/registerOrg.tsx",
+       "start": 46,
+       "end": 76,
+       "label": "sendOTP: signs up with temp password to trigger email"
+      },
+      {
+       "file": "app/(auth)/registerOrg.tsx",
+       "start": 78,
+       "end": 101,
+       "label": "verifyOTP: confirms code, stores session and uuid"
+      },
+      {
+       "file": "app/(auth)/registerOrg.tsx",
+       "start": 103,
+       "end": 164,
+       "label": "signUpWithEmail: creates org profile, navigates to /org"
+      },
+      {
+       "file": "app/(auth)/registerOrg.tsx",
+       "start": 187,
+       "end": 420,
+       "label": "renderStage: UI for all 5 stages"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Organisation name",
+         "detail": "Text input for the official org name; Continue is disabled until non-empty.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Organisation email",
+         "detail": "Pressing Send Verification Code calls `sendOTP` — same temp-password mechanism as individual registration.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "OTP verification",
+         "detail": "6-digit code; identical `verifyOtp` call as the individual flow.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Set password",
+         "detail": "Same validation: 8+ characters, one uppercase, one digit.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Category selection",
+         "detail": "Pick 2–5 from the same 8 categories. Completing inserts into `organizations` and navigates to `/org`.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Profile row inserted into the organizations table",
+       "columns": [
+        "Column",
+        "Source"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "id",
+         "session.user.id from OTP verification"
+        ],
+        [
+         "email",
+         "Typed in stage 2"
+        ],
+        [
+         "org_name",
+         "Typed in stage 1"
+        ],
+        [
+         "type",
+         "Array of selected category values (2–5)"
+        ]
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Supabase calls across the five stages",
+       "actors": [
+        "Phone",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "auth.signUp with temp password",
+         "note": "triggers OTP email",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "auth.verifyOtp(email, token, 'signup')",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "session with user id",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "auth.updateUser({ password })",
+         "note": "replaces temp password",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "insert into organizations table",
+         "note": "no campus column set",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "fetchAllEvents('UIUC')",
+         "note": "campus is hardcoded",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Events fetched only for UIUC",
+       "detail": "`fetchAllEvents(\"UIUC\")` is hardcoded. Organisations at any other campus see no events after registration.",
+       "where": "app/(auth)/registerOrg.tsx:150"
+      },
+      {
+       "title": "Campus selection never happens",
+       "detail": "A `CampusSelectionScreen` component exists in `campusSelection.tsx` and writes to `organizations.campus`, but it is never imported. After registration the org has no campus set.",
+       "where": "app/(auth)/campusSelection.tsx:38"
+      }
+     ]
+    },
+    {
+     "id": "su-reset",
+     "title": "Password Reset",
+     "sub": "Two-step OTP flow to reset a forgotten password for either account type",
+     "footprint": {
+      "dirs": [
+       "app/(auth)/resetPassword.tsx"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "Checks both tables to find the account type. For organisation accounts, the new password is also written in plaintext to the `organizations` table's `password` column.",
+     "code": [
+      {
+       "file": "app/(auth)/resetPassword.tsx",
+       "start": 35,
+       "end": 75,
+       "label": "checkUserExists: queries both tables to find account type"
+      },
+      {
+       "file": "app/(auth)/resetPassword.tsx",
+       "start": 77,
+       "end": 111,
+       "label": "sendOTP: validates email, checks existence, sends reset email"
+      },
+      {
+       "file": "app/(auth)/resetPassword.tsx",
+       "start": 113,
+       "end": 180,
+       "label": "verifyOTPAndResetPassword: verifies OTP, updates auth and org table"
+      },
+      {
+       "file": "app/(auth)/resetPassword.tsx",
+       "start": 194,
+       "end": 274,
+       "label": "renderStep: UI for both steps"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Enter email",
+         "detail": "The email is looked up in `individual` then `organizations` to confirm the account exists and record its type.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "OTP and new password",
+         "detail": "User enters the emailed OTP and a new password. Calls `verifyOtp`, then `updateUser`, then for orgs writes plaintext to the table, then navigates to login.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Calls during step 2 for an organisation account",
+       "actors": [
+        "Phone",
+        "Supabase Auth",
+        "organizations table"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase Auth",
+         "label": "verifyOtp(email, token, 'recovery')",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase Auth",
+         "label": "updateUser({ password: newPassword })",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "organizations table",
+         "label": "update set password = newPassword",
+         "note": "plaintext — not hashed",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "screen",
+       "title": "Step 1: Email",
+       "caption": "Password reset entry screen",
+       "items": [
+        {
+         "type": "button",
+         "label": "← Back",
+         "note": "returns to login or to step 1"
+        },
+        {
+         "type": "text",
+         "label": "Progress bar (2 segments)",
+         "note": "current step highlighted in accent"
+        },
+        {
+         "type": "heading",
+         "label": "What's your email address?"
+        },
+        {
+         "type": "field",
+         "label": "Email",
+         "note": "email-address keyboard"
+        },
+        {
+         "type": "button",
+         "label": "Send OTP",
+         "note": "disabled until email is entered"
+        }
+       ]
+      },
+      {
+       "kind": "screen",
+       "title": "Step 2: OTP + New Password",
+       "caption": "After the OTP email is sent",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Enter OTP and New Password"
+        },
+        {
+         "type": "field",
+         "label": "OTP code",
+         "note": "numeric keyboard"
+        },
+        {
+         "type": "field",
+         "label": "New Password",
+         "note": "secure entry with eye toggle"
+        },
+        {
+         "type": "button",
+         "label": "Reset Password",
+         "note": "disabled until both fields filled"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Plaintext password stored in organisations table",
+       "detail": "For organisation accounts, the new password is written unhashed to the `password` column of `organizations`. On subsequent login, `select(\"*\")` fetches it into the phone and AsyncStorage.",
+       "where": "app/(auth)/resetPassword.tsx:161"
+      },
+      {
+       "title": "No password strength check on reset",
+       "detail": "Unlike registration, the reset screen accepts any non-empty password with no check for length, uppercase, or digit. A user can set a one-character password.",
+       "where": "app/(auth)/resetPassword.tsx:265"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "finding-events",
+   "title": "Finding Events",
+   "sub": "Individual user's home feed, personalised recommendations, search with category filters, event details, RSVP flow, bookmarking, and saved-events tab",
+   "state": "derived",
+   "col": 0,
+   "row": 1,
+   "detail": "After login the individual lands on a home screen filtered by campus, discovers events through recommendations and search, opens event details, joins via an RSVP drawer, and bookmarks for later in the saved tab.",
+   "footprint": {
+    "dirs": [
+     "app/individual/index/",
+     "app/individual/saved/",
+     "app/individual/_layout.tsx"
+    ],
+    "files": 22
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "supabase",
+     "expo"
+    ]
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Screens the user reaches in any order; the home feed is the entry point but the saved tab is always one tap away."
+   },
+   "code": [
+    {
+     "file": "app/individual/_layout.tsx",
+     "start": 9,
+     "end": 58,
+     "label": "Tab layout: saved, home, account with Twitter-blue active color"
+    },
+    {
+     "file": "app/individual/index/_layout.tsx",
+     "start": 3,
+     "end": 11,
+     "label": "Index stack navigator, header hidden"
+    },
+    {
+     "file": "app/individual/index/components/eventContext.tsx",
+     "start": 17,
+     "end": 67,
+     "label": "EventProvider wrapping all individual screens"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the individual navigates between screens and where data is stored",
+     "boxes": [
+      {
+       "id": "home",
+       "label": "Home Screen",
+       "sub": "greeting, campus, two lists",
+       "col": 0,
+       "row": 0,
+       "opens": "fe-home"
+      },
+      {
+       "id": "search",
+       "label": "Search Screen",
+       "sub": "text + category filters",
+       "col": 1,
+       "row": 0,
+       "opens": "fe-search"
+      },
+      {
+       "id": "saved",
+       "label": "Saved Tab",
+       "sub": "RSVP'd + bookmarked lists",
+       "col": 2,
+       "row": 0,
+       "opens": "fe-saved"
+      },
+      {
+       "id": "details",
+       "label": "Event Details",
+       "sub": "full event page + Join",
+       "col": 1,
+       "row": 1,
+       "opens": "fe-details"
+      },
+      {
+       "id": "rsvp",
+       "label": "RSVP Drawer",
+       "sub": "form + swipe confirm",
+       "col": 2,
+       "row": 1,
+       "opens": "fe-rsvp"
+      },
+      {
+       "id": "events-tbl",
+       "label": "events table",
+       "sub": "rsvp stored as JSON text",
+       "col": 0,
+       "row": 2
+      },
+      {
+       "id": "indiv-tbl",
+       "label": "individual table",
+       "sub": "rsvp + saved_events arrays",
+       "col": 2,
+       "row": 2
+      }
+     ],
+     "arrows": [
+      {
+       "from": "home",
+       "to": "search",
+       "label": "tap search bar",
+       "at": "app/individual/index/index.tsx:57"
+      },
+      {
+       "from": "home",
+       "to": "details",
+       "label": "tap event",
+       "at": "app/individual/index/components/upcoming.tsx:43"
+      },
+      {
+       "from": "search",
+       "to": "details",
+       "label": "tap event",
+       "at": "app/individual/index/search.tsx:75"
+      },
+      {
+       "from": "saved",
+       "to": "details",
+       "label": "tap event",
+       "at": "app/individual/saved/index.tsx:111"
+      },
+      {
+       "from": "details",
+       "to": "rsvp",
+       "label": "tap Join",
+       "at": "app/individual/index/eventdetails.tsx:221"
+      },
+      {
+       "from": "rsvp",
+       "to": "events-tbl",
+       "label": "writes rsvp JSON",
+       "at": "app/individual/index/components/rsvpDrawer.tsx:168"
+      },
+      {
+       "from": "rsvp",
+       "to": "indiv-tbl",
+       "label": "adds event id",
+       "at": "app/individual/index/components/rsvpDrawer.tsx:213"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Cancel from saved tab calls .includes() on an object",
+     "detail": "Two cancel implementations parse the events.rsvp JSON object and call `.includes()` on it. Objects do not have this method, so cancel throws a TypeError whenever the event has RSVP data. The user's entry is never removed from the event.",
+     "where": "app/individual/saved/index.tsx:127"
+    },
+    {
+     "title": "Every student downloads every guest list",
+     "detail": "fetchAllEvents uses select('*') and caches the result in AsyncStorage. Every student's phone receives names, emails, and user ids of everyone who joined any event on their campus.",
+     "where": "lib/localStorage.ts:51"
+    }
+   ],
+   "children": [
+    {
+     "id": "fe-home",
+     "title": "Home Feed",
+     "sub": "Personalised greeting, campus selector, and two event lists",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Loads the user profile from AsyncStorage, auto-detects the nearest campus via GPS, then fetches all published events for that campus and renders a 'You Might Like' carousel and an 'Upcoming Events' list.",
+     "footprint": {
+      "dirs": [
+       "app/individual/index/index.tsx",
+       "app/individual/index/components/"
+      ],
+      "files": 6
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Sections of the home screen rendered together on load."
+     },
+     "code": [
+      {
+       "file": "app/individual/index/index.tsx",
+       "start": 38,
+       "end": 71,
+       "label": "HomeScreen state, refreshEvents, and data fetching"
+      },
+      {
+       "file": "app/individual/index/index.tsx",
+       "start": 299,
+       "end": 402,
+       "label": "Home screen JSX: greeting, search bar, event lists, campus drawer"
+      },
+      {
+       "file": "lib/localStorage.ts",
+       "start": 42,
+       "end": 76,
+       "label": "fetchAllEvents: queries Supabase by campus, caches in AsyncStorage"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Home Screen",
+       "caption": "What the individual sees on the home tab",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Hello, Maya!",
+         "note": "first name from AsyncStorage profile"
+        },
+        {
+         "type": "choice",
+         "label": "Exploring events at UIUC ▾",
+         "note": "tap opens campus drawer; defaults to GPS nearest"
+        },
+        {
+         "type": "field",
+         "label": "Search for an event...",
+         "note": "tap navigates to search screen, not a real input"
+        },
+        {
+         "type": "list",
+         "label": "You Might Like",
+         "note": "horizontal carousel of scored events, max 8"
+        },
+        {
+         "type": "list",
+         "label": "Upcoming Events",
+         "note": "vertical list of chronological events, max 8"
+        }
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "Data sources that populate the home screen",
+       "boxes": [
+        {
+         "id": "gps",
+         "label": "GPS Location",
+         "sub": "nearest of 60 universities",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "campus-drawer",
+         "label": "Campus Drawer",
+         "sub": "manual override",
+         "col": 1,
+         "row": 0,
+         "opens": "fe-campus"
+        },
+        {
+         "id": "fetch-events",
+         "label": "fetchAllEvents",
+         "sub": "Supabase → AsyncStorage",
+         "col": 0,
+         "row": 1
+        },
+        {
+         "id": "yml-comp",
+         "label": "You Might Like",
+         "sub": "scored + sorted carousel",
+         "col": 0,
+         "row": 2,
+         "opens": "fe-recommend"
+        },
+        {
+         "id": "upcoming-comp",
+         "label": "Upcoming Events",
+         "sub": "chronological list",
+         "col": 1,
+         "row": 2,
+         "opens": "fe-upcoming"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "gps",
+         "to": "fetch-events",
+         "label": "nearest campus name",
+         "at": "app/individual/index/index.tsx:169"
+        },
+        {
+         "from": "campus-drawer",
+         "to": "fetch-events",
+         "label": "selected campus",
+         "at": "app/individual/index/index.tsx:82"
+        },
+        {
+         "from": "fetch-events",
+         "to": "yml-comp",
+         "label": "events array",
+         "at": "app/individual/index/index.tsx:386"
+        },
+        {
+         "from": "fetch-events",
+         "to": "upcoming-comp",
+         "label": "events array",
+         "at": "app/individual/index/index.tsx:390"
+        }
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "fe-campus",
+       "title": "Campus Selection",
+       "sub": "Auto-detect nearest university by GPS or pick from a searchable drawer",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "On first load requests location permission and computes haversine distance to each of 60 hardcoded US universities. The user can override with a searchable campus drawer that re-fetches events for the new campus.",
+       "code": [
+        {
+         "file": "app/individual/index/index.tsx",
+         "start": 130,
+         "end": 173,
+         "label": "GPS request and nearest-university calculation"
+        },
+        {
+         "file": "app/individual/index/index.tsx",
+         "start": 179,
+         "end": 192,
+         "label": "Haversine distance formula"
+        },
+        {
+         "file": "app/individual/index/index.tsx",
+         "start": 73,
+         "end": 91,
+         "label": "updateCampus: sets campus and triggers event refresh"
+        },
+        {
+         "file": "app/individual/index/components/universityList.tsx",
+         "start": 1,
+         "end": 7,
+         "label": "First entries of the 60-university list"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Request permission",
+           "detail": "Calls Location.requestForegroundPermissionsAsync(). If denied, shows alert offering manual selection.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Get current position",
+           "detail": "Location.getCurrentPositionAsync() returns user's lat/lon.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Find nearest campus",
+           "detail": "Computes haversine distance to all 60 universities and picks the smallest.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Fetch events for campus",
+           "detail": "Calls fetchAllEvents(campusName) which queries Supabase for published events at that campus and caches in AsyncStorage.",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "fe-recommend",
+       "title": "Recommendations",
+       "sub": "Scores each campus event by interest match, proximity, timing, and attendance",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "`filterAndScoreEvents` assigns a numeric score to each future event and sorts descending. The top 8 appear in a horizontal carousel where each card also fetches its own attendee avatars.",
+       "code": [
+        {
+         "file": "app/individual/index/components/youmightlike.tsx",
+         "start": 48,
+         "end": 90,
+         "label": "Scoring algorithm: interests, timing, attendance, location, time of day"
+        },
+        {
+         "file": "app/individual/index/components/youmightlike.tsx",
+         "start": 131,
+         "end": 164,
+         "label": "EventItem fetchAttendees: per-card Supabase query for RSVP and avatars"
+        },
+        {
+         "file": "app/individual/index/components/youmightlike.tsx",
+         "start": 171,
+         "end": 203,
+         "label": "renderAttendees: up to 3 avatars plus +N badge"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "table",
+         "caption": "Scoring factors and their point weights",
+         "columns": [
+          "Factor",
+          "Condition",
+          "Points"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "Interest match",
+           "event types ∩ user interests / total interests",
+           "up to 5"
+          ],
+          [
+           "Timing ≤ 7 days",
+           "event is within 7 days",
+           "+3"
+          ],
+          [
+           "Timing ≤ 14 days",
+           "event is within 14 days",
+           "+2"
+          ],
+          [
+           "Timing ≤ 30 days",
+           "event is within 30 days",
+           "+1"
+          ],
+          [
+           "Popular ≥ 10",
+           "10 or more RSVPs",
+           "+2"
+          ],
+          [
+           "Popular ≥ 5",
+           "5 or more RSVPs",
+           "+1"
+          ],
+          [
+           "Same city",
+           "event location mentions user's city",
+           "+2"
+          ],
+          [
+           "Evening event",
+           "start hour 18–21",
+           "+1"
+          ]
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Each carousel card fires its own Supabase query",
+         "detail": "Every EventItem runs fetchAttendees on mount, querying the events then individual tables. With 8 visible cards this is 16 Supabase calls just for the carousel's attendee avatars.",
+         "where": "app/individual/index/components/youmightlike.tsx:166"
+        }
+       ]
+      },
+      {
+       "id": "fe-upcoming",
+       "title": "Upcoming Events",
+       "sub": "Chronological list of up to 8 upcoming events with Join and Save buttons",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "Receives the events array from the home screen, shows the first 8 as cards with thumbnail, date badge, name, location, time, and Join/Save buttons. A 'View more' link navigates to the full list.",
+       "code": [
+        {
+         "file": "app/individual/index/components/upcoming.tsx",
+         "start": 38,
+         "end": 51,
+         "label": "UpcomingEvents: limit to 8, navigation handlers"
+        },
+        {
+         "file": "app/individual/index/components/upcoming.tsx",
+         "start": 81,
+         "end": 100,
+         "label": "renderItem: event card layout with thumbnail and actions"
+        },
+        {
+         "file": "app/individual/index/allUpcoming.tsx",
+         "start": 35,
+         "end": 49,
+         "label": "AllUpcoming: full scrollable list with same card layout"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "fe-search",
+     "title": "Searching Events",
+     "sub": "Text search and category filters on cached campus events",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "Reads events from AsyncStorage (not live from Supabase), enriches each with its organizer name via a per-event Supabase query, then filters by text and selected category chips.",
+     "footprint": {
+      "dirs": [
+       "app/individual/index/search.tsx",
+       "app/individual/index/data/categories.ts"
+      ],
+      "files": 2
+     },
+     "code": [
+      {
+       "file": "app/individual/index/search.tsx",
+       "start": 48,
+       "end": 62,
+       "label": "fetchEvents: reads AsyncStorage, enriches each event with org name from Supabase"
+      },
+      {
+       "file": "app/individual/index/search.tsx",
+       "start": 113,
+       "end": 132,
+       "label": "filterEvents: text query and selected categories filtering"
+      },
+      {
+       "file": "app/individual/index/data/categories.ts",
+       "start": 1,
+       "end": 10,
+       "label": "8 category options with emoji labels"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Search Screen",
+       "caption": "Search with category filters and event grid",
+       "items": [
+        {
+         "type": "button",
+         "label": "← Back",
+         "note": "returns to home"
+        },
+        {
+         "type": "field",
+         "label": "Search for an event...",
+         "note": "auto-focused; matches name, description, location, organizer"
+        },
+        {
+         "type": "list",
+         "label": "Category chips",
+         "note": "multi-select toggle; 8 categories with emoji"
+        },
+        {
+         "type": "list",
+         "label": "Event cards grid",
+         "note": "two-column grid; each shows thumbnail, date, location, time, Join/Save"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Event categories available as filters",
+       "rows": [
+        {
+         "label": "Social 👫",
+         "state": "derived"
+        },
+        {
+         "label": "Cultural 🎭",
+         "state": "derived"
+        },
+        {
+         "label": "STEM 🔬",
+         "state": "derived"
+        },
+        {
+         "label": "Sports & Recreation 🎯",
+         "state": "derived"
+        },
+        {
+         "label": "Business, Law & Policy 🏛️",
+         "state": "derived"
+        },
+        {
+         "label": "Education & Social Service 🎓",
+         "state": "derived"
+        },
+        {
+         "label": "Religion & Philosophy 🤔",
+         "state": "derived"
+        },
+        {
+         "label": "Health & Wellbeing 💪",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "One Supabase query per event on every focus",
+       "detail": "fetchEvents makes a separate select from the organizations table for every cached event to get the org name. A campus with 100 events fires 100 individual queries each time the search screen gains focus.",
+       "where": "app/individual/index/search.tsx:53"
+      }
+     ]
+    },
+    {
+     "id": "fe-details",
+     "title": "Event Details",
+     "sub": "Full event page with organizer, attendees, map link, and Join button",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Opens from any event card. Fetches the event's RSVP data and attendee avatars, the organizer profile, and renders a scrollable page with a fixed Join/Cancel button at the bottom.",
+     "footprint": {
+      "dirs": [
+       "app/individual/index/eventdetails.tsx",
+       "app/individual/index/attendees.tsx"
+      ],
+      "files": 2
+     },
+     "code": [
+      {
+       "file": "app/individual/index/eventdetails.tsx",
+       "start": 135,
+       "end": 176,
+       "label": "fetchAttendees: parse rsvp JSON, fetch individual avatars"
+      },
+      {
+       "file": "app/individual/index/eventdetails.tsx",
+       "start": 178,
+       "end": 196,
+       "label": "fetchOrganizationProfile from organizations table"
+      },
+      {
+       "file": "app/individual/index/eventdetails.tsx",
+       "start": 80,
+       "end": 108,
+       "label": "openMap: Apple Maps on iOS, Google Maps on Android"
+      },
+      {
+       "file": "app/individual/index/eventdetails.tsx",
+       "start": 345,
+       "end": 420,
+       "label": "JSX: header, thumbnail, type tags, location, date/time"
+      },
+      {
+       "file": "app/individual/index/eventdetails.tsx",
+       "start": 495,
+       "end": 537,
+       "label": "Attendees section and fixed Join/Cancel button"
+      },
+      {
+       "file": "app/individual/index/attendees.tsx",
+       "start": 43,
+       "end": 108,
+       "label": "AttendeesList: full list with avatar, name, party size"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Event Details",
+       "caption": "A published event opened from any list",
+       "items": [
+        {
+         "type": "button",
+         "label": "← Back / Bookmark",
+         "note": "back returns to home; bookmark at top right"
+        },
+        {
+         "type": "heading",
+         "label": "Event Name"
+        },
+        {
+         "type": "image",
+         "label": "Thumbnail, full width"
+        },
+        {
+         "type": "list",
+         "label": "Category chips",
+         "note": "e.g. Social, STEM"
+        },
+        {
+         "type": "text",
+         "label": "📍 Location, Room Number",
+         "note": "tap opens native map app"
+        },
+        {
+         "type": "text",
+         "label": "📅 date  ⏰ start – end"
+        },
+        {
+         "type": "text",
+         "label": "Description",
+         "note": "expandable; truncated to ~3 lines"
+        },
+        {
+         "type": "text",
+         "label": "Organizer",
+         "note": "avatar + org name from organizations table"
+        },
+        {
+         "type": "text",
+         "label": "Food & Beverages / Dress Code",
+         "note": "each shown only if set"
+        },
+        {
+         "type": "heading",
+         "label": "Attendees (N)",
+         "note": "N = sum of party sizes; View all → full list"
+        },
+        {
+         "type": "list",
+         "label": "Up to 7 avatars + first 3 names"
+        },
+        {
+         "type": "button",
+         "label": "Join / Cancel",
+         "note": "fixed at bottom; Join opens RSVP drawer"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Supabase calls when the event details screen mounts",
+       "actors": [
+        "Phone",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "select rsvp from events where id = event.id",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "rsvp JSON text (or null)",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "select id, avatar_url from individual where id in (attendee uuids)",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "attendee profiles for avatar display",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "select * from organizations where id = event.uuid",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "org name and avatar for organizer section",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "'More are coming' mixes bookings and people",
+       "detail": "The attendees text says 'and N more are coming' where N = totalAttendees − 3. But totalAttendees is the sum of party sizes while 3 counts bookings. With 5 bookings totalling 10 people it says '7 more' instead of '2 more'.",
+       "where": "app/individual/index/eventdetails.tsx:517"
+      }
+     ]
+    },
+    {
+     "id": "fe-rsvp",
+     "title": "Joining An Event",
+     "sub": "RSVP drawer with form, swipe-to-confirm, and dual writes to Supabase",
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "Tapping Join opens a bottom-sheet drawer with name, email, party size, and dietary restriction fields. A swipe-up confirms, writing the entry into the event's rsvp JSON and adding the event id to the individual's rsvp array.",
+     "footprint": {
+      "dirs": [
+       "app/individual/index/components/rsvpDrawer.tsx",
+       "app/individual/index/components/joinButton.tsx",
+       "app/individual/index/components/eventContext.tsx"
+      ],
+      "files": 3
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Three aspects of the RSVP lifecycle: the form, what it stores, and how it is cancelled."
+     },
+     "code": [
+      {
+       "file": "app/individual/index/components/rsvpDrawer.tsx",
+       "start": 134,
+       "end": 190,
+       "label": "handleConfirm: read rsvp JSON, add user entry, write back"
+      },
+      {
+       "file": "app/individual/index/components/rsvpDrawer.tsx",
+       "start": 192,
+       "end": 223,
+       "label": "addEventToUserRSVP: add event id to individual.rsvp array"
+      },
+      {
+       "file": "app/individual/index/components/joinButton.tsx",
+       "start": 24,
+       "end": 26,
+       "label": "handleJoin: opens RSVP drawer via context"
+      },
+      {
+       "file": "app/individual/index/components/joinButton.tsx",
+       "start": 28,
+       "end": 79,
+       "label": "handleCancel: delete from rsvp JSON and individual.rsvp"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Where RSVP data is written and how cancel removes it",
+       "boxes": [
+        {
+         "id": "drawer-box",
+         "label": "RSVP Drawer",
+         "sub": "form + swipe confirm",
+         "col": 0,
+         "row": 0,
+         "opens": "fe-rsvp-form"
+        },
+        {
+         "id": "join-btn",
+         "label": "Join Button",
+         "sub": "opens drawer",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "cancel-btn",
+         "label": "Cancel Button",
+         "sub": "on cards + details page",
+         "col": 2,
+         "row": 0,
+         "opens": "fe-rsvp-cancel"
+        },
+        {
+         "id": "events-rsvp",
+         "label": "events.rsvp",
+         "sub": "JSON text per event",
+         "col": 0,
+         "row": 1,
+         "opens": "fe-rsvp-data"
+        },
+        {
+         "id": "indiv-rsvp",
+         "label": "individual.rsvp",
+         "sub": "array of event ids",
+         "col": 2,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "join-btn",
+         "to": "drawer-box",
+         "label": "opens",
+         "at": "app/individual/index/components/joinButton.tsx:25"
+        },
+        {
+         "from": "drawer-box",
+         "to": "events-rsvp",
+         "label": "writes entry",
+         "at": "app/individual/index/components/rsvpDrawer.tsx:168"
+        },
+        {
+         "from": "drawer-box",
+         "to": "indiv-rsvp",
+         "label": "adds event id",
+         "at": "app/individual/index/components/rsvpDrawer.tsx:213"
+        },
+        {
+         "from": "cancel-btn",
+         "to": "events-rsvp",
+         "label": "deletes entry",
+         "at": "app/individual/index/components/joinButton.tsx:49"
+        },
+        {
+         "from": "cancel-btn",
+         "to": "indiv-rsvp",
+         "label": "removes event id",
+         "at": "app/individual/index/components/joinButton.tsx:69"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Join flow from swipe to database writes",
+       "actors": [
+        "Phone",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "Read events.rsvp for this event",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "Current rsvp JSON (or null)",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "Write whole rsvp JSON with new entry added",
+         "note": "user's entry keyed by their auth uuid",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "Read individual.rsvp array",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "Current rsvp id array",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "Write updated array with event id added",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "fe-rsvp-form",
+       "title": "RSVP Form",
+       "sub": "Bottom-sheet drawer with name, email, party size, and dietary restrictions",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "A slide-up modal with text inputs and dietary chips. Confirmation is a swipe-up gesture; after success it shows 'Done' and 'Add to Calendar' linking to Google Calendar.",
+       "code": [
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 82,
+         "end": 90,
+         "label": "DietaryRestrictions array: 6 predefined + Other"
+        },
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 302,
+         "end": 343,
+         "label": "confirmPanResponder: swipe-up gesture triggers handleConfirm"
+        },
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 345,
+         "end": 364,
+         "label": "drawerPanResponder: swipe-down to close drawer"
+        },
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 263,
+         "end": 285,
+         "label": "handleAddToCalendar: Google Calendar deep link"
+        },
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 287,
+         "end": 300,
+         "label": "handleCustomDietaryRestrictions: comma-separated text merged with chips"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "RSVP Drawer",
+         "caption": "The form the user fills before swiping to confirm",
+         "items": [
+          {
+           "type": "heading",
+           "label": "Event Name + Date"
+          },
+          {
+           "type": "field",
+           "label": "Full Name"
+          },
+          {
+           "type": "field",
+           "label": "Email or Phone Number"
+          },
+          {
+           "type": "field",
+           "label": "Party Size",
+           "note": "numeric, defaults to 1"
+          },
+          {
+           "type": "choice",
+           "label": "Dietary Restrictions",
+           "note": "chips: Vegetarian, Halal, Gluten-free, Dairy-free, Vegan, Peanut, Other"
+          },
+          {
+           "type": "field",
+           "label": "Other dietary needs",
+           "note": "shown when Other selected; comma-separated"
+          },
+          {
+           "type": "button",
+           "label": "↑ Swipe up to confirm",
+           "note": "pan gesture; threshold 50px up"
+          }
+         ]
+        },
+        {
+         "kind": "chips",
+         "caption": "Dietary restriction options",
+         "rows": [
+          {
+           "label": "🥗 Vegetarian",
+           "state": "derived"
+          },
+          {
+           "label": "🕌 Halal",
+           "state": "derived"
+          },
+          {
+           "label": "🌾 Gluten-free",
+           "state": "derived"
+          },
+          {
+           "label": "🥛 Dairy-free",
+           "state": "derived"
+          },
+          {
+           "label": "🥕 Vegan",
+           "state": "derived"
+          },
+          {
+           "label": "🥜 Peanut",
+           "state": "derived"
+          },
+          {
+           "label": "Other",
+           "note": "opens text field; typed words split on commas",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "fe-rsvp-data",
+       "title": "What An RSVP Stores",
+       "sub": "Dual storage: a JSON entry in the event row and an id in the user's array",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "Each RSVP writes to two places: the event's `rsvp` column (a JSON text keyed by user uuid with name/email/party details) and the individual's `rsvp` column (a Set-based array of event ids). No transactional guarantee ties the two writes together.",
+       "code": [
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 145,
+         "end": 170,
+         "label": "Read current rsvp JSON, add entry keyed by uuid, write back"
+        },
+        {
+         "file": "app/individual/index/components/rsvpDrawer.tsx",
+         "start": 192,
+         "end": 223,
+         "label": "addEventToUserRSVP: read individual.rsvp, add event id, write back"
+        },
+        {
+         "file": "lib/localStorage.ts",
+         "start": 42,
+         "end": 76,
+         "label": "fetchAllEvents: select('*') from events, store to AsyncStorage"
+        },
+        {
+         "file": "lib/localStorage.ts",
+         "start": 5,
+         "end": 17,
+         "label": "storeData: writes JSON to AsyncStorage"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "example",
+         "caption": "events.rsvp column after two students join (JSON text)",
+         "value": "{\n  \"6f1c2a…a2\": {\n    \"fullName\": \"Maya Chen\",\n    \"email\": \"maya@illinois.edu\",\n    \"partySize\": 2,\n    \"dietaryRestrictions\": [\"🥕 Vegan\"]\n  },\n  \"b93e71…07\": {\n    \"fullName\": \"Leo Park\",\n    \"email\": \"leo@illinois.edu\",\n    \"partySize\": 1,\n    \"dietaryRestrictions\": [\"🕌 Halal\", \"no shellfish\"]\n  }\n}",
+         "notes": [
+          {
+           "label": "stored as",
+           "value": "a text column, not a JSONB column — every reader parses, every writer stringifies the whole object",
+           "state": "derived"
+          },
+          {
+           "label": "keys",
+           "value": "each user's auth uuid",
+           "state": "derived"
+          },
+          {
+           "label": "checkedIn",
+           "value": "added only by the organiser's check-in tap, not by the join flow",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "example",
+         "caption": "individual.rsvp column after joining two events",
+         "value": "[42, 87]",
+         "notes": [
+          {
+           "label": "type",
+           "value": "likely a Postgres array column — used as a JS array with .includes(), Set, and .filter()",
+           "state": "inferred"
+          }
+         ]
+        },
+        {
+         "kind": "table",
+         "caption": "Fields of one RSVP entry",
+         "columns": [
+          "Field",
+          "What it is",
+          "Written by"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "(key)",
+           "The student's auth uuid",
+           "RSVP drawer"
+          ],
+          [
+           "fullName",
+           "Name typed in the form",
+           "RSVP drawer"
+          ],
+          [
+           "email",
+           "Email or phone, as typed",
+           "RSVP drawer"
+          ],
+          [
+           "partySize",
+           "Number of people, ≥ 1",
+           "RSVP drawer"
+          ],
+          [
+           "dietaryRestrictions",
+           "Array of needs, emoji included",
+           "RSVP drawer"
+          ],
+          [
+           "checkedIn",
+           "Arrived? Missing until org taps",
+           "Organiser check-in"
+          ]
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Every student downloads every guest list",
+         "detail": "fetchAllEvents uses select('*') on the events table and caches results via AsyncStorage. Since the rsvp column contains full names, emails, and user uuids of every attendee, each student's device receives PII for all guests of every published event on their campus.",
+         "where": "lib/localStorage.ts:49-71"
+        }
+       ]
+      },
+      {
+       "id": "fe-rsvp-cancel",
+       "title": "Cancelling An RSVP",
+       "sub": "Four cancel implementations, two of which treat the rsvp data as the wrong type",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "JoinButton and EventDetails correctly parse rsvp as an object and use `delete`. The saved tab and RSVPEvents parse it and call `.includes()`, which does not exist on objects and throws.",
+       "code": [
+        {
+         "file": "app/individual/index/components/joinButton.tsx",
+         "start": 28,
+         "end": 79,
+         "label": "JoinButton cancel: correctly uses delete rsvpData[user.id]"
+        },
+        {
+         "file": "app/individual/index/eventdetails.tsx",
+         "start": 224,
+         "end": 261,
+         "label": "EventDetails cancel: correctly uses delete rsvpJson[userId]"
+        },
+        {
+         "file": "app/individual/saved/index.tsx",
+         "start": 114,
+         "end": 153,
+         "label": "Saved tab cancel: rsvpArray.includes(userId) — broken"
+        },
+        {
+         "file": "app/individual/index/components/rsvpEvents.tsx",
+         "start": 85,
+         "end": 128,
+         "label": "RSVPEvents cancel: rsvpArray.includes(userId) — broken"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "table",
+         "caption": "The four cancel implementations and how each parses events.rsvp",
+         "columns": [
+          "Location",
+          "Parses rsvp as",
+          "Removes user by",
+          "Works?"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "JoinButton (cards)",
+           "object",
+           "delete rsvpData[user.id]",
+           "✓"
+          ],
+          [
+           "EventDetails page",
+           "object",
+           "delete rsvpJson[userId]",
+           "✓"
+          ],
+          [
+           "Saved tab handleCancel",
+           "defaults to []",
+           "rsvpArray.includes(userId)",
+           "✗"
+          ],
+          [
+           "RSVPEvents handleCancel",
+           "defaults to []",
+           "rsvpArray.includes(userId)",
+           "✗"
+          ]
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Cancel from saved tab calls .includes() on an object",
+         "detail": "The cancel handler parses events.rsvp (a JSON object keyed by user uuid) into a variable named rsvpArray and calls .includes(userId). Objects have no .includes() method, so this throws a TypeError when the event has any RSVP data.",
+         "where": "app/individual/saved/index.tsx:127"
+        },
+        {
+         "title": "Same bug in the RSVPEvents component",
+         "detail": "The standalone RSVP events list uses the identical broken cancel pattern: parses the rsvp JSON object and calls .includes() on it, which throws a TypeError.",
+         "where": "app/individual/index/components/rsvpEvents.tsx:98"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "fe-saved",
+     "title": "Saved & RSVP Tab",
+     "sub": "Tabbed screen showing bookmarked events and RSVP'd events side by side",
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "The heart tab shows two horizontally-scrollable sub-tabs: RSVPd Events (with cancel) and Saved Events (with bookmark toggle). The bookmark writes to `individual.saved_events`, a separate array column from `rsvp`.",
+     "footprint": {
+      "dirs": [
+       "app/individual/saved/",
+       "app/individual/index/components/saveButton.tsx",
+       "app/individual/index/components/savedevents.tsx"
+      ],
+      "files": 4
+     },
+     "code": [
+      {
+       "file": "app/individual/saved/index.tsx",
+       "start": 46,
+       "end": 102,
+       "label": "fetchEvents: reads individual.rsvp and saved_events, then fetches full event rows"
+      },
+      {
+       "file": "app/individual/saved/index.tsx",
+       "start": 261,
+       "end": 290,
+       "label": "Tab switching: handleTabPress and handleScroll"
+      },
+      {
+       "file": "app/individual/index/components/saveButton.tsx",
+       "start": 57,
+       "end": 101,
+       "label": "handlePress: toggles saved_events array in Supabase and context"
+      },
+      {
+       "file": "app/individual/index/components/saveButton.tsx",
+       "start": 30,
+       "end": 51,
+       "label": "fetchSaveState: reads saved_events from Supabase on mount"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Saved Tab",
+       "caption": "The heart tab at the bottom of the app",
+       "items": [
+        {
+         "type": "choice",
+         "label": "RSVPd Events | Saved Events",
+         "note": "two tabs with horizontal scroll between them"
+        },
+        {
+         "type": "list",
+         "label": "Event cards",
+         "note": "thumbnail with date, name, location, time"
+        },
+        {
+         "type": "button",
+         "label": "Cancel / Bookmark",
+         "note": "Cancel removes RSVP; bookmark toggles saved_events"
+        }
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "Two separate columns track bookmarks versus RSVPs",
+       "boxes": [
+        {
+         "id": "save-btn",
+         "label": "Save Button",
+         "sub": "bookmark icon on all cards",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "tab-screen",
+         "label": "Saved Tab Screen",
+         "sub": "reads both columns",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "join-btn-fe",
+         "label": "Join Button",
+         "sub": "RSVP via drawer",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "saved-col",
+         "label": "individual.saved_events",
+         "sub": "array of event ids",
+         "col": 0,
+         "row": 1
+        },
+        {
+         "id": "rsvp-col",
+         "label": "individual.rsvp",
+         "sub": "array of event ids",
+         "col": 2,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "save-btn",
+         "to": "saved-col",
+         "label": "toggles",
+         "at": "app/individual/index/components/saveButton.tsx:88"
+        },
+        {
+         "from": "join-btn-fe",
+         "to": "rsvp-col",
+         "label": "adds id",
+         "at": "app/individual/index/components/rsvpDrawer.tsx:213"
+        },
+        {
+         "from": "tab-screen",
+         "to": "saved-col",
+         "label": "reads",
+         "at": "app/individual/saved/index.tsx:59"
+        },
+        {
+         "from": "tab-screen",
+         "to": "rsvp-col",
+         "label": "reads",
+         "at": "app/individual/saved/index.tsx:59"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Context state never initialised from database",
+       "detail": "EventProvider starts savedEvents and joinedEvents as empty arrays and only updates them by local toggles. They are never seeded from Supabase, so all buttons render the wrong state on first mount.",
+       "where": "app/individual/index/components/eventContext.tsx:18"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "managing-events",
+   "title": "Managing Events",
+   "sub": "Organization dashboard with ongoing, draft, and archived event lists, attendee check-in, event details, search, and a tab to browse other orgs' campus events",
+   "footprint": {
+    "dirs": [
+     "app/org/",
+     "supabase/functions/archive-event/"
+    ],
+    "files": 13
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Five parts of the org experience: home dashboard, event lists, event details with check-in, search, and browsing other orgs' events"
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "supabase",
+     "expo",
+     "googlemaps"
+    ]
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 2,
+   "detail": "Organizations manage events through a three-tab layout: the Home tab has category lists (Ongoing, Draft, Archive), event details with attendee check-in, and search. A separate calendar tab shows all campus events.",
+   "code": [
+    {
+     "file": "app/org/_layout.tsx",
+     "start": 9,
+     "end": 58,
+     "label": "Three-tab layout: otherevents, home, account"
+    },
+    {
+     "file": "app/org/index/_layout.tsx",
+     "start": 3,
+     "end": 11,
+     "label": "Stack navigator for org home routes"
+    },
+    {
+     "file": "app/org/index/index.tsx",
+     "start": 37,
+     "end": 175,
+     "label": "Home screen with greeting, search bar, category grid"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Navigation from the tab bar through lists, details, and check-in",
+     "boxes": [
+      {
+       "id": "tabbar",
+       "label": "Tab Bar",
+       "sub": "home, calendar, account",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "home",
+       "label": "Home Screen",
+       "sub": "greeting, search, categories",
+       "col": 1,
+       "row": 0,
+       "opens": "me-home"
+      },
+      {
+       "id": "lists",
+       "label": "Event Lists",
+       "sub": "ongoing, draft, archive",
+       "col": 2,
+       "row": 0,
+       "opens": "me-lists"
+      },
+      {
+       "id": "details",
+       "label": "Event Details",
+       "sub": "single event view + check-in",
+       "col": 3,
+       "row": 0,
+       "opens": "me-details"
+      },
+      {
+       "id": "search",
+       "label": "Search",
+       "sub": "text + category filter",
+       "col": 2,
+       "row": 1,
+       "opens": "me-search"
+      },
+      {
+       "id": "otherevents",
+       "label": "Other Events",
+       "sub": "all campus events",
+       "col": 1,
+       "row": 1,
+       "opens": "me-other-events"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "tabbar",
+       "to": "home",
+       "label": "home tab",
+       "at": "app/org/_layout.tsx:32"
+      },
+      {
+       "from": "tabbar",
+       "to": "otherevents",
+       "label": "calendar tab",
+       "at": "app/org/_layout.tsx:20"
+      },
+      {
+       "from": "home",
+       "to": "lists",
+       "label": "category tap",
+       "at": "app/org/index/index.tsx:107"
+      },
+      {
+       "from": "home",
+       "to": "search",
+       "label": "search bar tap",
+       "at": "app/org/index/index.tsx:98"
+      },
+      {
+       "from": "lists",
+       "to": "details",
+       "label": "tap event",
+       "at": "app/org/index/components/ongoing.tsx:103"
+      },
+      {
+       "from": "search",
+       "to": "details",
+       "label": "tap event",
+       "at": "app/org/index/search.tsx:82"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Archive-event edge function is a stub",
+     "detail": "The Supabase edge function at archive-event/index.ts echoes a greeting message and performs no actual archiving. It is not called from the app; archive filtering happens client-side by date comparison.",
+     "where": "supabase/functions/archive-event/index.ts:10"
+    }
+   ],
+   "children": [
+    {
+     "id": "me-home",
+     "title": "Organization Home",
+     "sub": "Landing screen with greeting, avatar, search bar, and category grid",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "footprint": {
+      "dirs": [
+       "app/org/index/index.tsx"
+      ],
+      "files": 1
+     },
+     "detail": "Shows the org name and avatar loaded from AsyncStorage with retry logic, a tappable search bar, and four category buttons. Ongoing, Draft, or Archive renders the matching list component inline; Add navigates to event creation.",
+     "code": [
+      {
+       "file": "app/org/index/index.tsx",
+       "start": 73,
+       "end": 96,
+       "label": "Profile fetch from AsyncStorage with retry loop"
+      },
+      {
+       "file": "app/org/index/index.tsx",
+       "start": 102,
+       "end": 137,
+       "label": "Four category buttons: Ongoing, Draft, Archive, Add"
+      },
+      {
+       "file": "app/org/index/index.tsx",
+       "start": 139,
+       "end": 175,
+       "label": "Switch renders OngoingEvents, DraftEvents, or ArchiveEvents inline"
+      },
+      {
+       "file": "app/org/index/index.tsx",
+       "start": 177,
+       "end": 248,
+       "label": "JSX: header with greeting/avatar, search bar, content area"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Organization Home",
+       "caption": "Default view before selecting a category",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Hello, [org_name]!"
+        },
+        {
+         "type": "image",
+         "label": "Avatar (80px)",
+         "note": "from Supabase storage via avatar_url"
+        },
+        {
+         "type": "field",
+         "label": "Search for an event...",
+         "note": "not a text input; tap navigates to search screen"
+        },
+        {
+         "type": "text",
+         "label": "What do you want to do today?"
+        },
+        {
+         "type": "button",
+         "label": "Ongoing",
+         "note": "renders OngoingEvents inline"
+        },
+        {
+         "type": "button",
+         "label": "Draft",
+         "note": "renders DraftEvents inline"
+        },
+        {
+         "type": "button",
+         "label": "Archive",
+         "note": "renders ArchiveEvents inline"
+        },
+        {
+         "type": "button",
+         "label": "Add",
+         "note": "navigates to addEvent screen (outside this root)"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "How the home screen loads its profile data",
+       "actors": [
+        "Screen",
+        "Supabase Auth",
+        "AsyncStorage"
+       ],
+       "rows": [
+        {
+         "from": "Screen",
+         "to": "Supabase Auth",
+         "label": "getSession()",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase Auth",
+         "to": "Screen",
+         "label": "session with user.id",
+         "state": "derived"
+        },
+        {
+         "from": "Screen",
+         "to": "AsyncStorage",
+         "label": "retrieveData('user'), retries up to 5x at 500ms",
+         "state": "derived"
+        },
+        {
+         "from": "AsyncStorage",
+         "to": "Screen",
+         "label": "{ avatar_url, org_name }",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "me-lists",
+     "title": "Event Lists",
+     "sub": "Ongoing, draft, and archive list components that fetch and display the org's events",
+     "state": "partial",
+     "col": 0,
+     "row": 1,
+     "footprint": {
+      "dirs": [
+       "app/org/index/components/"
+      ],
+      "files": 3
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Three near-identical components differing only in their Supabase query filter"
+     },
+     "detail": "Three components fetch events from Supabase by org UUID, render cards with thumbnail/date/location/time, and offer Edit and Delete buttons. They differ only in the published flag and date filter.",
+     "code": [
+      {
+       "file": "app/org/index/components/ongoing.tsx",
+       "start": 42,
+       "end": 61,
+       "label": "Ongoing: published=true, date >= today"
+      },
+      {
+       "file": "app/org/index/components/draft.tsx",
+       "start": 47,
+       "end": 66,
+       "label": "Draft: published=false, all dates"
+      },
+      {
+       "file": "app/org/index/components/archive.tsx",
+       "start": 42,
+       "end": 61,
+       "label": "Archive: published=true, date < today"
+      },
+      {
+       "file": "app/org/index/components/ongoing.tsx",
+       "start": 69,
+       "end": 80,
+       "label": "Delete by id with no confirmation prompt"
+      },
+      {
+       "file": "app/org/index/components/ongoing.tsx",
+       "start": 107,
+       "end": 149,
+       "label": "Ongoing renderItem: thumbnail, date, location, time, Edit & Delete buttons"
+      },
+      {
+       "file": "app/org/index/components/ongoing.tsx",
+       "start": 63,
+       "end": 67,
+       "label": "Ongoing useFocusEffect depends on [userUuid]"
+      },
+      {
+       "file": "app/org/index/components/draft.tsx",
+       "start": 68,
+       "end": 72,
+       "label": "Draft useFocusEffect has empty dependency array"
+      },
+      {
+       "file": "app/org/index/components/archive.tsx",
+       "start": 63,
+       "end": 67,
+       "label": "Archive useFocusEffect depends on [userUuid]"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "How each list filters events from Supabase",
+       "columns": [
+        "List",
+        "Query filter",
+        "Date filter",
+        "Tap navigates to"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Ongoing",
+         "published = true",
+         "date >= start of today",
+         "eventdetails"
+        ],
+        [
+         "Draft",
+         "published = false",
+         "none",
+         "previewEvent"
+        ],
+        [
+         "Archive",
+         "published = true",
+         "date < start of today",
+         "eventdetails"
+        ]
+       ]
+      },
+      {
+       "kind": "screen",
+       "title": "Event Card",
+       "caption": "Shared layout used by all three lists",
+       "items": [
+        {
+         "type": "image",
+         "label": "Thumbnail (100x100)",
+         "note": "with month/day overlay on image"
+        },
+        {
+         "type": "text",
+         "label": "Event name"
+        },
+        {
+         "type": "text",
+         "label": "Location, Room number"
+        },
+        {
+         "type": "text",
+         "label": "Start - End time"
+        },
+        {
+         "type": "button",
+         "label": "Edit",
+         "note": "navigates to /org/editEvent/[id]"
+        },
+        {
+         "type": "button",
+         "label": "Delete",
+         "note": "immediately deletes from Supabase, no confirmation"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Delete has no confirmation dialog",
+       "detail": "Tapping the trash icon immediately calls supabase.delete() with no Alert or prompt. A single accidental tap permanently removes the event row from the database.",
+       "where": "app/org/index/components/ongoing.tsx:69"
+      },
+      {
+       "title": "Draft list ignores userUuid changes",
+       "detail": "Draft's useFocusEffect has an empty dependency array, unlike Ongoing and Archive which depend on [userUuid]. If userUuid is initially null, the stale callback captures a fetchEvents that early-returns forever.",
+       "where": "app/org/index/components/draft.tsx:68"
+      }
+     ],
+     "unsure": "Whether deleting an event cascades to RSVP data cannot be determined from this repository; that depends on the Supabase database schema and foreign-key constraints configured server-side."
+    },
+    {
+     "id": "me-details",
+     "title": "Event Details",
+     "sub": "Single event view with organizer info, attendees section, and check-in screen",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "footprint": {
+      "dirs": [
+       "app/org/index/eventdetails.tsx",
+       "app/org/index/attendees.tsx"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "sequence"
+     },
+     "detail": "Opened from any event list or search. The details page fetches the organizer profile and RSVP list, then offers View all to navigate to the attendees screen where check-in happens.",
+     "code": [
+      {
+       "file": "app/org/index/eventdetails.tsx",
+       "start": 51,
+       "end": 68,
+       "label": "Reads event from route params, hides tab bar on mount"
+      },
+      {
+       "file": "app/org/index/eventdetails.tsx",
+       "start": 145,
+       "end": 187,
+       "label": "fetchAttendees: reads rsvp, maps UUIDs to profiles from individual table"
+      },
+      {
+       "file": "app/org/index/eventdetails.tsx",
+       "start": 199,
+       "end": 201,
+       "label": "handleAttendees passes event and attendees list to attendees screen"
+      },
+      {
+       "file": "app/org/index/attendees.tsx",
+       "start": 97,
+       "end": 123,
+       "label": "handleCheckIn: flip checkedIn flag, write whole rsvp back"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Data flow from event tap through detail to check-in",
+       "boxes": [
+        {
+         "id": "event-param",
+         "label": "Route Params",
+         "sub": "full event object",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "detail-screen",
+         "label": "Event Details",
+         "sub": "fetches org + attendees",
+         "col": 1,
+         "row": 0,
+         "opens": "me-detail-view"
+        },
+        {
+         "id": "attendees-screen",
+         "label": "Attendees Screen",
+         "sub": "list with check-in",
+         "col": 2,
+         "row": 0,
+         "opens": "me-checkin"
+        },
+        {
+         "id": "orgs-table",
+         "label": "organizations",
+         "sub": "org_name, avatar_url",
+         "col": 0,
+         "row": 1
+        },
+        {
+         "id": "events-rsvp",
+         "label": "events.rsvp",
+         "sub": "JSON text per event",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "individual-table",
+         "label": "individual",
+         "sub": "id, avatar_url",
+         "col": 2,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "event-param",
+         "to": "detail-screen",
+         "label": "event object",
+         "at": "app/org/index/eventdetails.tsx:53"
+        },
+        {
+         "from": "detail-screen",
+         "to": "orgs-table",
+         "label": "fetch org profile",
+         "at": "app/org/index/eventdetails.tsx:125"
+        },
+        {
+         "from": "detail-screen",
+         "to": "events-rsvp",
+         "label": "fetch rsvp",
+         "at": "app/org/index/eventdetails.tsx:147"
+        },
+        {
+         "from": "detail-screen",
+         "to": "individual-table",
+         "label": "fetch avatars",
+         "at": "app/org/index/eventdetails.tsx:166"
+        },
+        {
+         "from": "detail-screen",
+         "to": "attendees-screen",
+         "label": "View all",
+         "at": "app/org/index/eventdetails.tsx:199"
+        },
+        {
+         "from": "attendees-screen",
+         "to": "events-rsvp",
+         "label": "writes whole rsvp",
+         "at": "app/org/index/attendees.tsx:102",
+         "tone": "warn"
+        }
+       ]
+      }
+     ],
+     "edges": [
+      {
+       "from": "me-detail-view",
+       "to": "me-checkin",
+       "state": "derived",
+       "label": "View all",
+       "order": 1
+      }
+     ],
+     "children": [
+      {
+       "id": "me-detail-view",
+       "title": "Event Detail View",
+       "sub": "Full event page showing description, organizer, location, food, dress code, and attendee preview",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "Fetches the organizer name and avatar from the organizations table, reads the event rsvp to list up to 7 attendee avatars. Opens Apple Maps on iOS or Google Maps on Android for the location.",
+       "code": [
+        {
+         "file": "app/org/index/eventdetails.tsx",
+         "start": 122,
+         "end": 141,
+         "label": "fetchOrganizationProfile from organizations table by uuid"
+        },
+        {
+         "file": "app/org/index/eventdetails.tsx",
+         "start": 145,
+         "end": 187,
+         "label": "fetchAttendees: parse rsvp JSON, fetch avatar_url from individual table"
+        },
+        {
+         "file": "app/org/index/eventdetails.tsx",
+         "start": 203,
+         "end": 233,
+         "label": "openMap: Apple Maps on iOS, Google Maps on Android via Linking"
+        },
+        {
+         "file": "app/org/index/eventdetails.tsx",
+         "start": 304,
+         "end": 373,
+         "label": "Two layout branches: with dress code (shows date) vs without (no date)"
+        },
+        {
+         "file": "app/org/index/eventdetails.tsx",
+         "start": 445,
+         "end": 469,
+         "label": "Attendees section: avatars, names, View all button"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "Event Details",
+         "caption": "A published event opened from Ongoing or Archive",
+         "items": [
+          {
+           "type": "button",
+           "label": "Back"
+          },
+          {
+           "type": "heading",
+           "label": "Event Name"
+          },
+          {
+           "type": "image",
+           "label": "Thumbnail (full width)"
+          },
+          {
+           "type": "list",
+           "label": "Category chips",
+           "note": "from event.type array"
+          },
+          {
+           "type": "button",
+           "label": "Location",
+           "note": "tap opens Apple/Google Maps via Linking"
+          },
+          {
+           "type": "text",
+           "label": "Date and Start - End time",
+           "note": "date line only appears when dress code is set"
+          },
+          {
+           "type": "text",
+           "label": "Description",
+           "note": "truncated to about 3 lines with more toggle"
+          },
+          {
+           "type": "text",
+           "label": "Organizer",
+           "note": "avatar + org_name from organizations table"
+          },
+          {
+           "type": "text",
+           "label": "Food and Beverages",
+           "note": "shown only if event.food starts with Yes"
+          },
+          {
+           "type": "text",
+           "label": "Dress Code",
+           "note": "shown only if non-empty"
+          },
+          {
+           "type": "heading",
+           "label": "Attendees (N)",
+           "note": "N = sum of party sizes"
+          },
+          {
+           "type": "button",
+           "label": "View all",
+           "note": "navigates to attendees screen"
+          },
+          {
+           "type": "list",
+           "label": "Up to 7 attendee avatars"
+          },
+          {
+           "type": "text",
+           "label": "Name1, Name2, Name3 and X more",
+           "note": "X = totalAttendees minus 3 (mixes units)"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Date hidden when there is no dress code",
+         "detail": "The layout has two branches. The one used when dress_code is empty or blank shows location and time but omits the date line entirely, so the user cannot see what day the event is on.",
+         "where": "app/org/index/eventdetails.tsx:343"
+        },
+        {
+         "title": "More-are-coming count mixes units",
+         "detail": "The text shows the first 3 attendee names, then 'and N more are coming' where N = totalAttendees minus 3. totalAttendees is the sum of party sizes and 3 is the count of names shown, producing a number that is neither remaining bookings nor remaining people.",
+         "where": "app/org/index/eventdetails.tsx:467"
+        }
+       ]
+      },
+      {
+       "id": "me-checkin",
+       "title": "Attendee Check-In",
+       "sub": "Full attendee list with dietary tally and tap-to-toggle check-in",
+       "state": "partial",
+       "unsure": "Whether Supabase row-level security prevents one organization from writing another organization's event rsvp is not visible in this codebase.",
+       "col": 0,
+       "row": 1,
+       "detail": "Parses the event rsvp JSON into a list, tallies dietary restrictions, and lets the organizer tap each row to flip checkedIn. Each tap rewrites the entire rsvp column with no read-before-write.",
+       "code": [
+        {
+         "file": "app/org/index/attendees.tsx",
+         "start": 58,
+         "end": 95,
+         "label": "parseAttendees: JSON.parse rsvp, tally dietary restrictions"
+        },
+        {
+         "file": "app/org/index/attendees.tsx",
+         "start": 97,
+         "end": 123,
+         "label": "handleCheckIn: flip flag, write whole rsvp, keep server reply"
+        },
+        {
+         "file": "app/org/index/attendees.tsx",
+         "start": 150,
+         "end": 221,
+         "label": "Screen layout: dietary chips, attendee rows with check-in taps"
+        },
+        {
+         "file": "app/org/index/attendees.tsx",
+         "start": 186,
+         "end": 191,
+         "label": "Avatar uses initialAttendees[index] by position, not by UUID"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "Attendees Screen",
+         "caption": "Event with three bookings, one checked in",
+         "items": [
+          {
+           "type": "button",
+           "label": "Back",
+           "note": "returns to eventdetails with current event state"
+          },
+          {
+           "type": "heading",
+           "label": "Attendees (N)",
+           "note": "N = sum of party sizes"
+          },
+          {
+           "type": "text",
+           "label": "Dietary Restrictions"
+          },
+          {
+           "type": "list",
+           "label": "Restriction chips with counts",
+           "note": "No dietary restrictions if none"
+          },
+          {
+           "type": "text",
+           "label": "Attendee List"
+          },
+          {
+           "type": "list",
+           "label": "Avatar, Name, Email, Party size, checkmark",
+           "note": "tap toggles check-in; green checkmark when checkedIn is true"
+          }
+         ]
+        },
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Start from route params",
+           "detail": "The event object passed from eventdetails, with its rsvp JSON string.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Parse RSVP",
+           "detail": "JSON.parse the rsvp text into entries keyed by student UUID.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Tap a row",
+           "detail": "Flip checkedIn on that entry, JSON.stringify the whole object.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Write back",
+           "detail": "supabase.update({ rsvp }) matched by event.id only, no read-before-write.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Keep the reply",
+           "detail": "The server updated row becomes the local event for the next tap.",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "sequence",
+         "caption": "How a check-in tap can erase a newer RSVP",
+         "actors": [
+          "Organiser",
+          "Database",
+          "Student"
+         ],
+         "rows": [
+          {
+           "from": "Organiser",
+           "to": "Database",
+           "label": "opens event; rsvp is { Maya }",
+           "state": "derived"
+          },
+          {
+           "from": "Student",
+           "to": "Database",
+           "label": "Leo joins: writes { Maya, Leo }",
+           "state": "derived"
+          },
+          {
+           "from": "Organiser",
+           "to": "Database",
+           "label": "taps Maya: writes { Maya checked } from stale copy",
+           "state": "derived"
+          },
+          {
+           "from": "Database",
+           "to": "Organiser",
+           "label": "{ Maya checked } and Leo is gone",
+           "note": "Leo's app still shows the event as joined",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Avatars indexed by position, not by person",
+         "detail": "Row N takes its avatar from initialAttendees[N], which was built by the details page from a separate query. If the order differs or an attendee was added between screens, avatars show next to the wrong names, and extra rows crash.",
+         "where": "app/org/index/attendees.tsx:190"
+        },
+        {
+         "title": "Check-in can overwrite newer RSVPs",
+         "detail": "handleCheckIn parses the event rsvp (loaded when the screen opened), flips one flag, and writes the whole text back without reading the current version first. Anyone who joined or cancelled since is silently reverted.",
+         "where": "app/org/index/attendees.tsx:102"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "me-search",
+     "title": "Event Search",
+     "sub": "Text and category filter search over cached campus events",
+     "state": "partial",
+     "col": 0,
+     "row": 3,
+     "footprint": {
+      "dirs": [
+       "app/org/index/search.tsx"
+      ],
+      "files": 1
+     },
+     "detail": "Reads all published campus events from AsyncStorage (cached by fetchAllEvents at registration and in several tabs), filters by text and category chips, and renders a two-column card grid. Tapping a card navigates to eventdetails.",
+     "code": [
+      {
+       "file": "app/org/index/search.tsx",
+       "start": 47,
+       "end": 70,
+       "label": "fetchEvents: reads from localStorage, enriches with org names via N+1 queries"
+      },
+      {
+       "file": "app/org/index/search.tsx",
+       "start": 121,
+       "end": 140,
+       "label": "filterEvents: text match on name/description/location/organizer plus category filter"
+      },
+      {
+       "file": "app/org/index/search.tsx",
+       "start": 82,
+       "end": 84,
+       "label": "handleEventDetails navigates to eventdetails with full event object"
+      },
+      {
+       "file": "app/org/index/search.tsx",
+       "start": 190,
+       "end": 257,
+       "label": "Layout: search bar, category pills, two-column event grid"
+      },
+      {
+       "file": "app/org/index/attendees.tsx",
+       "start": 97,
+       "end": 123,
+       "label": "handleCheckIn updates check-in by event.id with no ownership guard"
+      },
+      {
+       "file": "lib/localStorage.ts",
+       "start": 42,
+       "end": 76,
+       "label": "fetchAllEvents populates the 'events' key in AsyncStorage"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Search Screen",
+       "caption": "Org searching events on their campus",
+       "items": [
+        {
+         "type": "button",
+         "label": "Back",
+         "note": "navigates to index"
+        },
+        {
+         "type": "field",
+         "label": "Search here...",
+         "note": "auto-focused on mount; matches name, description, location, organizer"
+        },
+        {
+         "type": "text",
+         "label": "Filter by category"
+        },
+        {
+         "type": "list",
+         "label": "Category pills",
+         "note": "from shared categories data; toggle selection on tap"
+        },
+        {
+         "type": "list",
+         "label": "Event cards in 2-column grid",
+         "note": "thumbnail with date badge, name, location, time"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "How events reach the search screen",
+       "actors": [
+        "Search Screen",
+        "AsyncStorage",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Search Screen",
+         "to": "AsyncStorage",
+         "label": "retrieveData('events')",
+         "state": "derived"
+        },
+        {
+         "from": "AsyncStorage",
+         "to": "Search Screen",
+         "label": "all published campus events (cached)",
+         "state": "derived"
+        },
+        {
+         "from": "Search Screen",
+         "to": "Supabase",
+         "label": "for each event: organizations.org_name by uuid",
+         "note": "N+1 query pattern, one request per event",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Search Screen",
+         "label": "organizer names for display and text filtering",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Search exposes cross-org check-in path",
+       "detail": "Events from localStorage include every published campus event. Tapping any event navigates to eventdetails then attendees, where handleCheckIn updates by event.id alone with no client-side ownership check, letting one org check in at another's event.",
+       "where": "app/org/index/attendees.tsx:97"
+      },
+      {
+       "title": "Search depends on AsyncStorage cache",
+       "detail": "The events key in AsyncStorage is populated by fetchAllEvents, called during registration and in other tabs. If the cache is cleared or missing, search shows No events found even though events exist on the server.",
+       "where": "app/org/index/search.tsx:49"
+      }
+     ],
+     "unsure": "Whether Supabase row-level security policies enforce ownership on the events table update (handleCheckIn) cannot be determined from the repository alone."
+    },
+    {
+     "id": "me-other-events",
+     "title": "Other Events Tab",
+     "sub": "Browse all upcoming events from every organization on the user's campus",
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "footprint": {
+      "dirs": [
+       "app/org/otherevents/"
+      ],
+      "files": 3
+     },
+     "detail": "A separate tab that fetches all published campus events via fetchAllEvents (stored in AsyncStorage), then lists them. Tapping opens a near-duplicate of the home-tab eventdetails with its own attendee preview.",
+     "code": [
+      {
+       "file": "app/org/otherevents/index.tsx",
+       "start": 40,
+       "end": 89,
+       "label": "Fetch user campus from AsyncStorage, then fetchAllEvents with retry loop"
+      },
+      {
+       "file": "app/org/otherevents/index.tsx",
+       "start": 122,
+       "end": 162,
+       "label": "Event card layout identical to ongoing.tsx"
+      },
+      {
+       "file": "app/org/otherevents/eventdetails.tsx",
+       "start": 47,
+       "end": 166,
+       "label": "Duplicate event details with fetchOrganizationProfile and fetchAttendees"
+      },
+      {
+       "file": "app/org/otherevents/eventdetails.tsx",
+       "start": 168,
+       "end": 170,
+       "label": "handleAttendees navigates to attendees but route does not exist"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "How the Other Events tab loads and displays campus events",
+       "boxes": [
+        {
+         "id": "oe-screen",
+         "label": "Other Events List",
+         "sub": "all campus events",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "oe-detail",
+         "label": "Campus Event Detail",
+         "sub": "near-duplicate of index",
+         "col": 1,
+         "row": 0
+        }
+       ],
+       "arrows": [
+        {
+         "from": "oe-screen",
+         "to": "oe-detail",
+         "label": "tap event",
+         "at": "app/org/otherevents/index.tsx:97"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Data loading sequence for the Other Events list and detail",
+       "actors": [
+        "Screen",
+        "AsyncStorage",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Screen",
+         "to": "AsyncStorage",
+         "label": "retrieveData('user') for campus, retries 5x",
+         "state": "derived"
+        },
+        {
+         "from": "AsyncStorage",
+         "to": "Screen",
+         "label": "user.campus",
+         "state": "derived"
+        },
+        {
+         "from": "Screen",
+         "to": "Supabase",
+         "label": "fetchAllEvents(campus): published events on this campus",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "AsyncStorage",
+         "label": "store filtered events under 'events' key",
+         "note": "also used by the search screen on the home tab",
+         "state": "derived"
+        },
+        {
+         "from": "AsyncStorage",
+         "to": "Screen",
+         "label": "events list for rendering",
+         "state": "derived"
+        },
+        {
+         "from": "Screen",
+         "to": "Supabase",
+         "label": "on tap: fetch org profile and attendees",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "screen",
+       "title": "Other Events List",
+       "caption": "All upcoming campus events from any organization",
+       "items": [
+        {
+         "type": "heading",
+         "label": "All upcoming events!"
+        },
+        {
+         "type": "list",
+         "label": "Event cards",
+         "note": "same layout as Ongoing: thumbnail, name, location, time; no Edit/Delete buttons"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "View all navigates to missing route",
+       "detail": "The campus event detail calls navigation.navigate('attendees'), but there is no attendees.tsx in the otherevents directory. The file-based router has no route to match, so the View all button fails at runtime.",
+       "where": "app/org/otherevents/eventdetails.tsx:168"
+      },
+      {
+       "title": "Event detail is a near-complete code duplicate",
+       "detail": "otherevents/eventdetails.tsx is a copy of index/eventdetails.tsx with minor differences (no food section, no map link). Both share the same more-are-coming count bug, and the campus version never shows the event date.",
+       "where": "app/org/otherevents/eventdetails.tsx:47"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "creating-events",
+   "title": "Creating Events",
+   "sub": "Multi-step event form with drawers, image upload, preview, and publish",
+   "footprint": {
+    "dirs": [
+     "app/org/index/addEvent.tsx",
+     "app/org/index/editEvent/",
+     "app/org/index/previewEvent.tsx"
+    ],
+    "files": 10
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Two form screens, five shared drawers, a preview screen, and an image upload component"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 3,
+   "detail": "An organisation fills a form in `addEvent`, saves it as an unpublished draft, previews it, then publishes or taps edit to reach `editEvent`. Both forms share five bottom-sheet drawer components.",
+   "code": [
+    {
+     "file": "app/org/index/addEvent.tsx",
+     "start": 193,
+     "end": 251,
+     "label": "handlePreview: validate, upload image, insert draft, navigate to preview"
+    },
+    {
+     "file": "app/org/index/editEvent/[id].tsx",
+     "start": 196,
+     "end": 253,
+     "label": "updateEvent: validate, upload image, update row, navigate to preview"
+    },
+    {
+     "file": "app/org/index/previewEvent.tsx",
+     "start": 103,
+     "end": 119,
+     "label": "handlePublish: sets published to true by event id"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the three screens connect to each other and to the database",
+     "boxes": [
+      {
+       "id": "add",
+       "label": "Add Event Form",
+       "sub": "fresh form",
+       "col": 0,
+       "row": 0,
+       "opens": "ce-form"
+      },
+      {
+       "id": "preview",
+       "label": "Preview Screen",
+       "sub": "read-only draft view",
+       "col": 1,
+       "row": 0,
+       "opens": "ce-preview"
+      },
+      {
+       "id": "edit",
+       "label": "Edit Event Form",
+       "sub": "pre-filled form",
+       "col": 2,
+       "row": 0,
+       "opens": "ce-form"
+      },
+      {
+       "id": "drawers",
+       "label": "Selection Drawers",
+       "sub": "5 bottom sheets",
+       "col": 0,
+       "row": 1,
+       "opens": "ce-drawers"
+      },
+      {
+       "id": "events-db",
+       "label": "Events Table",
+       "sub": "published: false → true",
+       "col": 1,
+       "row": 1
+      },
+      {
+       "id": "storage",
+       "label": "Image Storage",
+       "sub": "event_thumbnail bucket",
+       "col": 2,
+       "row": 1,
+       "opens": "ce-image"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "add",
+       "to": "preview",
+       "label": "save draft & navigate",
+       "at": "app/org/index/addEvent.tsx:245"
+      },
+      {
+       "from": "preview",
+       "to": "edit",
+       "label": "tap edit",
+       "at": "app/org/index/previewEvent.tsx:77"
+      },
+      {
+       "from": "edit",
+       "to": "preview",
+       "label": "update & navigate",
+       "at": "app/org/index/editEvent/[id].tsx:246"
+      },
+      {
+       "from": "add",
+       "to": "events-db",
+       "label": "insert draft row",
+       "at": "app/org/index/addEvent.tsx:239"
+      },
+      {
+       "from": "preview",
+       "to": "events-db",
+       "label": "set published",
+       "at": "app/org/index/previewEvent.tsx:107"
+      },
+      {
+       "from": "add",
+       "to": "drawers",
+       "label": "opens",
+       "at": "app/org/index/addEvent.tsx:520"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "Fields written to the events table",
+     "columns": [
+      "Field",
+      "Source",
+      "Required"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "name",
+       "Text input",
+       "Yes"
+      ],
+      [
+       "description",
+       "Text input",
+       "Yes"
+      ],
+      [
+       "type",
+       "Category drawer (string array)",
+       "Yes"
+      ],
+      [
+       "date",
+       "Date drawer",
+       "Yes"
+      ],
+      [
+       "time",
+       "Time drawer (start)",
+       "Yes"
+      ],
+      [
+       "end_time",
+       "Time drawer (end)",
+       "Yes"
+      ],
+      [
+       "location",
+       "Google Places (JSON object)",
+       "Yes"
+      ],
+      [
+       "room_number",
+       "Text input",
+       "No"
+      ],
+      [
+       "campus",
+       "Campus drawer",
+       "Add: No / Edit: Yes"
+      ],
+      [
+       "food",
+       "Food drawer",
+       "Yes"
+      ],
+      [
+       "dress_code",
+       "Text input",
+       "No"
+      ],
+      [
+       "thumbnail",
+       "Image upload URL",
+       "Yes"
+      ],
+      [
+       "published",
+       "false on create, true on publish",
+       "—"
+      ],
+      [
+       "uuid",
+       "Current user's auth id",
+       "—"
+      ]
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Google Maps API key hardcoded in source",
+     "detail": "The Google Places autocomplete query object contains a plaintext API key in both addEvent and editEvent. Anyone inspecting the JavaScript bundle can extract and reuse it.",
+     "where": "app/org/index/addEvent.tsx:415"
+    },
+    {
+     "title": "Campus auto-detection always fails",
+     "detail": "After selecting a location, an axios call to the Place Details API fetches coordinates to find the nearest campus via haversine. The URL contains the literal string `YOUR_API_KEY` instead of a real key, so the call always fails and the campus field is never auto-filled.",
+     "where": "app/org/index/addEvent.tsx:396"
+    }
+   ],
+   "children": [
+    {
+     "id": "ce-form",
+     "title": "The Event Form",
+     "sub": "Scrollable form for name, image, description, and seven more fields with drawer pickers",
+     "footprint": {
+      "dirs": [
+       "app/org/index/addEvent.tsx",
+       "app/org/index/editEvent/[id].tsx"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "set",
+      "note": "How each form screen saves data, and how they pick a location"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Both `addEvent` and `editEvent/[id]` render the same field layout with identical drawer integrations. Add inserts a new draft row; edit fetches an existing one and updates it.",
+     "code": [
+      {
+       "file": "app/org/index/addEvent.tsx",
+       "start": 286,
+       "end": 493,
+       "label": "Add Event form field layout and drawer triggers"
+      },
+      {
+       "file": "app/org/index/editEvent/[id].tsx",
+       "start": 297,
+       "end": 510,
+       "label": "Edit Event form field layout (same structure)"
+      },
+      {
+       "file": "app/org/index/addEvent.tsx",
+       "start": 177,
+       "end": 191,
+       "label": "checkRequiredFields in addEvent (campus omitted)"
+      },
+      {
+       "file": "app/org/index/editEvent/[id].tsx",
+       "start": 179,
+       "end": 194,
+       "label": "checkRequiredFields in editEvent (campus included)"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Add Event / Edit Event",
+       "caption": "Both screens share this field layout; edit pre-fills every field",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Add Event / Edit Event"
+        },
+        {
+         "type": "field",
+         "label": "Name *",
+         "note": "text input"
+        },
+        {
+         "type": "image",
+         "label": "Cover picture *",
+         "note": "ImageUpload component, 150×150 circle"
+        },
+        {
+         "type": "field",
+         "label": "Description *",
+         "note": "multiline text input, 10 lines"
+        },
+        {
+         "type": "choice",
+         "label": "Category *",
+         "note": "opens CategoryDrawer, shows joined values"
+        },
+        {
+         "type": "choice",
+         "label": "Date *",
+         "note": "opens DateDrawer"
+        },
+        {
+         "type": "choice",
+         "label": "Time *",
+         "note": "opens TimeDrawer, start and end"
+        },
+        {
+         "type": "field",
+         "label": "Location *",
+         "note": "Google Places autocomplete"
+        },
+        {
+         "type": "field",
+         "label": "Room Number",
+         "note": "optional text input"
+        },
+        {
+         "type": "choice",
+         "label": "Campus *",
+         "note": "opens CampusDrawer"
+        },
+        {
+         "type": "choice",
+         "label": "Food and beverages *",
+         "note": "opens FoodDrawer"
+        },
+        {
+         "type": "field",
+         "label": "Dress code",
+         "note": "optional text input"
+        },
+        {
+         "type": "button",
+         "label": "Preview / Update",
+         "note": "validates fields, then saves and navigates"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "How add and edit differ",
+       "columns": [
+        "",
+        "Add Event",
+        "Edit Event"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Initial data",
+         "Empty fields",
+         "Fetched from events table by id"
+        ],
+        [
+         "Save action",
+         "Insert new row (published: false)",
+         "Update existing row by id"
+        ],
+        [
+         "Campus required",
+         "No",
+         "Yes"
+        ],
+        [
+         "After save",
+         "Navigate to previewEvent",
+         "Navigate to previewEvent"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Campus not validated when creating",
+       "detail": "`addEvent.checkRequiredFields` omits campus from its checks, so a new event can be saved without a campus value, while editing the same event would reject it.",
+       "where": "app/org/index/addEvent.tsx:177"
+      }
+     ],
+     "children": [
+      {
+       "id": "ce-add",
+       "title": "Creating A Draft",
+       "sub": "Validate fields, upload image, insert an unpublished row, navigate to preview",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "`handlePreview` checks required fields, uploads the cover image to `event_thumbnail`, inserts a row with `published: false`, and navigates to the preview screen with the returned event data.",
+       "code": [
+        {
+         "file": "app/org/index/addEvent.tsx",
+         "start": 193,
+         "end": 251,
+         "label": "handlePreview: the full save-and-navigate flow"
+        },
+        {
+         "file": "app/org/index/addEvent.tsx",
+         "start": 140,
+         "end": 175,
+         "label": "uploadImage: uploads to event_thumbnail bucket"
+        },
+        {
+         "file": "app/org/index/addEvent.tsx",
+         "start": 222,
+         "end": 237,
+         "label": "previewEventData: the object inserted into events"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Validate fields",
+           "detail": "checkRequiredFields returns false if any required field is empty; shows alert and aborts.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Upload cover image",
+           "detail": "If a new image was selected, fetch its URI as ArrayBuffer, upload to event_thumbnail bucket, get public URL.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Get current user",
+           "detail": "supabase.auth.getUser() returns the logged-in organisation's uuid.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Insert draft row",
+           "detail": "Insert into events table with published: false. Returns the new row with its generated id.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Navigate to preview",
+           "detail": "navigation.navigate('previewEvent', { event: data[0] }) passes the full event object as a route param.",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "example",
+         "caption": "The object inserted into the events table (synthesised)",
+         "value": "{\n  uuid: \"a1b2c3…\",\n  name: \"Robotics Demo Night\",\n  location: {\n    description: \"Siebel Center\",\n    terms: [{ value: \"Siebel Center\" }]\n  },\n  room_number: \"2405\",\n  description: \"Come see student robots…\",\n  type: [\"stem\", \"social\"],\n  thumbnail: \"https://…/event_thumbnail/1710000000.jpeg\",\n  dress_code: \"\",\n  food: \"Yes, no dietary restrictions\",\n  campus: \"University of Illinois\",\n  date: \"2025-03-15\",\n  time: \"18:00:00\",\n  end_time: \"20:00:00\",\n  published: false\n}"
+        }
+       ]
+      },
+      {
+       "id": "ce-edit",
+       "title": "Updating A Draft",
+       "sub": "Fetch an existing event by id, pre-fill the form, update the row on save",
+       "state": "partial",
+       "unsure": "Whether Supabase row-level security restricts edits to the event's owner is not visible in this repository.",
+       "col": 0,
+       "row": 1,
+       "detail": "On mount, `editEvent` fetches the event by id and populates every form field. `updateEvent` writes changes back without checking the user's uuid against the event's owner.",
+       "code": [
+        {
+         "file": "app/org/index/editEvent/[id].tsx",
+         "start": 94,
+         "end": 135,
+         "label": "useEffect: fetch event by id and populate all form state"
+        },
+        {
+         "file": "app/org/index/editEvent/[id].tsx",
+         "start": 196,
+         "end": 253,
+         "label": "updateEvent: validate, upload, update row, navigate"
+        },
+        {
+         "file": "app/org/index/editEvent/[id].tsx",
+         "start": 225,
+         "end": 242,
+         "label": "The Supabase update call — filters by id only, no uuid"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "sequence",
+         "caption": "Fetch-then-update flow",
+         "actors": [
+          "Phone",
+          "Supabase"
+         ],
+         "rows": [
+          {
+           "from": "Phone",
+           "to": "Supabase",
+           "label": "SELECT * FROM events WHERE id = :id",
+           "state": "derived"
+          },
+          {
+           "from": "Supabase",
+           "to": "Phone",
+           "label": "event row → populate all form fields",
+           "state": "derived"
+          },
+          {
+           "from": "Phone",
+           "to": "Supabase",
+           "label": "upload new image if changed",
+           "state": "derived"
+          },
+          {
+           "from": "Phone",
+           "to": "Supabase",
+           "label": "UPDATE events SET … WHERE id = :id",
+           "note": "no uuid filter in the query",
+           "state": "derived"
+          },
+          {
+           "from": "Supabase",
+           "to": "Phone",
+           "label": "updated row → navigate to previewEvent",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "No ownership check on update",
+         "detail": "The update query filters by event id only, without matching the current user's uuid. Unless Supabase RLS enforces ownership, any organisation could update any event by navigating to its edit URL.",
+         "where": "app/org/index/editEvent/[id].tsx:225"
+        }
+       ]
+      },
+      {
+       "id": "ce-location",
+       "title": "Location And Campus",
+       "sub": "Google Places autocomplete with automatic nearest-campus detection via haversine",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "The user types an address into `GooglePlacesAutocomplete` (real API key). A separate axios call fetches coordinates to find the nearest campus via haversine over 61 universities, but uses a placeholder key (`YOUR_API_KEY`) so it always fails silently.",
+       "code": [
+        {
+         "file": "app/org/index/addEvent.tsx",
+         "start": 386,
+         "end": 417,
+         "label": "GooglePlacesAutocomplete with place details axios call"
+        },
+        {
+         "file": "app/org/index/addEvent.tsx",
+         "start": 122,
+         "end": 138,
+         "label": "findNearestCampus: haversine distance over universities array"
+        },
+        {
+         "file": "app/org/index/editEvent/[id].tsx",
+         "start": 255,
+         "end": 271,
+         "label": "Same findNearestCampus in editEvent"
+        },
+        {
+         "file": "app/individual/index/components/universityList.tsx",
+         "start": 1,
+         "end": 369,
+         "label": "universities array: 61 entries with name, abbreviation, lat, lon"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "User types address",
+           "detail": "GooglePlacesAutocomplete sends keystrokes to the Places API using the real API key in the query prop.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "User selects a result",
+           "detail": "onPress stores { description, terms } as the location object.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Fetch coordinates",
+           "detail": "An axios GET to Place Details with the place_id requests geometry. Uses the literal string YOUR_API_KEY, so this always fails.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Find nearest campus",
+           "detail": "If coordinates were returned (they never are), haversine distance is computed against all 60 universities to auto-fill campus.",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "Autocomplete key",
+           "value": "Real key embedded in the query prop — works for address search",
+           "state": "derived"
+          },
+          {
+           "label": "Place Details key",
+           "value": "Literal string YOUR_API_KEY in the URL — always fails",
+           "state": "derived"
+          },
+          {
+           "label": "University list",
+           "value": "60 hardcoded US universities with lat/lon in universityList.tsx",
+           "state": "derived"
+          },
+          {
+           "label": "Distance function",
+           "value": "haversine-distance npm package",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "ce-drawers",
+     "title": "Selection Drawers",
+     "sub": "Five bottom-sheet drawers shared by both form screens for structured field input",
+     "footprint": {
+      "dirs": [
+       "app/org/index/editEvent/categorydrawer.tsx",
+       "app/org/index/editEvent/dateDrawer.tsx",
+       "app/org/index/editEvent/timeDrawer.tsx",
+       "app/org/index/editEvent/campusDrawer.tsx",
+       "app/org/index/editEvent/foodDrawer.tsx"
+      ],
+      "files": 5
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "All five drawers slide up with `Animated.timing`, support swipe-down dismiss via `PanResponder` (threshold 100 px), and call a parent callback on Apply. They share identical animation logic.",
+     "code": [
+      {
+       "file": "app/org/index/editEvent/categorydrawer.tsx",
+       "start": 17,
+       "end": 71,
+       "label": "CategoryDrawer: multi-select toggle and apply"
+      },
+      {
+       "file": "app/org/index/editEvent/dateDrawer.tsx",
+       "start": 20,
+       "end": 70,
+       "label": "DateDrawer: native date picker and apply"
+      },
+      {
+       "file": "app/org/index/editEvent/timeDrawer.tsx",
+       "start": 23,
+       "end": 114,
+       "label": "TimeDrawer: start and end time pickers with date sync"
+      },
+      {
+       "file": "app/org/index/editEvent/campusDrawer.tsx",
+       "start": 95,
+       "end": 143,
+       "label": "CampusDrawer: select, sort by distance, filter by search"
+      },
+      {
+       "file": "app/org/index/editEvent/foodDrawer.tsx",
+       "start": 64,
+       "end": 96,
+       "label": "FoodDrawer: yes/no with optional dietary text input"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "The five drawers and what each picks",
+       "columns": [
+        "Drawer",
+        "Picks",
+        "Details"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Category",
+         "One or more from 8 categories",
+         "Multi-select with checkmarks; Apply commits"
+        ],
+        [
+         "Date",
+         "A single date",
+         "Native DateTimePicker in date mode"
+        ],
+        [
+         "Time",
+         "Start and end time",
+         "Two native time pickers synced to selected date"
+        ],
+        [
+         "Campus",
+         "One of 60 universities",
+         "Searchable list sorted by haversine distance"
+        ],
+        [
+         "Food",
+         "Yes or No",
+         "Yes reveals a text input for dietary restrictions"
+        ]
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "The eight event categories from categories.ts",
+       "rows": [
+        {
+         "label": "Social 👫",
+         "state": "derived"
+        },
+        {
+         "label": "Cultural 🎭",
+         "state": "derived"
+        },
+        {
+         "label": "STEM 🔬",
+         "state": "derived"
+        },
+        {
+         "label": "Sports & Recreation 🎯",
+         "state": "derived"
+        },
+        {
+         "label": "Business, Law & Policy 🏛️",
+         "state": "derived"
+        },
+        {
+         "label": "Education & Social Service 🎓",
+         "state": "derived"
+        },
+        {
+         "label": "Religion & Philosophy 🤔",
+         "state": "derived"
+        },
+        {
+         "label": "Health & Wellbeing 💪",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Category drawer ignores existing selection when editing",
+       "detail": "CategoryDrawer initialises its selected state to an empty array and accepts no prop for the event's current categories. When editing, the drawer shows nothing selected even though the event already has categories chosen.",
+       "where": "app/org/index/editEvent/categorydrawer.tsx:19"
+      }
+     ]
+    },
+    {
+     "id": "ce-preview",
+     "title": "Preview And Publish",
+     "sub": "Read-only view of the event draft with back, edit, and publish buttons",
+     "footprint": {
+      "dirs": [
+       "app/org/index/previewEvent.tsx"
+      ],
+      "files": 1
+     },
+     "state": "partial",
+     "unsure": "Whether Supabase row-level security restricts the publish update to the event's owner is not visible in this repository.",
+     "col": 0,
+     "row": 2,
+     "detail": "`previewEvent` receives the event object via route params, fetches the organisation's name and avatar from the organisations table, and renders a full preview. Publish sets `published: true` by event id.",
+     "code": [
+      {
+       "file": "app/org/index/previewEvent.tsx",
+       "start": 47,
+       "end": 78,
+       "label": "PreviewEvent setup: route params, back press, edit navigation"
+      },
+      {
+       "file": "app/org/index/previewEvent.tsx",
+       "start": 103,
+       "end": 119,
+       "label": "handlePublish: update published to true by event id"
+      },
+      {
+       "file": "app/org/index/previewEvent.tsx",
+       "start": 155,
+       "end": 179,
+       "label": "fetchOrganizationProfile: gets org name and avatar"
+      },
+      {
+       "file": "app/org/index/previewEvent.tsx",
+       "start": 220,
+       "end": 386,
+       "label": "Preview screen JSX: thumbnail, details, organizer, publish"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Event Preview",
+       "caption": "What the organisation sees before publishing",
+       "items": [
+        {
+         "type": "button",
+         "label": "← Back",
+         "note": "shows 'Draft Saved!' alert, navigates to index"
+        },
+        {
+         "type": "heading",
+         "label": "Event Name"
+        },
+        {
+         "type": "button",
+         "label": "✏️ Edit",
+         "note": "navigates to editEvent/[id]"
+        },
+        {
+         "type": "image",
+         "label": "Cover thumbnail",
+         "note": "full-width RenderThumbnail"
+        },
+        {
+         "type": "list",
+         "label": "Category chips",
+         "note": "each category as a styled tag"
+        },
+        {
+         "type": "text",
+         "label": "📍 Location",
+         "note": "first term from location object"
+        },
+        {
+         "type": "text",
+         "label": "📅 Date  ⏰ Start – End",
+         "note": "formatted date and locale times"
+        },
+        {
+         "type": "text",
+         "label": "Description",
+         "note": "truncated to ~3 lines with more/less toggle"
+        },
+        {
+         "type": "text",
+         "label": "Organizer",
+         "note": "avatar + org name from organizations table"
+        },
+        {
+         "type": "text",
+         "label": "Food & Beverages",
+         "note": "shown only when food starts with 'Yes'"
+        },
+        {
+         "type": "text",
+         "label": "Dress Code",
+         "note": "shown only if dress_code is set"
+        },
+        {
+         "type": "button",
+         "label": "Publish!",
+         "note": "sets published: true, alerts success, navigates to index"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "What happens when the organisation taps Publish",
+       "actors": [
+        "Phone",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "UPDATE events SET published = true WHERE id = :eventId",
+         "note": "no uuid filter in the query",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Phone",
+         "label": "success or error response",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Phone",
+         "label": "Alert 'Your event has been published!' then navigate to index",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "No ownership check on publish",
+       "detail": "handlePublish updates the event by id without filtering by the current user's uuid. Unless Supabase RLS enforces ownership, any user who reaches this screen with an event id could publish someone else's draft.",
+       "where": "app/org/index/previewEvent.tsx:105"
+      }
+     ]
+    },
+    {
+     "id": "ce-image",
+     "title": "Image Upload",
+     "sub": "Image picker and the double-upload to two different Supabase storage buckets",
+     "footprint": {
+      "dirs": [
+       "app/org/index/editEvent/imageupload.tsx"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`ImageUpload` opens the device library via expo-image-picker, then immediately uploads the image to the `user_avatar` bucket. When the form saves, the parent re-uploads the same image to `event_thumbnail`, creating an orphaned file.",
+     "code": [
+      {
+       "file": "app/org/index/editEvent/imageupload.tsx",
+       "start": 20,
+       "end": 65,
+       "label": "handleImageSelection: pick image, upload to user_avatar bucket"
+      },
+      {
+       "file": "app/org/index/addEvent.tsx",
+       "start": 140,
+       "end": 175,
+       "label": "uploadImage in addEvent: re-uploads to event_thumbnail"
+      },
+      {
+       "file": "app/org/index/editEvent/[id].tsx",
+       "start": 142,
+       "end": 177,
+       "label": "uploadImage in editEvent: re-uploads to event_thumbnail"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "The double upload: once on selection, once on save",
+       "actors": [
+        "Phone",
+        "user_avatar bucket",
+        "event_thumbnail bucket"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "Phone",
+         "label": "expo-image-picker opens device library (1:1, quality 1.0)",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "user_avatar bucket",
+         "label": "ImageUpload uploads ArrayBuffer immediately",
+         "note": "this upload is never referenced by anything",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Phone",
+         "label": "onImageSelect passes image data to parent form state",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "event_thumbnail bucket",
+         "label": "handlePreview/updateEvent re-uploads the same image",
+         "state": "derived"
+        },
+        {
+         "from": "event_thumbnail bucket",
+         "to": "Phone",
+         "label": "public URL stored in the events row as thumbnail",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "First upload bucket",
+         "value": "user_avatar — wrong bucket; the file is never referenced",
+         "state": "derived"
+        },
+        {
+         "label": "Second upload bucket",
+         "value": "event_thumbnail — correct; its public URL is stored in events",
+         "state": "derived"
+        },
+        {
+         "label": "Image constraints",
+         "value": "1:1 aspect ratio, quality 1.0, allowsEditing true",
+         "state": "derived"
+        },
+        {
+         "label": "File naming",
+         "value": "Date.now() + original extension (e.g. 1710000000.jpeg)",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Image uploaded to wrong storage bucket",
+       "detail": "ImageUpload immediately uploads to the `user_avatar` bucket instead of `event_thumbnail`. The parent form then re-uploads to the correct bucket on save, so every image selection leaves an orphaned file in `user_avatar` that is never cleaned up.",
+       "where": "app/org/index/editEvent/imageupload.tsx:45"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "managing-profile",
+   "title": "Managing Profile",
+   "sub": "Account settings, avatar upload, profile editing drawer, sign-out, and account deletion for both individual and organization users",
+   "state": "derived",
+   "col": 0,
+   "row": 4,
+   "footprint": {
+    "dirs": [
+     "app/individual/account",
+     "app/org/account",
+     "supabase/functions/delete-user"
+    ],
+    "files": 10
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "supabase",
+     "expo"
+    ]
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Four concerns of the account tab: two screen types, editing, and deletion"
+   },
+   "detail": "Two near-identical account tabs — one for individuals, one for organisations — each with an Edit Profile drawer, avatar upload via Supabase storage, sign-out, and account deletion through an edge function.",
+   "code": [
+    {
+     "file": "app/individual/account/index.tsx",
+     "start": 26,
+     "end": 275,
+     "label": "Individual account screen"
+    },
+    {
+     "file": "app/org/account/index.tsx",
+     "start": 26,
+     "end": 273,
+     "label": "Organization account screen"
+    },
+    {
+     "file": "supabase/functions/delete-user/index.ts",
+     "start": 6,
+     "end": 60,
+     "label": "Delete-user edge function"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the two account screens connect to editing and deletion",
+     "boxes": [
+      {
+       "id": "d-ind-acct",
+       "label": "Individual Account",
+       "sub": "avatar, name, settings",
+       "col": 0,
+       "row": 0,
+       "opens": "mp-ind-account"
+      },
+      {
+       "id": "d-delete",
+       "label": "Delete Function",
+       "sub": "Supabase edge function",
+       "col": 1,
+       "row": 0,
+       "tone": "warn",
+       "opens": "mp-deletion"
+      },
+      {
+       "id": "d-org-acct",
+       "label": "Organization Account",
+       "sub": "avatar, name, settings",
+       "col": 2,
+       "row": 0,
+       "opens": "mp-org-account"
+      },
+      {
+       "id": "d-ind-edit",
+       "label": "Individual Edit",
+       "sub": "interests picker",
+       "col": 0,
+       "row": 1,
+       "opens": "mp-editing"
+      },
+      {
+       "id": "d-avatar",
+       "label": "Avatar Upload",
+       "sub": "shared component",
+       "col": 1,
+       "row": 1,
+       "opens": "mp-editing"
+      },
+      {
+       "id": "d-org-edit",
+       "label": "Organization Edit",
+       "sub": "bio, contact, links",
+       "col": 2,
+       "row": 1,
+       "opens": "mp-editing"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "d-ind-acct",
+       "to": "d-ind-edit",
+       "label": "Edit Profile",
+       "at": "app/individual/account/index.tsx:82"
+      },
+      {
+       "from": "d-org-acct",
+       "to": "d-org-edit",
+       "label": "Edit Profile",
+       "at": "app/org/account/index.tsx:97"
+      },
+      {
+       "from": "d-ind-edit",
+       "to": "d-avatar",
+       "label": "embeds uploader",
+       "at": "app/individual/account/components/EditProfileDrawer.tsx:159"
+      },
+      {
+       "from": "d-org-edit",
+       "to": "d-avatar",
+       "label": "embeds uploader",
+       "at": "app/org/account/components/EditProfileDrawer.tsx:180"
+      },
+      {
+       "from": "d-ind-acct",
+       "to": "d-delete",
+       "label": "delete-user",
+       "at": "app/individual/account/index.tsx:125"
+      },
+      {
+       "from": "d-org-acct",
+       "to": "d-delete",
+       "label": "delete-organization",
+       "tone": "warn",
+       "at": "app/org/account/index.tsx:142"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Feedback and Report Issue open the same URL",
+     "detail": "Both `handleFeedback` and `handleIssue` open the identical Google Form link on both account screens, so the two support buttons are indistinguishable.",
+     "where": "app/individual/account/index.tsx:62"
+    }
+   ],
+   "children": [
+    {
+     "id": "mp-ind-account",
+     "title": "Individual Account",
+     "sub": "The account tab for individual users, showing avatar, name, and action links",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "footprint": {
+      "dirs": [
+       "app/individual/account"
+      ],
+      "files": 2
+     },
+     "detail": "Loads the user's full name and avatar URL from AsyncStorage on every focus. Shows Settings (reset password, delete account), Support (feedback, report issue), and a sign-out link at the bottom.",
+     "code": [
+      {
+       "file": "app/individual/account/index.tsx",
+       "start": 168,
+       "end": 274,
+       "label": "Screen JSX with avatar, name, settings, support, sign-out"
+      },
+      {
+       "file": "app/individual/account/index.tsx",
+       "start": 51,
+       "end": 59,
+       "label": "fetchUserProfile reads from AsyncStorage"
+      },
+      {
+       "file": "app/individual/account/index.tsx",
+       "start": 69,
+       "end": 79,
+       "label": "handleSignOut clears storage then signs out"
+      },
+      {
+       "file": "app/individual/account/index.tsx",
+       "start": 111,
+       "end": 162,
+       "label": "deleteAccount invokes delete-user edge function"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Individual Account",
+       "caption": "What the individual user sees on the Account tab",
+       "items": [
+        {
+         "type": "image",
+         "label": "Avatar",
+         "note": "tappable to upload a new photo"
+        },
+        {
+         "type": "heading",
+         "label": "Full Name"
+        },
+        {
+         "type": "button",
+         "label": "Edit Profile",
+         "note": "opens the edit drawer"
+        },
+        {
+         "type": "heading",
+         "label": "Settings"
+        },
+        {
+         "type": "button",
+         "label": "🔒 Reset password",
+         "note": "navigates to (auth)/resetPassword"
+        },
+        {
+         "type": "button",
+         "label": "🗑️ Delete account",
+         "note": "confirmation alert, then delete-user"
+        },
+        {
+         "type": "heading",
+         "label": "Support"
+        },
+        {
+         "type": "button",
+         "label": "💬 Feedback",
+         "note": "opens Google Form"
+        },
+        {
+         "type": "button",
+         "label": "📢 Report an issue",
+         "note": "opens same Google Form"
+        },
+        {
+         "type": "button",
+         "label": "Sign Out",
+         "note": "clears AsyncStorage, then signOut()"
+        }
+       ]
+      },
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Set signing-out flag",
+         "detail": "Triggers a useLayoutEffect that calls router.replace('/') immediately, before the async work finishes.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Clear AsyncStorage",
+         "detail": "All cached profile and event data is removed.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Supabase sign out",
+         "detail": "Revokes the session token via supabase.auth.signOut().",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Reset flag",
+         "detail": "Sets isSigningOut back to false in finally block.",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "mp-org-account",
+     "title": "Organization Account",
+     "sub": "The account tab for organisation users, showing avatar, org name, and action links",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "footprint": {
+      "dirs": [
+       "app/org/account"
+      ],
+      "files": 2
+     },
+     "detail": "Nearly identical to the individual screen, but loads org name and avatar from AsyncStorage with a retry loop (up to 5 attempts, 500 ms apart). Calls `delete-organization` for account deletion, but that edge function does not exist.",
+     "code": [
+      {
+       "file": "app/org/account/index.tsx",
+       "start": 171,
+       "end": 271,
+       "label": "Screen JSX with avatar, org name, settings, support, sign-out"
+      },
+      {
+       "file": "app/org/account/index.tsx",
+       "start": 51,
+       "end": 74,
+       "label": "fetchOrgProfile with retry loop reading AsyncStorage"
+      },
+      {
+       "file": "app/org/account/index.tsx",
+       "start": 129,
+       "end": 169,
+       "label": "deleteOrg invokes missing delete-organization function"
+      },
+      {
+       "file": "app/org/account/index.tsx",
+       "start": 84,
+       "end": 94,
+       "label": "handleSignOut clears storage then signs out"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Organization Account",
+       "caption": "What the organisation user sees on the Account tab",
+       "items": [
+        {
+         "type": "image",
+         "label": "Avatar",
+         "note": "tappable to upload a new photo"
+        },
+        {
+         "type": "heading",
+         "label": "Organization Name"
+        },
+        {
+         "type": "button",
+         "label": "Edit Profile",
+         "note": "opens the org edit drawer"
+        },
+        {
+         "type": "heading",
+         "label": "Organization Settings"
+        },
+        {
+         "type": "button",
+         "label": "🔒 Reset password",
+         "note": "navigates to (auth)/resetPassword"
+        },
+        {
+         "type": "button",
+         "label": "🗑️ Delete account",
+         "note": "calls delete-organization (missing)"
+        },
+        {
+         "type": "heading",
+         "label": "Support"
+        },
+        {
+         "type": "button",
+         "label": "💬 Feedback / 📢 Report issue",
+         "note": "both open same Google Form"
+        },
+        {
+         "type": "button",
+         "label": "Sign Out",
+         "note": "clears AsyncStorage, then signOut()"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Retry logic",
+         "value": "fetchOrgProfile polls AsyncStorage up to 5 times at 500 ms intervals if user data is not yet available",
+         "state": "derived"
+        },
+        {
+         "label": "Imports",
+         "value": "AvatarUploader is imported from the individual account path, not duplicated",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "delete-organization function does not exist",
+       "detail": "The screen invokes `supabase.functions.invoke('delete-organization')` but no such edge function is deployed. Only `delete-user` exists. Organisation deletion always fails with a function-not-found error.",
+       "where": "app/org/account/index.tsx:142"
+      }
+     ]
+    },
+    {
+     "id": "mp-editing",
+     "title": "Editing Profiles",
+     "sub": "Bottom-sheet drawers for editing individual interests or organisation contact details, plus shared avatar upload",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "footprint": {
+      "dirs": [
+       "app/individual/account/components",
+       "app/org/account/components"
+      ],
+      "files": 3
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Two edit drawers and a shared avatar uploader, grouped by the editing concern"
+     },
+     "detail": "Each account type has its own edit drawer: individual saves interests only, organisation saves bio, contact name, email, website, and Instagram. Both embed the same `AvatarUploader` component.",
+     "code": [
+      {
+       "file": "app/individual/account/components/EditProfileDrawer.tsx",
+       "start": 104,
+       "end": 124,
+       "label": "Individual handleSave: writes interests only"
+      },
+      {
+       "file": "app/org/account/components/EditProfileDrawer.tsx",
+       "start": 106,
+       "end": 130,
+       "label": "Org handleSave: writes bio, contact, website, instagram"
+      },
+      {
+       "file": "app/individual/account/components/UploadAvatar.tsx",
+       "start": 84,
+       "end": 133,
+       "label": "Shared avatar upload flow"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Two drawers sharing one avatar uploader, each writing different fields to Supabase",
+       "boxes": [
+        {
+         "id": "e-ind-edit",
+         "label": "Individual Edit",
+         "sub": "interests only",
+         "col": 0,
+         "row": 0,
+         "opens": "mp-edit-ind"
+        },
+        {
+         "id": "e-avatar",
+         "label": "Avatar Uploader",
+         "sub": "pick, upload, update",
+         "col": 1,
+         "row": 0,
+         "opens": "mp-avatar"
+        },
+        {
+         "id": "e-org-edit",
+         "label": "Organization Edit",
+         "sub": "bio, contact, links",
+         "col": 2,
+         "row": 0,
+         "opens": "mp-edit-org"
+        },
+        {
+         "id": "e-supabase",
+         "label": "Supabase",
+         "sub": "DB + storage bucket",
+         "col": 1,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "e-ind-edit",
+         "to": "e-avatar",
+         "label": "embeds uploader",
+         "at": "app/individual/account/components/EditProfileDrawer.tsx:159"
+        },
+        {
+         "from": "e-org-edit",
+         "to": "e-avatar",
+         "label": "embeds uploader",
+         "at": "app/org/account/components/EditProfileDrawer.tsx:180"
+        },
+        {
+         "from": "e-ind-edit",
+         "to": "e-supabase",
+         "label": "saves interests",
+         "at": "app/individual/account/components/EditProfileDrawer.tsx:106"
+        },
+        {
+         "from": "e-org-edit",
+         "to": "e-supabase",
+         "label": "saves contact info",
+         "at": "app/org/account/components/EditProfileDrawer.tsx:108"
+        },
+        {
+         "from": "e-avatar",
+         "to": "e-supabase",
+         "label": "uploads + updates",
+         "at": "app/individual/account/components/UploadAvatar.tsx:117"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What each drawer edits",
+       "columns": [
+        "Drawer",
+        "Fields saved to Supabase",
+        "Target table"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Individual",
+         "interests (array, max 5)",
+         "individual"
+        ],
+        [
+         "Organization",
+         "bio, contact_name, contact_email, website, instagram",
+         "organizations"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Neither drawer updates AsyncStorage after save",
+       "detail": "Both drawers write to Supabase but never update the AsyncStorage cache. The `onSave` callback re-reads AsyncStorage, so saved changes are invisible on the account page until the cache is refreshed on next app launch.",
+       "where": "app/individual/account/components/EditProfileDrawer.tsx:114"
+      }
+     ],
+     "children": [
+      {
+       "id": "mp-edit-ind",
+       "title": "Individual Interests",
+       "sub": "A grid of 8 category chips with a maximum of 5 selectable",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "Shows the avatar uploader and a wrapped grid of interest categories from `categories.ts`. Tapping a chip toggles it; at 5 selected further additions are silently ignored and a red warning appears.",
+       "code": [
+        {
+         "file": "app/individual/account/components/EditProfileDrawer.tsx",
+         "start": 170,
+         "end": 210,
+         "label": "Interests grid with toggle and 5-cap logic"
+        },
+        {
+         "file": "app/individual/account/components/EditProfileDrawer.tsx",
+         "start": 104,
+         "end": 124,
+         "label": "handleSave writes only the interests array"
+        },
+        {
+         "file": "app/individual/index/data/categories.ts",
+         "start": 1,
+         "end": 11,
+         "label": "The 8 interest categories"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "Individual Edit Drawer",
+         "caption": "What appears when Edit Profile is tapped",
+         "items": [
+          {
+           "type": "heading",
+           "label": "Edit Profile"
+          },
+          {
+           "type": "image",
+           "label": "Avatar Uploader",
+           "note": "tap to change photo"
+          },
+          {
+           "type": "heading",
+           "label": "Interests"
+          },
+          {
+           "type": "choice",
+           "label": "Category chips",
+           "note": "max 5; red warning at limit"
+          },
+          {
+           "type": "button",
+           "label": "Save",
+           "note": "writes interests array to individual table"
+          }
+         ]
+        },
+        {
+         "kind": "chips",
+         "caption": "The 8 interest categories",
+         "rows": [
+          {
+           "label": "Social 👫",
+           "state": "derived"
+          },
+          {
+           "label": "Cultural 🎭",
+           "state": "derived"
+          },
+          {
+           "label": "STEM 🔬",
+           "state": "derived"
+          },
+          {
+           "label": "Sports & Recreation 🎯",
+           "state": "derived"
+          },
+          {
+           "label": "Business, Law & Policy 🏛️",
+           "state": "derived"
+          },
+          {
+           "label": "Education & Social Service 🎓",
+           "state": "derived"
+          },
+          {
+           "label": "Religion & Philosophy 🤔",
+           "state": "derived"
+          },
+          {
+           "label": "Health & Wellbeing 💪",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "mp-edit-org",
+       "title": "Organization Details",
+       "sub": "Text fields for bio, contact info, website, and Instagram handle",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "Shows the avatar uploader and five text fields, all written to the `organizations` table on save. The drawer takes 80% of screen height and handles keyboard avoidance on iOS.",
+       "code": [
+        {
+         "file": "app/org/account/components/EditProfileDrawer.tsx",
+         "start": 183,
+         "end": 222,
+         "label": "The five input fields and save button"
+        },
+        {
+         "file": "app/org/account/components/EditProfileDrawer.tsx",
+         "start": 106,
+         "end": 130,
+         "label": "handleSave updates organizations table"
+        },
+        {
+         "file": "app/org/account/components/EditProfileDrawer.tsx",
+         "start": 238,
+         "end": 256,
+         "label": "Reusable InputField component"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "Organization Edit Drawer",
+         "caption": "What appears when Edit Profile is tapped on the org account",
+         "items": [
+          {
+           "type": "heading",
+           "label": "Edit Profile"
+          },
+          {
+           "type": "image",
+           "label": "Avatar Uploader",
+           "note": "tap to change photo"
+          },
+          {
+           "type": "field",
+           "label": "Organization bio"
+          },
+          {
+           "type": "field",
+           "label": "Contact Name"
+          },
+          {
+           "type": "field",
+           "label": "Contact Email",
+           "note": "email-address keyboard"
+          },
+          {
+           "type": "field",
+           "label": "Website",
+           "note": "url keyboard"
+          },
+          {
+           "type": "field",
+           "label": "Instagram"
+          },
+          {
+           "type": "button",
+           "label": "Save",
+           "note": "writes all five fields to organizations table"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "mp-avatar",
+       "title": "Avatar Upload",
+       "sub": "Shared component that picks an image, uploads to Supabase storage, and updates the database",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "Used by both edit drawers, this opens the device image picker, uploads to the `user_avatar` bucket with a timestamped filename, and updates `avatar_url` in either `individual` or `organizations`. AsyncStorage is only synced for individual users.",
+       "code": [
+        {
+         "file": "app/individual/account/components/UploadAvatar.tsx",
+         "start": 84,
+         "end": 133,
+         "label": "uploadAvatar: pick, upload, update DB"
+        },
+        {
+         "file": "app/individual/account/components/UploadAvatar.tsx",
+         "start": 54,
+         "end": 82,
+         "label": "updateAvatarUrl: writes to individual or organizations"
+        },
+        {
+         "file": "app/individual/account/components/UploadAvatar.tsx",
+         "start": 39,
+         "end": 52,
+         "label": "downloadImage: gets public URL from bucket"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Pick image",
+           "detail": "Opens expo-image-picker; allows editing, one image, full quality.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Upload to bucket",
+           "detail": "Fetches as ArrayBuffer, uploads to user_avatar bucket as {type}_{timestamp}.{ext}.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Update database",
+           "detail": "Sets avatar_url on the individual or organizations table row.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Sync localStorage",
+           "detail": "Updates AsyncStorage with new avatar_url, but only for individual users.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Display new image",
+           "detail": "Fetches the public URL from the bucket and shows it on screen.",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "map",
+         "caption": "How the type prop changes what is updated",
+         "rows": [
+          {
+           "from": "type = individual",
+           "to": "Updates individual table + AsyncStorage",
+           "state": "derived"
+          },
+          {
+           "from": "type = organization",
+           "to": "Updates organizations table only — no AsyncStorage sync",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Old avatars accumulate in storage",
+         "detail": "Each upload creates a new file with a timestamp-based name and `upsert: false`. The previous avatar file is never deleted, so the storage bucket grows indefinitely with orphaned images.",
+         "where": "app/individual/account/components/UploadAvatar.tsx:121"
+        },
+        {
+         "title": "Org avatar not synced to AsyncStorage",
+         "detail": "The `updateAvatarUrl` function only writes to AsyncStorage for individual users. After an org uploads a new avatar, the account page re-reads from stale AsyncStorage and continues to show the old image.",
+         "where": "app/individual/account/components/UploadAvatar.tsx:71"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "mp-deletion",
+     "title": "Deleting An Account",
+     "sub": "A Supabase edge function that deletes an individual user's profile and auth record",
+     "state": "partial",
+     "unsure": "Whether orphaned avatar files remain indefinitely depends on Supabase storage bucket lifecycle/cascade policies, which are not defined in this repository.",
+     "col": 0,
+     "row": 3,
+     "detail": "The `delete-user` edge function authenticates the caller from their JWT, deletes their `individual` table row, then removes the auth user. There is no `delete-organization` function, so org deletion always fails.",
+     "code": [
+      {
+       "file": "supabase/functions/delete-user/index.ts",
+       "start": 6,
+       "end": 60,
+       "label": "Full edge function handler"
+      },
+      {
+       "file": "supabase/functions/delete-user/index.ts",
+       "start": 17,
+       "end": 27,
+       "label": "JWT extraction and validation"
+      },
+      {
+       "file": "supabase/functions/delete-user/index.ts",
+       "start": 32,
+       "end": 47,
+       "label": "Delete individual row then auth user"
+      },
+      {
+       "file": "app/individual/account/index.tsx",
+       "start": 111,
+       "end": 162,
+       "label": "Client-side deleteAccount for individual"
+      },
+      {
+       "file": "app/org/account/index.tsx",
+       "start": 129,
+       "end": 169,
+       "label": "Client-side deleteOrg calls missing function"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Individual account deletion flow",
+       "actors": [
+        "Phone",
+        "delete-user fn",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Phone",
+         "to": "delete-user fn",
+         "label": "invoke with JWT in Authorization header",
+         "state": "derived"
+        },
+        {
+         "from": "delete-user fn",
+         "to": "Supabase",
+         "label": "validate JWT, extract user id",
+         "state": "derived"
+        },
+        {
+         "from": "delete-user fn",
+         "to": "Supabase",
+         "label": "DELETE FROM individual WHERE id = userId",
+         "state": "derived"
+        },
+        {
+         "from": "delete-user fn",
+         "to": "Supabase",
+         "label": "auth.admin.deleteUser(userId)",
+         "state": "derived"
+        },
+        {
+         "from": "delete-user fn",
+         "to": "Phone",
+         "label": "{ success: true }",
+         "state": "derived"
+        },
+        {
+         "from": "Phone",
+         "to": "Supabase",
+         "label": "supabase.auth.signOut()",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Auth method",
+         "value": "JWT from Authorization header; ignores the userId sent in the request body",
+         "state": "derived"
+        },
+        {
+         "label": "Admin client",
+         "value": "Created with SUPABASE_SERVICE_ROLE_KEY so it can bypass RLS",
+         "state": "derived"
+        },
+        {
+         "label": "Cleanup gaps",
+         "value": "Avatar files in user_avatar bucket and rsvp entries in events JSON are not removed",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "No delete-organization function exists",
+       "detail": "The org account screen invokes `delete-organization` but no such edge function is deployed. Only `delete-user` exists, and it deletes from the `individual` table. Organisations can never delete their account through the UI.",
+       "where": "app/org/account/index.tsx:142"
+      },
+      {
+       "title": "Deletion does not remove storage files",
+       "detail": "The delete-user function removes the database row and auth record but does not delete the user's avatar images from storage. Whether orphaned files persist depends on external Supabase bucket configuration.",
+       "where": "supabase/functions/delete-user/index.ts:32"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "app-shell",
+   "title": "App Shell",
+   "sub": "Infrastructure that launches the app, checks authentication, routes to the right screen, and provides shared services",
+   "footprint": {
+    "dirs": [
+     "app/",
+     "lib/",
+     "components/",
+     "constants/",
+     "hooks/",
+     "android/",
+     "api/",
+     "supabase/"
+    ],
+    "files": 21
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Architectural pieces that support all feature screens"
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "supabase",
+     "expo"
+    ]
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 5,
+   "detail": "Everything that runs before a feature screen mounts: splash, fonts, auth redirect to individual, org, or login, Supabase connection, local caching, and themed components. Two independent auth checks race on startup.",
+   "code": [
+    {
+     "file": "app/_layout.tsx",
+     "start": 24,
+     "end": 114,
+     "label": "Root layout: fonts, splash, auth check, Stack router"
+    },
+    {
+     "file": "app/index.tsx",
+     "start": 11,
+     "end": 95,
+     "label": "Index screen: second auth check with loading spinner"
+    },
+    {
+     "file": "lib/supabase.ts",
+     "start": 5,
+     "end": 16,
+     "label": "Supabase client with hardcoded credentials"
+    },
+    {
+     "file": "lib/localStorage.ts",
+     "start": 5,
+     "end": 76,
+     "label": "AsyncStorage helpers and event fetch-cache"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the app launches and decides where to route",
+     "boxes": [
+      {
+       "id": "native",
+       "label": "Native Entry",
+       "sub": "Android Activity / iOS",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "layout",
+       "label": "Root Layout",
+       "sub": "fonts, splash, auth check",
+       "col": 1,
+       "row": 0,
+       "opens": "as-launch"
+      },
+      {
+       "id": "supa",
+       "label": "Supabase",
+       "sub": "auth + database client",
+       "col": 2,
+       "row": 0,
+       "opens": "as-supabase"
+      },
+      {
+       "id": "index",
+       "label": "Index Screen",
+       "sub": "auth re-check, spinner",
+       "col": 1,
+       "row": 1,
+       "opens": "as-launch",
+       "tone": "warn"
+      },
+      {
+       "id": "stor",
+       "label": "AsyncStorage",
+       "sub": "uuid, user, events cache",
+       "col": 2,
+       "row": 1,
+       "opens": "as-storage"
+      },
+      {
+       "id": "indiv",
+       "label": "Individual Tabs",
+       "sub": "home, saved, account",
+       "col": 0,
+       "row": 2
+      },
+      {
+       "id": "orgtab",
+       "label": "Organisation Tabs",
+       "sub": "home, events, account",
+       "col": 1,
+       "row": 2
+      },
+      {
+       "id": "loginsc",
+       "label": "Login Screen",
+       "sub": "email + password",
+       "col": 2,
+       "row": 2
+      }
+     ],
+     "arrows": [
+      {
+       "from": "native",
+       "to": "layout",
+       "label": "launches",
+       "at": "android/app/src/main/java/com/explorify/explorify/MainActivity.kt:26"
+      },
+      {
+       "from": "layout",
+       "to": "supa",
+       "label": "auth check (races)",
+       "tone": "warn",
+       "at": "app/_layout.tsx:50"
+      },
+      {
+       "from": "layout",
+       "to": "index",
+       "label": "mounts route",
+       "at": "app/_layout.tsx:106"
+      },
+      {
+       "from": "index",
+       "to": "supa",
+       "label": "auth check",
+       "at": "app/index.tsx:22"
+      },
+      {
+       "from": "index",
+       "to": "stor",
+       "label": "caches uuid",
+       "at": "app/index.tsx:23"
+      },
+      {
+       "from": "index",
+       "to": "indiv",
+       "label": "if individual",
+       "at": "app/index.tsx:39"
+      },
+      {
+       "from": "index",
+       "to": "orgtab",
+       "label": "if organization",
+       "at": "app/index.tsx:54"
+      },
+      {
+       "from": "index",
+       "to": "loginsc",
+       "label": "if no user",
+       "at": "app/index.tsx:61"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Two auth checks race on every app launch",
+     "detail": "Both _layout.tsx and index.tsx independently call supabase.auth.getUser() and navigate on mount. The layout uses router.push while the index uses router.replace, so two navigations can fire for the same user.",
+     "where": "app/_layout.tsx:46"
+    },
+    {
+     "title": "Undefined token crashes individual login",
+     "detail": "index.tsx references token.data to update the push token, but token is never declared or imported. Any individual user routed through this path hits a ReferenceError.",
+     "where": "app/index.tsx:35"
+    }
+   ],
+   "children": [
+    {
+     "id": "as-launch",
+     "title": "Launch Routing",
+     "sub": "How the app decides whether to show individual, organisation, or login screens",
+     "footprint": {
+      "dirs": [
+       "app/_layout.tsx",
+       "app/index.tsx",
+       "app/+html.tsx",
+       "app/+not-found.tsx"
+      ],
+      "files": 4
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "On mount, both `_layout.tsx` and `index.tsx` independently query Supabase for the current user, check the individual and organizations tables, then navigate. They use different navigation methods and can interfere.",
+     "code": [
+      {
+       "file": "app/_layout.tsx",
+       "start": 46,
+       "end": 90,
+       "label": "Layout checkUser: getUser then individual then org then login"
+      },
+      {
+       "file": "app/index.tsx",
+       "start": 18,
+       "end": 73,
+       "label": "Index checkUser: same queries, adds push token update"
+      },
+      {
+       "file": "app/_layout.tsx",
+       "start": 26,
+       "end": 31,
+       "label": "Nunito font loading with useFonts"
+      },
+      {
+       "file": "app/_layout.tsx",
+       "start": 102,
+       "end": 112,
+       "label": "Stack with individual, org, and not-found screens"
+      },
+      {
+       "file": "app/+not-found.tsx",
+       "start": 7,
+       "end": 19,
+       "label": "404 screen with link back to home"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Both auth checks fire on every cold start",
+       "actors": [
+        "Native",
+        "Root Layout",
+        "Index Screen",
+        "Supabase"
+       ],
+       "rows": [
+        {
+         "from": "Native",
+         "to": "Root Layout",
+         "label": "App launches, layout mounts, fonts load",
+         "state": "derived"
+        },
+        {
+         "from": "Root Layout",
+         "to": "Supabase",
+         "label": "checkUser: supabase.auth.getUser()",
+         "state": "derived"
+        },
+        {
+         "from": "Root Layout",
+         "to": "Index Screen",
+         "label": "Stack renders index as initial route",
+         "state": "derived"
+        },
+        {
+         "from": "Index Screen",
+         "to": "Supabase",
+         "label": "checkUser: supabase.auth.getUser() again",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Root Layout",
+         "label": "user object or null",
+         "state": "derived"
+        },
+        {
+         "from": "Root Layout",
+         "to": "Supabase",
+         "label": "select * from individual where id = user.id",
+         "state": "derived"
+        },
+        {
+         "from": "Supabase",
+         "to": "Index Screen",
+         "label": "user object or null",
+         "state": "derived"
+        },
+        {
+         "from": "Index Screen",
+         "to": "Supabase",
+         "label": "select * from individual where id = user.id",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "How the two auth checks differ",
+       "columns": [
+        "Aspect",
+        "_layout.tsx",
+        "index.tsx"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Navigation",
+         "router.push",
+         "router.replace"
+        ],
+        [
+         "Login route",
+         "/login",
+         "/(auth)/login"
+        ],
+        [
+         "Push token",
+         "Not updated",
+         "Updates but token undefined"
+        ],
+        [
+         "Font loading",
+         "Yes, five Nunito weights",
+         "No"
+        ],
+        [
+         "Splash screen",
+         "Controls hide",
+         "No"
+        ],
+        [
+         "Loading UI",
+         "Returns null (blank)",
+         "ActivityIndicator spinner"
+        ]
+       ]
+      },
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Splash screen holds",
+         "detail": "preventAutoHideAsync keeps the splash visible while fonts load.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Fonts loaded, splash hides",
+         "detail": "useFonts resolves, hideAsync called, Stack renders index route.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Both checkUser fire",
+         "detail": "Layout and index each call supabase.auth.getUser() independently on mount.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Check individual table",
+         "detail": "Query individual table by user id. If found, route to /individual and cache profile.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Check organizations table",
+         "detail": "If not individual, query organizations. If found, route to /org and cache profile.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Fall through to login",
+         "detail": "No user or no profile row found: route to login screen.",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Undefined token crashes individual route",
+       "detail": "index.tsx at line 35 writes token.data to the individual table, but token is never declared. Every individual user routed through the index hits a ReferenceError before reaching the home screen.",
+       "where": "app/index.tsx:35"
+      },
+      {
+       "title": "Duplicate navigations for the same user",
+       "detail": "Layout calls router.push('/individual') and index calls router.replace('/individual') for the same authenticated user. Whichever resolves second either pushes a duplicate stack entry or silently replaces the first.",
+       "where": "app/_layout.tsx:59"
+      }
+     ]
+    },
+    {
+     "id": "as-supabase",
+     "title": "Supabase Client",
+     "sub": "The single database and auth connection shared by the entire app",
+     "footprint": {
+      "dirs": [
+       "lib/supabase.ts",
+       "supabase/functions/_shared/cors.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "A single `createClient` call with project URL and anon key hardcoded in source, using AsyncStorage for persistent sessions. Auto-refresh is on; URL detection is off for React Native.",
+     "code": [
+      {
+       "file": "lib/supabase.ts",
+       "start": 5,
+       "end": 16,
+       "label": "Client creation with hardcoded URL and anon key"
+      },
+      {
+       "file": "supabase/functions/_shared/cors.ts",
+       "start": 1,
+       "end": 5,
+       "label": "CORS headers for Supabase edge functions"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Project host",
+         "value": "ngovhqybxeiwyezwpjgi.supabase.co",
+         "state": "derived"
+        },
+        {
+         "label": "Auth storage",
+         "value": "AsyncStorage — sessions persist across app restarts",
+         "state": "derived"
+        },
+        {
+         "label": "Auto-refresh",
+         "value": "Enabled — tokens refresh automatically",
+         "state": "derived"
+        },
+        {
+         "label": "Detect session URL",
+         "value": "Disabled — no browser URL bar in React Native",
+         "state": "derived"
+        },
+        {
+         "label": "Edge function CORS",
+         "value": "Allow all origins, auth + apikey + content-type headers",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Supabase anon key committed to source",
+       "detail": "The full JWT anon key is hardcoded in lib/supabase.ts. While anon keys are meant for client use with Row Level Security, committing them makes key rotation harder and exposes the project reference to anyone with repo access.",
+       "where": "lib/supabase.ts:6"
+      }
+     ]
+    },
+    {
+     "id": "as-storage",
+     "title": "Data Caching",
+     "sub": "AsyncStorage wrappers and Supabase fetch-and-cache helpers used across all screens",
+     "footprint": {
+      "dirs": [
+       "lib/localStorage.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Three generic AsyncStorage wrappers (`storeData`, `retrieveData`, `removeData`) plus three fetch functions that query Supabase tables and cache results under fixed keys: `uuid`, `user`, and `events`.",
+     "code": [
+      {
+       "file": "lib/localStorage.ts",
+       "start": 5,
+       "end": 40,
+       "label": "Generic store, retrieve, remove wrappers"
+      },
+      {
+       "file": "lib/localStorage.ts",
+       "start": 42,
+       "end": 76,
+       "label": "fetchAllEvents: published events for a campus, today onward"
+      },
+      {
+       "file": "lib/localStorage.ts",
+       "start": 78,
+       "end": 106,
+       "label": "fetchUserProfileOrg: org row by stored uuid"
+      },
+      {
+       "file": "lib/localStorage.ts",
+       "start": 108,
+       "end": 136,
+       "label": "fetchUserProfileIndividual: individual row by stored uuid"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "AsyncStorage keys used across the app",
+       "columns": [
+        "Key",
+        "Written by",
+        "Contains"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "uuid",
+         "Auth checks in _layout.tsx and index.tsx",
+         "Supabase user id string"
+        ],
+        [
+         "events",
+         "fetchAllEvents(location)",
+         "Published events for campus, today onward"
+        ],
+        [
+         "user",
+         "fetchUserProfileOrg / fetchUserProfileIndividual",
+         "Full row from individual or organizations table"
+        ]
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "Fetch functions: what goes in, what comes back",
+       "rows": [
+        {
+         "from": "fetchAllEvents(location)",
+         "to": "Events for that campus, filtered to today+, stored as 'events'",
+         "state": "derived"
+        },
+        {
+         "from": "fetchUserProfileOrg()",
+         "to": "Organization row by stored uuid, stored as 'user'",
+         "state": "derived"
+        },
+        {
+         "from": "fetchUserProfileIndividual()",
+         "to": "Individual row by stored uuid, stored as 'user'",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Date filter",
+         "value": "fetchAllEvents uses date-fns to drop events before startOfDay(now)",
+         "state": "derived"
+        },
+        {
+         "label": "Null guard",
+         "value": "storeData rejects null or undefined with a warning, returns false",
+         "state": "derived"
+        },
+        {
+         "label": "Error handling",
+         "value": "All functions catch, log, and return false — callers get no error detail",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "as-theming",
+     "title": "UI Primitives",
+     "sub": "Themed text and view components, color constants, and font variants",
+     "footprint": {
+      "dirs": [
+       "components/",
+       "hooks/",
+       "constants/"
+      ],
+      "files": 9
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`ThemedText` and `ThemedView` read the device color scheme through hooks, but dark mode is force-disabled at startup and the dark palette is identical to light. Five Nunito font weights are available.",
+     "code": [
+      {
+       "file": "components/ThemedText.tsx",
+       "start": 11,
+       "end": 52,
+       "label": "ThemedText: themed color and Nunito font variants"
+      },
+      {
+       "file": "components/ThemedView.tsx",
+       "start": 10,
+       "end": 14,
+       "label": "ThemedView: background from current theme"
+      },
+      {
+       "file": "hooks/useThemeColor.ts",
+       "start": 10,
+       "end": 22,
+       "label": "useThemeColor: resolves light or dark color"
+      },
+      {
+       "file": "constants/Colors.ts",
+       "start": 9,
+       "end": 26,
+       "label": "Light and dark palettes with identical values"
+      },
+      {
+       "file": "components/navigation/SafeView.tsx",
+       "start": 3,
+       "end": 9,
+       "label": "Android safe area with status bar padding"
+      },
+      {
+       "file": "components/navigation/TabBarIcon.tsx",
+       "start": 7,
+       "end": 9,
+       "label": "TabBarIcon: Ionicons at 28px for tab bars"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Shared UI components",
+       "columns": [
+        "Component",
+        "What it does"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "ThemedText",
+         "Text with theme color and one of five Nunito weights"
+        ],
+        [
+         "ThemedView",
+         "View with theme-aware background color"
+        ],
+        [
+         "TabBarIcon",
+         "Ionicons wrapper at 28px with bottom margin for tabs"
+        ],
+        [
+         "SafeView",
+         "StyleSheet with Android status-bar top padding"
+        ],
+        [
+         "useThemeColor",
+         "Hook: returns color from theme with optional overrides"
+        ],
+        [
+         "useColorScheme",
+         "Re-exports RN hook; web version always returns 'light'"
+        ]
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Nunito font variants loaded at startup",
+       "rows": [
+        {
+         "label": "NunitoLight",
+         "state": "derived"
+        },
+        {
+         "label": "NunitoRegular",
+         "state": "derived"
+        },
+        {
+         "label": "NunitoSemiBold",
+         "state": "derived"
+        },
+        {
+         "label": "NunitoBold",
+         "state": "derived"
+        },
+        {
+         "label": "NunitoExtraBold",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Dark mode palette identical to light",
+       "detail": "Colors.ts defines dark mode with the exact same values as light (same text, background, tint, icon colors). The theming hooks work but produce no visible difference. Additionally, _layout.tsx force-sets Appearance to 'light'.",
+       "where": "constants/Colors.ts:18"
+      }
+     ]
+    },
+    {
+     "id": "as-config",
+     "title": "Build Configuration",
+     "sub": "Expo config, Babel, Tailwind, Android native entry, and Flask API stub",
+     "footprint": {
+      "dirs": [
+       "app.config.js",
+       "babel.config.js",
+       "tailwind.config.js",
+       "android/",
+       "api/"
+      ],
+      "files": 6
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "Expo config, Babel with NativeWind, and Tailwind define the build pipeline; Android entries are standard Expo boilerplate and a Flask API stub serves only 'Hello World'.",
+     "code": [
+      {
+       "file": "app.config.js",
+       "start": 1,
+       "end": 16,
+       "label": "Expo config: scheme, EAS project ID, bundle identifiers"
+      },
+      {
+       "file": "babel.config.js",
+       "start": 1,
+       "end": 7,
+       "label": "Babel with expo preset and NativeWind plugin"
+      },
+      {
+       "file": "tailwind.config.js",
+       "start": 2,
+       "end": 24,
+       "label": "Tailwind theme with custom color palette"
+      },
+      {
+       "file": "android/app/src/main/java/com/explorify/explorify/MainActivity.kt",
+       "start": 13,
+       "end": 41,
+       "label": "Android Activity: AppTheme, main component, Expo wrapper"
+      },
+      {
+       "file": "android/app/src/main/java/com/explorify/explorify/MainApplication.kt",
+       "start": 18,
+       "end": 49,
+       "label": "Application: RN host, SoLoader, lifecycle dispatch"
+      },
+      {
+       "file": "api/app.py",
+       "start": 8,
+       "end": 20,
+       "label": "Flask app with CORS, SQLAlchemy stub, Hello World"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Configuration files and what they control",
+       "columns": [
+        "File",
+        "Purpose"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "app.config.js",
+         "Expo scheme 'explorify', EAS project ID, bundle: com.explorify.explorify"
+        ],
+        [
+         "babel.config.js",
+         "babel-preset-expo + nativewind/babel for Tailwind in RN"
+        ],
+        [
+         "tailwind.config.js",
+         "Custom colors: accent, dark, blueFill, gray variants, red"
+        ],
+        [
+         "MainActivity.kt",
+         "Sets AppTheme, renders 'main' component, handles back button"
+        ],
+        [
+         "MainApplication.kt",
+         "RN host with Expo wrapper, SoLoader, New Architecture toggle"
+        ],
+        [
+         "api/app.py",
+         "Flask + CORS + SQLAlchemy — only a Hello World route exists"
+        ]
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Tailwind custom colors",
+       "rows": [
+        {
+         "label": "accent: #1DA1F2",
+         "state": "derived"
+        },
+        {
+         "label": "dark: #212427",
+         "state": "derived"
+        },
+        {
+         "label": "blueFill: #F0F8FF",
+         "state": "derived"
+        },
+        {
+         "label": "blueBorder: #7DCAFC",
+         "state": "derived"
+        },
+        {
+         "label": "gray: #DDDDDD",
+         "state": "derived"
+        },
+        {
+         "label": "lightGray: #F1F1F1",
+         "state": "derived"
+        },
+        {
+         "label": "darkGray: #999999",
+         "state": "derived"
+        },
+        {
+         "label": "red: #ED0303",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Flask host uses commas instead of dots",
+       "detail": "api/app.py passes host='10,193,207,116' which is not a valid IP address. The Flask dev server fails to bind when run directly via python app.py.",
+       "where": "api/app.py:20"
+      },
+      {
+       "title": "SQLAlchemy initialized but never configured",
+       "detail": "api/app.py creates a SQLAlchemy instance and db_name but never sets SQLALCHEMY_DATABASE_URI on the Flask app. No database connection is possible.",
+       "where": "api/app.py:8"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "E0": [
+  {
+   "from": "signing-up",
+   "to": "finding-events",
+   "label": "routes student to",
+   "lane": "individual",
+   "order": 1,
+   "state": "derived"
+  },
+  {
+   "from": "signing-up",
+   "to": "managing-events",
+   "label": "routes org to",
+   "lane": "org",
+   "order": 1,
+   "state": "derived"
+  },
+  {
+   "from": "managing-events",
+   "to": "creating-events",
+   "label": "opens form for",
+   "state": "derived"
+  }
+ ],
+ "LINKS": []
+}

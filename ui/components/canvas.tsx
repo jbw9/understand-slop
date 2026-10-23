@@ -533,33 +533,43 @@ function Level({
         }
       />
 
-      <div className="flex flex-col gap-12">
+      {/* One hairline between every block, the full width of the level, so it
+          is plain where one thing ends and the next begins — a picture under
+          a table is its own thing, not more of the table. Each block's width
+          cap is on an inner box, so the line never stops at a ragged edge. */}
+      <div className="flex flex-col [&>*+*]:mt-10 [&>*+*]:border-t [&>*+*]:border-border-gray [&>*+*]:pt-10">
         {/* The picture is the main thing on the level, not a thumbnail in
             the header's corner. */}
         {figure ? (
-          <div data-pick="The picture" className="max-w-[540px]">
-            <ShapeView shape={figure} />
+          <div data-pick="The picture">
+            <div className="max-w-[540px]">
+              <ShapeView shape={figure} />
+            </div>
           </div>
         ) : null}
 
         {blocks.map((b, i) =>
           isExplained(b) ? (
-            <div key={i} data-pick={blockLabel(b)} className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
-              <ExplainedBlock
-                block={b}
-                onOpen={(id) =>
-                  kids.some((k) => k.id === id) ? onOpen([...path, id]) : undefined
-                }
-                hrefFor={(id) =>
-                  `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
-                }
-              />
+            <div key={i} data-pick={blockLabel(b)}>
+              <div className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
+                <ExplainedBlock
+                  block={b}
+                  onOpen={(id) =>
+                    kids.some((k) => k.id === id) ? onOpen([...path, id]) : undefined
+                  }
+                  hrefFor={(id) =>
+                    `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
+                  }
+                />
+              </div>
             </div>
           ) : (
             // The older blocks are typeset for a 340px card (11px rows); zoom
             // lifts them to reading size without forking their type scale.
-            <div key={i} data-pick={blockLabel(b)} className="max-w-[900px] [zoom:1.18]">
-              <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
+            <div key={i} data-pick={blockLabel(b)}>
+              <div className="max-w-[900px] [zoom:1.18]">
+                <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
+              </div>
             </div>
           ),
         )}
@@ -593,20 +603,24 @@ function Level({
         ) : null}
 
         {node.issues?.length ? (
-          <div className="max-w-[820px]">
-            <WatchOut issues={node.issues} />
+          <div>
+            <div className="max-w-[820px]">
+              <WatchOut issues={node.issues} />
+            </div>
           </div>
         ) : null}
 
         {code.length ? (
-          <div className="max-w-[1000px]">
-            <CodeDrawer
-              owner={node.id}
-              refs={code}
-              ctx={ctx}
-              open={codeOpen}
-              onToggle={() => setCodeOpen((v) => !v)}
-            />
+          <div>
+            <div className="max-w-[1000px]">
+              <CodeDrawer
+                owner={node.id}
+                refs={code}
+                ctx={ctx}
+                open={codeOpen}
+                onToggle={() => setCodeOpen((v) => !v)}
+              />
+            </div>
           </div>
         ) : null}
       </div>

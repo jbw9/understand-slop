@@ -15,8 +15,8 @@
         "title": "understand-slop",
         "width": 1512,
         "height": 900,
-        "minWidth": 900,
-        "minHeight": 600,
+        "minWidth": 480,
+        "minHeight": 400,
         "decorations": false
       }
     ],

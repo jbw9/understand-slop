@@ -7,10 +7,11 @@ import { describe, type BuiltMap } from "@/lib/map";
  * thing on a level — a row, a box, a message, a line of the screen, a problem,
  * a place in the code.
  *
- * Each Claude tab has its own queue (src-tauri/src/claude.rs): a pick is
- * written there and goes out with that tab's next prompt. Picks go to the
- * Claude tab you used last. With none open, the pick waits, a tab is opened,
- * and it is queued as soon as the tab has started.
+ * Every workspace tab has its own queue (src-tauri/src/claude.rs): a pick is
+ * written there and goes out with the next prompt to Claude in that tab.
+ * Picks go to the tab the workspace names, one running Claude
+ * (components/workspace.tsx). With none, the pick waits, a tab is opened
+ * (it starts in Claude), and it is queued as soon as the tab has started.
  *
  * Delivery is seen, not assumed: while anything is queued its queue is polled,
  * and the moment the prompt hook has taken it the pick shows as sent.
@@ -57,9 +58,9 @@ const withPicks = (pty: number, picks: Pick[]) => set({ ...state, picks: { ...st
 /** Picked before any Claude tab existed; queued once one starts. */
 let waiting: Target[] = [];
 
-/* ── Claude tabs coming and going (terminal.tsx) ──────────────── */
+/* ── tabs coming and going (components/workspace.tsx) ─────────── */
 
-/** Anything can ask for Claude: shows the last Claude tab, or opens one. */
+/** Anything can ask for Claude: shows a tab running it, or opens one. */
 const OPEN = "slop:claude";
 export const openClaude = () => window.dispatchEvent(new Event(OPEN));
 export const onOpenClaude = (f: () => void) => {
@@ -67,28 +68,39 @@ export const onOpenClaude = (f: () => void) => {
   return () => window.removeEventListener(OPEN, f);
 };
 
-export function claudeStarted(pty: number) {
-  set({ target: pty, picks: { ...state.picks, [pty]: [] } });
+/**
+ * A tab has its pty, so it can hold picks. One starting in Claude takes the
+ * picks that were waiting for it, and the next ones; a plain shell waits until
+ * Claude runs in it (retarget).
+ */
+export function tabStarted(pty: number, claude: boolean) {
+  set({ target: claude ? pty : state.target, picks: { ...state.picks, [pty]: [] } });
+  if (!claude) return;
   const queued = waiting;
   waiting = [];
   for (const p of queued) void add(pty, p);
 }
 
-/** The user switched to this Claude tab: picks now go there. */
-export function claudeFocused(pty: number) {
-  if (pty in state.picks && state.target !== pty) set({ ...state, target: pty });
+/**
+ * The tab picks go to now: the one in view in the open project if Claude runs
+ * there, else the newest one running it. None
+ * when the project has no Claude tab, so a pick opens one there rather than
+ * reaching a session in another project.
+ */
+export function retarget(pty: number | null) {
+  if (pty !== null && !(pty in state.picks)) return;
+  if (state.target !== pty) set({ ...state, target: pty });
 }
 
-export function claudeEnded(pty: number) {
+export function tabEnded(pty: number) {
   const picks = { ...state.picks };
   delete picks[pty];
-  const left = Object.keys(picks).map(Number);
-  set({ target: state.target === pty ? (left.at(-1) ?? null) : state.target, picks });
+  set({ target: state.target === pty ? null : state.target, picks });
 }
 
 /* ── picking ──────────────────────────────────────────────────── */
 
-/** Hand something to Claude. Opens a Claude tab first if there is none. */
+/** Hand something to Claude. Opens a tab first if none is running Claude. */
 export function pick(t: Target) {
   if (state.target === null) {
     if (!waiting.some((w) => w.key === t.key)) waiting.push(t);

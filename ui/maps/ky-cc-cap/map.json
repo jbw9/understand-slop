@@ -1,0 +1,5158 @@
+{
+ "RUN": {
+  "command": "understand-slop map ky",
+  "repo": "ky",
+  "about": "Cut by the lifecycle of one HTTP request — a caller configures ky, makes a request, then consumes the response — with retry logic and error handling branching from the request step.",
+  "commit": "3541888",
+  "files": 112,
+  "elapsed": "14 min",
+  "root": "/Users/jonathanmacmini/Desktop/Code/slop-eval/ky",
+  "models": {
+   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+   "cut": "global.anthropic.claude-opus-4-6-v1",
+   "author": "global.anthropic.claude-opus-4-6-v1",
+   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+ },
+ "AUTHORED": [
+  {
+   "id": "setting-up",
+   "title": "Setting Up Ky",
+   "sub": "Import ky, create instances with custom defaults, merge and normalize options",
+   "footprint": {
+    "dirs": [
+     "source/index.ts",
+     "source/core/constants.ts",
+     "source/types/ky.ts",
+     "source/types/options.ts",
+     "source/utils/merge.ts",
+     "source/utils/normalize.ts",
+     "source/utils/options.ts",
+     "source/utils/is.ts",
+     "source/types/common.ts",
+     "source/utils/types.ts"
+    ],
+    "files": 10
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Building blocks of instance setup: a caller can import the default, create a fresh instance, or extend one, and each path uses the same merging and normalization machinery."
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 0,
+   "detail": "The default export is a `KyInstance` built by `createInstance()`. Every call deep-merges options and normalizes retry, headers, hooks, and signals before handing them to the `Ky` constructor.",
+   "code": [
+    {
+     "file": "source/index.ts",
+     "start": 33,
+     "end": 56,
+     "label": "createInstance builds a KyInstance with method shortcuts, create, extend, stop, retry"
+    },
+    {
+     "file": "source/index.ts",
+     "start": 58,
+     "end": 58,
+     "label": "Default singleton exported as ky"
+    },
+    {
+     "file": "source/index.ts",
+     "start": 17,
+     "end": 31,
+     "label": "createRequest wraps Ky.create to reject setup errors as promises"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How a caller gets from import to a configured request",
+     "boxes": [
+      {
+       "id": "caller",
+       "label": "Caller",
+       "sub": "import ky from 'ky'",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "default-inst",
+       "label": "Default Instance",
+       "sub": "ky (no defaults)",
+       "col": 1,
+       "row": 0,
+       "opens": "su-instance"
+      },
+      {
+       "id": "create-inst",
+       "label": "ky.create()",
+       "sub": "fresh, no parent",
+       "col": 1,
+       "row": 1,
+       "opens": "su-instance"
+      },
+      {
+       "id": "extend-inst",
+       "label": "ky.extend()",
+       "sub": "inherits parent",
+       "col": 1,
+       "row": 2,
+       "opens": "su-instance"
+      },
+      {
+       "id": "deep-merge",
+       "label": "Deep Merge",
+       "sub": "headers, hooks, search",
+       "col": 2,
+       "row": 1,
+       "opens": "su-merge"
+      },
+      {
+       "id": "normalize",
+       "label": "Normalize",
+       "sub": "retry, method, options",
+       "col": 3,
+       "row": 0,
+       "opens": "su-normalize"
+      },
+      {
+       "id": "ky-constructor",
+       "label": "Ky Constructor",
+       "sub": "builds Request, URL",
+       "col": 3,
+       "row": 1
+      }
+     ],
+     "arrows": [
+      {
+       "from": "caller",
+       "to": "default-inst",
+       "label": "import",
+       "at": "source/index.ts:58"
+      },
+      {
+       "from": "default-inst",
+       "to": "create-inst",
+       "label": ".create()",
+       "at": "source/index.ts:42"
+      },
+      {
+       "from": "default-inst",
+       "to": "extend-inst",
+       "label": ".extend()",
+       "at": "source/index.ts:43"
+      },
+      {
+       "from": "create-inst",
+       "to": "deep-merge",
+       "label": "validateAndMerge",
+       "at": "source/index.ts:42"
+      },
+      {
+       "from": "extend-inst",
+       "to": "deep-merge",
+       "label": "validateAndMerge",
+       "at": "source/index.ts:49"
+      },
+      {
+       "from": "default-inst",
+       "to": "deep-merge",
+       "label": "per-request merge",
+       "at": "source/index.ts:35"
+      },
+      {
+       "from": "deep-merge",
+       "to": "ky-constructor",
+       "label": "merged options",
+       "at": "source/index.ts:19"
+      },
+      {
+       "from": "normalize",
+       "to": "ky-constructor",
+       "label": "called inside ctor",
+       "at": "source/core/Ky.ts:493"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "Ky-specific options (beyond standard fetch RequestInit)",
+     "columns": [
+      "Option",
+      "Default",
+      "What it does"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "json",
+       "undefined",
+       "Stringified as body, sets content-type"
+      ],
+      [
+       "retry",
+       "{limit: 2, ...}",
+       "Retry config: limit, methods, status codes, delay"
+      ],
+      [
+       "timeout",
+       "10000",
+       "Per-attempt ms, false to disable"
+      ],
+      [
+       "totalTimeout",
+       "false",
+       "Overall ms including retries"
+      ],
+      [
+       "hooks",
+       "{}",
+       "init, beforeRequest, beforeRetry, beforeError, afterResponse"
+      ],
+      [
+       "searchParams",
+       "undefined",
+       "Merged into URL query string"
+      ],
+      [
+       "prefix",
+       "''",
+       "Prepended to input before URL resolution"
+      ],
+      [
+       "baseUrl",
+       "undefined",
+       "Base for resolving relative input"
+      ],
+      [
+       "throwHttpErrors",
+       "true",
+       "Throw HTTPError on non-2xx"
+      ],
+      [
+       "maxResponseSize",
+       "Infinity",
+       "Max response body bytes"
+      ],
+      [
+       "fetch",
+       "globalThis.fetch",
+       "Custom fetch implementation"
+      ],
+      [
+       "context",
+       "{}",
+       "User data passed to hooks"
+      ]
+     ]
+    }
+   ],
+   "edges": [],
+   "children": [
+    {
+     "id": "su-instance",
+     "title": "Instance Creation",
+     "sub": "How the default, create, and extend paths build a KyInstance",
+     "footprint": {
+      "dirs": [
+       "source/index.ts",
+       "source/types/ky.ts"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Three ways to get a KyInstance: default import, .create(), and .extend()"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "`createInstance` builds a callable with method shortcuts for `get`, `post`, `put`, `patch`, `head`, `delete`, `query`, plus `.create()`, `.extend()`, `.stop`, and `.retry`. Each shortcut calls `createRequest`, which wraps `Ky.create()` so setup errors reject.",
+     "code": [
+      {
+       "file": "source/index.ts",
+       "start": 33,
+       "end": 56,
+       "label": "createInstance: assemble the KyInstance shape"
+      },
+      {
+       "file": "source/index.ts",
+       "start": 37,
+       "end": 40,
+       "label": "Loop over requestMethods to add method shortcuts"
+      },
+      {
+       "file": "source/index.ts",
+       "start": 42,
+       "end": 42,
+       "label": ".create() builds a new instance without inheriting"
+      },
+      {
+       "file": "source/index.ts",
+       "start": 43,
+       "end": 50,
+       "label": ".extend() inherits and deep-merges parent defaults"
+      },
+      {
+       "file": "source/index.ts",
+       "start": 17,
+       "end": 31,
+       "label": "createRequest wraps errors as rejections"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "The three paths to a KyInstance and what each inherits",
+       "boxes": [
+        {
+         "id": "default",
+         "label": "Default ky",
+         "sub": "no defaults, singleton",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "create",
+         "label": ".create(opts)",
+         "sub": "fresh, no parent",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "extend-obj",
+         "label": ".extend(opts)",
+         "sub": "merge with parent",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "extend-fn",
+         "label": ".extend(fn)",
+         "sub": "fn receives cloned parent",
+         "col": 1,
+         "row": 2
+        },
+        {
+         "id": "new-inst",
+         "label": "New KyInstance",
+         "sub": "callable + shortcuts",
+         "col": 2,
+         "row": 1,
+         "tone": "good"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "default",
+         "to": "create",
+         "label": ".create()",
+         "at": "source/index.ts:42"
+        },
+        {
+         "from": "default",
+         "to": "extend-obj",
+         "label": ".extend(object)",
+         "at": "source/index.ts:43"
+        },
+        {
+         "from": "default",
+         "to": "extend-fn",
+         "label": ".extend(function)",
+         "at": "source/index.ts:44"
+        },
+        {
+         "from": "create",
+         "to": "new-inst",
+         "label": "validateAndMerge(new)",
+         "at": "source/index.ts:42"
+        },
+        {
+         "from": "extend-obj",
+         "to": "new-inst",
+         "label": "merge(parent, new)",
+         "at": "source/index.ts:49"
+        },
+        {
+         "from": "extend-fn",
+         "to": "new-inst",
+         "label": "merge(parent, fn(clone))",
+         "at": "source/index.ts:46"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What .create() vs .extend() inherit",
+       "columns": [
+        "Path",
+        "Inherits parent?",
+        "How options are composed"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "ky(url, opts)",
+         "No (default empty)",
+         "validateAndMerge(undefined, opts)"
+        ],
+        [
+         "instance(url, opts)",
+         "Yes",
+         "validateAndMerge(defaults, opts)"
+        ],
+        [
+         ".create(opts)",
+         "No",
+         "validateAndMerge(opts)"
+        ],
+        [
+         ".extend(opts)",
+         "Yes",
+         "validateAndMerge(parent, opts)"
+        ],
+        [
+         ".extend(fn)",
+         "Yes",
+         "fn(cloneDeep(parent)) then merge"
+        ]
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "HTTP method shortcuts on every KyInstance",
+       "rows": [
+        {
+         "label": "get",
+         "state": "derived"
+        },
+        {
+         "label": "post",
+         "state": "derived"
+        },
+        {
+         "label": "put",
+         "state": "derived"
+        },
+        {
+         "label": "patch",
+         "state": "derived"
+        },
+        {
+         "label": "head",
+         "state": "derived"
+        },
+        {
+         "label": "delete",
+         "state": "derived"
+        },
+        {
+         "label": "query",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "su-merge",
+     "title": "Deep Merging Options",
+     "sub": "How headers, hooks, search params, signals, and nested options are merged",
+     "footprint": {
+      "dirs": [
+       "source/utils/merge.ts"
+      ],
+      "files": 1
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Each option kind has its own merge strategy; they are all applied inside deepMergeInternal"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "`deepMerge` is the single entry point. It recurses plain objects and arrays but treats class instances as whole values, with special handling for `headers`, `hooks`, `searchParams`, `signal`, `context`, and `retry` at the root level.",
+     "code": [
+      {
+       "file": "source/utils/merge.ts",
+       "start": 500,
+       "end": 501,
+       "label": "deepMerge: public entry, delegates to deepMergeInternal with isRoot=true"
+      },
+      {
+       "file": "source/utils/merge.ts",
+       "start": 340,
+       "end": 346,
+       "label": "deepMergeInternal: initializes return value and special accumulators"
+      },
+      {
+       "file": "source/utils/merge.ts",
+       "start": 63,
+       "end": 71,
+       "label": "validateAndMerge: validates all sources are objects, then deep-merges"
+      },
+      {
+       "file": "source/utils/merge.ts",
+       "start": 53,
+       "end": 61,
+       "label": "replaceOption: wraps a value so extend replaces instead of merging"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "map",
+       "caption": "How each option kind is merged when extending",
+       "rows": [
+        {
+         "from": "headers",
+         "to": "Lowercase plain object; undefined deletes a key",
+         "state": "derived"
+        },
+        {
+         "from": "hooks",
+         "to": "Arrays appended per stage; undefined clears",
+         "state": "derived"
+        },
+        {
+         "from": "searchParams",
+         "to": "Accumulated into URLSearchParams; undefined deletes",
+         "state": "derived"
+        },
+        {
+         "from": "signal",
+         "to": "Combined via AbortSignal.any(); replaceOption replaces",
+         "state": "derived"
+        },
+        {
+         "from": "context",
+         "to": "Shallow merge only; nested objects replaced",
+         "state": "derived"
+        },
+        {
+         "from": "retry",
+         "to": "Number expanded to {limit: n}; object deep-merged",
+         "state": "derived"
+        },
+        {
+         "from": "Plain objects/arrays",
+         "to": "Recursively deep-merged; class instances replaced",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "What happens inside deepMergeInternal for one merge pass",
+       "actors": [
+        "Caller",
+        "deepMergeInternal",
+        "mergeHeaderContainers",
+        "mergeHooks",
+        "appendSearchParameters"
+       ],
+       "rows": [
+        {
+         "from": "Caller",
+         "to": "deepMergeInternal",
+         "label": "deepMerge(parent, child)",
+         "state": "derived"
+        },
+        {
+         "from": "deepMergeInternal",
+         "to": "mergeHeaderContainers",
+         "label": "headers to lowercase object",
+         "state": "derived"
+        },
+        {
+         "from": "deepMergeInternal",
+         "to": "mergeHooks",
+         "label": "hooks: append or replace",
+         "state": "derived"
+        },
+        {
+         "from": "deepMergeInternal",
+         "to": "appendSearchParameters",
+         "label": "searchParams: accumulate",
+         "state": "derived"
+        },
+        {
+         "from": "deepMergeInternal",
+         "to": "Caller",
+         "label": "merged options + signal",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "replaceOption",
+         "value": "Wraps with Symbol.for('ky.replaceOption') so extend replaces instead of merging. Works across duplicate Ky copies.",
+         "state": "derived"
+        },
+        {
+         "label": "deletedParametersSymbol",
+         "value": "Tracks search param keys deleted by undefined, so they are removed from the input URL before new values are appended.",
+         "state": "derived"
+        },
+        {
+         "label": "null rejection",
+         "value": "null for headers, searchParams, context, and hooks throws TypeError instead of being silently merged.",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Without AbortSignal.any, only the last signal survives",
+       "detail": "When `AbortSignal.any` is unavailable, merging multiple signals via `.extend()` keeps only the last one. Earlier signals are silently discarded, so aborting them has no effect on the request.",
+       "where": "source/utils/merge.ts:485"
+      }
+     ],
+     "children": [
+      {
+       "id": "su-merge-headers",
+       "title": "Header Merging",
+       "sub": "Headers are normalized to a lowercase plain object and merged with deletion support",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "All header sources are converted to a plain object with lowercase keys via `toHeaderObject`. A value of `undefined` in a plain object, or the string `'undefined'` in a `Headers` instance, acts as a deletion marker.",
+       "code": [
+        {
+         "file": "source/utils/merge.ts",
+         "start": 73,
+         "end": 86,
+         "label": "mergeHeaders: merges two header sources into a Headers instance"
+        },
+        {
+         "file": "source/utils/merge.ts",
+         "start": 188,
+         "end": 196,
+         "label": "mergeHeaderContainers: normalizes and merges to plain object"
+        },
+        {
+         "file": "source/utils/merge.ts",
+         "start": 170,
+         "end": 184,
+         "label": "toHeaderObject: converts any header source to a plain object"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Convert to plain object",
+           "detail": "Each header source is run through toHeaderObject, normalizing Headers instances, plain objects, and tuple arrays to {key: value} with lowercase keys.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Apply deletions",
+           "detail": "An undefined value deletes the key. In a Headers instance, the string 'undefined' is treated as a deletion marker.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Merge into result",
+           "detail": "Second source's entries overwrite the first's. Undefined values survive as deletion markers for later request construction.",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Header named __proto__ is silently dropped",
+         "detail": "When iterating entries in `toHeaderObject`, a header named `__proto__` is assigned via property access, which changes the prototype instead of creating an own property. The header is silently lost.",
+         "where": "source/utils/merge.ts:179"
+        }
+       ]
+      },
+      {
+       "id": "su-merge-hooks",
+       "title": "Hook Merging",
+       "sub": "Hook arrays are appended per lifecycle stage with validation and replace support",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "`mergeHooks` processes all five hook stages (init, beforeRequest, beforeRetry, beforeError, afterResponse). Each stage's array is appended unless `replaceOption` wraps it, in which case the parent's hooks are discarded.",
+       "code": [
+        {
+         "file": "source/utils/merge.ts",
+         "start": 218,
+         "end": 231,
+         "label": "mergeHooks: merges all five hook stages"
+        },
+        {
+         "file": "source/utils/merge.ts",
+         "start": 198,
+         "end": 216,
+         "label": "newHookValue: validates and merges one hook stage"
+        },
+        {
+         "file": "source/utils/merge.ts",
+         "start": 452,
+         "end": 458,
+         "label": "hooks merge entry point in deepMergeInternal"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "table",
+         "caption": "The five hook stages and their merge behavior",
+         "columns": [
+          "Hook",
+          "When it runs",
+          "Merge rule"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "init",
+           "Synchronous, before request build",
+           "Appended"
+          ],
+          [
+           "beforeRequest",
+           "Async, before each attempt",
+           "Appended"
+          ],
+          [
+           "beforeRetry",
+           "Async, before each retry",
+           "Appended"
+          ],
+          [
+           "beforeError",
+           "Async, before error thrown",
+           "Appended"
+          ],
+          [
+           "afterResponse",
+           "Async, after response received",
+           "Appended"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "id": "su-merge-search",
+       "title": "Search Param Merging",
+       "sub": "Search parameters are accumulated across extend layers with deletion tracking",
+       "state": "derived",
+       "col": 0,
+       "row": 2,
+       "detail": "`appendSearchParameters` merges parameters from URLSearchParams, arrays, objects, and strings. Deleted keys are tracked via a symbol-keyed Set so they are removed from the input URL before re-added values are appended.",
+       "code": [
+        {
+         "file": "source/utils/merge.ts",
+         "start": 273,
+         "end": 337,
+         "label": "appendSearchParameters: merge search params with deletion tracking"
+        },
+        {
+         "file": "source/utils/merge.ts",
+         "start": 233,
+         "end": 235,
+         "label": "deletedParametersSymbol and MarkedSearchParameters type"
+        },
+        {
+         "file": "source/utils/merge.ts",
+         "start": 400,
+         "end": 417,
+         "label": "searchParams handling in deepMergeInternal"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "map",
+         "caption": "How each search parameter input type is processed",
+         "rows": [
+          {
+           "from": "URLSearchParams",
+           "to": "Entries appended; symbol-tracked deletions first",
+           "state": "derived"
+          },
+          {
+           "from": "Array of [key, value]",
+           "to": "Each pair appended; replaceOption replaces key",
+           "state": "derived"
+          },
+          {
+           "from": "Plain object",
+           "to": "Entries appended; undefined deletes the key",
+           "state": "derived"
+          },
+          {
+           "from": "String",
+           "to": "Parsed as URLSearchParams and appended",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "su-normalize",
+     "title": "Option Normalization",
+     "sub": "Validate and normalize retry config, HTTP methods, and option categories",
+     "footprint": {
+      "dirs": [
+       "source/utils/normalize.ts",
+       "source/utils/options.ts",
+       "source/core/Ky.ts"
+      ],
+      "files": 3
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Independent normalization steps that all run during Ky construction"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "The Ky constructor normalizes merged options into `InternalOptions`: expanding retry shorthand, uppercasing standard HTTP methods, validating timeouts and callbacks, and separating Ky-specific options from unknown ones that pass through to fetch.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 484,
+       "end": 498,
+       "label": "Ky constructor builds InternalOptions from merged options"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 499,
+       "end": 507,
+       "label": "Validates callbacks, timeouts, and maxResponseSize"
+      },
+      {
+       "file": "source/utils/normalize.ts",
+       "start": 37,
+       "end": 100,
+       "label": "normalizeRetryOptions: validates and expands retry config"
+      },
+      {
+       "file": "source/utils/normalize.ts",
+       "start": 6,
+       "end": 7,
+       "label": "normalizeRequestMethod: uppercases standard methods"
+      },
+      {
+       "file": "source/utils/options.ts",
+       "start": 5,
+       "end": 30,
+       "label": "findUnknownOptions: separates unknown options for fetch passthrough"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "What the Ky constructor does with merged options",
+       "boxes": [
+        {
+         "id": "merged-opts",
+         "label": "Merged Options",
+         "sub": "from deepMerge",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "retry-norm",
+         "label": "Retry Normalization",
+         "sub": "expand, validate",
+         "col": 1,
+         "row": 0,
+         "opens": "su-norm-retry"
+        },
+        {
+         "id": "method-norm",
+         "label": "Method Normalization",
+         "sub": "uppercase standard",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "validate-cbs",
+         "label": "Callback Validation",
+         "sub": "parseJson, fetch...",
+         "col": 1,
+         "row": 2
+        },
+        {
+         "id": "unknown-opts",
+         "label": "Unknown Options",
+         "sub": "passthrough to fetch()",
+         "col": 2,
+         "row": 2,
+         "opens": "su-norm-passthrough"
+        },
+        {
+         "id": "internal-opts",
+         "label": "InternalOptions",
+         "sub": "fully resolved",
+         "col": 2,
+         "row": 0,
+         "tone": "good"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "merged-opts",
+         "to": "retry-norm",
+         "label": "normalizeRetryOptions",
+         "at": "source/core/Ky.ts:493"
+        },
+        {
+         "from": "merged-opts",
+         "to": "method-norm",
+         "label": "normalizeRequestMethod",
+         "at": "source/core/Ky.ts:488"
+        },
+        {
+         "from": "merged-opts",
+         "to": "validate-cbs",
+         "label": "validateCallbackOptions",
+         "at": "source/core/Ky.ts:500"
+        },
+        {
+         "from": "merged-opts",
+         "to": "unknown-opts",
+         "label": "findUnknownOptions",
+         "at": "source/utils/options.ts:5"
+        },
+        {
+         "from": "retry-norm",
+         "to": "internal-opts",
+         "label": "normalized retry",
+         "at": "source/core/Ky.ts:493"
+        },
+        {
+         "from": "method-norm",
+         "to": "internal-opts",
+         "label": "uppercased method",
+         "at": "source/core/Ky.ts:488"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Validations the constructor performs before any fetch",
+       "columns": [
+        "Check",
+        "Throws"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "input not string, URL, or Request",
+         "TypeError"
+        ],
+        [
+         "prefixUrl used (renamed in v2)",
+         "Error with migration message"
+        ],
+        [
+         "headers, method, prefix set to null",
+         "TypeError"
+        ],
+        [
+         "timeout NaN, negative, or > 2147483647",
+         "TypeError or RangeError"
+        ],
+        [
+         "maxResponseSize not safe integer",
+         "TypeError"
+        ],
+        [
+         "parseJson, fetch, progress not functions",
+         "TypeError"
+        ],
+        [
+         "throwHttpErrors not boolean or function",
+         "TypeError"
+        ],
+        [
+         "retry.limit not non-negative integer",
+         "TypeError"
+        ],
+        [
+         "retry.methods not array of strings",
+         "Error"
+        ]
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "su-norm-retry",
+       "title": "Retry Defaults",
+       "sub": "Default retry configuration and how it is normalized from user input",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "A number is expanded to `{limit: n}`, then merged with defaults: limit 2, exponential backoff (0.3s * 2^(n-1)), methods GET/PUT/HEAD/DELETE/OPTIONS/TRACE/QUERY, and status codes 408/413/429/500-504.",
+       "code": [
+        {
+         "file": "source/utils/normalize.ts",
+         "start": 25,
+         "end": 35,
+         "label": "defaultRetryOptions with all fields"
+        },
+        {
+         "file": "source/utils/normalize.ts",
+         "start": 37,
+         "end": 53,
+         "label": "normalizeRetryOptions: expand number, merge, validate limit"
+        },
+        {
+         "file": "source/utils/normalize.ts",
+         "start": 55,
+         "end": 99,
+         "label": "Field-by-field validation of arrays, limits, callbacks"
+        },
+        {
+         "file": "source/utils/normalize.ts",
+         "start": 17,
+         "end": 21,
+         "label": "Default retryMethods, retryStatusCodes, retryAfterStatusCodes"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "limit",
+           "value": "2 (must be finite non-negative integer)",
+           "state": "derived"
+          },
+          {
+           "label": "delay",
+           "value": "0.3 * 2^(attempt-1) * 1000 ms (exponential backoff)",
+           "state": "derived"
+          },
+          {
+           "label": "backoffLimit",
+           "value": "Infinity (clamped with Math.min)",
+           "state": "derived"
+          },
+          {
+           "label": "maxRetryAfter",
+           "value": "Infinity (caps server Retry-After)",
+           "state": "derived"
+          },
+          {
+           "label": "jitter",
+           "value": "undefined (no jitter by default)",
+           "state": "derived"
+          },
+          {
+           "label": "retryOnTimeout",
+           "value": "false",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "chips",
+         "caption": "Default retry methods",
+         "rows": [
+          {
+           "label": "get",
+           "state": "derived"
+          },
+          {
+           "label": "put",
+           "state": "derived"
+          },
+          {
+           "label": "head",
+           "state": "derived"
+          },
+          {
+           "label": "delete",
+           "state": "derived"
+          },
+          {
+           "label": "options",
+           "state": "derived"
+          },
+          {
+           "label": "trace",
+           "state": "derived"
+          },
+          {
+           "label": "query",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "chips",
+         "caption": "Default retry status codes",
+         "rows": [
+          {
+           "label": "408 Request Timeout",
+           "state": "derived"
+          },
+          {
+           "label": "413 Payload Too Large",
+           "note": "only with retry timing header",
+           "state": "derived"
+          },
+          {
+           "label": "429 Too Many Requests",
+           "state": "derived"
+          },
+          {
+           "label": "500 Internal Server Error",
+           "state": "derived"
+          },
+          {
+           "label": "502 Bad Gateway",
+           "state": "derived"
+          },
+          {
+           "label": "503 Service Unavailable",
+           "state": "derived"
+          },
+          {
+           "label": "504 Gateway Timeout",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "su-norm-passthrough",
+       "title": "Option Passthrough",
+       "sub": "Unknown options are forwarded to fetch() as extra init properties",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "`findUnknownOptions` checks each key against `kyOptionKeys` and `requestOptionsRegistry`. Any key in neither is collected and passed as extra init to `fetch()`, supporting runtime extensions like Next.js `next` or undici `dispatcher`.",
+       "code": [
+        {
+         "file": "source/utils/options.ts",
+         "start": 5,
+         "end": 30,
+         "label": "findUnknownOptions: collects non-standard, non-Ky keys"
+        },
+        {
+         "file": "source/core/constants.ts",
+         "start": 268,
+         "end": 285,
+         "label": "kyOptionKeys: registry of all Ky-specific option names"
+        },
+        {
+         "file": "source/core/constants.ts",
+         "start": 292,
+         "end": 307,
+         "label": "requestOptionsRegistry: standard RequestInit keys applied to Request"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "table",
+         "caption": "How options are categorized",
+         "columns": [
+          "Category",
+          "Handled by",
+          "Example keys"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "Ky options",
+           "Ky internals (stripped)",
+           "json, retry, timeout, hooks"
+          ],
+          [
+           "Request options",
+           "Request constructor",
+           "method, headers, body, mode"
+          ],
+          [
+           "Unknown options",
+           "Passed through to fetch()",
+           "next, dispatcher, priority"
+          ]
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "su-constants",
+     "title": "Runtime Detection",
+     "sub": "Feature flags that determine what Ky can do in the current environment",
+     "footprint": {
+      "dirs": [
+       "source/core/constants.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "Constants evaluated once at import time detect environment capabilities. `supportsRequestStreams` probes the Request constructor with a ReadableStream body and the `duplex` getter, with Bun and Deno special-cased.",
+     "code": [
+      {
+       "file": "source/core/constants.ts",
+       "start": 4,
+       "end": 31,
+       "label": "supportsRequestStreams: IIFE probes ReadableStream + duplex support"
+      },
+      {
+       "file": "source/core/constants.ts",
+       "start": 33,
+       "end": 36,
+       "label": "supportsAbortController, supportsAbortSignal, supportsResponseStreams, supportsFormData"
+      },
+      {
+       "file": "source/core/constants.ts",
+       "start": 57,
+       "end": 60,
+       "label": "getSupportedResponseTypes: filters out .bytes() if not available"
+      },
+      {
+       "file": "source/core/constants.ts",
+       "start": 73,
+       "end": 73,
+       "label": "stop: globally registered Symbol for beforeRetry hook"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Runtime feature flags and what they control",
+       "columns": [
+        "Flag",
+        "Check",
+        "Effect when false"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "supportsRequestStreams",
+         "ReadableStream + duplex (or Bun/Deno)",
+         "Upload progress disabled; body dropped on URL rebuild"
+        ],
+        [
+         "supportsAbortController",
+         "typeof AbortController",
+         "No per-attempt abort or signal management"
+        ],
+        [
+         "supportsAbortSignal",
+         "AbortSignal.any exists",
+         "Only last signal kept when merging"
+        ],
+        [
+         "supportsResponseStreams",
+         "typeof ReadableStream",
+         "No download progress streaming"
+        ],
+        [
+         "supportsFormData",
+         "typeof FormData",
+         "Content-type not auto-deleted for FormData"
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "making-request",
+   "title": "Making a Request",
+   "sub": "Build the URL, set headers, serialize the body, run lifecycle hooks, and execute the fetch call with timeout and abort support.",
+   "footprint": {
+    "dirs": [
+     "source/core/Ky.ts",
+     "source/utils/body.ts",
+     "source/utils/timeout.ts",
+     "source/utils/delay.ts",
+     "source/types/hooks.ts",
+     "source/types/request.ts"
+    ],
+    "files": 6
+   },
+   "group": {
+    "ordering": "sequence"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 1,
+   "detail": "The `Ky` class orchestrates a full request lifecycle: `Ky.create()` runs init hooks, builds a `Request`, enters `#run()` where hooks, fetch, and retry branching happen, then returns a `ResponsePromise` with body shortcuts.",
+   "code": [
+    {
+     "file": "source/core/Ky.ts",
+     "start": 348,
+     "end": 436,
+     "label": "Ky.create() — factory that runs init hooks, builds Ky, returns ResponsePromise"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 590,
+     "end": 663,
+     "label": "#run() — main execution loop: hooks → fetch → afterResponse → retry"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 1218,
+     "end": 1274,
+     "label": "#fetch() — wraps fetch with timeout, abort, upload progress, and error mapping"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How a request flows through the Ky class from create() to the final Response",
+     "boxes": [
+      {
+       "id": "create",
+       "label": "Ky.create()",
+       "sub": "entry, returns promise",
+       "col": 0,
+       "row": 0,
+       "opens": "rq-create"
+      },
+      {
+       "id": "constructor",
+       "label": "Constructor",
+       "sub": "builds Request",
+       "col": 1,
+       "row": 0,
+       "opens": "rq-build"
+      },
+      {
+       "id": "run",
+       "label": "#run()",
+       "sub": "main loop",
+       "col": 2,
+       "row": 0,
+       "opens": "rq-hooks"
+      },
+      {
+       "id": "fetch",
+       "label": "#fetch()",
+       "sub": "calls fetch + timeout",
+       "col": 3,
+       "row": 0,
+       "opens": "rq-fetch"
+      },
+      {
+       "id": "timeout-box",
+       "label": "timeout()",
+       "sub": "races against timer",
+       "col": 3,
+       "row": 1,
+       "opens": "rq-timeout"
+      },
+      {
+       "id": "response",
+       "label": "Response",
+       "sub": "decorated, size-limited",
+       "col": 2,
+       "row": 1,
+       "tone": "good"
+      },
+      {
+       "id": "upload-progress",
+       "label": "Upload Progress",
+       "sub": "streams body counter",
+       "col": 1,
+       "row": 1,
+       "opens": "rq-progress"
+      },
+      {
+       "id": "error-path",
+       "label": "Error Path",
+       "sub": "beforeError → throw",
+       "col": 0,
+       "row": 1,
+       "tone": "warn"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "create",
+       "to": "constructor",
+       "label": "new Ky(input, opts)",
+       "at": "source/core/Ky.ts:357"
+      },
+      {
+       "from": "constructor",
+       "to": "run",
+       "label": "await #run()",
+       "at": "source/core/Ky.ts:362"
+      },
+      {
+       "from": "run",
+       "to": "fetch",
+       "label": "#retry() → #fetch()",
+       "at": "source/core/Ky.ts:1119"
+      },
+      {
+       "from": "fetch",
+       "to": "timeout-box",
+       "label": "if timeout set",
+       "at": "source/core/Ky.ts:1244"
+      },
+      {
+       "from": "fetch",
+       "to": "upload-progress",
+       "label": "wraps body stream",
+       "at": "source/core/Ky.ts:1226"
+      },
+      {
+       "from": "fetch",
+       "to": "response",
+       "label": "returns Response",
+       "at": "source/core/Ky.ts:1260"
+      },
+      {
+       "from": "run",
+       "to": "error-path",
+       "label": "non-2xx or throw",
+       "tone": "warn",
+       "at": "source/core/Ky.ts:632"
+      },
+      {
+       "from": "create",
+       "to": "error-path",
+       "label": "catch → processed",
+       "tone": "warn",
+       "at": "source/core/Ky.ts:365"
+      }
+     ]
+    },
+    {
+     "kind": "sequence",
+     "caption": "The call sequence for one successful request (no retries)",
+     "actors": [
+      "Caller",
+      "Ky.create",
+      "Constructor",
+      "#run",
+      "#fetch",
+      "fetch()"
+     ],
+     "rows": [
+      {
+       "from": "Caller",
+       "to": "Ky.create",
+       "label": "ky.post(url, {json, hooks, timeout})",
+       "state": "derived"
+      },
+      {
+       "from": "Ky.create",
+       "to": "Constructor",
+       "label": "run init hooks, then new Ky(input, options)",
+       "state": "derived"
+      },
+      {
+       "from": "Constructor",
+       "to": "Constructor",
+       "label": "resolve URL, serialize JSON body, merge headers, build Request",
+       "state": "derived"
+      },
+      {
+       "from": "Ky.create",
+       "to": "#run",
+       "label": "await #run()",
+       "state": "derived"
+      },
+      {
+       "from": "#run",
+       "to": "#run",
+       "label": "run beforeRequest hooks",
+       "state": "derived"
+      },
+      {
+       "from": "#run",
+       "to": "#fetch",
+       "label": "#retry() → #fetch()",
+       "state": "derived"
+      },
+      {
+       "from": "#fetch",
+       "to": "fetch()",
+       "label": "clone request for retry, call timeout(fetch(request))",
+       "state": "derived"
+      },
+      {
+       "from": "fetch()",
+       "to": "#run",
+       "label": "Response",
+       "state": "derived"
+      },
+      {
+       "from": "#run",
+       "to": "#run",
+       "label": "run afterResponse hooks, check .ok",
+       "state": "derived"
+      },
+      {
+       "from": "#run",
+       "to": "Ky.create",
+       "label": "decorated Response → ResponsePromise",
+       "state": "derived"
+      }
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "from": "rq-create",
+     "to": "rq-build",
+     "state": "derived",
+     "label": "new Ky()",
+     "order": 1
+    },
+    {
+     "from": "rq-build",
+     "to": "rq-hooks",
+     "state": "derived",
+     "label": "await #run()",
+     "order": 2
+    },
+    {
+     "from": "rq-hooks",
+     "to": "rq-fetch",
+     "state": "derived",
+     "label": "#retry() → #fetch()",
+     "order": 3
+    },
+    {
+     "from": "rq-fetch",
+     "to": "rq-timeout",
+     "state": "derived",
+     "label": "if timeout set",
+     "order": 4
+    },
+    {
+     "from": "rq-fetch",
+     "to": "rq-progress",
+     "state": "derived",
+     "label": "if onUploadProgress"
+    }
+   ],
+   "children": [
+    {
+     "id": "rq-create",
+     "title": "Creating The Pipeline",
+     "sub": "Ky.create() runs init hooks, instantiates Ky, and wraps the result in a ResponsePromise with body method shortcuts.",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "`Ky.create()` is the only public entry. It runs synchronous `init` hooks on a cloned options object, constructs a `Ky` instance, then attaches `.json()`, `.text()`, `.bytes()` etc. shortcuts to the returned promise.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 349,
+       "end": 378,
+       "label": "create() — init hooks, new Ky(), async result wrapper with try/finally cleanup"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 380,
+       "end": 433,
+       "label": "Body method shortcuts (.json(), .text(), etc.) attached to ResponsePromise"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 312,
+       "end": 327,
+       "label": "cloneInitHookOptions — deep-copies headers, json, searchParams, retry before init hooks"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 329,
+       "end": 346,
+       "label": "validateJsonWithSchema — validates .json() output against Standard Schema"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Clone options for init hooks",
+         "detail": "Deep-copies headers, json, searchParams, retry, and context so init hook mutations don't leak across requests from the same instance.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Run init hooks synchronously",
+         "detail": "Each init hook receives the mutable options object and can modify it in place. Errors here reject the promise but skip beforeError hooks.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Construct Ky instance",
+         "detail": "Calls `new Ky(input, options)` which resolves the URL, serializes the body, merges headers, and builds the native Request.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Attach body shortcuts",
+         "detail": "For each supported response type (json, text, formData, arrayBuffer, blob, bytes), adds a method that sets the Accept header and awaits the result with schema validation.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Clean up on settle",
+         "detail": "A finally block cancels unused request bodies — the original and any retry clone — so streams are not leaked.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Body method shortcuts and their Accept headers",
+       "columns": [
+        "Method",
+        "Accept header",
+        "Schema"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         ".json(schema?)",
+         "application/json",
+         "Standard Schema V1"
+        ],
+        [
+         ".text()",
+         "text/*",
+         "No"
+        ],
+        [
+         ".formData()",
+         "multipart/form-data",
+         "No"
+        ],
+        [
+         ".arrayBuffer()",
+         "*/*",
+         "No"
+        ],
+        [
+         ".blob()",
+         "*/*",
+         "No"
+        ],
+        [
+         ".bytes()",
+         "*/*",
+         "Runtime-checked"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rq-build",
+     "title": "Building The Request",
+     "sub": "The constructor resolves the URL, serializes JSON, merges headers, sets up abort signals, and creates a native Request.",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "The constructor normalizes all options, resolves `prefix`/`baseUrl` with the input, JSON-stringifies `options.json`, manages the abort controller signal chain, and appends `searchParams` to the URL.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 458,
+       "end": 588,
+       "label": "Constructor — full request building: validation, URL resolution, JSON body, headers, signal, searchParams"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 246,
+       "end": 269,
+       "label": "resolveInput() — joins prefix, resolves against baseUrl"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 280,
+       "end": 309,
+       "label": "applySearchParameters() — appends searchParams to the URL"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1013,
+       "end": 1017,
+       "label": "#createManagedSignal — combines user signal with Ky's internal abort controller"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Validate input and options",
+         "detail": "Checks input type, rejects null for key options, validates context is an object, validates timeout and callback options.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Normalize and merge",
+         "detail": "Merges headers from Request input and options, normalizes method to uppercase, normalizes retry options, applies defaults for throwHttpErrors/timeout/fetch.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Resolve URL",
+         "detail": "`resolveInput()` joins string input with `prefix` (stripping trailing/leading slashes), then resolves against `baseUrl`. URL and Request inputs pass through.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Serialize JSON body",
+         "detail": "If `options.json` is set, stringifies it (via custom `stringifyJson` or `JSON.stringify`) and sets content-type to application/json unless user provided one.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Set up abort signal chain",
+         "detail": "Creates an internal AbortController and combines its signal with the user's signal via `AbortSignal.any()`. This managed signal is attached to the Request.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Append search parameters",
+         "detail": "If `searchParams` has content, builds a new URL, applies deleted keys and new params, then recreates the Request with the updated URL.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "How the URL is resolved from input, prefix, and baseUrl",
+       "boxes": [
+        {
+         "id": "str-input",
+         "label": "String input",
+         "sub": "e.g. \"users/123\"",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "prefix-join",
+         "label": "Prefix join",
+         "sub": "strips slashes, joins",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "base-resolve",
+         "label": "baseUrl resolve",
+         "sub": "new URL(input, base)",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "search-apply",
+         "label": "Search params",
+         "sub": "appends to URL",
+         "col": 3,
+         "row": 0
+        },
+        {
+         "id": "url-input",
+         "label": "URL/Request input",
+         "sub": "used as-is",
+         "col": 0,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "str-input",
+         "to": "prefix-join",
+         "label": "if prefix set",
+         "at": "source/core/Ky.ts:251"
+        },
+        {
+         "from": "prefix-join",
+         "to": "base-resolve",
+         "label": "if baseUrl set",
+         "at": "source/core/Ky.ts:257"
+        },
+        {
+         "from": "base-resolve",
+         "to": "search-apply",
+         "at": "source/core/Ky.ts:548"
+        },
+        {
+         "from": "url-input",
+         "to": "search-apply",
+         "label": "skips prefix/base",
+         "at": "source/core/Ky.ts:247"
+        },
+        {
+         "from": "str-input",
+         "to": "search-apply",
+         "label": "no prefix/base",
+         "at": "source/core/Ky.ts:544"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Inherited body lost when searchParams changes URL",
+       "detail": "When a Request input has a body and `searchParams` alter the URL, the Request is rebuilt. If the environment lacks request stream support or `keepalive`/`no-cors` is set, the inherited body is silently dropped.",
+       "where": "source/core/Ky.ts:568"
+      }
+     ]
+    },
+    {
+     "id": "rq-hooks",
+     "title": "Running Lifecycle Hooks",
+     "sub": "Five hook types intercept the request at different stages: init, beforeRequest, afterResponse, beforeRetry, and beforeError.",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts",
+       "source/types/hooks.ts"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Each hook type runs at a different stage; they are grouped by what they intercept."
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Hooks run inside `#run()` and `#retryFromError()`. Every async hook is raced against the `totalTimeout` budget, and can replace requests/responses, force retries, or transform errors.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1041,
+       "end": 1063,
+       "label": "#runBeforeRequestHooks — can return Request or Response"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1065,
+       "end": 1115,
+       "label": "#runAfterResponseHooks — can replace Response or force retry"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1163,
+       "end": 1210,
+       "label": "beforeRetry hooks inside #retryFromError — can stop, replace request, or return response"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 783,
+       "end": 812,
+       "label": "#throwProcessedError — runs beforeError hooks on every error"
+      },
+      {
+       "file": "source/types/hooks.ts",
+       "start": 30,
+       "end": 110,
+       "label": "Hook type definitions: InitHook, BeforeRequestHook, BeforeRetryHook, BeforeErrorHook, AfterResponseHook"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "The five hook types and what each can do",
+       "columns": [
+        "Hook",
+        "When",
+        "Can return",
+        "Async"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "init",
+         "Before Request built",
+         "void (mutates options)",
+         "No"
+        ],
+        [
+         "beforeRequest",
+         "After build, before fetch",
+         "Request, Response, void",
+         "Yes"
+        ],
+        [
+         "afterResponse",
+         "After each fetch",
+         "Response, ky.retry(), void",
+         "Yes"
+        ],
+        [
+         "beforeRetry",
+         "Before each retry",
+         "Request, Response, stop, {options}, void",
+         "Yes"
+        ],
+        [
+         "beforeError",
+         "Before any error thrown",
+         "Error (replacement)",
+         "Yes"
+        ]
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "Where each hook type intercepts the request lifecycle",
+       "boxes": [
+        {
+         "id": "init-hook",
+         "label": "init hooks",
+         "sub": "sync, mutate options",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "before-req",
+         "label": "beforeRequest",
+         "sub": "can short-circuit",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "fetch-call",
+         "label": "fetch()",
+         "sub": "actual network call",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "after-resp",
+         "label": "afterResponse",
+         "sub": "inspect/replace",
+         "col": 3,
+         "row": 0
+        },
+        {
+         "id": "before-retry",
+         "label": "beforeRetry",
+         "sub": "before each retry",
+         "col": 2,
+         "row": 1
+        },
+        {
+         "id": "before-error",
+         "label": "beforeError",
+         "sub": "wraps/replaces errors",
+         "col": 3,
+         "row": 1,
+         "tone": "warn"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "init-hook",
+         "to": "before-req",
+         "label": "options finalized",
+         "at": "source/core/Ky.ts:357"
+        },
+        {
+         "from": "before-req",
+         "to": "fetch-call",
+         "label": "no short-circuit",
+         "at": "source/core/Ky.ts:598"
+        },
+        {
+         "from": "fetch-call",
+         "to": "after-resp",
+         "label": "response",
+         "at": "source/core/Ky.ts:612"
+        },
+        {
+         "from": "after-resp",
+         "to": "before-retry",
+         "label": "ky.retry() or error",
+         "tone": "warn",
+         "at": "source/core/Ky.ts:646"
+        },
+        {
+         "from": "before-retry",
+         "to": "fetch-call",
+         "label": "retry attempt",
+         "at": "source/core/Ky.ts:1215"
+        },
+        {
+         "from": "fetch-call",
+         "to": "before-error",
+         "label": "thrown error",
+         "tone": "warn",
+         "at": "source/core/Ky.ts:365"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Hook-returned Response with failing status throws without retry",
+       "detail": "A Response returned from a `beforeRequest` or `beforeRetry` hook that has a non-2xx status is thrown as an HTTPError immediately, bypassing retry logic. The `#hookResponses` WeakSet marks these responses so the retry path is never entered.",
+       "where": "source/core/Ky.ts:638"
+      }
+     ]
+    },
+    {
+     "id": "rq-fetch",
+     "title": "Executing The Fetch",
+     "sub": "Clones the request for retries, wraps upload progress, calls fetch with timeout, and maps raw errors to typed Ky errors.",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "The `#fetch()` method clones the request when retries are enabled, wraps the body for upload progress, then calls fetch — either directly or through `timeout()`. Raw network errors become `NetworkError`.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1218,
+       "end": 1274,
+       "label": "#fetch() — clone, wrap upload progress, call fetch with timeout, map errors"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1117,
+       "end": 1123,
+       "label": "#retry() — calls #fetch(), catches errors for retry"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 868,
+       "end": 877,
+       "label": "#getEffectiveTimeout — min of per-request timeout and remaining totalTimeout budget"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1369,
+       "end": 1375,
+       "label": "#wrapRequestWithUploadProgress — streams request body for progress tracking"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Cancel previous attempt's body",
+         "detail": "Releases the unused upload body from any previous attempt via `cancelBody()`.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Clone request for retries",
+         "detail": "If retry limit > 0, calls `request.clone()` and reattaches the managed signal. Skipped when retries disabled to avoid buffering large streams.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Wrap upload progress",
+         "detail": "If `onUploadProgress` is configured and request streams are supported, pipes the body through a byte-counting TransformStream.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Calculate effective timeout",
+         "detail": "Takes the minimum of per-request `timeout` and remaining `totalTimeout` budget. Returns `undefined` if neither applies.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Call fetch or timeout(fetch)",
+         "detail": "Without timeout, calls `fetch(request)` directly. With timeout, calls `timeout()` which races fetch against a setTimeout.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Map errors",
+         "detail": "Rethrows user aborts, wraps raw network errors into `NetworkError`, throws `TimeoutError` if totalTimeout exhausted.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "Decision tree inside #fetch()",
+       "boxes": [
+        {
+         "id": "clone-step",
+         "label": "Clone for retry",
+         "sub": "if retries > 0",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "upload-wrap",
+         "label": "Upload progress",
+         "sub": "pipe body counter",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "direct-fetch",
+         "label": "Direct fetch()",
+         "sub": "no timeout",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "timed-fetch",
+         "label": "timeout(fetch)",
+         "sub": "races timer",
+         "col": 2,
+         "row": 1
+        },
+        {
+         "id": "ok-resp",
+         "label": "Response",
+         "sub": "to #run()",
+         "col": 3,
+         "row": 0,
+         "tone": "good"
+        },
+        {
+         "id": "net-err",
+         "label": "NetworkError",
+         "sub": "wrapped raw error",
+         "col": 3,
+         "row": 1,
+         "tone": "warn"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "clone-step",
+         "to": "upload-wrap",
+         "at": "source/core/Ky.ts:1226"
+        },
+        {
+         "from": "upload-wrap",
+         "to": "direct-fetch",
+         "label": "no timeout",
+         "at": "source/core/Ky.ts:1243"
+        },
+        {
+         "from": "upload-wrap",
+         "to": "timed-fetch",
+         "label": "timeout set",
+         "at": "source/core/Ky.ts:1244"
+        },
+        {
+         "from": "direct-fetch",
+         "to": "ok-resp",
+         "at": "source/core/Ky.ts:1260"
+        },
+        {
+         "from": "timed-fetch",
+         "to": "ok-resp",
+         "at": "source/core/Ky.ts:1260"
+        },
+        {
+         "from": "timed-fetch",
+         "to": "net-err",
+         "label": "raw network error",
+         "tone": "warn",
+         "at": "source/core/Ky.ts:1268"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Cloning streaming uploads buffers entire body in memory",
+       "detail": "When retries are enabled (the default), `request.clone()` calls `ReadableStream#tee()` which buffers the entire stream. For large uploads this causes excessive memory usage. Cloning is only skipped when retries are explicitly disabled.",
+       "where": "source/core/Ky.ts:1225"
+      }
+     ]
+    },
+    {
+     "id": "rq-timeout",
+     "title": "Timeout Management",
+     "sub": "Two timeout layers: per-request timeout races a single fetch, and totalTimeout caps the entire pipeline including retries.",
+     "footprint": {
+      "dirs": [
+       "source/utils/timeout.ts",
+       "source/core/Ky.ts"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Two independent timeout mechanisms that can both be active at once."
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "The `timeout()` utility races a single fetch against a setTimeout (default 10s). The `totalTimeout` sets a wall-clock deadline at construction; `#raceWithTotalTimeout()` enforces it on every async operation.",
+     "code": [
+      {
+       "file": "source/utils/timeout.ts",
+       "start": 11,
+       "end": 46,
+       "label": "timeout() — races fetch against setTimeout, aborts on expiry"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 931,
+       "end": 1005,
+       "label": "#raceWithTotalTimeout — races any operation against remaining totalTimeout budget"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 585,
+       "end": 588,
+       "label": "Deadline set in constructor: performance.now() + totalTimeout"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1281,
+       "end": 1284,
+       "label": "#getRemainingTotalTimeout — Math.max(0, deadline - now)"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 868,
+       "end": 877,
+       "label": "#getEffectiveTimeout — min(timeout, remaining totalTimeout)"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Per-request timeout default",
+         "value": "10,000 ms (10 seconds)",
+         "state": "derived"
+        },
+        {
+         "label": "Per-request scope",
+         "value": "One fetch call — send to response headers",
+         "state": "derived"
+        },
+        {
+         "label": "totalTimeout default",
+         "value": "false (disabled)",
+         "state": "derived"
+        },
+        {
+         "label": "totalTimeout scope",
+         "value": "Entire pipeline: build + hooks + retries + body reads",
+         "state": "derived"
+        },
+        {
+         "label": "Clock source",
+         "value": "performance.now() ?? Date.now()",
+         "state": "derived"
+        },
+        {
+         "label": "Max allowed value",
+         "value": "2^31 - 1 ms ≈ 24.8 days",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "How per-request timeout and totalTimeout overlap",
+       "boxes": [
+        {
+         "id": "total-start",
+         "label": "Pipeline start",
+         "sub": "deadline set",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "hooks-phase",
+         "label": "Hooks & delay",
+         "sub": "raced vs budget",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "per-req",
+         "label": "Per-request",
+         "sub": "min(timeout, budget)",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "body-read",
+         "label": "Body read",
+         "sub": "also raced",
+         "col": 3,
+         "row": 0
+        }
+       ],
+       "arrows": [
+        {
+         "from": "total-start",
+         "to": "hooks-phase",
+         "label": "budget starts",
+         "at": "source/core/Ky.ts:587"
+        },
+        {
+         "from": "hooks-phase",
+         "to": "per-req",
+         "label": "effective timeout",
+         "at": "source/core/Ky.ts:875"
+        },
+        {
+         "from": "per-req",
+         "to": "body-read",
+         "label": "#raceBodyRead",
+         "at": "source/core/Ky.ts:894"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rq-progress",
+     "title": "Upload And Download Progress",
+     "sub": "Pipes request or response bodies through TransformStreams that count bytes and call progress callbacks.",
+     "footprint": {
+      "dirs": [
+       "source/utils/body.ts"
+      ],
+      "files": 1
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Upload and download progress are independent features that share the same withProgress() helper."
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 5,
+     "detail": "Both progress callbacks work by piping the body through a TransformStream that counts transferred bytes. Upload requires request stream support (`duplex: 'half'`); download adjusts for content-encoding.",
+     "code": [
+      {
+       "file": "source/utils/body.ts",
+       "start": 78,
+       "end": 110,
+       "label": "withProgress() — TransformStream that counts bytes and calls the progress callback"
+      },
+      {
+       "file": "source/utils/body.ts",
+       "start": 200,
+       "end": 214,
+       "label": "streamResponse() — wraps response body for download progress, adjusts for content-encoding"
+      },
+      {
+       "file": "source/utils/body.ts",
+       "start": 217,
+       "end": 242,
+       "label": "streamRequest() — wraps request body for upload progress with duplex: half"
+      },
+      {
+       "file": "source/utils/body.ts",
+       "start": 29,
+       "end": 76,
+       "label": "getBodySize() — calculates byte size for FormData, Blob, ArrayBuffer, string, URLSearchParams"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Callback shape",
+         "value": "{percent, totalBytes, transferredBytes}, chunk",
+         "state": "derived"
+        },
+        {
+         "label": "percent cap before flush",
+         "value": "1 - Number.EPSILON to avoid 100% prematurely",
+         "state": "derived"
+        },
+        {
+         "label": "Unknown total",
+         "value": "totalBytes = 0, percent = 0 until flush",
+         "state": "derived"
+        },
+        {
+         "label": "Download + encoding",
+         "value": "totalBytes forced to 0 for encoded responses",
+         "state": "derived"
+        },
+        {
+         "label": "Upload requires",
+         "value": "Request streams (duplex: half); skipped for keepalive/no-cors",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "How total bytes are determined for each body type",
+       "columns": [
+        "Body type",
+        "Size source"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "FormData",
+         "Approximated: boundary + headers + field sizes"
+        ],
+        [
+         "Blob",
+         "blob.size"
+        ],
+        [
+         "ArrayBuffer / TypedArray",
+         "byteLength"
+        ],
+        [
+         "string",
+         "TextEncoder.encode().byteLength"
+        ],
+        [
+         "URLSearchParams",
+         "TextEncoder on toString()"
+        ],
+        [
+         "ReadableStream",
+         "0 (unknown), falls back to content-length"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "FormData size is an approximation that can overcount",
+       "detail": "The `getBodySize()` function estimates FormData size using a fixed boundary length constant that may differ from the runtime's actual boundary. The estimate errs high, so progress percent may reach its ceiling before the upload finishes.",
+       "where": "source/utils/body.ts:35"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "consuming-response",
+   "title": "Consuming The Response",
+   "sub": "Read the response body via .json(), .text(), .bytes() shortcuts, validate with Standard Schema, and track download progress",
+   "footprint": {
+    "dirs": [
+     "source/core/Ky.ts",
+     "source/utils/body.ts",
+     "source/types/ResponsePromise.ts",
+     "source/types/response.ts",
+     "source/types/standard-schema.ts",
+     "source/errors/SchemaValidationError.ts"
+    ],
+    "files": 6
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Independent capabilities of response consumption: body shortcuts, schema validation, size limiting, and progress tracking"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 2,
+   "detail": "`Ky.create` attaches body method shortcuts (`.json()`, `.text()`, `.blob()`, etc.) to the `ResponsePromise`. Each shortcut sets an `Accept` header, awaits the response, then reads the body through `#raceBodyRead` which enforces timeouts and abort signals.",
+   "code": [
+    {
+     "file": "source/core/Ky.ts",
+     "start": 349,
+     "end": 436,
+     "label": "Ky.create attaches body shortcuts to ResponsePromise"
+    },
+    {
+     "file": "source/types/ResponsePromise.ts",
+     "start": 9,
+     "end": 71,
+     "label": "ResponsePromise type with all body method signatures"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 881,
+     "end": 929,
+     "label": "#raceBodyRead enforces timeout and abort on body reads"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 646,
+     "end": 663,
+     "label": "Download progress wrapping applied in #run before return"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How a caller reads the response body, and what each shortcut touches",
+     "boxes": [
+      {
+       "id": "caller",
+       "label": "Caller",
+       "sub": "ky.get(url).json()",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "rp",
+       "label": "ResponsePromise",
+       "sub": "Promise + shortcuts",
+       "col": 1,
+       "row": 0,
+       "opens": "rs-shortcuts"
+      },
+      {
+       "id": "race",
+       "label": "#raceBodyRead",
+       "sub": "timeout + abort",
+       "col": 2,
+       "row": 0,
+       "opens": "rs-timeout"
+      },
+      {
+       "id": "schema",
+       "label": "Schema Validation",
+       "sub": "Standard Schema V1",
+       "col": 2,
+       "row": 1,
+       "opens": "rs-schema"
+      },
+      {
+       "id": "sizelimit",
+       "label": "Size Limiter",
+       "sub": "maxResponseSize",
+       "col": 3,
+       "row": 1,
+       "opens": "rs-size"
+      },
+      {
+       "id": "progress",
+       "label": "Download Progress",
+       "sub": "onDownloadProgress",
+       "col": 3,
+       "row": 0,
+       "opens": "rs-progress"
+      },
+      {
+       "id": "fetchresp",
+       "label": "Native Response",
+       "sub": ".text(), .blob()",
+       "col": 3,
+       "row": 2
+      }
+     ],
+     "arrows": [
+      {
+       "from": "caller",
+       "to": "rp",
+       "label": ".json(), .text(), etc.",
+       "at": "source/core/Ky.ts:383"
+      },
+      {
+       "from": "rp",
+       "to": "race",
+       "label": "non-json: direct read",
+       "at": "source/core/Ky.ts:398"
+      },
+      {
+       "from": "rp",
+       "to": "schema",
+       "label": "json with schema",
+       "at": "source/core/Ky.ts:416"
+      },
+      {
+       "from": "race",
+       "to": "progress",
+       "label": "body already wrapped",
+       "at": "source/core/Ky.ts:657"
+      },
+      {
+       "from": "progress",
+       "to": "fetchresp",
+       "label": "piped through",
+       "at": "source/utils/body.ts:211"
+      },
+      {
+       "from": "race",
+       "to": "fetchresp",
+       "label": "response.text()",
+       "at": "source/core/Ky.ts:401"
+      },
+      {
+       "from": "sizelimit",
+       "to": "fetchresp",
+       "label": "wraps body stream",
+       "at": "source/utils/body.ts:185"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "Body method shortcuts and their Accept headers",
+     "columns": [
+      "Method",
+      "Accept Header",
+      "Returns"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       ".json()",
+       "application/json",
+       "Parsed JSON (or validated via schema)"
+      ],
+      [
+       ".text()",
+       "text/*",
+       "string"
+      ],
+      [
+       ".formData()",
+       "multipart/form-data",
+       "FormData"
+      ],
+      [
+       ".arrayBuffer()",
+       "*/*",
+       "ArrayBuffer"
+      ],
+      [
+       ".blob()",
+       "*/*",
+       "Blob"
+      ],
+      [
+       ".bytes()",
+       "*/*",
+       "Uint8Array (runtime-gated)"
+      ]
+     ]
+    },
+    {
+     "kind": "sequence",
+     "caption": "What happens when a caller calls .json(schema) on a ResponsePromise",
+     "actors": [
+      "Caller",
+      "ResponsePromise",
+      "Ky",
+      "Fetch Response"
+     ],
+     "rows": [
+      {
+       "from": "Caller",
+       "to": "ResponsePromise",
+       "label": ".json(zodSchema)",
+       "state": "derived"
+      },
+      {
+       "from": "ResponsePromise",
+       "to": "Ky",
+       "label": "sets Accept: application/json",
+       "note": "only if request not yet sent",
+       "state": "derived"
+      },
+      {
+       "from": "ResponsePromise",
+       "to": "ResponsePromise",
+       "label": "await result (the fetch promise)",
+       "state": "derived"
+      },
+      {
+       "from": "ResponsePromise",
+       "to": "Ky",
+       "label": "#raceBodyRead → response.text()",
+       "note": "raced against timeout and abort signal",
+       "state": "derived"
+      },
+      {
+       "from": "Ky",
+       "to": "Fetch Response",
+       "label": "reads body as text",
+       "state": "derived"
+      },
+      {
+       "from": "Ky",
+       "to": "Ky",
+       "label": "#parseJson (custom or JSON.parse)",
+       "state": "derived"
+      },
+      {
+       "from": "Ky",
+       "to": "Ky",
+       "label": "validateJsonWithSchema → ~standard.validate()",
+       "note": "throws SchemaValidationError on failure",
+       "state": "derived"
+      },
+      {
+       "from": "Ky",
+       "to": "Caller",
+       "label": "validated & typed result",
+       "state": "derived"
+      }
+     ]
+    }
+   ],
+   "edges": [],
+   "children": [
+    {
+     "id": "rs-shortcuts",
+     "title": "Body Method Shortcuts",
+     "sub": "Each shortcut sets an Accept header, awaits the response, and reads the body with timeout protection",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts",
+       "source/types/ResponsePromise.ts",
+       "source/types/response.ts"
+      ],
+      "files": 3
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "In `Ky.create`, a loop over `getSupportedResponseTypes()` attaches each body method to the result promise. `.json()` reads the body as text first, then parses; all others delegate directly to the native `Response` method, guarded by `#raceBodyRead`.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 381,
+       "end": 432,
+       "label": "Loop attaching body shortcuts to the ResponsePromise"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 397,
+       "end": 398,
+       "label": "Non-json types: direct native call via #raceBodyRead"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 401,
+       "end": 416,
+       "label": "JSON path: text → parseJson → optional schema validation"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 765,
+       "end": 779,
+       "label": "#decorateResponse patches response.json with custom parseJson"
+      },
+      {
+       "file": "source/core/constants.ts",
+       "start": 46,
+       "end": 55,
+       "label": "responseTypes map: method name → Accept MIME type"
+      },
+      {
+       "file": "source/core/constants.ts",
+       "start": 58,
+       "end": 60,
+       "label": "getSupportedResponseTypes filters .bytes() at runtime"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "map",
+       "caption": "What each shortcut does internally",
+       "rows": [
+        {
+         "from": ".json()",
+         "to": "response.text() → #parseJson → optional schema validate",
+         "state": "derived"
+        },
+        {
+         "from": ".json(schema)",
+         "to": "same as .json() then validateJsonWithSchema()",
+         "state": "derived"
+        },
+        {
+         "from": ".text()",
+         "to": "response.text() via #raceBodyRead",
+         "state": "derived"
+        },
+        {
+         "from": ".blob()",
+         "to": "response.blob() via #raceBodyRead",
+         "state": "derived"
+        },
+        {
+         "from": ".arrayBuffer()",
+         "to": "response.arrayBuffer() via #raceBodyRead",
+         "state": "derived"
+        },
+        {
+         "from": ".formData()",
+         "to": "response.formData() via #raceBodyRead",
+         "state": "derived"
+        },
+        {
+         "from": ".bytes()",
+         "to": "response.bytes() via #raceBodyRead (runtime-gated)",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Set Accept header",
+         "detail": "If the request hasn't been sent yet, sets Accept to the MIME type matching the shortcut (e.g. `application/json` for `.json()`).",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Await the response",
+         "detail": "Waits for the inner fetch promise to resolve. If `ky.stop` was returned by a `beforeRetry` hook, the response is `undefined` and a TypeError is thrown.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Read the body",
+         "detail": "Non-JSON shortcuts call the native method directly through `#raceBodyRead`. JSON reads `response.text()` first, then parses via `#parseJson` (custom or `JSON.parse`).",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Return or validate",
+         "detail": "If a schema was passed to `.json(schema)`, the parsed value is validated via `validateJsonWithSchema` before returning.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Custom parseJson",
+         "value": "When `options.parseJson` is set, `#decorateResponse` also patches `response.json()` on the raw Response so both paths use it.",
+         "state": "derived"
+        },
+        {
+         "label": ".bytes() gating",
+         "value": "`getSupportedResponseTypes()` checks `Response.prototype.bytes` at runtime; the shortcut is omitted in environments that lack it.",
+         "state": "derived"
+        },
+        {
+         "label": "Empty body + schema",
+         "value": "When text is empty, a schema is passed, and no custom `parseJson` is set, the value is `undefined` instead of throwing a JSON parse error.",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rs-schema",
+     "title": "Schema Validation",
+     "sub": "Validates parsed JSON against a Standard Schema V1 and throws SchemaValidationError on failure",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts",
+       "source/errors/SchemaValidationError.ts",
+       "source/types/standard-schema.ts"
+      ],
+      "files": 3
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "`validateJsonWithSchema` reads `schema['~standard'].validate`, awaits the result, and throws `SchemaValidationError` if `result.issues` is truthy. The error does not extend `KyError`, so `isKyError()` does not match it.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 329,
+       "end": 346,
+       "label": "validateJsonWithSchema: validates and returns or throws"
+      },
+      {
+       "file": "source/errors/SchemaValidationError.ts",
+       "start": 25,
+       "end": 33,
+       "label": "SchemaValidationError class with issues property"
+      },
+      {
+       "file": "source/types/standard-schema.ts",
+       "start": 27,
+       "end": 37,
+       "label": "StandardSchemaV1 interface: the ~standard.validate contract"
+      },
+      {
+       "file": "source/types/standard-schema.ts",
+       "start": 1,
+       "end": 16,
+       "label": "Issue, SuccessResult, FailureResult types"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Check schema shape",
+         "detail": "Reads `schema['~standard']` and verifies it is an object with a `validate` function. Throws `TypeError` if not.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Call validate",
+         "detail": "Awaits `schema['~standard'].validate(jsonValue)`, which may be sync or async per the Standard Schema spec.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Check issues",
+         "detail": "If `result.issues` is truthy, throws `new SchemaValidationError(result.issues)`. Otherwise returns `result.value`.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "What SchemaValidationError looks like when caught",
+       "value": "SchemaValidationError {\n  name: 'SchemaValidationError',\n  message: 'Response schema validation failed',\n  issues: [\n    { message: 'Expected string, received number', path: ['name'] }\n  ]\n}",
+       "notes": [
+        {
+         "label": "Not a KyError",
+         "value": "Does not extend KyError — isKyError() returns false, so it won't be caught by KyError-specific handlers",
+         "state": "derived"
+        },
+        {
+         "label": "issues",
+         "value": "Readonly array of StandardSchemaV1Issue, each with message and optional path",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Supported validators",
+         "value": "Any library implementing Standard Schema V1: Zod 3.24+, Valibot, ArkType, etc.",
+         "state": "derived"
+        },
+        {
+         "label": "Called inside #raceWithTotalTimeout",
+         "value": "Validation runs within the totalTimeout budget; a slow validator can trigger a TimeoutError",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rs-timeout",
+     "title": "Body Read Timeout",
+     "sub": "Guards every body read against per-request timeout, totalTimeout, and user abort signals",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "`#raceBodyRead` races the native body method against `timeout` and checks `totalTimeout` budget and user abort signals before and after. For `.json()`, parse and validation also run inside `#raceWithTotalTimeout`.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 881,
+       "end": 929,
+       "label": "#raceBodyRead: races body read against timeout, checks abort"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 868,
+       "end": 877,
+       "label": "#getEffectiveTimeout: min of timeout and remaining totalTimeout"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 931,
+       "end": 1005,
+       "label": "#raceWithTotalTimeout: totalTimeout budget guard for json parse"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 916,
+       "end": 925,
+       "label": "On timeout, aborts the controller since stream is locked"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "What can interrupt a body read",
+       "boxes": [
+        {
+         "id": "bodyread",
+         "label": "Body Read",
+         "sub": "response.text() etc.",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "pertimeout",
+         "label": "Per-Request Timeout",
+         "sub": "options.timeout",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "totaltimeout",
+         "label": "Total Timeout",
+         "sub": "totalTimeout budget",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "abortsig",
+         "label": "User Abort Signal",
+         "sub": "options.signal",
+         "col": 1,
+         "row": 2
+        },
+        {
+         "id": "neterr",
+         "label": "Network Error",
+         "sub": "connection drops",
+         "col": 2,
+         "row": 0,
+         "tone": "warn"
+        },
+        {
+         "id": "timeouterr",
+         "label": "TimeoutError",
+         "sub": "thrown via hooks",
+         "col": 2,
+         "row": 1,
+         "tone": "warn"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "bodyread",
+         "to": "pertimeout",
+         "label": "raced via setTimeout",
+         "at": "source/core/Ky.ts:896"
+        },
+        {
+         "from": "bodyread",
+         "to": "totaltimeout",
+         "label": "budget check",
+         "at": "source/core/Ky.ts:920"
+        },
+        {
+         "from": "bodyread",
+         "to": "abortsig",
+         "label": "checked before & after",
+         "at": "source/core/Ky.ts:898"
+        },
+        {
+         "from": "bodyread",
+         "to": "neterr",
+         "label": "raw TypeError wrapped",
+         "tone": "warn",
+         "at": "source/core/Ky.ts:905"
+        },
+        {
+         "from": "pertimeout",
+         "to": "timeouterr",
+         "label": "aborts controller",
+         "at": "source/core/Ky.ts:924"
+        },
+        {
+         "from": "totaltimeout",
+         "to": "timeouterr",
+         "label": "budget exhausted",
+         "at": "source/core/Ky.ts:925"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Effective timeout",
+         "value": "min(options.timeout, remaining totalTimeout). If both are Infinity, no timeout is set.",
+         "state": "derived"
+        },
+        {
+         "label": "Network errors during read",
+         "value": "A raw TypeError from a dropped connection is wrapped in NetworkError and sent through beforeError hooks.",
+         "state": "derived"
+        },
+        {
+         "label": "Stream already locked",
+         "value": "On timeout, the body stream is locked by the reader, so #raceBodyRead aborts the controller instead of cancelling the stream.",
+         "state": "derived"
+        },
+        {
+         "label": "Abort wins over data",
+         "value": "Even if body bytes arrive before abort fires, a cancelled signal still rejects to prevent masking the cancellation.",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rs-size",
+     "title": "Response Size Limiting",
+     "sub": "Enforces maxResponseSize by wrapping the response body stream and throwing ResponseSizeError",
+     "footprint": {
+      "dirs": [
+       "source/utils/body.ts",
+       "source/errors/ResponseSizeError.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`limitResponseSize` wraps the body in a `TransformStream` counting bytes, throwing `ResponseSizeError` when `maxResponseSize` is exceeded. It patches native body methods because Chromium replaces stream errors with a generic TypeError.",
+     "code": [
+      {
+       "file": "source/utils/body.ts",
+       "start": 176,
+       "end": 198,
+       "label": "limitResponseSize: wraps body stream with byte counter"
+      },
+      {
+       "file": "source/utils/body.ts",
+       "start": 112,
+       "end": 164,
+       "label": "copyResponseMetadata: patches body methods and preserves url/redirected/type"
+      },
+      {
+       "file": "source/errors/ResponseSizeError.ts",
+       "start": 20,
+       "end": 30,
+       "label": "ResponseSizeError class with request and maxResponseSize"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1364,
+       "end": 1367,
+       "label": "#limitResponseSize called on every response and hook replacement"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Check wrappable",
+         "detail": "`wrappableBody` returns undefined if the body is null, used, locked, or a null-body status (101, 103, 204, 205, 304). Size limiting is skipped.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Pipe through counter",
+         "detail": "A TransformStream counts `transferredBytes += chunk.byteLength` and throws `ResponseSizeError` when the total exceeds `maxResponseSize`.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Build new Response",
+         "detail": "A new `Response` is created with the wrapped body. `copyResponseMetadata` restores `url`, `redirected`, `type`, and `headers` from the original.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Patch body methods",
+         "detail": "Each native body method is replaced with a wrapper that catches errors and re-throws the stored `ResponseSizeError` if one exists.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Null-body statuses that skip size limiting and progress",
+       "rows": [
+        {
+         "label": "101 Switching Protocols",
+         "state": "derived"
+        },
+        {
+         "label": "103 Early Hints",
+         "state": "derived"
+        },
+        {
+         "label": "204 No Content",
+         "state": "derived"
+        },
+        {
+         "label": "205 Reset Content",
+         "state": "derived"
+        },
+        {
+         "label": "304 Not Modified",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Chromium replaces stream errors with generic TypeError",
+       "detail": "When a TransformStream throws inside `transform()`, Chromium's native body methods replace the error with a generic TypeError. The code works around this by patching every body method to re-throw the stored ResponseSizeError, but this relies on a WeakMap keyed by the body stream.",
+       "where": "source/utils/body.ts:117"
+      }
+     ]
+    },
+    {
+     "id": "rs-progress",
+     "title": "Download Progress",
+     "sub": "Wraps the response body stream to report download progress via onDownloadProgress callback",
+     "footprint": {
+      "dirs": [
+       "source/utils/body.ts",
+       "source/core/Ky.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "When `onDownloadProgress` is set, `#run` calls `streamResponse` which pipes the body through a `TransformStream` tracking bytes. Progress reports lag one chunk behind so `percent` never hits 100% early.",
+     "code": [
+      {
+       "file": "source/utils/body.ts",
+       "start": 200,
+       "end": 214,
+       "label": "streamResponse: handles content-encoding and wires up progress"
+      },
+      {
+       "file": "source/utils/body.ts",
+       "start": 78,
+       "end": 110,
+       "label": "withProgress: TransformStream that tracks bytes and calls back"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 651,
+       "end": 660,
+       "label": "#run wraps response with streamResponse when onDownloadProgress is set"
+      },
+      {
+       "file": "source/utils/body.ts",
+       "start": 167,
+       "end": 174,
+       "label": "wrappableBody: guards against locked, used, or null-body responses"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Determine total bytes",
+         "detail": "Uses `content-length` unless `content-encoding` is set (compressed responses make the header inaccurate). Unknown total is `0`.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Pipe through withProgress",
+         "detail": "A TransformStream enqueues each chunk, then reports the *previous* chunk's byte count. This one-chunk delay prevents `percent` from reaching 100% early.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Cap percent below 100%",
+         "detail": "While streaming, `percent` is capped at `1 - Number.EPSILON`. If `totalBytes` is inaccurate, `reportedTotalBytes` adjusts upward.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Final flush",
+         "detail": "The `flush` callback fires with `percent: 1` and `totalBytes` set to the actual `transferredBytes`, guaranteeing an accurate final event.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Shape of each progress callback argument",
+       "value": "{\n  percent: 0.42,\n  totalBytes: 10240,\n  transferredBytes: 4300\n}",
+       "notes": [
+        {
+         "label": "percent",
+         "value": "0 to 1 - Number.EPSILON during streaming, exactly 1 on the final flush event",
+         "state": "derived"
+        },
+        {
+         "label": "totalBytes",
+         "value": "From content-length when uncompressed, 0 when unknown, true transferred bytes on final event",
+         "state": "derived"
+        },
+        {
+         "label": "second argument",
+         "value": "The current Uint8Array chunk",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Requires ReadableStream",
+         "value": "If the environment lacks ReadableStream, an Error is thrown before wrapping: 'Streams are not supported in your environment'.",
+         "state": "derived"
+        },
+        {
+         "label": "Compressed responses",
+         "value": "content-encoding other than 'identity' makes totalBytes 0, since content-length counts wire bytes but progress counts decompressed bytes.",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "retrying",
+   "title": "Retrying on Failure",
+   "sub": "Automatically retry failed requests based on status codes, methods, retry-after headers, and configurable delays with jitter",
+   "footprint": {
+    "dirs": [
+     "source/core/Ky.ts",
+     "source/core/retry-timing.ts",
+     "source/errors/ForceRetryError.ts",
+     "source/types/retry.ts"
+    ],
+    "files": 4
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Configuration, decision, timing, and execution are stages of one retry; forced retry is an alternative trigger from hooks"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 3,
+   "detail": "When a request fails with a retriable error, `#retryFromError` calculates a delay, waits, runs `beforeRetry` hooks, then re-fetches. The retry limit defaults to 2 and only safe methods are retried unless a hook forces it.",
+   "code": [
+    {
+     "file": "source/core/Ky.ts",
+     "start": 1117,
+     "end": 1123,
+     "label": "#retry() catches fetch errors and delegates to #retryFromError"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 688,
+     "end": 763,
+     "label": "#calculateRetryDelay decides whether and when to retry"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 1125,
+     "end": 1216,
+     "label": "#retryFromError waits, runs hooks, and re-fetches"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 590,
+     "end": 646,
+     "label": "#run loop retries on HTTP errors and ForceRetryError from hooks"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "The retry loop: a failed fetch enters the decision, waits, runs hooks, and re-fetches",
+     "boxes": [
+      {
+       "id": "forced",
+       "label": "ky.retry()",
+       "sub": "from afterResponse hook",
+       "col": 0,
+       "row": 0,
+       "opens": "rt-forced"
+      },
+      {
+       "id": "decision",
+       "label": "Retry Decision",
+       "sub": "limit, method, error type",
+       "col": 1,
+       "row": 0,
+       "opens": "rt-decision"
+      },
+      {
+       "id": "throw",
+       "label": "Throw to Caller",
+       "sub": "not retriable",
+       "col": 2,
+       "row": 0,
+       "tone": "warn"
+      },
+      {
+       "id": "fetch",
+       "label": "Fetch Call",
+       "sub": "#retry() then #fetch()",
+       "col": 0,
+       "row": 1
+      },
+      {
+       "id": "hooks",
+       "label": "beforeRetry Hooks",
+       "sub": "stop, modify, replace",
+       "col": 1,
+       "row": 1,
+       "opens": "rt-execution"
+      },
+      {
+       "id": "delay-box",
+       "label": "Delay Wait",
+       "sub": "backoff or server timing",
+       "col": 2,
+       "row": 1,
+       "opens": "rt-timing"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "fetch",
+       "to": "decision",
+       "label": "error caught",
+       "at": "source/core/Ky.ts:1121"
+      },
+      {
+       "from": "forced",
+       "to": "decision",
+       "label": "from afterResponse",
+       "at": "source/core/Ky.ts:646"
+      },
+      {
+       "from": "decision",
+       "to": "throw",
+       "label": "not retriable",
+       "tone": "warn",
+       "at": "source/core/Ky.ts:691"
+      },
+      {
+       "from": "decision",
+       "to": "delay-box",
+       "label": "eligible",
+       "at": "source/core/Ky.ts:1128"
+      },
+      {
+       "from": "delay-box",
+       "to": "hooks",
+       "label": "delay elapsed",
+       "at": "source/core/Ky.ts:1163"
+      },
+      {
+       "from": "hooks",
+       "to": "fetch",
+       "label": "re-fetch",
+       "at": "source/core/Ky.ts:1215"
+      }
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "from": "rt-decision",
+     "to": "rt-timing",
+     "state": "derived",
+     "label": "calculates delay",
+     "order": 1
+    },
+    {
+     "from": "rt-timing",
+     "to": "rt-execution",
+     "state": "derived",
+     "label": "waits then retries",
+     "order": 2
+    }
+   ],
+   "children": [
+    {
+     "id": "rt-config",
+     "title": "Retry Options",
+     "sub": "Configurable retry behavior with validated defaults",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Retry accepts a number (shorthand for `limit`) or an object with fields like limit, methods, statusCodes, delay, and jitter. All fields are validated at construction time by `normalizeRetryOptions`.",
+     "code": [
+      {
+       "file": "source/utils/normalize.ts",
+       "start": 25,
+       "end": 35,
+       "label": "Default retry options object"
+      },
+      {
+       "file": "source/utils/normalize.ts",
+       "start": 37,
+       "end": 100,
+       "label": "normalizeRetryOptions validates and merges user config"
+      },
+      {
+       "file": "source/types/retry.ts",
+       "start": 21,
+       "end": 189,
+       "label": "RetryOptions type definition with JSDoc"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "All retry options and their defaults",
+       "columns": [
+        "Option",
+        "Default",
+        "What it does"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "limit",
+         "2",
+         "Maximum number of retries"
+        ],
+        [
+         "methods",
+         "get, put, head, delete, options, trace, query",
+         "HTTP methods eligible for retry"
+        ],
+        [
+         "statusCodes",
+         "408, 413, 429, 500, 502, 503, 504",
+         "HTTP status codes that trigger retry"
+        ],
+        [
+         "afterStatusCodes",
+         "413, 429, 503",
+         "Status codes that respect server timing headers"
+        ],
+        [
+         "maxRetryAfter",
+         "Infinity",
+         "Cap on server-provided retry delay (ms)"
+        ],
+        [
+         "backoffLimit",
+         "Infinity",
+         "Cap on calculated backoff delay (ms)"
+        ],
+        [
+         "delay",
+         "0.3 * 2^(n-1) * 1000",
+         "Function returning delay ms for attempt n"
+        ],
+        [
+         "jitter",
+         "undefined (none)",
+         "true for full jitter, or a custom function"
+        ],
+        [
+         "retryOnTimeout",
+         "false",
+         "Whether to retry on request timeout"
+        ],
+        [
+         "shouldRetry",
+         "undefined",
+         "Callback to override retry eligibility"
+        ]
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Default delay values for each retry attempt",
+       "value": "Attempt 1: 0.3 * 2^0 * 1000 =  300 ms\nAttempt 2: 0.3 * 2^1 * 1000 =  600 ms\nAttempt 3: 0.3 * 2^2 * 1000 = 1200 ms\nAttempt 4: 0.3 * 2^3 * 1000 = 2400 ms",
+       "notes": [
+        {
+         "label": "Attempts",
+         "value": "1-indexed: the first retry is attempt 1",
+         "state": "derived"
+        },
+        {
+         "label": "With jitter: true",
+         "value": "Each value is multiplied by Math.random(), so delay is in [0, computed)",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rt-decision",
+     "title": "Deciding to Retry",
+     "sub": "The cascade of checks that determines whether a failed request is retried",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "`#calculateRetryDelay` runs a strict cascade: retry limit, ForceRetryError shortcut, method check, `shouldRetry` callback, then error-type-specific rules for timeout, HTTP, and network errors.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 688,
+       "end": 763,
+       "label": "#calculateRetryDelay: the full eligibility cascade"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 694,
+       "end": 700,
+       "label": "ForceRetryError shortcut bypasses method and shouldRetry"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 707,
+       "end": 722,
+       "label": "shouldRetry callback with true/false/undefined semantics"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Check retry limit",
+         "detail": "If retryCount >= min(retry.limit, retryLimit), throw. retryLimit is reset each time #fetch runs.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "ForceRetryError shortcut",
+         "detail": "If the error is a ForceRetryError from ky.retry(), return its customDelay or calculate the default. Skips all remaining checks.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Check method",
+         "detail": "If the request method is not in retry.methods, throw. POST is not retried by default.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Run shouldRetry",
+         "detail": "If configured, call shouldRetry({error, retryCount}). true forces retry, false prevents it, undefined uses default logic.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Check error type",
+         "detail": "TimeoutError retries only if retryOnTimeout or shouldRetry returned true. HTTPError retries if status is in statusCodes. 413 without a retry header is rejected. NetworkError always retries.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Reject unknown errors",
+         "detail": "Errors that are not TimeoutError, HTTPError, or NetworkError are thrown without retry, unless shouldRetry returned true.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What each error type needs to be retried",
+       "columns": [
+        "Error Type",
+        "Retried when",
+        "Skipped when"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "ForceRetryError",
+         "Always (within limit)",
+         "Retry limit exceeded"
+        ],
+        [
+         "TimeoutError",
+         "retryOnTimeout: true or shouldRetry returns true",
+         "retryOnTimeout: false (default)"
+        ],
+        [
+         "HTTPError",
+         "Status in statusCodes",
+         "Status not listed, or 413 without Retry-After header"
+        ],
+        [
+         "NetworkError",
+         "Always (within limit)",
+         "Method not in retry.methods"
+        ],
+        [
+         "Other errors",
+         "shouldRetry returns true",
+         "Default: not retried"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rt-timing",
+     "title": "Delay Calculation",
+     "sub": "How long to wait before retrying, from server headers or exponential backoff",
+     "group": {
+      "ordering": "set",
+      "note": "Server timing and backoff are two alternative paths for calculating the delay"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "Server-provided timing from Retry-After or rate-limit headers takes priority for status codes in `afterStatusCodes` and is never jittered. Otherwise, exponential backoff runs with optional jitter.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 738,
+       "end": 748,
+       "label": "Server timing path: header value capped by maxRetryAfter, no jitter"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 665,
+       "end": 686,
+       "label": "#calculateDelay: backoff formula with jitter and backoffLimit cap"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Two paths to a retry delay: server-provided or client-calculated",
+       "boxes": [
+        {
+         "id": "headers",
+         "label": "Server Timing",
+         "sub": "Retry-After, rate-limit",
+         "col": 0,
+         "row": 0,
+         "opens": "rt-timing-headers"
+        },
+        {
+         "id": "backoff",
+         "label": "Backoff Formula",
+         "sub": "exponential with jitter",
+         "col": 0,
+         "row": 1,
+         "opens": "rt-timing-backoff"
+        },
+        {
+         "id": "final",
+         "label": "Final Delay",
+         "sub": "capped, passed to setTimeout",
+         "col": 1,
+         "row": 0
+        }
+       ],
+       "arrows": [
+        {
+         "from": "headers",
+         "to": "final",
+         "label": "maxRetryAfter cap",
+         "at": "source/core/Ky.ts:747"
+        },
+        {
+         "from": "backoff",
+         "to": "final",
+         "label": "backoffLimit cap",
+         "at": "source/core/Ky.ts:685"
+        }
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "Which delay path is taken",
+       "rows": [
+        {
+         "from": "HTTP error, status in afterStatusCodes, valid header",
+         "to": "Server timing: min(parsed delay, maxRetryAfter), no jitter",
+         "state": "derived"
+        },
+        {
+         "from": "HTTP error, status in afterStatusCodes, malformed header",
+         "to": "Backoff formula (malformed headers do not disable retries)",
+         "state": "derived"
+        },
+        {
+         "from": "ForceRetryError with customDelay",
+         "to": "Custom delay directly, no jitter or backoff",
+         "state": "derived"
+        },
+        {
+         "from": "All other retriable errors",
+         "to": "Backoff: delay(attempt) then jitter then min(result, backoffLimit)",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "rt-timing-headers",
+       "title": "Server Timing Headers",
+       "sub": "Parse Retry-After and rate-limit headers into delay milliseconds",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "Headers are checked in priority order. Values can be delay-seconds, HTTP-dates (three formats), or Unix timestamps (rate-limit headers only, distinguished by a one-billion-second threshold).",
+       "code": [
+        {
+         "file": "source/core/retry-timing.ts",
+         "start": 25,
+         "end": 49,
+         "label": "getRetryTimingHeader: priority cascade across five header names"
+        },
+        {
+         "file": "source/core/retry-timing.ts",
+         "start": 151,
+         "end": 173,
+         "label": "calculateRetryTimingDelay: numeric delay vs HTTP-date parsing"
+        },
+        {
+         "file": "source/core/retry-timing.ts",
+         "start": 88,
+         "end": 149,
+         "label": "parseDate: IMF-fixdate, RFC 850, and asctime formats"
+        },
+        {
+         "file": "source/core/retry-timing.ts",
+         "start": 51,
+         "end": 84,
+         "label": "createTimestamp: validates date parts and handles leap seconds"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "table",
+         "caption": "Header priority (first present wins)",
+         "columns": [
+          "Priority",
+          "Header",
+          "Allows Unix timestamp"
+         ],
+         "state": "derived",
+         "rows": [
+          [
+           "1",
+           "Retry-After",
+           "No: numeric value is always delay seconds"
+          ],
+          [
+           "2",
+           "RateLimit-Reset",
+           "Yes: value >= 1 billion treated as epoch"
+          ],
+          [
+           "3",
+           "X-RateLimit-Retry-After",
+           "No: Symfony convention"
+          ],
+          [
+           "4",
+           "X-RateLimit-Reset or X-Rate-Limit-Reset",
+           "Yes: GitHub / Twitter convention"
+          ]
+         ]
+        },
+        {
+         "kind": "map",
+         "caption": "How a header value becomes a delay in milliseconds",
+         "rows": [
+          {
+           "from": "Numeric string (e.g. \"120\")",
+           "to": "120 * 1000 = 120000 ms (delay seconds)",
+           "state": "derived"
+          },
+          {
+           "from": "Numeric >= 1B on timestamp-allowed header",
+           "to": "(value * 1000) - Date.now() ms",
+           "state": "derived"
+          },
+          {
+           "from": "IMF-fixdate (Mon, 01 Jan 2024 12:00:00 GMT)",
+           "to": "parsed timestamp - Date.now() ms",
+           "state": "derived"
+          },
+          {
+           "from": "RFC 850 (Monday, 01-Jan-24 12:00:00 GMT)",
+           "to": "parsed timestamp - Date.now() ms, two-digit year per RFC 9110",
+           "state": "derived"
+          },
+          {
+           "from": "asctime (Mon Jan  1 12:00:00 2024)",
+           "to": "parsed timestamp - Date.now() ms",
+           "state": "derived"
+          },
+          {
+           "from": "Unparseable value",
+           "to": "undefined: falls back to backoff formula",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "rt-timing-backoff",
+       "title": "Backoff and Jitter",
+       "sub": "Exponential delay with optional jitter and a configurable cap",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "Default delay is `0.3 * 2^(attempt-1) * 1000` ms. `jitter: true` applies full jitter (`Math.random() * delay`); a custom jitter function returning invalid values silently falls back to the un-jittered delay.",
+       "code": [
+        {
+         "file": "source/core/Ky.ts",
+         "start": 665,
+         "end": 686,
+         "label": "#calculateDelay: delay then jitter then backoffLimit cap"
+        },
+        {
+         "file": "source/utils/normalize.ts",
+         "start": 32,
+         "end": 32,
+         "label": "Default delay formula"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Call retry.delay(attempt)",
+           "detail": "Default: 0.3 * 2^(attempt-1) * 1000. Must return a non-negative number or Infinity; anything else throws TypeError with the original error as cause.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Apply jitter",
+           "detail": "If jitter is true: Math.random() * delay (full jitter). If jitter is a function: jitter(delay). Invalid function result silently falls back to un-jittered delay.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Cap with backoffLimit",
+           "detail": "Return Math.min(backoffLimit, jitteredDelay). Default backoffLimit is Infinity. Final result is also capped at maxSafeTimeout (2^31 - 1 ms) before reaching setTimeout.",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "Full jitter purpose",
+           "value": "Prevents thundering herd when many clients retry simultaneously after a shared failure",
+           "state": "derived"
+          },
+          {
+           "label": "Server timing exemption",
+           "value": "Jitter is never applied to server-provided Retry-After delays, only to calculated backoff",
+           "state": "derived"
+          },
+          {
+           "label": "maxSafeTimeout",
+           "value": "2,147,483,647 ms (~25 days): the maximum 32-bit int, preventing setTimeout overflow",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rt-execution",
+     "title": "Executing the Retry",
+     "sub": "The retry loop that waits, runs hooks, and re-fetches",
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`#retryFromError` checks the totalTimeout budget, waits for the delay, resets the abort controller if the previous attempt timed out, applies any custom request from ForceRetryError, then runs `beforeRetry` hooks before re-fetching.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1125,
+       "end": 1216,
+       "label": "#retryFromError: the full retry execution path"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1117,
+       "end": 1123,
+       "label": "#retry: catch fetch error and delegate"
+      },
+      {
+       "file": "source/utils/delay.ts",
+       "start": 9,
+       "end": 29,
+       "label": "delay() utility with abort signal support"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Check totalTimeout budget",
+         "detail": "If remaining budget is 0, throw TimeoutError. If the delay alone would consume all remaining budget, wait it out then throw.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Wait for delay",
+         "detail": "await delay(retryDelay, {signal: userAbortSignal}). Only the user's abort signal can interrupt the wait, not Ky's internal controller.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Reset abort controller",
+         "detail": "If the previous attempt was aborted (e.g. per-request timeout), create a fresh AbortController and managed signal for the retry.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Apply custom request",
+         "detail": "For ForceRetryError with a custom Request, replace the current request. The custom request's signal is swapped for Ky's managed signal.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Run beforeRetry hooks",
+         "detail": "Each hook receives {request, options, error, retryCount}. A hook can return a Request, Response, ky.stop, or {options} to modify settings.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Increment and re-fetch",
+         "detail": "Increment retryCount and call #retry(), which calls #fetch(). On failure, the whole loop repeats from the decision step.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What beforeRetry hooks can return",
+       "columns": [
+        "Return value",
+        "Effect"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Request",
+         "Replaces the request for this and later retries; remaining hooks are skipped"
+        ],
+        [
+         "Response",
+         "Used as the response (goes through afterResponse hooks); counts as a retry"
+        ],
+        [
+         "ky.stop",
+         "Stops the retry without error; the request resolves to undefined"
+        ],
+        [
+         "{options: {...}}",
+         "Merges into options for this and later retries (timeout, retry, etc.)"
+        ],
+        [
+         "undefined / void",
+         "Continue to the next hook or to re-fetch"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "rt-forced",
+     "title": "Forced Retry",
+     "sub": "Hook-driven retries triggered by returning ky.retry() from afterResponse hooks",
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "An `afterResponse` hook returns `ky.retry()` to force a retry. This creates a `ForceRetryError` that bypasses method and shouldRetry checks but still counts against the retry limit.",
+     "code": [
+      {
+       "file": "source/errors/ForceRetryError.ts",
+       "start": 11,
+       "end": 51,
+       "label": "ForceRetryError class with constructor validation"
+      },
+      {
+       "file": "source/core/constants.ts",
+       "start": 78,
+       "end": 145,
+       "label": "ForceRetryOptions type with full JSDoc"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 614,
+       "end": 618,
+       "label": "#run catches ForceRetryError from afterResponse hooks"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 697,
+       "end": 700,
+       "label": "#calculateRetryDelay shortcut for ForceRetryError"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1154,
+       "end": 1161,
+       "label": "Custom request applied before beforeRetry hooks"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "How ky.retry() triggers a retry from an afterResponse hook",
+       "actors": [
+        "afterResponse hook",
+        "Ky #run loop",
+        "#retryFromError",
+        "#calculateRetryDelay"
+       ],
+       "rows": [
+        {
+         "from": "afterResponse hook",
+         "to": "Ky #run loop",
+         "label": "returns ky.retry({code: 'TOKEN_EXPIRED'})",
+         "state": "derived"
+        },
+        {
+         "from": "Ky #run loop",
+         "to": "Ky #run loop",
+         "label": "catches ForceRetryError (other errors propagate)",
+         "state": "derived"
+        },
+        {
+         "from": "Ky #run loop",
+         "to": "#retryFromError",
+         "label": "passes ForceRetryError as the error to retry from",
+         "state": "derived"
+        },
+        {
+         "from": "#retryFromError",
+         "to": "#calculateRetryDelay",
+         "label": "asks for delay",
+         "state": "derived"
+        },
+        {
+         "from": "#calculateRetryDelay",
+         "to": "#retryFromError",
+         "label": "returns customDelay or default backoff",
+         "note": "skips method check and shouldRetry, but still checks retry limit",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "ForceRetryOptions fields",
+       "columns": [
+        "Field",
+        "Type",
+        "What it does"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "delay",
+         "number | undefined",
+         "Custom delay in ms; bypasses jitter and backoffLimit"
+        ],
+        [
+         "code",
+         "string | undefined",
+         "Identifier in the error message (e.g. 'RATE_LIMIT')"
+        ],
+        [
+         "cause",
+         "Error | undefined",
+         "Original error preserved via Error.cause"
+        ],
+        [
+         "request",
+         "Request | undefined",
+         "Replacement request; its signal is swapped for Ky's"
+        ]
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Retry limit",
+         "value": "ForceRetryError still counts against retry.limit: it only skips eligibility checks",
+         "state": "derived"
+        },
+        {
+         "label": "Custom request headers",
+         "value": "Not sanitized across origins: remove credentials manually if redirecting to a different host",
+         "state": "derived"
+        },
+        {
+         "label": "Validation",
+         "value": "Constructor throws TypeError for null options, negative delay, non-string code, or non-Request request",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "handling-errors",
+   "title": "Handling Errors",
+   "sub": "Catch and identify typed errors: HTTPError, TimeoutError, NetworkError, ResponseSizeError, and more",
+   "footprint": {
+    "dirs": [
+     "source/errors",
+     "source/utils/is-network-error.ts",
+     "source/utils/type-guards.ts"
+    ],
+    "files": 8
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Each child covers a different concern: the class hierarchy, how errors are thrown, detection heuristics, and type guards"
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 4,
+   "detail": "All Ky errors extend `KyError`, which carries an `isKyError` brand for cross-realm checks. The request lifecycle wraps raw fetch failures into typed errors, runs `beforeError` hooks, then throws.",
+   "code": [
+    {
+     "file": "source/errors/KyError.ts",
+     "start": 8,
+     "end": 14,
+     "label": "KyError base class with isKyError brand getter"
+    },
+    {
+     "file": "source/core/Ky.ts",
+     "start": 783,
+     "end": 811,
+     "label": "#throwProcessedError runs beforeError hooks then throws"
+    },
+    {
+     "file": "source/index.ts",
+     "start": 96,
+     "end": 110,
+     "label": "Public exports: error classes and type guards"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Error class hierarchy and where each is thrown from",
+     "boxes": [
+      {
+       "id": "ky-error",
+       "label": "KyError",
+       "sub": "base class, isKyError brand",
+       "col": 1,
+       "row": 0
+      },
+      {
+       "id": "http-err",
+       "label": "HTTPError",
+       "sub": "non-2xx status code",
+       "col": 0,
+       "row": 1,
+       "opens": "er-hierarchy"
+      },
+      {
+       "id": "network-err",
+       "label": "NetworkError",
+       "sub": "connection failed",
+       "col": 1,
+       "row": 1,
+       "opens": "er-detection"
+      },
+      {
+       "id": "timeout-err",
+       "label": "TimeoutError",
+       "sub": "per-request or total timeout",
+       "col": 2,
+       "row": 1,
+       "opens": "er-hierarchy"
+      },
+      {
+       "id": "size-err",
+       "label": "ResponseSizeError",
+       "sub": "body > maxResponseSize",
+       "col": 0,
+       "row": 2,
+       "opens": "er-hierarchy"
+      },
+      {
+       "id": "retry-err",
+       "label": "ForceRetryError",
+       "sub": "afterResponse hook retry",
+       "col": 1,
+       "row": 2,
+       "opens": "er-hierarchy"
+      },
+      {
+       "id": "non-err",
+       "label": "NonError",
+       "sub": "wraps thrown non-Errors",
+       "col": 2,
+       "row": 2,
+       "opens": "er-hierarchy"
+      },
+      {
+       "id": "guards-box",
+       "label": "Type Guards",
+       "sub": "isHTTPError, isKyError, …",
+       "col": 3,
+       "row": 1,
+       "opens": "er-guards"
+      },
+      {
+       "id": "hooks-box",
+       "label": "beforeError hooks",
+       "sub": "transform before throw",
+       "col": 3,
+       "row": 0,
+       "opens": "er-lifecycle"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "http-err",
+       "to": "ky-error",
+       "label": "extends",
+       "at": "source/errors/HTTPError.ts:15"
+      },
+      {
+       "from": "network-err",
+       "to": "ky-error",
+       "label": "extends",
+       "at": "source/errors/NetworkError.ts:11"
+      },
+      {
+       "from": "timeout-err",
+       "to": "ky-error",
+       "label": "extends",
+       "at": "source/errors/TimeoutError.ts:7"
+      },
+      {
+       "from": "size-err",
+       "to": "ky-error",
+       "label": "extends",
+       "at": "source/errors/ResponseSizeError.ts:20"
+      },
+      {
+       "from": "retry-err",
+       "to": "ky-error",
+       "label": "extends",
+       "at": "source/errors/ForceRetryError.ts:11"
+      },
+      {
+       "from": "http-err",
+       "to": "hooks-box",
+       "label": "processed before throw",
+       "at": "source/core/Ky.ts:795"
+      },
+      {
+       "from": "network-err",
+       "to": "hooks-box",
+       "label": "processed before throw",
+       "at": "source/core/Ky.ts:906"
+      },
+      {
+       "from": "guards-box",
+       "to": "ky-error",
+       "label": "checks brand",
+       "at": "source/utils/type-guards.ts:9"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "When each error type is thrown",
+     "columns": [
+      "Error",
+      "Trigger",
+      "Thrown from"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "HTTPError",
+       "Response status not 2xx (and throwHttpErrors enabled)",
+       "Ky.ts:632"
+      ],
+      [
+       "TimeoutError",
+       "Per-request timeout or totalTimeout budget exhausted",
+       "timeout.ts:27, Ky.ts:713+"
+      ],
+      [
+       "NetworkError",
+       "Raw TypeError matching known network-error patterns",
+       "Ky.ts:1269, Ky.ts:906"
+      ],
+      [
+       "ResponseSizeError",
+       "Streamed body exceeds maxResponseSize bytes",
+       "body.ts:189"
+      ],
+      [
+       "ForceRetryError",
+       "afterResponse hook returns ky.retry()",
+       "Ky.ts:1089"
+      ],
+      [
+       "NonError",
+       "Non-Error value thrown by hook or fetch (wrapped)",
+       "Ky.ts:695"
+      ]
+     ]
+    }
+   ],
+   "children": [
+    {
+     "id": "er-hierarchy",
+     "title": "Error Classes",
+     "sub": "KyError base class and five concrete subclasses, plus the NonError wrapper",
+     "footprint": {
+      "dirs": [
+       "source/errors"
+      ],
+      "files": 7
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Each class covers a different failure mode; they share the KyError base"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Every Ky error extends `KyError`, which only adds a `name` override and an `isKyError` getter that returns `true`. `NonError` extends plain `Error` instead, because it wraps values that are not Ky failures.",
+     "code": [
+      {
+       "file": "source/errors/KyError.ts",
+       "start": 8,
+       "end": 14,
+       "label": "KyError: brand getter isKyError always returns true"
+      },
+      {
+       "file": "source/errors/HTTPError.ts",
+       "start": 15,
+       "end": 34,
+       "label": "HTTPError: carries response, request, options, and pre-parsed data"
+      },
+      {
+       "file": "source/errors/NetworkError.ts",
+       "start": 11,
+       "end": 19,
+       "label": "NetworkError: stores request and chains cause"
+      },
+      {
+       "file": "source/errors/TimeoutError.ts",
+       "start": 7,
+       "end": 15,
+       "label": "TimeoutError: describes which request timed out"
+      },
+      {
+       "file": "source/errors/ResponseSizeError.ts",
+       "start": 20,
+       "end": 30,
+       "label": "ResponseSizeError: stores request and maxResponseSize limit"
+      },
+      {
+       "file": "source/errors/ForceRetryError.ts",
+       "start": 11,
+       "end": 52,
+       "label": "ForceRetryError: validates retry options and stores customDelay, code, customRequest"
+      },
+      {
+       "file": "source/errors/NonError.ts",
+       "start": 8,
+       "end": 37,
+       "label": "NonError: wraps thrown non-Error values, extracting message when possible"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Properties carried by each error class",
+       "columns": [
+        "Class",
+        "Properties",
+        "Base"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "KyError",
+         "name, isKyError (getter)",
+         "Error"
+        ],
+        [
+         "HTTPError<T>",
+         "response, request, options, data",
+         "KyError"
+        ],
+        [
+         "NetworkError",
+         "request, cause",
+         "KyError"
+        ],
+        [
+         "TimeoutError",
+         "request",
+         "KyError"
+        ],
+        [
+         "ResponseSizeError",
+         "request, maxResponseSize",
+         "KyError"
+        ],
+        [
+         "ForceRetryError",
+         "customDelay, code, customRequest",
+         "KyError"
+        ],
+        [
+         "NonError",
+         "value (the raw thrown thing)",
+         "Error"
+        ]
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "HTTPError message format",
+       "value": "Request failed with status code 404 Not Found: GET https://example.com/api/data",
+       "notes": [
+        {
+         "label": "status 0",
+         "value": "Used for opaque status codes; message says 'an unknown error'",
+         "state": "derived"
+        },
+        {
+         "label": "data",
+         "value": "Pre-parsed response body: JSON by default, plain text for other types, undefined if empty or unreadable",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "HTTPError.data population",
+         "value": "Body is read and parsed before beforeError hooks run, bounded by request timeout (or 10s fallback), totalTimeout budget, and a 10 MiB size limit",
+         "state": "derived"
+        },
+        {
+         "label": "ForceRetryError validation",
+         "value": "Rejects null options, negative delay, non-string code, non-Request request; wraps non-Error cause via NonError.wrap",
+         "state": "derived"
+        },
+        {
+         "label": "NonError.wrap",
+         "value": "Static method: returns Errors as-is, wraps anything else in NonError with best-effort message extraction",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "er-lifecycle",
+     "title": "Error Throw Pipeline",
+     "sub": "How a raw failure becomes a typed, hook-processed error thrown to the caller",
+     "footprint": {
+      "dirs": [
+       "source/core/Ky.ts",
+       "source/utils/timeout.ts"
+      ],
+      "files": 2
+     },
+     "group": {
+      "ordering": "sequence"
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "Every error passes through `#throwProcessedError`, which runs the `beforeError` hook chain. Non-Error throws bypass hooks; errors from `beforeRetry` hooks are tracked to avoid re-processing.",
+     "code": [
+      {
+       "file": "source/core/Ky.ts",
+       "start": 783,
+       "end": 811,
+       "label": "#throwProcessedError: skip non-Errors and beforeRetry hook errors, run beforeError hooks"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 362,
+       "end": 365,
+       "label": "Top-level catch: all errors from #run() go through #throwProcessedError"
+      },
+      {
+       "file": "source/core/Ky.ts",
+       "start": 1261,
+       "end": 1273,
+       "label": "#fetch catch: wraps raw TypeError as NetworkError, rethrows others"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Path from raw failure to the caller's catch block",
+       "actors": [
+        "fetch()",
+        "Ky core",
+        "beforeError hooks",
+        "Caller"
+       ],
+       "rows": [
+        {
+         "from": "fetch()",
+         "to": "Ky core",
+         "label": "raw TypeError from runtime (network failure)",
+         "state": "derived"
+        },
+        {
+         "from": "Ky core",
+         "to": "Ky core",
+         "label": "isRawNetworkError? → wrap in NetworkError with cause",
+         "note": "also checks user abort and totalTimeout first",
+         "state": "derived"
+        },
+        {
+         "from": "Ky core",
+         "to": "Ky core",
+         "label": "retry decision: retryable method? status code? shouldRetry?",
+         "note": "if retries exhausted, error flows to #throwProcessedError",
+         "state": "derived"
+        },
+        {
+         "from": "Ky core",
+         "to": "beforeError hooks",
+         "label": "each hook receives {request, options, error, retryCount}",
+         "state": "derived"
+        },
+        {
+         "from": "beforeError hooks",
+         "to": "Caller",
+         "label": "final error thrown (possibly replaced by a hook)",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Catch in #fetch",
+         "detail": "Check user abort, totalTimeout, then isRawNetworkError. Wrap matching TypeErrors in NetworkError; rethrow others.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Retry decision",
+         "detail": "Errors flow through #retryFromError → #calculateRetryDelay. ForceRetryError skips method checks; others must match retry.methods.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "HTTPError data population",
+         "detail": "For non-2xx responses, the body is read and parsed into httpError.data before hooks run, bounded by timeout and 10 MiB.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "beforeError hook chain",
+         "detail": "Each hook may replace the error. Only real Errors (cross-realm included) are accepted; non-Error returns are ignored.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Throw to caller",
+         "detail": "The final processed error is thrown. Non-Error throws (e.g. strings) bypass the hook chain entirely.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What each timeout path throws",
+       "columns": [
+        "Where",
+        "Condition",
+        "Error"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "timeout.ts:27",
+         "Per-request timeout elapsed before fetch resolves",
+         "TimeoutError"
+        ],
+        [
+         "Ky.ts:1257",
+         "totalTimeout = 0 after fetch returns",
+         "TimeoutError"
+        ],
+        [
+         "Ky.ts:925",
+         "totalTimeout = 0 during body read",
+         "TimeoutError (via #throwProcessedError)"
+        ],
+        [
+         "Ky.ts:1133",
+         "totalTimeout = 0 when entering retry",
+         "TimeoutError"
+        ],
+        [
+         "Ky.ts:1139",
+         "Retry delay would consume all remaining budget",
+         "TimeoutError"
+        ]
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "er-lifecycle-http",
+       "title": "HTTP Error Creation",
+       "sub": "How a non-2xx response becomes an HTTPError with pre-parsed data",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "After each fetch attempt, Ky checks `response.ok`. If false and `throwHttpErrors` is enabled, it creates an `HTTPError`, reads the body into `error.data`, then decides whether to retry or throw.",
+       "code": [
+        {
+         "file": "source/core/Ky.ts",
+         "start": 624,
+         "end": 646,
+         "label": "Create HTTPError, populate data, decide retry or throw"
+        },
+        {
+         "file": "source/core/Ky.ts",
+         "start": 814,
+         "end": 830,
+         "label": "#getResponseData: read body text with timeout"
+        },
+        {
+         "file": "source/errors/HTTPError.ts",
+         "start": 22,
+         "end": 33,
+         "label": "Constructor builds message from status code and request URL"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Check response.ok",
+           "detail": "Opaque responses (type 'opaque' from no-cors) are allowed through even though ok is false.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Create HTTPError",
+           "detail": "new HTTPError(response, request, normalizedOptions) — message includes status code and request URL.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Populate data",
+           "detail": "Body text is read with a timeout, then parsed as JSON or kept as text. Empty or failed reads set data to undefined.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Retry or throw",
+           "detail": "If response came from a hook, throw immediately. Otherwise pass to #retryFromError for retry decision.",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "id": "er-lifecycle-network",
+       "title": "Network Error Wrapping",
+       "sub": "Raw TypeErrors from fetch are wrapped into NetworkError with cause chaining",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "detail": "The `#fetch` catch block and the body-read catch block both check `isRawNetworkError` to detect dropped connections. Matching TypeErrors become `NetworkError` with the original as `cause`.",
+       "code": [
+        {
+         "file": "source/core/Ky.ts",
+         "start": 1261,
+         "end": 1273,
+         "label": "#fetch catch: user abort check, totalTimeout check, then wrap network errors"
+        },
+        {
+         "file": "source/core/Ky.ts",
+         "start": 897,
+         "end": 912,
+         "label": "Body-read catch: dropped connection during streaming also wrapped as NetworkError"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "facts",
+         "rows": [
+          {
+           "label": "Two wrapping sites",
+           "value": "Ky.ts:1269 (during fetch) and Ky.ts:906 (during body streaming) — same NetworkError constructor",
+           "state": "derived"
+          },
+          {
+           "label": "Body-read network errors",
+           "value": "Wrapped and run through beforeError hooks, but NOT retried — the response was already received",
+           "state": "derived"
+          },
+          {
+           "label": "Priority order",
+           "value": "User abort checked first, then totalTimeout, then isRawNetworkError — abort during network error surfaces as abort reason",
+           "state": "derived"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "edges": [
+      {
+       "from": "er-lifecycle-http",
+       "to": "er-lifecycle-network",
+       "state": "derived",
+       "label": "different failure paths",
+       "order": 1
+      }
+     ]
+    },
+    {
+     "id": "er-detection",
+     "title": "Network Error Detection",
+     "sub": "Heuristic matching of runtime-specific TypeError messages to identify network failures",
+     "footprint": {
+      "dirs": [
+       "source/utils/is-network-error.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "The `isRawNetworkError` function checks that the thrown value is a `TypeError` whose message matches a known set of strings from Chrome, Firefox, Safari, Deno, Undici, Bun, and Cloudflare Workers.",
+     "code": [
+      {
+       "file": "source/utils/is-network-error.ts",
+       "start": 4,
+       "end": 13,
+       "label": "errorMessages: the known set of network error strings"
+      },
+      {
+       "file": "source/utils/is-network-error.ts",
+       "start": 15,
+       "end": 46,
+       "label": "isRawNetworkError: type guard with special cases for Safari 17+, Deno, Chrome"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "Known network error messages by runtime",
+       "columns": [
+        "Runtime",
+        "Message"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Chrome",
+         "Failed to fetch"
+        ],
+        [
+         "Chrome (with host)",
+         "Failed to fetch (example.com)"
+        ],
+        [
+         "Firefox",
+         "NetworkError when attempting to fetch resource."
+        ],
+        [
+         "Safari 16",
+         "The Internet connection appears to be offline."
+        ],
+        [
+         "Safari 17+",
+         "Load failed (no stack)"
+        ],
+        [
+         "Deno",
+         "error sending request for url…"
+        ],
+        [
+         "Undici (Node.js)",
+         "fetch failed"
+        ],
+        [
+         "Undici (Node.js)",
+         "terminated"
+        ],
+        [
+         "Bun (WebKit)",
+         " A network error occurred."
+        ],
+        [
+         "cross-fetch",
+         "Network request failed"
+        ],
+        [
+         "Cloudflare Workers",
+         "Network connection lost"
+        ]
+       ]
+      },
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Type check",
+         "detail": "Must be an Error (via isError cross-realm check) with name === 'TypeError' and a string message.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Safari 17+ special case",
+         "detail": "Message is 'Load failed' or 'Load failed (…)': accepted only if stack is undefined or Sentry captured it.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Deno prefix match",
+         "detail": "Message starts with 'error sending request for url' — no exact match needed.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Chrome exact or prefix",
+         "detail": "Exact 'Failed to fetch' or 'Failed to fetch (hostname)' pattern.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Set lookup",
+         "detail": "Remaining messages checked against the errorMessages Set of exact strings.",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Unrecognised runtimes produce unwrapped errors",
+       "detail": "If a runtime throws a network-level TypeError whose message is not in the known set, it will not be wrapped in NetworkError and will not be retried. The library documents this and suggests the shouldRetry option as a workaround.",
+       "where": "source/utils/is-network-error.ts:15"
+      }
+     ]
+    },
+    {
+     "id": "er-guards",
+     "title": "Type Guard Functions",
+     "sub": "Exported functions to safely identify Ky error types in catch blocks",
+     "footprint": {
+      "dirs": [
+       "source/utils/type-guards.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "Six exported type guards use a cross-realm strategy: try `instanceof` first, then fall back to checking `isKyError === true` and matching `error.name`. This handles errors from iframes, workers, or duplicated packages.",
+     "code": [
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 8,
+       "end": 10,
+       "label": "isErrorType: cross-realm check via instanceof then brand+name"
+      },
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 36,
+       "end": 39,
+       "label": "isKyError: only checks the brand property, no name match"
+      },
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 59,
+       "end": 61,
+       "label": "isHTTPError: delegates to isErrorType"
+      },
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 81,
+       "end": 83,
+       "label": "isNetworkError"
+      },
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 103,
+       "end": 105,
+       "label": "isTimeoutError"
+      },
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 130,
+       "end": 132,
+       "label": "isForceRetryError"
+      },
+      {
+       "file": "source/utils/type-guards.ts",
+       "start": 153,
+       "end": 155,
+       "label": "isResponseSizeError"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "map",
+       "caption": "Each guard function and what it checks",
+       "rows": [
+        {
+         "from": "isKyError(error)",
+         "to": "error.isKyError === true (brand only)",
+         "state": "derived"
+        },
+        {
+         "from": "isHTTPError(error)",
+         "to": "instanceof HTTPError OR (isKyError && name === 'HTTPError')",
+         "state": "derived"
+        },
+        {
+         "from": "isNetworkError(error)",
+         "to": "instanceof NetworkError OR (isKyError && name === 'NetworkError')",
+         "state": "derived"
+        },
+        {
+         "from": "isTimeoutError(error)",
+         "to": "instanceof TimeoutError OR (isKyError && name === 'TimeoutError')",
+         "state": "derived"
+        },
+        {
+         "from": "isResponseSizeError(error)",
+         "to": "instanceof ResponseSizeError OR (isKyError && name === 'ResponseSizeError')",
+         "state": "derived"
+        },
+        {
+         "from": "isForceRetryError(error)",
+         "to": "instanceof ForceRetryError OR (isKyError && name === 'ForceRetryError')",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Cross-realm strategy",
+         "value": "instanceof fails across iframes/workers/duplicated packages; brand check (isKyError getter + name string) works everywhere",
+         "state": "derived"
+        },
+        {
+         "label": "isKyError is broader",
+         "value": "Only checks the brand property, matches any KyError subclass — the other guards additionally match on error.name",
+         "state": "derived"
+        },
+        {
+         "label": "SchemaValidationError excluded",
+         "value": "Not a KyError subclass — schema errors come from user-provided schemas, not from Ky's HTTP lifecycle",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "E0": [
+  {
+   "from": "setting-up",
+   "to": "making-request",
+   "label": "configures then calls",
+   "order": 1,
+   "state": "derived"
+  },
+  {
+   "from": "making-request",
+   "to": "consuming-response",
+   "label": "resolves into",
+   "order": 2,
+   "state": "derived"
+  },
+  {
+   "from": "making-request",
+   "to": "retrying",
+   "label": "retries failed requests via",
+   "state": "derived"
+  },
+  {
+   "from": "making-request",
+   "to": "handling-errors",
+   "label": "throws on failure",
+   "state": "derived"
+  }
+ ],
+ "LINKS": []
+}

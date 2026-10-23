@@ -1,0 +1,5581 @@
+{
+ "RUN": {
+  "command": "understand-slop map saas-starter",
+  "repo": "saas-starter",
+  "about": "Cut by the journey of a new user — they land on the marketing page, sign up, choose a subscription plan via Stripe, manage their team on the dashboard, and adjust account settings — with shared database infrastructure off the path.",
+  "commit": "6e33e58",
+  "files": 51,
+  "elapsed": "0 min",
+  "root": "/Users/jonathanmacmini/Desktop/Code/slop-eval/saas-starter",
+  "models": {
+   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+   "cut": "global.anthropic.claude-opus-4-6-v1",
+   "author": "global.anthropic.claude-opus-4-6-v1",
+   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+ },
+ "AUTHORED": [
+  {
+   "id": "landing-page",
+   "title": "Landing Page",
+   "sub": "Marketing home page with hero section, feature cards, animated terminal, and the shared app shell layout.",
+   "state": "derived",
+   "col": 0,
+   "row": 0,
+   "detail": "The public marketing surface at `/`. A root layout provides SWR-prefetched user data, a dashboard layout adds a shared header, and the home page renders three static sections plus an animated terminal.",
+   "footprint": {
+    "dirs": [
+     "app/(dashboard)/page.tsx",
+     "app/(dashboard)/layout.tsx",
+     "app/(dashboard)/terminal.tsx",
+     "app/layout.tsx",
+     "app/not-found.tsx"
+    ],
+    "files": 5
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "nextjs"
+    ]
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Rendering layers nested by Next.js layout convention, not a sequence."
+   },
+   "code": [
+    {
+     "file": "app/(dashboard)/page.tsx",
+     "start": 5,
+     "end": 131,
+     "label": "HomePage component with hero, features, and CTA"
+    },
+    {
+     "file": "app/(dashboard)/layout.tsx",
+     "start": 99,
+     "end": 106,
+     "label": "Dashboard layout wrapping all pages with header"
+    },
+    {
+     "file": "app/layout.tsx",
+     "start": 18,
+     "end": 44,
+     "label": "Root layout with SWR fallback config"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the page nests: root layout → dashboard layout → home page content",
+     "boxes": [
+      {
+       "id": "root-layout",
+       "label": "Root Layout",
+       "sub": "HTML, fonts, SWR provider",
+       "col": 0,
+       "row": 0,
+       "opens": "lp-root-layout"
+      },
+      {
+       "id": "dash-layout",
+       "label": "Dashboard Layout",
+       "sub": "header + children",
+       "col": 1,
+       "row": 0,
+       "opens": "lp-header"
+      },
+      {
+       "id": "home-page",
+       "label": "Home Page",
+       "sub": "hero, features, CTA",
+       "col": 2,
+       "row": 0,
+       "opens": "lp-page-sections"
+      },
+      {
+       "id": "terminal-box",
+       "label": "Terminal",
+       "sub": "animated setup commands",
+       "col": 3,
+       "row": 0,
+       "opens": "lp-terminal"
+      },
+      {
+       "id": "api-user",
+       "label": "/api/user",
+       "sub": "returns current user or null",
+       "col": 1,
+       "row": 1
+      },
+      {
+       "id": "not-found",
+       "label": "404 Page",
+       "sub": "catch-all not-found",
+       "col": 2,
+       "row": 1,
+       "opens": "lp-not-found"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "root-layout",
+       "to": "dash-layout",
+       "label": "renders children",
+       "at": "app/layout.tsx:39"
+      },
+      {
+       "from": "dash-layout",
+       "to": "home-page",
+       "label": "renders children",
+       "at": "app/(dashboard)/layout.tsx:103"
+      },
+      {
+       "from": "home-page",
+       "to": "terminal-box",
+       "label": "imports <Terminal/>",
+       "at": "app/(dashboard)/page.tsx:38"
+      },
+      {
+       "from": "dash-layout",
+       "to": "api-user",
+       "label": "SWR fetches user",
+       "at": "app/(dashboard)/layout.tsx:23"
+      },
+      {
+       "from": "root-layout",
+       "to": "api-user",
+       "label": "SWR fallback prefetch",
+       "at": "app/layout.tsx:34"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Avatar image never shows",
+     "detail": "AvatarImage receives an `alt` prop but no `src`, so the image element never loads and the fallback is always displayed. The user's profile picture can never appear in the header.",
+     "where": "app/(dashboard)/layout.tsx:52"
+    },
+    {
+     "title": "Avatar fallback splits email by space",
+     "detail": "The fallback initials are computed by splitting `user.email` on spaces. Emails do not contain spaces, so this always produces a single-character initial (the first character of the email). It should likely use `user.name`.",
+     "where": "app/(dashboard)/layout.tsx:54"
+    }
+   ],
+   "children": [
+    {
+     "id": "lp-root-layout",
+     "title": "Root Layout",
+     "sub": "The outermost HTML wrapper providing fonts, dark mode, and SWR data prefetching.",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Server component that sets the HTML lang, loads Manrope font, and wraps children in an `SWRConfig` whose `fallback` pre-populates `/api/user` and `/api/team` without awaiting — only components that consume these keys suspend.",
+     "code": [
+      {
+       "file": "app/layout.tsx",
+       "start": 7,
+       "end": 14,
+       "label": "Page metadata and viewport config"
+      },
+      {
+       "file": "app/layout.tsx",
+       "start": 16,
+       "end": 16,
+       "label": "Manrope font loaded from Google Fonts"
+      },
+      {
+       "file": "app/layout.tsx",
+       "start": 29,
+       "end": 37,
+       "label": "SWR fallback with getUser() and getTeamForUser()"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 7,
+       "end": 37,
+       "label": "getUser reads session cookie, verifies JWT, queries users table"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Page title",
+         "value": "\"Next.js SaaS Starter\"",
+         "state": "derived"
+        },
+        {
+         "label": "Description",
+         "value": "\"Get started quickly with Next.js, Postgres, and Stripe.\"",
+         "state": "derived"
+        },
+        {
+         "label": "Font",
+         "value": "Manrope from Google Fonts",
+         "state": "derived"
+        },
+        {
+         "label": "maximumScale",
+         "value": "1 — prevents pinch-to-zoom",
+         "state": "derived"
+        },
+        {
+         "label": "SWR keys prefilled",
+         "value": "/api/user and /api/team (not awaited)",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "How user data reaches the client",
+       "actors": [
+        "Root Layout (server)",
+        "SWRConfig",
+        "UserMenu (client)",
+        "/api/user"
+       ],
+       "rows": [
+        {
+         "from": "Root Layout (server)",
+         "to": "SWRConfig",
+         "label": "passes getUser() promise as fallback for /api/user",
+         "state": "derived"
+        },
+        {
+         "from": "UserMenu (client)",
+         "to": "SWRConfig",
+         "label": "calls useSWR('/api/user') — resolved from fallback",
+         "state": "derived"
+        },
+        {
+         "from": "UserMenu (client)",
+         "to": "/api/user",
+         "label": "revalidation fetches fresh data via GET",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "lp-header",
+     "title": "Header And User Menu",
+     "sub": "Top navigation bar with ACME logo, and a user-aware dropdown that switches between guest and logged-in states.",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "The `Header` component renders the ACME logo linking to `/`. Inside it, `UserMenu` uses SWR to read the current user and renders either guest links (Pricing, Sign Up) or an avatar dropdown (Dashboard, Sign out).",
+     "code": [
+      {
+       "file": "app/(dashboard)/layout.tsx",
+       "start": 81,
+       "end": 97,
+       "label": "Header with logo and Suspense-wrapped UserMenu"
+      },
+      {
+       "file": "app/(dashboard)/layout.tsx",
+       "start": 21,
+       "end": 79,
+       "label": "UserMenu: two branches for guest vs authenticated"
+      },
+      {
+       "file": "app/(dashboard)/layout.tsx",
+       "start": 26,
+       "end": 30,
+       "label": "handleSignOut calls server action, clears SWR cache, redirects"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 224,
+       "end": 229,
+       "label": "signOut server action: logs activity and deletes session cookie"
+      },
+      {
+       "file": "components/ui/avatar.tsx",
+       "start": 24,
+       "end": 35,
+       "label": "AvatarImage wraps Radix AvatarPrimitive.Image (img element)"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Header (guest)",
+       "caption": "What a visitor sees before logging in",
+       "items": [
+        {
+         "type": "image",
+         "label": "Orange circle icon + ACME",
+         "note": "links to /"
+        },
+        {
+         "type": "button",
+         "label": "Pricing",
+         "note": "links to /pricing"
+        },
+        {
+         "type": "button",
+         "label": "Sign Up",
+         "note": "links to /sign-up"
+        }
+       ]
+      },
+      {
+       "kind": "screen",
+       "title": "Header (logged in)",
+       "caption": "What an authenticated user sees",
+       "items": [
+        {
+         "type": "image",
+         "label": "Orange circle icon + ACME",
+         "note": "links to /"
+        },
+        {
+         "type": "button",
+         "label": "Avatar circle",
+         "note": "always shows fallback initial because AvatarImage has no src"
+        },
+        {
+         "type": "list",
+         "label": "Dropdown: Dashboard, Sign out"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Sign-out flow",
+       "actors": [
+        "Browser",
+        "Server Action",
+        "Cookie",
+        "SWR cache"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "Server Action",
+         "label": "calls signOut()",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Cookie",
+         "label": "deletes 'session' cookie",
+         "state": "derived"
+        },
+        {
+         "from": "Browser",
+         "to": "SWR cache",
+         "label": "mutate('/api/user') clears cached user",
+         "state": "derived"
+        },
+        {
+         "from": "Browser",
+         "to": "Browser",
+         "label": "router.push('/') redirects home",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Avatar image never shows",
+       "detail": "AvatarImage has `alt` but no `src` prop. Without a source, the underlying `<img>` element never loads, so the AvatarFallback letter is always displayed.",
+       "where": "app/(dashboard)/layout.tsx:52"
+      },
+      {
+       "title": "Avatar fallback splits email by space",
+       "detail": "The initials are computed with `user.email.split(' ')`. Since email addresses don't contain spaces, the result is always a single character — the first letter of the email.",
+       "where": "app/(dashboard)/layout.tsx:54"
+      }
+     ]
+    },
+    {
+     "id": "lp-page-sections",
+     "title": "Page Sections",
+     "sub": "Three static marketing sections: hero, feature cards, and call-to-action.",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "The `HomePage` component renders a `<main>` with three `<section>` elements. All content is static JSX with no data fetching, relying on Tailwind for a responsive grid layout.",
+     "code": [
+      {
+       "file": "app/(dashboard)/page.tsx",
+       "start": 8,
+       "end": 42,
+       "label": "Hero section: headline, description, deploy button, terminal"
+      },
+      {
+       "file": "app/(dashboard)/page.tsx",
+       "start": 44,
+       "end": 98,
+       "label": "Features section: three-column grid with icon cards"
+      },
+      {
+       "file": "app/(dashboard)/page.tsx",
+       "start": 100,
+       "end": 127,
+       "label": "CTA section: launch prompt and GitHub link"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Marketing Home Page",
+       "caption": "Three sections top to bottom",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Build Your SaaS — Faster Than Ever",
+         "note": "orange accent on second line"
+        },
+        {
+         "type": "text",
+         "label": "Launch your SaaS product in record time…"
+        },
+        {
+         "type": "button",
+         "label": "Deploy your own →",
+         "note": "links to Vercel template (external)"
+        },
+        {
+         "type": "image",
+         "label": "Animated Terminal",
+         "note": "shows setup commands appearing one by one"
+        },
+        {
+         "type": "list",
+         "label": "Feature card: Next.js and React"
+        },
+        {
+         "type": "list",
+         "label": "Feature card: Postgres and Drizzle ORM"
+        },
+        {
+         "type": "list",
+         "label": "Feature card: Stripe Integration"
+        },
+        {
+         "type": "heading",
+         "label": "Ready to launch your SaaS?"
+        },
+        {
+         "type": "button",
+         "label": "View the code →",
+         "note": "links to GitHub repo (external)"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "External links on the landing page",
+       "columns": [
+        "Button",
+        "Destination"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Deploy your own",
+         "https://vercel.com/templates/next.js/next-js-saas-starter"
+        ],
+        [
+         "View the code",
+         "https://github.com/nextjs/saas-starter"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "lp-terminal",
+     "title": "Animated Terminal",
+     "sub": "Client-side component that reveals setup commands one at a time with a copy button.",
+     "state": "partial",
+     "col": 0,
+     "row": 3,
+     "detail": "A `useEffect` fires every 500 ms to advance a step counter, revealing the next command line. A copy button writes all six commands (including the trailing 🎉 emoji on the last one) to the clipboard via the Clipboard API.",
+     "code": [
+      {
+       "file": "app/(dashboard)/terminal.tsx",
+       "start": 6,
+       "end": 68,
+       "label": "Terminal component with step animation and copy"
+      },
+      {
+       "file": "app/(dashboard)/terminal.tsx",
+       "start": 9,
+       "end": 16,
+       "label": "The six setup commands"
+      },
+      {
+       "file": "app/(dashboard)/terminal.tsx",
+       "start": 18,
+       "end": 26,
+       "label": "useEffect: advance step every 500 ms"
+      },
+      {
+       "file": "app/(dashboard)/terminal.tsx",
+       "start": 28,
+       "end": 32,
+       "label": "copyToClipboard: writes all commands and shows check"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Initial render",
+         "detail": "Step counter starts at 0; only the first command is visible.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "500 ms timer",
+         "detail": "useEffect sets a timeout; each tick increments `terminalStep` until it reaches 5.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Reveal commands",
+         "detail": "Lines with index > step get `opacity-0`; others transition to `opacity-100`.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Copy to clipboard",
+         "detail": "Joins all six commands with newlines and writes via `navigator.clipboard.writeText`.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "The six terminal steps shown",
+       "columns": [
+        "Step",
+        "Command"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "1",
+         "git clone https://github.com/nextjs/saas-starter"
+        ],
+        [
+         "2",
+         "pnpm install"
+        ],
+        [
+         "3",
+         "pnpm db:setup"
+        ],
+        [
+         "4",
+         "pnpm db:migrate"
+        ],
+        [
+         "5",
+         "pnpm db:seed"
+        ],
+        [
+         "6",
+         "pnpm dev 🎉"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Copy includes emoji suffix",
+       "detail": "The last command is stored as `pnpm dev 🎉`. Copying all steps to clipboard gives the user a command that includes the party emoji, which could be problematic if pasted into a real terminal.",
+       "where": "app/(dashboard)/terminal.tsx:15"
+      }
+     ],
+     "unsure": "Whether the emoji actually causes a terminal failure is a claim about external shell behavior, not demonstrable from this repository."
+    },
+    {
+     "id": "lp-not-found",
+     "title": "Not Found Page",
+     "sub": "Global 404 error page shown for any unmatched route.",
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "A standalone page outside the dashboard layout. It renders an orange circle icon, a heading, an explanation, and a \"Back to Home\" link pointing to `/`.",
+     "code": [
+      {
+       "file": "app/not-found.tsx",
+       "start": 4,
+       "end": 27,
+       "label": "NotFound component with icon, heading, and home link"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "404 Page",
+       "caption": "What any visitor sees on an unknown route",
+       "items": [
+        {
+         "type": "image",
+         "label": "Orange circle icon",
+         "note": "same brand icon as header"
+        },
+        {
+         "type": "heading",
+         "label": "Page Not Found"
+        },
+        {
+         "type": "text",
+         "label": "The page you are looking for might have been removed…"
+        },
+        {
+         "type": "button",
+         "label": "Back to Home",
+         "note": "links to /"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "signing-in",
+   "title": "Signing In",
+   "sub": "How a visitor creates an account or logs in, gets a session cookie, and is allowed into protected pages",
+   "state": "derived",
+   "col": 0,
+   "row": 1,
+   "detail": "A shared `Login` component handles both modes. Server actions validate with Zod, hash with bcrypt, issue a signed JWT cookie, and redirect to `/dashboard` or Stripe checkout.",
+   "footprint": {
+    "dirs": [
+     "app/(login)",
+     "lib/auth",
+     "middleware.ts"
+    ],
+    "files": 7
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Four concerns that together get a user from anonymous to authenticated: form, account creation, session tokens, and route protection."
+   },
+   "code": [
+    {
+     "file": "app/(login)/actions.ts",
+     "start": 52,
+     "end": 101,
+     "label": "signIn server action — validates, checks password, sets session"
+    },
+    {
+     "file": "app/(login)/actions.ts",
+     "start": 109,
+     "end": 222,
+     "label": "signUp server action — creates user, team, sets session"
+    },
+    {
+     "file": "lib/auth/session.ts",
+     "start": 46,
+     "end": 59,
+     "label": "setSession — signs JWT and writes httpOnly cookie"
+    },
+    {
+     "file": "middleware.ts",
+     "start": 7,
+     "end": 44,
+     "label": "Global middleware — guards /dashboard and refreshes tokens"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "End-to-end flow from sign-in/sign-up pages through session creation to the guarded dashboard",
+     "boxes": [
+      {
+       "id": "signin-page",
+       "label": "/sign-in",
+       "sub": "renders Login in signin mode",
+       "col": 0,
+       "row": 0
+      },
+      {
+       "id": "signup-page",
+       "label": "/sign-up",
+       "sub": "renders Login in signup mode",
+       "col": 0,
+       "row": 1
+      },
+      {
+       "id": "login-form",
+       "label": "Login Component",
+       "sub": "email + password form",
+       "col": 1,
+       "row": 0,
+       "opens": "si-form"
+      },
+      {
+       "id": "signin-action",
+       "label": "signIn Action",
+       "sub": "validates, checks pw",
+       "col": 2,
+       "row": 0
+      },
+      {
+       "id": "signup-action",
+       "label": "signUp Action",
+       "sub": "creates user + team",
+       "col": 2,
+       "row": 1,
+       "opens": "si-signup"
+      },
+      {
+       "id": "users-db",
+       "label": "Users Table",
+       "sub": "email, passwordHash",
+       "col": 2,
+       "row": 2
+      },
+      {
+       "id": "session-cookie",
+       "label": "Session Cookie",
+       "sub": "signed JWT, httpOnly",
+       "col": 3,
+       "row": 0,
+       "opens": "si-session"
+      },
+      {
+       "id": "mw",
+       "label": "Route Guard",
+       "sub": "verifies on every request",
+       "col": 3,
+       "row": 1,
+       "opens": "si-guard"
+      },
+      {
+       "id": "dashboard",
+       "label": "/dashboard",
+       "sub": "protected route",
+       "col": 3,
+       "row": 2,
+       "tone": "good"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "signin-page",
+       "to": "login-form",
+       "label": "renders",
+       "at": "app/(login)/sign-in/page.tsx:7"
+      },
+      {
+       "from": "signup-page",
+       "to": "login-form",
+       "label": "renders",
+       "at": "app/(login)/sign-up/page.tsx:7"
+      },
+      {
+       "from": "login-form",
+       "to": "signin-action",
+       "label": "mode=signin",
+       "at": "app/(login)/login.tsx:19"
+      },
+      {
+       "from": "login-form",
+       "to": "signup-action",
+       "label": "mode=signup",
+       "at": "app/(login)/login.tsx:19"
+      },
+      {
+       "from": "signin-action",
+       "to": "users-db",
+       "label": "reads",
+       "at": "app/(login)/actions.ts:55"
+      },
+      {
+       "from": "signin-action",
+       "to": "session-cookie",
+       "label": "sets cookie",
+       "at": "app/(login)/actions.ts:90"
+      },
+      {
+       "from": "signup-action",
+       "to": "users-db",
+       "label": "inserts",
+       "at": "app/(login)/actions.ts:134"
+      },
+      {
+       "from": "signup-action",
+       "to": "session-cookie",
+       "label": "sets cookie",
+       "at": "app/(login)/actions.ts:212"
+      },
+      {
+       "from": "mw",
+       "to": "session-cookie",
+       "label": "reads and refreshes",
+       "at": "middleware.ts:9"
+      },
+      {
+       "from": "mw",
+       "to": "dashboard",
+       "label": "allows or redirects",
+       "at": "middleware.ts:13"
+      }
+     ]
+    },
+    {
+     "kind": "sequence",
+     "caption": "A successful sign-in, step by step",
+     "actors": [
+      "Browser",
+      "Login Form",
+      "signIn Action",
+      "Database",
+      "Cookie"
+     ],
+     "rows": [
+      {
+       "from": "Browser",
+       "to": "Login Form",
+       "label": "opens /sign-in",
+       "state": "derived"
+      },
+      {
+       "from": "Login Form",
+       "to": "signIn Action",
+       "label": "submits email + password (FormData)",
+       "state": "derived"
+      },
+      {
+       "from": "signIn Action",
+       "to": "Database",
+       "label": "SELECT user + team WHERE email = ?",
+       "note": "joins users → teamMembers → teams",
+       "state": "derived"
+      },
+      {
+       "from": "signIn Action",
+       "to": "signIn Action",
+       "label": "bcrypt.compare(password, hash)",
+       "state": "derived"
+      },
+      {
+       "from": "signIn Action",
+       "to": "Cookie",
+       "label": "signs JWT with user.id, sets httpOnly cookie",
+       "state": "derived"
+      },
+      {
+       "from": "signIn Action",
+       "to": "Browser",
+       "label": "redirect('/dashboard') or Stripe checkout",
+       "state": "derived"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Plaintext password returned in action state",
+     "detail": "Both `signIn` and `signUp` return the user's plaintext password in the error response object. The `Login` component reads `state.password` as a `defaultValue`. The password travels from server action back to the client in the serialized React state.",
+     "where": "app/(login)/actions.ts:70"
+    },
+    {
+     "title": "signOut crashes on expired session",
+     "detail": "`signOut` casts `getUser()` to `User` with no null check. If the session cookie is expired or missing, `getUser()` returns null, and accessing `.id` on the next line throws a runtime error.",
+     "where": "app/(login)/actions.ts:225"
+    }
+   ],
+   "children": [
+    {
+     "id": "si-form",
+     "title": "The Login Form",
+     "sub": "Shared client component for both sign-in and sign-up modes",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "footprint": {
+      "dirs": [
+       "app/(login)/login.tsx",
+       "app/(login)/sign-in/page.tsx",
+       "app/(login)/sign-up/page.tsx"
+      ],
+      "files": 3
+     },
+     "detail": "A single `Login` component receives a `mode` prop. It reads `redirect`, `priceId`, and `inviteId` from query params and passes them as hidden fields to the server action via `useActionState`.",
+     "code": [
+      {
+       "file": "app/(login)/login.tsx",
+       "start": 13,
+       "end": 21,
+       "label": "Login component head — reads mode, search params, wires useActionState"
+      },
+      {
+       "file": "app/(login)/login.tsx",
+       "start": 37,
+       "end": 40,
+       "label": "Hidden fields carry redirect, priceId, inviteId to the server action"
+      },
+      {
+       "file": "app/(login)/login.tsx",
+       "start": 127,
+       "end": 136,
+       "label": "Mode toggle link preserves redirect and priceId params"
+      },
+      {
+       "file": "app/(login)/sign-in/page.tsx",
+       "start": 4,
+       "end": 10,
+       "label": "/sign-in page passes mode=signin"
+      },
+      {
+       "file": "app/(login)/sign-up/page.tsx",
+       "start": 4,
+       "end": 10,
+       "label": "/sign-up page passes mode=signup"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Sign-In / Sign-Up Form",
+       "caption": "The same component in both modes; heading and toggle text change",
+       "items": [
+        {
+         "type": "image",
+         "label": "Orange circle logo"
+        },
+        {
+         "type": "heading",
+         "label": "Sign in to your account / Create your account",
+         "note": "heading changes with mode"
+        },
+        {
+         "type": "field",
+         "label": "Email",
+         "note": "max 50 chars, retains value from state on error"
+        },
+        {
+         "type": "field",
+         "label": "Password",
+         "note": "8–100 chars, autocomplete switches between current-password and new-password"
+        },
+        {
+         "type": "text",
+         "label": "Error message",
+         "note": "red text, shown only when state.error is set"
+        },
+        {
+         "type": "button",
+         "label": "Sign in / Sign up",
+         "note": "disabled with spinner while pending"
+        },
+        {
+         "type": "button",
+         "label": "Create an account / Sign in to existing account",
+         "note": "links to opposite mode, preserves redirect and priceId"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Hidden form fields forwarded to the server action",
+       "columns": [
+        "Field",
+        "Source",
+        "Purpose"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "redirect",
+         "searchParams.redirect",
+         "If 'checkout', action creates a Stripe session instead of redirecting to /dashboard"
+        ],
+        [
+         "priceId",
+         "searchParams.priceId",
+         "Stripe price ID for the checkout session"
+        ],
+        [
+         "inviteId",
+         "searchParams.inviteId",
+         "Database invitation ID; signUp joins that team instead of creating a new one"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "si-signup",
+     "title": "Account Creation",
+     "sub": "The signUp server action that creates a user, a team, and a membership row",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "footprint": {
+      "dirs": [
+       "app/(login)/actions.ts"
+      ],
+      "files": 1
+     },
+     "detail": "Validates with Zod, rejects duplicate emails, hashes the password, then takes one of two paths: with `inviteId` it joins an existing team, without it creates a new team named \"{email}'s Team\".",
+     "code": [
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 103,
+       "end": 142,
+       "label": "Zod schema, duplicate check, hash, insert user"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 148,
+       "end": 201,
+       "label": "Two paths: invitation join vs new team creation"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 203,
+       "end": 222,
+       "label": "Insert teamMember, log activity, set session, redirect"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Two sign-up paths: new team vs accepted invitation",
+       "boxes": [
+        {
+         "id": "su-validate",
+         "label": "Zod Validation",
+         "sub": "email, password, inviteId?",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "su-dup",
+         "label": "Duplicate Check",
+         "sub": "SELECT by email",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "su-hash",
+         "label": "Hash Password",
+         "sub": "bcrypt 10 rounds",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "su-invite",
+         "label": "Invitation Path",
+         "sub": "joins existing team",
+         "col": 3,
+         "row": 0
+        },
+        {
+         "id": "su-newteam",
+         "label": "New Team Path",
+         "sub": "creates team + owner",
+         "col": 3,
+         "row": 1
+        },
+        {
+         "id": "su-session",
+         "label": "Set Session",
+         "sub": "JWT cookie + redirect",
+         "col": 3,
+         "row": 2,
+         "tone": "good"
+        }
+       ],
+       "arrows": [
+        {
+         "from": "su-validate",
+         "to": "su-dup",
+         "label": "passes",
+         "at": "app/(login)/actions.ts:112"
+        },
+        {
+         "from": "su-dup",
+         "to": "su-hash",
+         "label": "no duplicate",
+         "at": "app/(login)/actions.ts:126"
+        },
+        {
+         "from": "su-hash",
+         "to": "su-invite",
+         "label": "inviteId present",
+         "at": "app/(login)/actions.ts:148"
+        },
+        {
+         "from": "su-hash",
+         "to": "su-newteam",
+         "label": "no inviteId",
+         "at": "app/(login)/actions.ts:181"
+        },
+        {
+         "from": "su-invite",
+         "to": "su-session",
+         "label": "set session",
+         "at": "app/(login)/actions.ts:212"
+        },
+        {
+         "from": "su-newteam",
+         "to": "su-session",
+         "label": "set session",
+         "at": "app/(login)/actions.ts:212"
+        }
+       ]
+      },
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Validate input",
+         "detail": "Zod schema requires email (valid format) and password (min 8 chars). inviteId is optional.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Check for duplicate email",
+         "detail": "Queries users table. Returns generic 'Failed to create user' if the email already exists.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Hash password and insert user",
+         "detail": "Hashes with bcrypt (10 rounds), inserts into users with role 'owner' (overridden for invitations).",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Create or join team",
+         "detail": "With inviteId: validates invitation (matching id, email, status=pending), joins that team. Without: creates a new team.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Insert team membership",
+         "detail": "Creates a teamMembers row linking user to team. Role is 'owner' for new teams, or the invitation's role.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Set session and redirect",
+         "detail": "Signs a JWT cookie and redirects to /dashboard, or to Stripe checkout if redirect=checkout.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What each path writes to the database",
+       "columns": [
+        "Table",
+        "New Team Path",
+        "Invitation Path"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "users",
+         "INSERT (email, hash, role=owner)",
+         "INSERT (email, hash, role=owner)"
+        ],
+        [
+         "teams",
+         "INSERT (name)",
+         "—"
+        ],
+        [
+         "teamMembers",
+         "INSERT (role=owner)",
+         "INSERT (role from invitation)"
+        ],
+        [
+         "invitations",
+         "—",
+         "UPDATE status → accepted"
+        ],
+        [
+         "activityLogs",
+         "CREATE_TEAM + SIGN_UP",
+         "ACCEPT_INVITATION + SIGN_UP"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Invitation email is never sent",
+       "detail": "The `inviteTeamMember` action creates a DB row but the email sending is a TODO comment. The invitee has no way to discover their invitation link unless shared manually.",
+       "where": "app/(login)/actions.ts:454"
+      },
+      {
+       "title": "User role column always set to owner",
+       "detail": "The newUser object hardcodes `role: 'owner'` for every sign-up. The comment says it will be overridden for invitations, but only `teamMembers.role` is set from the invitation — `users.role` stays 'owner' regardless.",
+       "where": "app/(login)/actions.ts:131"
+      }
+     ]
+    },
+    {
+     "id": "si-session",
+     "title": "Session Management",
+     "sub": "JWT signing, cookie storage, and password hashing via bcrypt",
+     "state": "partial",
+     "unsure": "AUTH_SECRET is loaded from the environment; its strength depends on deploy-time configuration not in this repo.",
+     "col": 0,
+     "row": 2,
+     "footprint": {
+      "dirs": [
+       "lib/auth/session.ts",
+       "lib/db/queries.ts"
+      ],
+      "files": 2
+     },
+     "detail": "Sessions are stateless: a signed JWT with `{ user: { id }, expires }` is stored in a single httpOnly cookie. `getUser()` reads the cookie, verifies the token, checks the expiry, and loads the user from Postgres.",
+     "code": [
+      {
+       "file": "lib/auth/session.ts",
+       "start": 6,
+       "end": 11,
+       "label": "AUTH_SECRET key derivation and bcrypt salt rounds"
+      },
+      {
+       "file": "lib/auth/session.ts",
+       "start": 20,
+       "end": 31,
+       "label": "SessionData type and signToken — JWT with 1-day expiry"
+      },
+      {
+       "file": "lib/auth/session.ts",
+       "start": 40,
+       "end": 59,
+       "label": "getSession and setSession — cookie read and write"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 7,
+       "end": 37,
+       "label": "getUser — verifies token, checks expiry, loads user from DB"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Algorithm",
+         "value": "HS256 (HMAC-SHA256) via jose library",
+         "state": "derived"
+        },
+        {
+         "label": "Signing key",
+         "value": "process.env.AUTH_SECRET, UTF-8 encoded",
+         "state": "derived"
+        },
+        {
+         "label": "Token lifetime",
+         "value": "1 day from issuance (set in both JWT exp and cookie expires)",
+         "state": "derived"
+        },
+        {
+         "label": "Cookie flags",
+         "value": "httpOnly, secure, sameSite: lax",
+         "state": "derived"
+        },
+        {
+         "label": "Password hashing",
+         "value": "bcryptjs with 10 salt rounds",
+         "state": "derived"
+        },
+        {
+         "label": "Payload",
+         "value": "{ user: { id: number }, expires: ISO string }",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "What the session JWT payload contains (decoded)",
+       "value": "{\n  \"user\": { \"id\": 42 },\n  \"expires\": \"2025-01-16T12:00:00.000Z\",\n  \"iat\": 1736942400,\n  \"exp\": 1737028800\n}",
+       "notes": [
+        {
+         "label": "id",
+         "value": "The users.id serial primary key — the only identity in the token",
+         "state": "derived"
+        },
+        {
+         "label": "expires",
+         "value": "Application-level expiry, checked by getUser() independently of JWT exp",
+         "state": "derived"
+        },
+        {
+         "label": "no role or team",
+         "value": "Every protected action must query the DB to learn the user's role or team",
+         "state": "inferred"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "How getUser() turns a cookie into a user row",
+       "actors": [
+        "Caller",
+        "getSession",
+        "verifyToken",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Caller",
+         "to": "getSession",
+         "label": "reads 'session' cookie value",
+         "state": "derived"
+        },
+        {
+         "from": "getSession",
+         "to": "verifyToken",
+         "label": "passes raw JWT string",
+         "state": "derived"
+        },
+        {
+         "from": "verifyToken",
+         "to": "getSession",
+         "label": "returns SessionData or throws",
+         "state": "derived"
+        },
+        {
+         "from": "Caller",
+         "to": "Database",
+         "label": "SELECT * FROM users WHERE id = ? AND deletedAt IS NULL",
+         "note": "also checks sessionData.expires < now",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Caller",
+         "label": "User row or null",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Double expiry check can diverge",
+       "detail": "The JWT has an `exp` claim set by `setExpirationTime`, AND the payload has an `expires` field checked by `getUser()`. The global middleware refreshes only the JWT while `getUser()` checks the payload's `expires` — they can disagree after a refresh.",
+       "where": "lib/db/queries.ts:22"
+      }
+     ]
+    },
+    {
+     "id": "si-guard",
+     "title": "Route Protection",
+     "sub": "Global edge middleware and per-action wrappers that enforce authentication",
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "footprint": {
+      "dirs": [
+       "middleware.ts",
+       "lib/auth/middleware.ts"
+      ],
+      "files": 2
+     },
+     "detail": "Two layers: a global Next.js middleware that redirects unauthenticated users away from `/dashboard`, and three wrapper functions (`validatedAction`, `validatedActionWithUser`, `withTeam`) that guard individual server actions.",
+     "code": [
+      {
+       "file": "middleware.ts",
+       "start": 5,
+       "end": 14,
+       "label": "Protected route check — only /dashboard prefix"
+      },
+      {
+       "file": "middleware.ts",
+       "start": 18,
+       "end": 41,
+       "label": "Token refresh on GET requests, delete cookie on error"
+      },
+      {
+       "file": "middleware.ts",
+       "start": 46,
+       "end": 49,
+       "label": "Matcher config — excludes API, static assets, favicon"
+      },
+      {
+       "file": "lib/auth/middleware.ts",
+       "start": 17,
+       "end": 29,
+       "label": "validatedAction — Zod parse only, no auth"
+      },
+      {
+       "file": "lib/auth/middleware.ts",
+       "start": 37,
+       "end": 54,
+       "label": "validatedActionWithUser — Zod parse + getUser() required"
+      },
+      {
+       "file": "lib/auth/middleware.ts",
+       "start": 61,
+       "end": 75,
+       "label": "withTeam — getUser() + getTeamForUser(), redirects to /sign-in"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Two layers: edge middleware for routes, action wrappers for mutations",
+       "boxes": [
+        {
+         "id": "gm-req",
+         "label": "Incoming Request",
+         "sub": "any non-API route",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "gm-check",
+         "label": "Global Middleware",
+         "sub": "checks cookie exists",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "gm-refresh",
+         "label": "Token Refresh",
+         "sub": "re-signs JWT on GET",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "gm-redirect",
+         "label": "/sign-in Redirect",
+         "sub": "missing cookie",
+         "col": 2,
+         "row": 1,
+         "tone": "warn"
+        },
+        {
+         "id": "am-action",
+         "label": "Server Action",
+         "sub": "form submission",
+         "col": 0,
+         "row": 2
+        },
+        {
+         "id": "am-zod",
+         "label": "Zod Only",
+         "sub": "validatedAction",
+         "col": 1,
+         "row": 2
+        },
+        {
+         "id": "am-user",
+         "label": "Auth + Zod",
+         "sub": "validatedActionWithUser",
+         "col": 2,
+         "row": 2
+        },
+        {
+         "id": "am-team",
+         "label": "Auth + Team",
+         "sub": "withTeam",
+         "col": 3,
+         "row": 2
+        }
+       ],
+       "arrows": [
+        {
+         "from": "gm-req",
+         "to": "gm-check",
+         "label": "every matched route",
+         "at": "middleware.ts:7"
+        },
+        {
+         "from": "gm-check",
+         "to": "gm-refresh",
+         "label": "valid cookie + GET",
+         "at": "middleware.ts:18"
+        },
+        {
+         "from": "gm-check",
+         "to": "gm-redirect",
+         "label": "no cookie + /dashboard",
+         "tone": "warn",
+         "at": "middleware.ts:12"
+        },
+        {
+         "from": "am-action",
+         "to": "am-zod",
+         "label": "signIn, signUp",
+         "at": "lib/auth/middleware.ts:21"
+        },
+        {
+         "from": "am-action",
+         "to": "am-user",
+         "label": "updatePassword etc.",
+         "at": "lib/auth/middleware.ts:41"
+        },
+        {
+         "from": "am-action",
+         "to": "am-team",
+         "label": "Stripe actions",
+         "at": "lib/auth/middleware.ts:62"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "The three action wrappers and what each checks",
+       "columns": [
+        "Wrapper",
+        "Zod",
+        "User",
+        "Team",
+        "Used By"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "validatedAction",
+         "✓",
+         "✗",
+         "✗",
+         "signIn, signUp"
+        ],
+        [
+         "validatedActionWithUser",
+         "✓",
+         "✓",
+         "✗",
+         "updatePassword, deleteAccount, updateAccount, removeTeamMember, inviteTeamMember"
+        ],
+        [
+         "withTeam",
+         "✗",
+         "✓",
+         "✓",
+         "checkoutAction, customerPortalAction"
+        ]
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "Where unauthenticated requests end up",
+       "rows": [
+        {
+         "from": "GET /dashboard/*",
+         "to": "302 → /sign-in",
+         "state": "derived"
+        },
+        {
+         "from": "GET / (public)",
+         "to": "allowed, cookie refreshed if present",
+         "state": "derived"
+        },
+        {
+         "from": "validatedActionWithUser",
+         "to": "throws Error('not authenticated')",
+         "state": "derived"
+        },
+        {
+         "from": "withTeam",
+         "to": "redirect('/sign-in')",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Middleware checks cookie presence, not validity",
+       "detail": "The protected-route guard at line 12 tests only `!sessionCookie`. An expired or tampered cookie passes the gate; the JWT is only verified inside the refresh block for GET requests. A POST with a garbage cookie is not caught here.",
+       "where": "middleware.ts:12"
+      },
+      {
+       "title": "Inconsistent auth failure behaviour",
+       "detail": "`validatedActionWithUser` throws an unhandled Error on missing user, while `withTeam` redirects to /sign-in. Callers see either an exception or a navigation depending on which wrapper the action uses.",
+       "where": "lib/auth/middleware.ts:44"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "choosing-plan",
+   "title": "Choosing a Plan",
+   "sub": "Pricing page with Stripe products, checkout session creation, post-checkout redirect, and webhook processing for subscription lifecycle.",
+   "state": "derived",
+   "col": 0,
+   "row": 2,
+   "detail": "Two Stripe products (Base $8/mo and Plus $12/mo) are seeded. A user picks one, goes through Stripe Checkout, and returns to a GET handler that writes the subscription to their team row.",
+   "footprint": {
+    "dirs": [
+     "app/(dashboard)/pricing",
+     "app/api/stripe",
+     "lib/payments"
+    ],
+    "files": 7
+   },
+   "group": {
+    "ordering": "sequence"
+   },
+   "code": [
+    {
+     "file": "app/(dashboard)/pricing/page.tsx",
+     "start": 9,
+     "end": 51,
+     "label": "Pricing page fetches Stripe products and renders two plan cards"
+    },
+    {
+     "file": "lib/payments/stripe.ts",
+     "start": 14,
+     "end": 47,
+     "label": "Creates Stripe checkout session with 14-day trial override"
+    },
+    {
+     "file": "app/api/stripe/checkout/route.ts",
+     "start": 9,
+     "end": 97,
+     "label": "GET handler: processes Stripe return, writes team, redirects to dashboard"
+    },
+    {
+     "file": "app/api/stripe/webhook/route.ts",
+     "start": 7,
+     "end": 34,
+     "label": "POST handler: verifies signature, routes subscription events"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "Full checkout flow from pricing page to team record update",
+     "boxes": [
+      {
+       "id": "pricing",
+       "label": "Pricing Page",
+       "sub": "Base and Plus cards",
+       "col": 0,
+       "row": 0,
+       "opens": "cp-pricing"
+      },
+      {
+       "id": "login-form",
+       "label": "Sign-Up / Sign-In",
+       "sub": "carries priceId",
+       "col": 0,
+       "row": 1
+      },
+      {
+       "id": "checkout-session",
+       "label": "Checkout Session",
+       "sub": "Stripe redirect",
+       "col": 1,
+       "row": 0,
+       "opens": "cp-checkout"
+      },
+      {
+       "id": "stripe",
+       "label": "Stripe Hosted Page",
+       "sub": "payment form",
+       "col": 2,
+       "row": 0
+      },
+      {
+       "id": "completion",
+       "label": "Checkout Callback",
+       "sub": "GET /api/stripe/checkout",
+       "col": 3,
+       "row": 0,
+       "opens": "cp-completion"
+      },
+      {
+       "id": "teams-table",
+       "label": "Teams Table",
+       "sub": "subscription cols",
+       "col": 3,
+       "row": 1
+      },
+      {
+       "id": "webhook",
+       "label": "Webhook Handler",
+       "sub": "POST /api/stripe/webhook",
+       "col": 2,
+       "row": 1,
+       "opens": "cp-webhook"
+      },
+      {
+       "id": "portal",
+       "label": "Customer Portal",
+       "sub": "billing portal",
+       "col": 1,
+       "row": 1,
+       "opens": "cp-portal"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "pricing",
+       "to": "checkout-session",
+       "label": "checkoutAction",
+       "at": "app/(dashboard)/pricing/page.tsx:88"
+      },
+      {
+       "from": "pricing",
+       "to": "login-form",
+       "label": "not logged in",
+       "at": "lib/payments/stripe.ts:24"
+      },
+      {
+       "from": "login-form",
+       "to": "checkout-session",
+       "label": "redirect=checkout",
+       "at": "app/(login)/actions.ts:95"
+      },
+      {
+       "from": "checkout-session",
+       "to": "stripe",
+       "label": "redirect to Stripe",
+       "at": "lib/payments/stripe.ts:46"
+      },
+      {
+       "from": "stripe",
+       "to": "completion",
+       "label": "success_url callback",
+       "at": "lib/payments/stripe.ts:36"
+      },
+      {
+       "from": "completion",
+       "to": "teams-table",
+       "label": "writes subscription",
+       "at": "app/api/stripe/checkout/route.ts:79"
+      },
+      {
+       "from": "webhook",
+       "to": "teams-table",
+       "label": "syncs status",
+       "at": "lib/payments/stripe.ts:133"
+      },
+      {
+       "from": "portal",
+       "to": "webhook",
+       "label": "triggers events",
+       "at": "lib/payments/stripe.ts:110"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "Stripe-related columns on the teams table",
+     "columns": [
+      "Column",
+      "Type",
+      "Written by"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "stripe_customer_id",
+       "text, unique",
+       "Checkout callback"
+      ],
+      [
+       "stripe_subscription_id",
+       "text, unique",
+       "Checkout callback / Webhook"
+      ],
+      [
+       "stripe_product_id",
+       "text",
+       "Checkout callback / Webhook"
+      ],
+      [
+       "plan_name",
+       "varchar(50)",
+       "Checkout callback / Webhook"
+      ],
+      [
+       "subscription_status",
+       "varchar(20)",
+       "Checkout callback / Webhook"
+      ]
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Displayed trial and actual trial differ",
+     "detail": "The pricing page reads `trial_period_days` from the Stripe price (7 days from seed), but `createCheckoutSession` hardcodes `trial_period_days: 14` on the session. The user sees \"7 day free trial\" but receives 14 days.",
+     "where": "lib/payments/stripe.ts:42"
+    },
+    {
+     "title": "Webhook sets planName to undefined",
+     "detail": "In `handleSubscriptionChange`, `plan.product` is a string (product ID) from the unexpanded webhook event, but it is cast to `Stripe.Product` and `.name` is accessed. This writes `undefined` as `planName`.",
+     "where": "lib/payments/stripe.ts:136"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cp-pricing",
+     "to": "cp-checkout",
+     "state": "derived",
+     "label": "form submits priceId",
+     "order": 1
+    },
+    {
+     "from": "cp-checkout",
+     "to": "cp-completion",
+     "state": "derived",
+     "label": "Stripe redirects back",
+     "order": 2
+    },
+    {
+     "from": "cp-completion",
+     "to": "cp-webhook",
+     "state": "derived",
+     "label": "ongoing sync"
+    }
+   ],
+   "children": [
+    {
+     "id": "cp-pricing",
+     "title": "Pricing Page",
+     "sub": "Two subscription plan cards fetched from Stripe, each with a checkout form",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "footprint": {
+      "dirs": [
+       "app/(dashboard)/pricing"
+      ],
+      "files": 2
+     },
+     "detail": "A server component fetches active Stripe products and prices, matches Base and Plus by name, and renders a card for each with a hidden `priceId` field and `checkoutAction` form.",
+     "code": [
+      {
+       "file": "app/(dashboard)/pricing/page.tsx",
+       "start": 9,
+       "end": 51,
+       "label": "PricingPage: fetches products/prices and renders two cards"
+      },
+      {
+       "file": "app/(dashboard)/pricing/page.tsx",
+       "start": 53,
+       "end": 94,
+       "label": "PricingCard: name, price, trial days, features, checkout form"
+      },
+      {
+       "file": "app/(dashboard)/pricing/submit-button.tsx",
+       "start": 7,
+       "end": 30,
+       "label": "SubmitButton: shows loading spinner or Get Started"
+      },
+      {
+       "file": "lib/payments/stripe.ts",
+       "start": 149,
+       "end": 165,
+       "label": "getStripePrices: fetches active recurring prices"
+      },
+      {
+       "file": "lib/payments/stripe.ts",
+       "start": 167,
+       "end": 182,
+       "label": "getStripeProducts: fetches active products"
+      },
+      {
+       "file": "lib/payments/actions.ts",
+       "start": 7,
+       "end": 10,
+       "label": "checkoutAction: extracts priceId from formData, calls createCheckoutSession"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Pricing Page",
+       "caption": "Two plan cards side by side",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Base"
+        },
+        {
+         "type": "text",
+         "label": "with 7 day free trial",
+         "note": "reads trialPeriodDays from Stripe price; actual checkout uses 14 days"
+        },
+        {
+         "type": "text",
+         "label": "$8 per user / month"
+        },
+        {
+         "type": "list",
+         "label": "Features: Unlimited Usage, Unlimited Workspace Members, Email Support"
+        },
+        {
+         "type": "button",
+         "label": "Get Started →",
+         "note": "submits form with hidden priceId to checkoutAction"
+        },
+        {
+         "type": "heading",
+         "label": "Plus"
+        },
+        {
+         "type": "text",
+         "label": "$12 per user / month"
+        },
+        {
+         "type": "list",
+         "label": "Everything in Base + Early Access, 24/7 Support + Slack"
+        },
+        {
+         "type": "button",
+         "label": "Get Started →",
+         "note": "same form pattern, different priceId"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Plans created by seed script",
+       "columns": [
+        "Plan",
+        "Price",
+        "Seed trial days",
+        "Features (hardcoded)"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Base",
+         "$8/mo (800 cents)",
+         "7",
+         "Unlimited Usage, Workspace Members, Email Support"
+        ],
+        [
+         "Plus",
+         "$12/mo (1200 cents)",
+         "7",
+         "Everything in Base, Early Access, 24/7 Support + Slack"
+        ]
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Caching",
+         "value": "revalidate = 3600; Stripe data is fresh for one hour max",
+         "state": "derived"
+        },
+        {
+         "label": "Fallbacks",
+         "value": "If Stripe products can't be matched by name, hardcoded defaults are shown",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Feature lists are hardcoded, not from Stripe",
+       "detail": "The feature bullet points are string literals in the component, not product metadata from Stripe. Changing features in the Stripe dashboard has no effect on the pricing page.",
+       "where": "app/(dashboard)/pricing/page.tsx:29"
+      },
+      {
+       "title": "Missing priceId submitted silently",
+       "detail": "If Stripe product fetch returns nothing matching 'Base' or 'Plus', `priceId` is undefined. The hidden input gets no value, and `checkoutAction` passes an empty string as priceId to `createCheckoutSession`.",
+       "where": "app/(dashboard)/pricing/page.tsx:89"
+      }
+     ]
+    },
+    {
+     "id": "cp-checkout",
+     "title": "Starting Checkout",
+     "sub": "Creates a Stripe checkout session or redirects unauthenticated users through sign-up first",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "footprint": {
+      "dirs": [
+       "lib/payments",
+       "app/(login)"
+      ],
+      "files": 3
+     },
+     "detail": "`checkoutAction` is wrapped with `withTeam`, which redirects unauthenticated users to `/sign-in` and throws if no team exists. After sign-in/sign-up with `redirect=checkout&priceId=...`, `createCheckoutSession` redirects to Stripe.",
+     "code": [
+      {
+       "file": "lib/payments/actions.ts",
+       "start": 7,
+       "end": 10,
+       "label": "checkoutAction: extracts priceId, calls createCheckoutSession"
+      },
+      {
+       "file": "lib/payments/stripe.ts",
+       "start": 14,
+       "end": 47,
+       "label": "createCheckoutSession: builds Stripe session with 14-day trial"
+      },
+      {
+       "file": "lib/auth/middleware.ts",
+       "start": 61,
+       "end": 75,
+       "label": "withTeam: guards action, redirects to /sign-in if no user"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 94,
+       "end": 98,
+       "label": "signIn: if redirect=checkout, creates checkout session"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 215,
+       "end": 219,
+       "label": "signUp: if redirect=checkout, creates checkout session"
+      },
+      {
+       "file": "app/(login)/login.tsx",
+       "start": 38,
+       "end": 40,
+       "label": "Login form carries redirect, priceId, inviteId as hidden fields"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Checkout flow for an unauthenticated user clicking Get Started",
+       "actors": [
+        "Browser",
+        "Server Action",
+        "Stripe"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "Server Action",
+         "label": "checkoutAction(priceId)",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Browser",
+         "label": "no user → redirect /sign-up?redirect=checkout&priceId=...",
+         "state": "derived"
+        },
+        {
+         "from": "Browser",
+         "to": "Server Action",
+         "label": "signUp(email, password) with hidden priceId",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Stripe",
+         "label": "stripe.checkout.sessions.create",
+         "state": "derived"
+        },
+        {
+         "from": "Stripe",
+         "to": "Server Action",
+         "label": "session with url",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Browser",
+         "label": "redirect(session.url)",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "mode",
+         "value": "subscription (not one-time payment)",
+         "state": "derived"
+        },
+        {
+         "label": "trial_period_days",
+         "value": "14 — hardcoded, overrides price-level trial",
+         "state": "derived"
+        },
+        {
+         "label": "client_reference_id",
+         "value": "user.id.toString() — used by callback to find user",
+         "state": "derived"
+        },
+        {
+         "label": "success_url",
+         "value": "{BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}",
+         "state": "derived"
+        },
+        {
+         "label": "cancel_url",
+         "value": "{BASE_URL}/pricing",
+         "state": "derived"
+        },
+        {
+         "label": "allow_promotion_codes",
+         "value": "true",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "diagram",
+       "caption": "Two paths into checkout: logged-in vs. unauthenticated",
+       "boxes": [
+        {
+         "id": "cs-action",
+         "label": "checkoutAction",
+         "sub": "withTeam wrapper",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "cs-authed",
+         "label": "User Logged In",
+         "sub": "team exists",
+         "col": 1,
+         "row": 0,
+         "tone": "good"
+        },
+        {
+         "id": "cs-unauthed",
+         "label": "No Session",
+         "sub": "redirect to /sign-up",
+         "col": 1,
+         "row": 1,
+         "tone": "warn"
+        },
+        {
+         "id": "cs-signup",
+         "label": "Sign-Up Form",
+         "sub": "hidden priceId field",
+         "col": 2,
+         "row": 1
+        },
+        {
+         "id": "cs-create",
+         "label": "Stripe Session",
+         "sub": "14-day trial",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "cs-hosted",
+         "label": "Stripe Page",
+         "sub": "card entry",
+         "col": 3,
+         "row": 0
+        }
+       ],
+       "arrows": [
+        {
+         "from": "cs-action",
+         "to": "cs-authed",
+         "label": "user found",
+         "at": "lib/auth/middleware.ts:63"
+        },
+        {
+         "from": "cs-action",
+         "to": "cs-unauthed",
+         "label": "no session cookie",
+         "at": "lib/auth/middleware.ts:65",
+         "tone": "warn"
+        },
+        {
+         "from": "cs-unauthed",
+         "to": "cs-signup",
+         "label": "redirect with params",
+         "at": "lib/payments/stripe.ts:24"
+        },
+        {
+         "from": "cs-signup",
+         "to": "cs-create",
+         "label": "after auth",
+         "at": "app/(login)/actions.ts:218"
+        },
+        {
+         "from": "cs-authed",
+         "to": "cs-create",
+         "label": "direct",
+         "at": "lib/payments/actions.ts:9"
+        },
+        {
+         "from": "cs-create",
+         "to": "cs-hosted",
+         "label": "redirect",
+         "at": "lib/payments/stripe.ts:46"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "withTeam throws on missing team instead of redirecting",
+       "detail": "`withTeam` redirects unauthenticated users to `/sign-in` (line 65), but throws an error for authenticated users with no team (line 70). The `/sign-up` redirect in `createCheckoutSession` (line 24) is unreachable via `checkoutAction` since `withTeam` already guards both conditions.",
+       "where": "lib/auth/middleware.ts:69-70"
+      }
+     ]
+    },
+    {
+     "id": "cp-completion",
+     "title": "After Checkout",
+     "sub": "GET handler that retrieves Stripe session, writes subscription to team, and redirects to dashboard",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "footprint": {
+      "dirs": [
+       "app/api/stripe/checkout"
+      ],
+      "files": 1
+     },
+     "detail": "Stripe's `success_url` sends the user to `/api/stripe/checkout?session_id=...`. The handler retrieves the session and subscription, finds the user's team, writes all Stripe IDs, then redirects to `/dashboard`.",
+     "code": [
+      {
+       "file": "app/api/stripe/checkout/route.ts",
+       "start": 9,
+       "end": 15,
+       "label": "Extract session_id; redirect to /pricing if missing"
+      },
+      {
+       "file": "app/api/stripe/checkout/route.ts",
+       "start": 18,
+       "end": 20,
+       "label": "Retrieve Stripe session with expanded customer and subscription"
+      },
+      {
+       "file": "app/api/stripe/checkout/route.ts",
+       "start": 36,
+       "end": 38,
+       "label": "Retrieve full subscription with expanded price.product"
+      },
+      {
+       "file": "app/api/stripe/checkout/route.ts",
+       "start": 57,
+       "end": 73,
+       "label": "Look up user by client_reference_id, then find their team"
+      },
+      {
+       "file": "app/api/stripe/checkout/route.ts",
+       "start": 79,
+       "end": 92,
+       "label": "Write Stripe data to teams table and redirect to /dashboard"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Read session_id",
+         "detail": "From the query string. Missing → redirect to /pricing.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Retrieve checkout session",
+         "detail": "Expands customer and subscription objects from Stripe.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Retrieve subscription",
+         "detail": "Second call expands items.data.price.product to get plan name.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Find user and team",
+         "detail": "Looks up user by client_reference_id, then finds their teamMembers row.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Write team record",
+         "detail": "Sets stripeCustomerId, subscriptionId, productId, planName, status, updatedAt.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Set session and redirect",
+         "detail": "Calls setSession(user), then redirects to /dashboard. On error → /error.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Fields written to teams on checkout completion",
+       "columns": [
+        "Field",
+        "Source"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "stripeCustomerId",
+         "session.customer.id"
+        ],
+        [
+         "stripeSubscriptionId",
+         "subscription.id"
+        ],
+        [
+         "stripeProductId",
+         "(plan.product as Product).id"
+        ],
+        [
+         "planName",
+         "(plan.product as Product).name"
+        ],
+        [
+         "subscriptionStatus",
+         "subscription.status"
+        ],
+        [
+         "updatedAt",
+         "new Date()"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "No auth check on the checkout callback",
+       "detail": "The GET handler accepts any `session_id` without verifying the caller's identity. Anyone who obtains a valid session_id can trigger the team update and get a session cookie for the referenced user via `setSession`.",
+       "where": "app/api/stripe/checkout/route.ts:9"
+      },
+      {
+       "title": "Error page is a dead redirect",
+       "detail": "On any failure the handler redirects to `/error`, but no `/error` page exists in the repository. The user sees a 404.",
+       "where": "app/api/stripe/checkout/route.ts:95"
+      }
+     ]
+    },
+    {
+     "id": "cp-webhook",
+     "title": "Webhook Processing",
+     "sub": "Receives Stripe subscription events and keeps the team's subscription data in sync",
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "footprint": {
+      "dirs": [
+       "app/api/stripe/webhook",
+       "lib/payments"
+      ],
+      "files": 2
+     },
+     "detail": "A POST handler verifies the Stripe webhook signature, then routes `customer.subscription.updated` and `deleted` events to `handleSubscriptionChange`, which updates or clears the team's subscription fields.",
+     "code": [
+      {
+       "file": "app/api/stripe/webhook/route.ts",
+       "start": 5,
+       "end": 5,
+       "label": "Reads STRIPE_WEBHOOK_SECRET from env"
+      },
+      {
+       "file": "app/api/stripe/webhook/route.ts",
+       "start": 7,
+       "end": 34,
+       "label": "POST: verify signature, switch on event type"
+      },
+      {
+       "file": "lib/payments/stripe.ts",
+       "start": 117,
+       "end": 147,
+       "label": "handleSubscriptionChange: update or clear team subscription"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 39,
+       "end": 47,
+       "label": "getTeamByStripeCustomerId: find team by Stripe customer"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 49,
+       "end": 65,
+       "label": "updateTeamSubscription: writes subscription fields to team"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Webhook receives a subscription.updated event",
+       "actors": [
+        "Stripe",
+        "Webhook POST",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Stripe",
+         "to": "Webhook POST",
+         "label": "POST with signed payload",
+         "state": "derived"
+        },
+        {
+         "from": "Webhook POST",
+         "to": "Webhook POST",
+         "label": "constructEvent verifies signature",
+         "note": "returns 400 on failure",
+         "state": "derived"
+        },
+        {
+         "from": "Webhook POST",
+         "to": "Database",
+         "label": "getTeamByStripeCustomerId",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Webhook POST",
+         "label": "team row",
+         "state": "derived"
+        },
+        {
+         "from": "Webhook POST",
+         "to": "Database",
+         "label": "updateTeamSubscription",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "How subscription status maps to database writes",
+       "rows": [
+        {
+         "from": "active or trialing",
+         "to": "Update subscriptionId, productId, planName, status",
+         "state": "derived"
+        },
+        {
+         "from": "canceled or unpaid",
+         "to": "Clear subscriptionId/productId/planName to null; set status",
+         "state": "derived"
+        },
+        {
+         "from": "Any other status",
+         "to": "Ignored — no database write",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Handled Stripe event types",
+       "rows": [
+        {
+         "label": "customer.subscription.updated",
+         "state": "derived"
+        },
+        {
+         "label": "customer.subscription.deleted",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "planName is always undefined from webhook",
+       "detail": "The webhook's subscription object has `plan.product` as a string (product ID), but line 136 casts it to `Stripe.Product` and reads `.name`. This writes `undefined` as `planName`, overwriting the value set at checkout.",
+       "where": "lib/payments/stripe.ts:136"
+      },
+      {
+       "title": "past_due and incomplete statuses are silently dropped",
+       "detail": "Only active/trialing and canceled/unpaid are handled. A subscription entering `past_due` triggers no write, so the team keeps its previous status until Stripe escalates to canceled.",
+       "where": "lib/payments/stripe.ts:131"
+      }
+     ]
+    },
+    {
+     "id": "cp-portal",
+     "title": "Customer Portal",
+     "sub": "Lets existing subscribers manage, upgrade, or cancel via Stripe's billing portal",
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "footprint": {
+      "dirs": [
+       "lib/payments"
+      ],
+      "files": 2
+     },
+     "detail": "The dashboard's \"Manage Subscription\" button calls `customerPortalAction`. If no portal configuration exists in Stripe, one is created on the fly with plan switching, cancellation, and payment method updates.",
+     "code": [
+      {
+       "file": "lib/payments/actions.ts",
+       "start": 12,
+       "end": 15,
+       "label": "customerPortalAction: wrapped with withTeam, redirects to portal URL"
+      },
+      {
+       "file": "lib/payments/stripe.ts",
+       "start": 49,
+       "end": 115,
+       "label": "createCustomerPortalSession: finds or creates billing portal config"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 63,
+       "end": 67,
+       "label": "Dashboard form button that triggers customerPortalAction"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Guard check",
+         "detail": "If team has no stripeCustomerId or stripeProductId, redirect to /pricing.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Find configuration",
+         "detail": "Lists existing billing portal configurations. Uses the first if any exist.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Create configuration",
+         "detail": "If none, builds one with plan switching, cancellation at period end, and payment method update.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Create portal session",
+         "detail": "Creates session for team's Stripe customer, return URL is /dashboard.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Redirect",
+         "detail": "User is sent to the Stripe-hosted portal URL.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Portal features enabled",
+       "rows": [
+        {
+         "label": "Change plan (price, quantity, promo code)",
+         "state": "derived"
+        },
+        {
+         "label": "Cancel subscription (at period end)",
+         "state": "derived"
+        },
+        {
+         "label": "Update payment method",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "Cancellation reasons offered",
+       "rows": [
+        {
+         "label": "too_expensive",
+         "state": "derived"
+        },
+        {
+         "label": "missing_features",
+         "state": "derived"
+        },
+        {
+         "label": "switched_service",
+         "state": "derived"
+        },
+        {
+         "label": "unused",
+         "state": "derived"
+        },
+        {
+         "label": "other",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "First portal configuration wins globally",
+       "detail": "The code picks `configurations.data[0]` regardless of which product it was built for. If a configuration was created for a different product, all teams reuse it. The on-the-fly creation path only runs once per Stripe account.",
+       "where": "lib/payments/stripe.ts:57"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "managing-team",
+   "title": "Managing the Team",
+   "sub": "Team dashboard showing subscription status, member list, invite form, and the sidebar navigation layout.",
+   "state": "derived",
+   "col": 0,
+   "row": 3,
+   "detail": "The `/dashboard` page is three cards — subscription, member list, invite form — each fetching via SWR from API routes. Server actions handle remove and invite, wrapped in Zod validation and user authentication.",
+   "footprint": {
+    "dirs": [
+     "app/(dashboard)/dashboard",
+     "app/(login)/actions.ts",
+     "app/api/team",
+     "lib/db/queries.ts"
+    ],
+    "files": 4
+   },
+   "group": {
+    "ordering": "set",
+    "note": "The page loads all three cards in parallel via Suspense; sidebar and data API are structural."
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "nextjs",
+     "postgres",
+     "zod"
+    ]
+   },
+   "code": [
+    {
+     "file": "app/(dashboard)/dashboard/page.tsx",
+     "start": 272,
+     "end": 288,
+     "label": "SettingsPage: renders three Suspense-wrapped cards"
+    },
+    {
+     "file": "app/(dashboard)/dashboard/layout.tsx",
+     "start": 9,
+     "end": 73,
+     "label": "DashboardLayout: sidebar navigation and main area"
+    },
+    {
+     "file": "app/api/team/route.ts",
+     "start": 1,
+     "end": 7,
+     "label": "GET /api/team returns current user's team"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the dashboard page loads data and calls server actions",
+     "boxes": [
+      {
+       "id": "shell",
+       "label": "Dashboard Shell",
+       "sub": "header + sidebar + content",
+       "col": 0,
+       "row": 0,
+       "opens": "mt-layout"
+      },
+      {
+       "id": "sub-card",
+       "label": "Subscription Card",
+       "sub": "plan name, status, portal",
+       "col": 1,
+       "row": 0,
+       "opens": "mt-subscription"
+      },
+      {
+       "id": "members-card",
+       "label": "Members Card",
+       "sub": "list with remove buttons",
+       "col": 2,
+       "row": 0,
+       "opens": "mt-members"
+      },
+      {
+       "id": "invite-card",
+       "label": "Invite Card",
+       "sub": "email + role form",
+       "col": 3,
+       "row": 0,
+       "opens": "mt-invite"
+      },
+      {
+       "id": "api-team",
+       "label": "Team API",
+       "sub": "GET team with members",
+       "col": 1,
+       "row": 1,
+       "opens": "mt-data"
+      },
+      {
+       "id": "actions",
+       "label": "Server Actions",
+       "sub": "remove, invite, portal",
+       "col": 2,
+       "row": 2
+      },
+      {
+       "id": "api-user",
+       "label": "User API",
+       "sub": "GET current user",
+       "col": 3,
+       "row": 1
+      },
+      {
+       "id": "db",
+       "label": "PostgreSQL",
+       "sub": "teams, members, invitations",
+       "col": 1,
+       "row": 2
+      }
+     ],
+     "arrows": [
+      {
+       "from": "sub-card",
+       "to": "api-team",
+       "label": "SWR fetch",
+       "at": "app/(dashboard)/dashboard/page.tsx:41"
+      },
+      {
+       "from": "members-card",
+       "to": "api-team",
+       "label": "SWR fetch",
+       "at": "app/(dashboard)/dashboard/page.tsx:97"
+      },
+      {
+       "from": "invite-card",
+       "to": "api-user",
+       "label": "SWR fetch",
+       "at": "app/(dashboard)/dashboard/page.tsx:191"
+      },
+      {
+       "from": "members-card",
+       "to": "actions",
+       "label": "removeTeamMember",
+       "at": "app/(dashboard)/dashboard/page.tsx:157"
+      },
+      {
+       "from": "invite-card",
+       "to": "actions",
+       "label": "inviteTeamMember",
+       "at": "app/(dashboard)/dashboard/page.tsx:204"
+      },
+      {
+       "from": "sub-card",
+       "to": "actions",
+       "label": "customerPortalAction",
+       "at": "app/(dashboard)/dashboard/page.tsx:63"
+      },
+      {
+       "from": "api-team",
+       "to": "db",
+       "label": "getTeamForUser",
+       "at": "lib/db/queries.ts:102"
+      },
+      {
+       "from": "api-user",
+       "to": "db",
+       "label": "getUser",
+       "at": "lib/db/queries.ts:7"
+      },
+      {
+       "from": "actions",
+       "to": "db",
+       "label": "insert/delete rows",
+       "at": "app/(login)/actions.ts:375"
+      }
+     ]
+    },
+    {
+     "kind": "screen",
+     "title": "Team Settings Page",
+     "caption": "What the user sees at /dashboard",
+     "items": [
+      {
+       "type": "heading",
+       "label": "Team Settings"
+      },
+      {
+       "type": "text",
+       "label": "Current Plan: Free / Base / Plus",
+       "note": "with status: Billed monthly, Trial period, or No active subscription"
+      },
+      {
+       "type": "button",
+       "label": "Manage Subscription",
+       "note": "submits form to customerPortalAction → redirects to Stripe portal"
+      },
+      {
+       "type": "heading",
+       "label": "Team Members"
+      },
+      {
+       "type": "list",
+       "label": "Avatar · Name · Role · Remove button",
+       "note": "Remove is hidden for the first two members (index 0 and 1)"
+      },
+      {
+       "type": "heading",
+       "label": "Invite Team Member"
+      },
+      {
+       "type": "field",
+       "label": "Email",
+       "note": "disabled when current user is not an owner"
+      },
+      {
+       "type": "choice",
+       "label": "Role: Member or Owner",
+       "note": "radio group, defaults to member"
+      },
+      {
+       "type": "button",
+       "label": "Invite Member",
+       "note": "disabled for non-owners; shows footer text explaining restriction"
+      }
+     ]
+    }
+   ],
+   "issues": [
+    {
+     "title": "Remove member always fails Zod validation",
+     "detail": "The `removeTeamMemberSchema` expects `memberId` as `z.number()`, but HTML form data always sends strings. `Object.fromEntries(formData)` produces `{ memberId: \"5\" }`, which Zod rejects. No member can ever be removed through the UI.",
+     "where": "app/(login)/actions.ts:362"
+    },
+    {
+     "title": "Invitation email is never sent",
+     "detail": "The `inviteTeamMember` action creates an invitation row and returns 'Invitation sent successfully', but the actual email dispatch is a TODO comment. The invitee has no way to know they were invited unless told out-of-band.",
+     "where": "app/(login)/actions.ts:454"
+    }
+   ],
+   "children": [
+    {
+     "id": "mt-layout",
+     "title": "Dashboard Shell",
+     "sub": "Outer header with user menu and inner sidebar with navigation links",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "Two nested layouts: the outer one renders the ACME header and avatar dropdown; the inner one renders a collapsible sidebar with four navigation links.",
+     "code": [
+      {
+       "file": "app/(dashboard)/layout.tsx",
+       "start": 99,
+       "end": 107,
+       "label": "Outer layout: Header then children"
+      },
+      {
+       "file": "app/(dashboard)/layout.tsx",
+       "start": 81,
+       "end": 96,
+       "label": "Header: ACME logo and UserMenu"
+      },
+      {
+       "file": "app/(dashboard)/layout.tsx",
+       "start": 21,
+       "end": 78,
+       "label": "UserMenu: avatar dropdown with Dashboard and Sign out"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/layout.tsx",
+       "start": 9,
+       "end": 73,
+       "label": "Inner layout: mobile header, sidebar, main content"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/layout.tsx",
+       "start": 17,
+       "end": 22,
+       "label": "navItems: Team, General, Activity, Security"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Nested layout structure wrapping dashboard pages",
+       "boxes": [
+        {
+         "id": "outer",
+         "label": "Outer Layout",
+         "sub": "header + children",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "header",
+         "label": "Header",
+         "sub": "ACME logo + UserMenu",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "user-menu",
+         "label": "User Menu",
+         "sub": "avatar → dropdown",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "inner",
+         "label": "Inner Layout",
+         "sub": "sidebar + main content",
+         "col": 0,
+         "row": 1
+        },
+        {
+         "id": "sidebar",
+         "label": "Sidebar",
+         "sub": "4 nav links, collapsible",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "page",
+         "label": "Page Content",
+         "sub": "SettingsPage or other",
+         "col": 2,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "outer",
+         "to": "header",
+         "label": "renders",
+         "at": "app/(dashboard)/layout.tsx:102"
+        },
+        {
+         "from": "header",
+         "to": "user-menu",
+         "label": "renders",
+         "at": "app/(dashboard)/layout.tsx:91"
+        },
+        {
+         "from": "outer",
+         "to": "inner",
+         "label": "children",
+         "at": "app/(dashboard)/layout.tsx:103"
+        },
+        {
+         "from": "inner",
+         "to": "sidebar",
+         "label": "renders",
+         "at": "app/(dashboard)/dashboard/layout.tsx:43"
+        },
+        {
+         "from": "inner",
+         "to": "page",
+         "label": "children",
+         "at": "app/(dashboard)/dashboard/layout.tsx:69"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Sidebar navigation items",
+       "columns": [
+        "Label",
+        "Href",
+        "Icon"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "Team",
+         "/dashboard",
+         "Users"
+        ],
+        [
+         "General",
+         "/dashboard/general",
+         "Settings"
+        ],
+        [
+         "Activity",
+         "/dashboard/activity",
+         "Activity"
+        ],
+        [
+         "Security",
+         "/dashboard/security",
+         "Shield"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Avatar fallback splits email on spaces",
+       "detail": "The outer layout UserMenu computes initials by splitting `user.email` on spaces, but emails don't contain spaces. The fallback always shows the first character of the email address, not real initials.",
+       "where": "app/(dashboard)/layout.tsx:54"
+      }
+     ]
+    },
+    {
+     "id": "mt-subscription",
+     "title": "Subscription Card",
+     "sub": "Displays the team's current plan and links to the Stripe customer portal",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "The `ManageSubscription` component fetches team data via SWR, shows the plan name (defaulting to 'Free') and billing status, and a button that calls `customerPortalAction` to redirect to Stripe's portal.",
+     "code": [
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 40,
+       "end": 73,
+       "label": "ManageSubscription component"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 53,
+       "end": 61,
+       "label": "Plan name and subscription status display logic"
+      },
+      {
+       "file": "lib/payments/actions.ts",
+       "start": 12,
+       "end": 15,
+       "label": "customerPortalAction: wraps with team auth, redirects to Stripe"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Clicking Manage Subscription",
+       "actors": [
+        "Browser",
+        "Server Action",
+        "Stripe"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "Server Action",
+         "label": "submits form to customerPortalAction",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Stripe",
+         "label": "createCustomerPortalSession with team's stripeCustomerId",
+         "state": "derived"
+        },
+        {
+         "from": "Stripe",
+         "to": "Server Action",
+         "label": "portal session URL",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Browser",
+         "label": "redirect to Stripe portal",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "map",
+       "caption": "Subscription status display text",
+       "rows": [
+        {
+         "from": "subscriptionStatus === 'active'",
+         "to": "Billed monthly",
+         "state": "derived"
+        },
+        {
+         "from": "subscriptionStatus === 'trialing'",
+         "to": "Trial period",
+         "state": "derived"
+        },
+        {
+         "from": "any other value or null",
+         "to": "No active subscription",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "mt-members",
+     "title": "Member List",
+     "sub": "Shows every team member with avatar, name, role, and a remove button",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "The `TeamMembers` component fetches from the team API, renders one row per member with initials avatar and a Remove button. The first two members by array index have their Remove button hidden.",
+     "code": [
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 96,
+       "end": 178,
+       "label": "TeamMembers component: fetches, lists, remove action"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 156,
+       "end": 168,
+       "label": "Remove button hidden for index ≤ 1"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 361,
+       "end": 392,
+       "label": "removeTeamMember server action with Zod schema"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 29,
+       "end": 45,
+       "label": "logActivity: records REMOVE_TEAM_MEMBER"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Removing a team member",
+       "actors": [
+        "Browser",
+        "Server Action",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "Server Action",
+         "label": "form with memberId as hidden input",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Server Action",
+         "label": "Zod validates memberId as z.number()",
+         "note": "FormData sends strings; z.number() rejects — always fails",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Database",
+         "label": "DELETE team_members WHERE id AND teamId match",
+         "note": "never reached due to schema bug",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Database",
+         "label": "INSERT activity log",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "First-two-members protection",
+         "value": "UI-only: index > 1 hides the button; server action has no such guard",
+         "state": "derived"
+        },
+        {
+         "label": "Role check for removal",
+         "value": "None — any authenticated team member can call the action, not just owners",
+         "state": "derived"
+        },
+        {
+         "label": "Scope of deletion",
+         "value": "Scoped to caller's team via AND(id, teamId)",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Remove action always fails Zod validation",
+       "detail": "The schema declares `memberId: z.number()` but `Object.fromEntries(formData)` yields a string. Zod rejects the string, so the DELETE query is never reached. Every removal attempt silently returns a validation error.",
+       "where": "app/(login)/actions.ts:362"
+      },
+      {
+       "title": "No role check on member removal",
+       "detail": "The `removeTeamMember` action only checks that the caller belongs to a team — not that they are an owner. Any member could remove any other member (if the Zod bug were fixed). The UI hides the button for the first two members, but the server enforces nothing.",
+       "where": "app/(login)/actions.ts:365"
+      }
+     ]
+    },
+    {
+     "id": "mt-invite",
+     "title": "Inviting Members",
+     "sub": "Form to invite a new team member by email with a chosen role, and the sign-up path that accepts it",
+     "state": "partial",
+     "unsure": "How the invitee receives the invite link is not implemented — the email send is a TODO. The invitation can only be consumed if the invitee signs up with the correct inviteId query param.",
+     "col": 0,
+     "row": 3,
+     "detail": "The invite form disables its fields for non-owners (UI only). The server action validates with Zod, checks for duplicates, and inserts an `invitations` row — but never sends an email to the invitee.",
+     "code": [
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 190,
+       "end": 270,
+       "label": "InviteTeamMember component with owner check and form"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 394,
+       "end": 459,
+       "label": "inviteTeamMember action: validate, check dupes, insert invitation"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 148,
+       "end": 180,
+       "label": "signUp: if inviteId present, join existing team with invitation role"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 454,
+       "end": 455,
+       "label": "TODO: Send invitation email"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Owner fills form",
+         "detail": "Email address and role (member or owner) submitted from the invite card.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Server validates",
+         "detail": "Zod checks email format and role enum. Authenticated user's team is looked up.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Duplicate checks",
+         "detail": "Rejects if the email is already a team member, or if a pending invitation already exists.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Row inserted",
+         "detail": "A row with teamId, email, role, invitedBy, and status 'pending' is written to invitations.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Email not sent",
+         "detail": "Returns 'Invitation sent successfully' but the send is a TODO. The invitee is never notified.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Invitee signs up",
+         "detail": "If the invitee visits sign-up with inviteId and matching email, sign-up joins them to the team.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "schema",
+       "table": "invitations",
+       "rows": [
+        {
+         "name": "id",
+         "type": "serial",
+         "key": "PK",
+         "state": "derived"
+        },
+        {
+         "name": "team_id",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived",
+         "note": "references teams.id"
+        },
+        {
+         "name": "email",
+         "type": "varchar(255)",
+         "state": "derived"
+        },
+        {
+         "name": "role",
+         "type": "varchar(50)",
+         "state": "derived",
+         "note": "member or owner"
+        },
+        {
+         "name": "invited_by",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived",
+         "note": "references users.id"
+        },
+        {
+         "name": "invited_at",
+         "type": "timestamp",
+         "state": "derived",
+         "note": "defaults to now"
+        },
+        {
+         "name": "status",
+         "type": "varchar(20)",
+         "state": "derived",
+         "note": "pending or accepted"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Invitation email is never sent",
+       "detail": "The inviteTeamMember action returns 'Invitation sent successfully' but the actual send is a TODO comment at line 454. The invitee has no automated way to discover the invitation or get the sign-up link with their inviteId.",
+       "where": "app/(login)/actions.ts:454"
+      },
+      {
+       "title": "No server-side owner check on invite",
+       "detail": "The form is disabled for non-owners in the UI, but the server action only checks that the caller belongs to a team — it never verifies the caller's role. Any member can call the action directly.",
+       "where": "app/(login)/actions.ts:399"
+      }
+     ]
+    },
+    {
+     "id": "mt-data",
+     "title": "Team Data Loading",
+     "sub": "API route and Drizzle query that fetches the team with all its members",
+     "state": "derived",
+     "col": 0,
+     "row": 4,
+     "detail": "The team API calls `getTeamForUser`, which reads the session cookie, finds the user's team membership, and returns the team row with nested `teamMembers` and their user profiles (id, name, email).",
+     "code": [
+      {
+       "file": "app/api/team/route.ts",
+       "start": 1,
+       "end": 7,
+       "label": "GET /api/team: calls getTeamForUser, returns JSON"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 102,
+       "end": 130,
+       "label": "getTeamForUser: session → user → teamMembers → team with nested members"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 7,
+       "end": 37,
+       "label": "getUser: reads session cookie, verifies JWT, queries users table"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/page.tsx",
+       "start": 28,
+       "end": 28,
+       "label": "SWR fetcher used by all three cards"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "How the team page loads its data",
+       "actors": [
+        "Browser",
+        "API Route",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "API Route",
+         "label": "SWR GET /api/team",
+         "state": "derived"
+        },
+        {
+         "from": "API Route",
+         "to": "Database",
+         "label": "verify session cookie → user id",
+         "state": "derived"
+        },
+        {
+         "from": "API Route",
+         "to": "Database",
+         "label": "findFirst teamMembers with team and nested members",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "API Route",
+         "label": "team row + teamMembers with user profiles",
+         "state": "derived"
+        },
+        {
+         "from": "API Route",
+         "to": "Browser",
+         "label": "JSON TeamDataWithMembers",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Shape of TeamDataWithMembers returned by the team API",
+       "value": "{\n  \"id\": 1,\n  \"name\": \"test@test.com's Team\",\n  \"planName\": \"Base\",\n  \"subscriptionStatus\": \"active\",\n  \"stripeCustomerId\": \"cus_...\",\n  \"stripeSubscriptionId\": \"sub_...\",\n  \"stripeProductId\": \"prod_...\",\n  \"teamMembers\": [\n    {\n      \"id\": 1,\n      \"userId\": 1,\n      \"teamId\": 1,\n      \"role\": \"owner\",\n      \"user\": { \"id\": 1, \"name\": \"Test\", \"email\": \"test@test.com\" }\n    }\n  ]\n}",
+       "notes": [
+        {
+         "label": "planName",
+         "value": "Set by Stripe webhook when subscription is created or updated; null for free teams",
+         "state": "derived"
+        },
+        {
+         "label": "user fields",
+         "value": "Only id, name, email selected — passwordHash excluded by the query's columns filter",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "account-settings",
+   "title": "Account Settings",
+   "sub": "Personal profile, password, account deletion, and activity log pages behind the dashboard sidebar",
+   "state": "derived",
+   "col": 0,
+   "row": 4,
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "nextjs",
+     "postgres",
+     "zod"
+    ]
+   },
+   "footprint": {
+    "dirs": [
+     "app/(dashboard)/dashboard/general",
+     "app/(dashboard)/dashboard/security",
+     "app/(dashboard)/dashboard/activity",
+     "app/api/user"
+    ],
+    "files": 6
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Independent settings pages navigated via sidebar"
+   },
+   "detail": "Four dashboard sidebar pages: General (name/email), Security (password/deletion), Activity (log). Settings actions like updatePassword and updateAccount are wrapped with `validatedActionWithUser` for Zod validation.",
+   "code": [
+    {
+     "file": "app/(dashboard)/dashboard/layout.tsx",
+     "start": 17,
+     "end": 22,
+     "label": "Sidebar nav items for all settings pages"
+    },
+    {
+     "file": "app/(login)/actions.ts",
+     "start": 29,
+     "end": 45,
+     "label": "logActivity inserts into activity_logs"
+    },
+    {
+     "file": "lib/auth/middleware.ts",
+     "start": 37,
+     "end": 54,
+     "label": "validatedActionWithUser definition with Zod safeParse"
+    },
+    {
+     "file": "app/(login)/actions.ts",
+     "start": 237,
+     "end": 240,
+     "label": "updatePassword wrapped with validatedActionWithUser"
+    },
+    {
+     "file": "app/(login)/actions.ts",
+     "start": 346,
+     "end": 349,
+     "label": "updateAccount wrapped with validatedActionWithUser"
+    },
+    {
+     "file": "app/(login)/actions.ts",
+     "start": 295,
+     "end": 298,
+     "label": "deleteAccount wrapped with validatedActionWithUser"
+    },
+    {
+     "file": "app/(dashboard)/dashboard/security/page.tsx",
+     "start": 9,
+     "end": 9,
+     "label": "Security page imports actions from actions.ts"
+    },
+    {
+     "file": "app/(dashboard)/dashboard/general/page.tsx",
+     "start": 9,
+     "end": 9,
+     "label": "General page imports updateAccount from actions.ts"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the settings pages reach the database through server actions",
+     "boxes": [
+      {
+       "id": "sidebar",
+       "label": "Dashboard Sidebar",
+       "sub": "four nav links",
+       "col": 0,
+       "row": 1
+      },
+      {
+       "id": "general",
+       "label": "General Page",
+       "sub": "name and email form",
+       "col": 1,
+       "row": 0,
+       "opens": "as-profile"
+      },
+      {
+       "id": "security",
+       "label": "Security Page",
+       "sub": "password and delete forms",
+       "col": 1,
+       "row": 1,
+       "opens": "as-security"
+      },
+      {
+       "id": "activity",
+       "label": "Activity Page",
+       "sub": "recent actions list",
+       "col": 1,
+       "row": 2,
+       "opens": "as-activity"
+      },
+      {
+       "id": "api-user",
+       "label": "GET User Endpoint",
+       "sub": "returns current user",
+       "col": 2,
+       "row": 0,
+       "opens": "as-user-api"
+      },
+      {
+       "id": "actions",
+       "label": "Server Actions",
+       "sub": "Zod-validated, authed",
+       "col": 2,
+       "row": 1
+      },
+      {
+       "id": "users-tbl",
+       "label": "users table",
+       "sub": "name, email, passwordHash",
+       "col": 3,
+       "row": 0
+      },
+      {
+       "id": "members-tbl",
+       "label": "team_members",
+       "sub": "userId, teamId, role",
+       "col": 3,
+       "row": 1
+      },
+      {
+       "id": "logs-tbl",
+       "label": "activity_logs",
+       "sub": "action, timestamp, IP",
+       "col": 3,
+       "row": 2
+      }
+     ],
+     "arrows": [
+      {
+       "from": "sidebar",
+       "to": "general",
+       "label": "General",
+       "at": "app/(dashboard)/dashboard/layout.tsx:19"
+      },
+      {
+       "from": "sidebar",
+       "to": "security",
+       "label": "Security",
+       "at": "app/(dashboard)/dashboard/layout.tsx:21"
+      },
+      {
+       "from": "sidebar",
+       "to": "activity",
+       "label": "Activity",
+       "at": "app/(dashboard)/dashboard/layout.tsx:20"
+      },
+      {
+       "from": "general",
+       "to": "api-user",
+       "label": "SWR fetch",
+       "at": "app/(dashboard)/dashboard/general/page.tsx:65"
+      },
+      {
+       "from": "general",
+       "to": "actions",
+       "label": "updateAccount",
+       "at": "app/(dashboard)/dashboard/general/page.tsx:77"
+      },
+      {
+       "from": "security",
+       "to": "actions",
+       "label": "form submits",
+       "at": "app/(dashboard)/dashboard/security/page.tsx:29"
+      },
+      {
+       "from": "activity",
+       "to": "logs-tbl",
+       "label": "getActivityLogs",
+       "at": "app/(dashboard)/dashboard/activity/page.tsx:72"
+      },
+      {
+       "from": "api-user",
+       "to": "users-tbl",
+       "label": "getUser",
+       "at": "app/api/user/route.ts:4"
+      },
+      {
+       "from": "actions",
+       "to": "users-tbl",
+       "label": "update / soft-delete",
+       "at": "app/(login)/actions.ts:353"
+      },
+      {
+       "from": "actions",
+       "to": "logs-tbl",
+       "label": "logActivity",
+       "at": "app/(login)/actions.ts:44"
+      },
+      {
+       "from": "actions",
+       "to": "members-tbl",
+       "label": "remove on delete",
+       "at": "app/(login)/actions.ts:327"
+      }
+     ]
+    },
+    {
+     "kind": "routes",
+     "rows": [
+      {
+       "method": "GET",
+       "path": "/api/user",
+       "auth": "session cookie",
+       "state": "derived",
+       "note": "Returns full user row as JSON"
+      },
+      {
+       "method": "GET",
+       "path": "/dashboard/general",
+       "auth": "session cookie",
+       "state": "derived",
+       "note": "Name and email form"
+      },
+      {
+       "method": "GET",
+       "path": "/dashboard/security",
+       "auth": "session cookie",
+       "state": "derived",
+       "note": "Password and delete forms"
+      },
+      {
+       "method": "GET",
+       "path": "/dashboard/activity",
+       "auth": "session cookie",
+       "state": "derived",
+       "note": "Last 10 activity records"
+      }
+     ]
+    }
+   ],
+   "children": [
+    {
+     "id": "as-profile",
+     "title": "Editing Profile",
+     "sub": "Name and email update on the General Settings page",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "footprint": {
+      "dirs": [
+       "app/(dashboard)/dashboard/general"
+      ],
+      "files": 1
+     },
+     "detail": "The General page fetches user data via SWR, renders name and email fields, and submits via `updateAccount`, which validates with Zod and updates the users table.",
+     "code": [
+      {
+       "file": "app/(dashboard)/dashboard/general/page.tsx",
+       "start": 75,
+       "end": 121,
+       "label": "GeneralPage form with useActionState"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/general/page.tsx",
+       "start": 64,
+       "end": 73,
+       "label": "SWR fetch from user endpoint for defaults"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 341,
+       "end": 359,
+       "label": "updateAccount validates and writes to DB"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "General Settings",
+       "caption": "The profile editing form",
+       "items": [
+        {
+         "type": "heading",
+         "label": "General Settings"
+        },
+        {
+         "type": "heading",
+         "label": "Account Information",
+         "note": "card title"
+        },
+        {
+         "type": "field",
+         "label": "Name",
+         "note": "defaultValue from SWR or previous action state"
+        },
+        {
+         "type": "field",
+         "label": "Email",
+         "note": "type=email, defaultValue from SWR"
+        },
+        {
+         "type": "text",
+         "label": "Error or success message",
+         "note": "red for error, green for success"
+        },
+        {
+         "type": "button",
+         "label": "Save Changes",
+         "note": "orange, shows spinner while pending"
+        }
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Data flow when saving changes",
+       "actors": [
+        "Browser",
+        "Server Action",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "Server Action",
+         "label": "form data: name, email",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Server Action",
+         "label": "Zod validates, getUser() authenticates",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Database",
+         "label": "UPDATE users SET name, email WHERE id",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Database",
+         "label": "INSERT INTO activity_logs (UPDATE_ACCOUNT)",
+         "note": "runs in parallel with the UPDATE",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Browser",
+         "label": "{ success: 'Account updated' }",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Duplicate email causes unhandled DB error",
+       "detail": "updateAccount does not check email uniqueness before writing. The database has a unique constraint on email, so setting an email that already exists throws an uncaught Postgres error instead of returning a user-friendly message.",
+       "where": "app/(login)/actions.ts:353"
+      }
+     ]
+    },
+    {
+     "id": "as-security",
+     "title": "Security Settings",
+     "sub": "Password updates and account deletion on one page",
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "footprint": {
+      "dirs": [
+       "app/(dashboard)/dashboard/security"
+      ],
+      "files": 1
+     },
+     "group": {
+      "ordering": "set",
+      "note": "Two independent forms on the same page"
+     },
+     "detail": "Two cards on one page: a password-change form with current/new/confirm fields, and a destructive account-deletion form requiring password confirmation. Both use `useActionState` to call server actions.",
+     "code": [
+      {
+       "file": "app/(dashboard)/dashboard/security/page.tsx",
+       "start": 25,
+       "end": 34,
+       "label": "Both useActionState hooks for password and delete"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 237,
+       "end": 289,
+       "label": "updatePassword with Zod and bcrypt"
+      },
+      {
+       "file": "app/(login)/actions.ts",
+       "start": 295,
+       "end": 339,
+       "label": "deleteAccount soft-delete flow"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "Two forms, two server actions, shared tables",
+       "boxes": [
+        {
+         "id": "pwd-form",
+         "label": "Password Form",
+         "sub": "current, new, confirm",
+         "col": 0,
+         "row": 0,
+         "opens": "as-sec-password"
+        },
+        {
+         "id": "del-form",
+         "label": "Delete Form",
+         "sub": "confirm password",
+         "col": 0,
+         "row": 1,
+         "opens": "as-sec-delete"
+        },
+        {
+         "id": "srv-actions",
+         "label": "Server Actions",
+         "sub": "Zod + bcrypt",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "sec-users",
+         "label": "users table",
+         "sub": "passwordHash, deletedAt",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "sec-logs",
+         "label": "activity_logs",
+         "sub": "action logged",
+         "col": 2,
+         "row": 1
+        }
+       ],
+       "arrows": [
+        {
+         "from": "pwd-form",
+         "to": "srv-actions",
+         "label": "updatePassword",
+         "at": "app/(dashboard)/dashboard/security/page.tsx:29"
+        },
+        {
+         "from": "del-form",
+         "to": "srv-actions",
+         "label": "deleteAccount",
+         "at": "app/(dashboard)/dashboard/security/page.tsx:34"
+        },
+        {
+         "from": "srv-actions",
+         "to": "sec-users",
+         "label": "update / soft-delete",
+         "at": "app/(login)/actions.ts:280"
+        },
+        {
+         "from": "srv-actions",
+         "to": "sec-logs",
+         "label": "logActivity",
+         "at": "app/(login)/actions.ts:282"
+        }
+       ]
+      }
+     ],
+     "children": [
+      {
+       "id": "as-sec-password",
+       "title": "Changing Password",
+       "sub": "Current password verification and new password update",
+       "state": "derived",
+       "col": 0,
+       "row": 0,
+       "detail": "The `updatePassword` action verifies the current password with bcrypt, checks the new password differs and confirmation matches, then hashes and saves. No session invalidation follows.",
+       "code": [
+        {
+         "file": "app/(dashboard)/dashboard/security/page.tsx",
+         "start": 46,
+         "end": 114,
+         "label": "Password form with three fields and submit"
+        },
+        {
+         "file": "app/(login)/actions.ts",
+         "start": 231,
+         "end": 289,
+         "label": "updatePassword Zod schema and handler"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "Password Card",
+         "caption": "The top card on the Security page",
+         "items": [
+          {
+           "type": "heading",
+           "label": "Password"
+          },
+          {
+           "type": "field",
+           "label": "Current Password",
+           "note": "type=password, min 8, max 100"
+          },
+          {
+           "type": "field",
+           "label": "New Password",
+           "note": "type=password, min 8, max 100"
+          },
+          {
+           "type": "field",
+           "label": "Confirm New Password",
+           "note": "type=password, min 8, max 100"
+          },
+          {
+           "type": "text",
+           "label": "Error or success message"
+          },
+          {
+           "type": "button",
+           "label": "Update Password",
+           "note": "lock icon, spinner when pending"
+          }
+         ]
+        },
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Zod validation",
+           "detail": "All three fields must be 8–100 characters.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Verify current password",
+           "detail": "bcrypt compare against stored passwordHash.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Check not same",
+           "detail": "New password must differ from current.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Check confirmation",
+           "detail": "confirmPassword must equal newPassword.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Hash and save",
+           "detail": "bcrypt hash the new password, UPDATE users, INSERT activity log in parallel.",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Other sessions survive password change",
+         "detail": "The JWT session is not invalidated or refreshed after a password change. Existing sessions on other devices remain valid until their 24-hour expiry, so a compromised session survives a password reset.",
+         "where": "app/(login)/actions.ts:277"
+        }
+       ]
+      },
+      {
+       "id": "as-sec-delete",
+       "title": "Deleting Account",
+       "sub": "Soft-delete with email mangling, team cleanup, and redirect",
+       "state": "derived",
+       "col": 0,
+       "row": 1,
+       "alarm": true,
+       "detail": "The `deleteAccount` action soft-deletes the user row, mangles the email for uniqueness, removes team membership, clears the session, and redirects. Stripe subscriptions are not touched.",
+       "code": [
+        {
+         "file": "app/(dashboard)/dashboard/security/page.tsx",
+         "start": 118,
+         "end": 164,
+         "label": "Delete account form and destructive button"
+        },
+        {
+         "file": "app/(login)/actions.ts",
+         "start": 295,
+         "end": 339,
+         "label": "deleteAccount server action"
+        },
+        {
+         "file": "app/(login)/actions.ts",
+         "start": 316,
+         "end": 323,
+         "label": "Soft delete: set deletedAt, CONCAT email"
+        }
+       ],
+       "anatomy": [
+        {
+         "kind": "screen",
+         "title": "Delete Account Card",
+         "caption": "The bottom card on the Security page",
+         "items": [
+          {
+           "type": "heading",
+           "label": "Delete Account"
+          },
+          {
+           "type": "text",
+           "label": "Account deletion is non-reversable.",
+           "note": "warning paragraph"
+          },
+          {
+           "type": "field",
+           "label": "Confirm Password",
+           "note": "type=password, min 8, max 100"
+          },
+          {
+           "type": "text",
+           "label": "Error message",
+           "note": "shown if password incorrect"
+          },
+          {
+           "type": "button",
+           "label": "Delete Account",
+           "note": "red destructive, trash icon"
+          }
+         ]
+        },
+        {
+         "kind": "flow",
+         "rows": [
+          {
+           "n": 1,
+           "title": "Verify password",
+           "detail": "bcrypt compare against stored hash.",
+           "state": "derived"
+          },
+          {
+           "n": 2,
+           "title": "Log activity",
+           "detail": "INSERT DELETE_ACCOUNT into activity_logs before deletion.",
+           "state": "derived"
+          },
+          {
+           "n": 3,
+           "title": "Soft-delete user",
+           "detail": "Set deletedAt to now; append '-id-deleted' to email for uniqueness.",
+           "state": "derived"
+          },
+          {
+           "n": 4,
+           "title": "Remove team membership",
+           "detail": "DELETE from team_members for this user and team.",
+           "state": "derived"
+          },
+          {
+           "n": 5,
+           "title": "Clear session and redirect",
+           "detail": "Delete the session cookie and redirect to sign-in.",
+           "state": "derived"
+          }
+         ]
+        },
+        {
+         "kind": "example",
+         "caption": "Email after soft-delete (synthesized example)",
+         "value": "test@test.com-1-deleted",
+         "notes": [
+          {
+           "label": "SQL pattern",
+           "value": "CONCAT(email, '-', id, '-deleted')",
+           "state": "derived"
+          },
+          {
+           "label": "purpose",
+           "value": "Frees the original email for re-registration",
+           "state": "derived"
+          }
+         ]
+        }
+       ],
+       "issues": [
+        {
+         "title": "Stripe subscription not cancelled",
+         "detail": "Account deletion removes the team_members row but does not cancel the team's Stripe subscription. If the deleted user was the sole owner, the subscription keeps billing with nobody able to manage or cancel it.",
+         "where": "app/(login)/actions.ts:325"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "as-activity",
+     "title": "Activity Log",
+     "sub": "Chronological list of user actions with icons, descriptions, and timestamps",
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "footprint": {
+      "dirs": [
+       "app/(dashboard)/dashboard/activity"
+      ],
+      "files": 2
+     },
+     "detail": "A server component that calls `getActivityLogs()` for the last 10 records, renders each with a mapped icon, a human-readable description, the IP address (if any), and a relative timestamp.",
+     "code": [
+      {
+       "file": "app/(dashboard)/dashboard/activity/page.tsx",
+       "start": 71,
+       "end": 126,
+       "label": "ActivityPage renders log list or empty state"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/activity/page.tsx",
+       "start": 17,
+       "end": 28,
+       "label": "iconMap: ActivityType to Lucide icon"
+      },
+      {
+       "file": "app/(dashboard)/dashboard/activity/page.tsx",
+       "start": 44,
+       "end": 69,
+       "label": "formatAction: ActivityType to description"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 81,
+       "end": 100,
+       "label": "getActivityLogs: last 10 ordered by timestamp"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "screen",
+       "title": "Activity Log",
+       "caption": "What the user sees",
+       "items": [
+        {
+         "type": "heading",
+         "label": "Activity Log"
+        },
+        {
+         "type": "heading",
+         "label": "Recent Activity",
+         "note": "card title"
+        },
+        {
+         "type": "list",
+         "label": "Action entries",
+         "note": "icon, description, IP address if set, relative time"
+        },
+        {
+         "type": "text",
+         "label": "No activity yet",
+         "note": "empty state with AlertCircle icon when no logs exist"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "All 10 activity types, their icons, and descriptions",
+       "columns": [
+        "ActivityType",
+        "Icon",
+        "Description"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "SIGN_UP",
+         "UserPlus",
+         "You signed up"
+        ],
+        [
+         "SIGN_IN",
+         "UserCog",
+         "You signed in"
+        ],
+        [
+         "SIGN_OUT",
+         "LogOut",
+         "You signed out"
+        ],
+        [
+         "UPDATE_PASSWORD",
+         "Lock",
+         "You changed your password"
+        ],
+        [
+         "DELETE_ACCOUNT",
+         "UserMinus",
+         "You deleted your account"
+        ],
+        [
+         "UPDATE_ACCOUNT",
+         "Settings",
+         "You updated your account"
+        ],
+        [
+         "CREATE_TEAM",
+         "UserPlus",
+         "You created a new team"
+        ],
+        [
+         "REMOVE_TEAM_MEMBER",
+         "UserMinus",
+         "You removed a team member"
+        ],
+        [
+         "INVITE_TEAM_MEMBER",
+         "Mail",
+         "You invited a team member"
+        ],
+        [
+         "ACCEPT_INVITATION",
+         "CheckCircle",
+         "You accepted an invitation"
+        ]
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "How an activity record is written and later read",
+       "actors": [
+        "Settings Page",
+        "Server Action",
+        "Database",
+        "Activity Page"
+       ],
+       "rows": [
+        {
+         "from": "Settings Page",
+         "to": "Server Action",
+         "label": "form submit (e.g. updateAccount)",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Database",
+         "label": "perform the write (UPDATE users)",
+         "state": "derived"
+        },
+        {
+         "from": "Server Action",
+         "to": "Database",
+         "label": "INSERT INTO activity_logs",
+         "note": "via logActivity(), runs in parallel",
+         "state": "derived"
+        },
+        {
+         "from": "Activity Page",
+         "to": "Database",
+         "label": "SELECT last 10 by userId",
+         "note": "getActivityLogs() on page load",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Activity Page",
+         "label": "rows with action, timestamp, ipAddress",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "IP address is never recorded",
+       "detail": "logActivity accepts an optional ipAddress parameter, but no caller ever passes it. Every record gets an empty string, so the 'from IP' display on the page never appears.",
+       "where": "app/(login)/actions.ts:42"
+      },
+      {
+       "title": "Hard limit of 10, no pagination",
+       "detail": "getActivityLogs() returns at most 10 records with no offset or cursor parameter. A user with more than 10 logged actions can never see older entries.",
+       "where": "lib/db/queries.ts:99"
+      },
+      {
+       "title": "No logs recorded without a team",
+       "detail": "logActivity silently returns if teamId is null or undefined. A user removed from their team gets no activity logged for any subsequent action, including password changes.",
+       "where": "app/(login)/actions.ts:35"
+      }
+     ]
+    },
+    {
+     "id": "as-user-api",
+     "title": "User Data Endpoint",
+     "sub": "Authenticated API returning the current user as JSON for settings pages",
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "alarm": true,
+     "footprint": {
+      "dirs": [
+       "app/api/user"
+      ],
+      "files": 1
+     },
+     "detail": "A single GET endpoint consumed by the General page and the dashboard layout header via SWR. It calls `getUser()`, which verifies the JWT session cookie and fetches the full user row including the password hash.",
+     "code": [
+      {
+       "file": "app/api/user/route.ts",
+       "start": 3,
+       "end": 6,
+       "label": "GET handler returns user as JSON"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 7,
+       "end": 37,
+       "label": "getUser: verify session, fetch full user row"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 26,
+       "end": 30,
+       "label": "select() with no columns selects everything"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "Request flow for the user endpoint",
+       "actors": [
+        "Browser",
+        "API Route",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Browser",
+         "to": "API Route",
+         "label": "GET request via SWR",
+         "state": "derived"
+        },
+        {
+         "from": "API Route",
+         "to": "API Route",
+         "label": "verify JWT from session cookie",
+         "state": "derived"
+        },
+        {
+         "from": "API Route",
+         "to": "Database",
+         "label": "SELECT * FROM users WHERE id AND deletedAt IS NULL",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "API Route",
+         "label": "full row including passwordHash",
+         "note": "all columns, nothing excluded",
+         "state": "derived"
+        },
+        {
+         "from": "API Route",
+         "to": "Browser",
+         "label": "Response.json(user)",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Auth",
+         "value": "JWT in httpOnly session cookie, verified with AUTH_SECRET",
+         "state": "derived"
+        },
+        {
+         "label": "Expiry check",
+         "value": "Returns null if JWT payload's expires date is past",
+         "state": "derived"
+        },
+        {
+         "label": "Soft-delete filter",
+         "value": "WHERE deletedAt IS NULL excludes deleted accounts",
+         "state": "derived"
+        },
+        {
+         "label": "No user response",
+         "value": "Returns JSON null (no 401 status); SWR callers check for it",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Response body (synthesized, shows exposed fields)",
+       "value": "{\n  \"id\": 1,\n  \"name\": \"Test User\",\n  \"email\": \"test@test.com\",\n  \"passwordHash\": \"$2a$10$...\",\n  \"role\": \"owner\",\n  \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n  \"updatedAt\": \"2024-01-01T00:00:00.000Z\",\n  \"deletedAt\": null\n}",
+       "notes": [
+        {
+         "label": "passwordHash",
+         "value": "bcrypt hash exposed to the browser — should be excluded",
+         "state": "derived"
+        },
+        {
+         "label": "consumers",
+         "value": "General page (name, email) and dashboard layout (avatar fallback)",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Password hash sent to the browser",
+       "detail": "getUser() does select() with no column list, returning all fields. The route serialises the result directly, so the bcrypt passwordHash is visible in every response in the browser's network tab.",
+       "where": "lib/db/queries.ts:27"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "database",
+   "title": "The Database",
+   "sub": "Table schema, PostgreSQL migrations, shared query functions, and development tooling",
+   "footprint": {
+    "dirs": [
+     "lib/db/",
+     "drizzle.config.ts"
+    ],
+    "files": 7
+   },
+   "group": {
+    "ordering": "set",
+    "note": "Layers of the data stack: table definitions, reusable queries, connection wiring, and development tooling"
+   },
+   "shape": {
+    "kind": "marks",
+    "ids": [
+     "postgres"
+    ]
+   },
+   "state": "derived",
+   "col": 0,
+   "row": 5,
+   "detail": "Five PostgreSQL tables managed by Drizzle ORM hold all persistent state. Features consume data through six shared query functions in `queries.ts`, or occasionally through the `db` client directly.",
+   "code": [
+    {
+     "file": "lib/db/schema.ts",
+     "start": 11,
+     "end": 69,
+     "label": "All five table definitions"
+    },
+    {
+     "file": "lib/db/queries.ts",
+     "start": 7,
+     "end": 130,
+     "label": "Six shared query functions"
+    },
+    {
+     "file": "lib/db/drizzle.ts",
+     "start": 1,
+     "end": 13,
+     "label": "Drizzle client initialization"
+    },
+    {
+     "file": "drizzle.config.ts",
+     "start": 3,
+     "end": 10,
+     "label": "Drizzle Kit configuration"
+    }
+   ],
+   "anatomy": [
+    {
+     "kind": "diagram",
+     "caption": "How the database layer is structured and who consumes it",
+     "boxes": [
+      {
+       "id": "tables",
+       "label": "Table Schema",
+       "sub": "5 Drizzle pgTable defs",
+       "col": 0,
+       "row": 0,
+       "opens": "db-tables"
+      },
+      {
+       "id": "client",
+       "label": "Drizzle Client",
+       "sub": "typed pg connection",
+       "col": 1,
+       "row": 0,
+       "opens": "db-connection"
+      },
+      {
+       "id": "queries",
+       "label": "Query Functions",
+       "sub": "6 shared reads/writes",
+       "col": 2,
+       "row": 0,
+       "opens": "db-queries"
+      },
+      {
+       "id": "migration",
+       "label": "Migration SQL",
+       "sub": "initial CREATE TABLEs",
+       "col": 0,
+       "row": 1
+      },
+      {
+       "id": "features",
+       "label": "Feature Code",
+       "sub": "actions, routes, Stripe",
+       "col": 2,
+       "row": 1
+      },
+      {
+       "id": "tooling",
+       "label": "Dev Tooling",
+       "sub": "seed and setup scripts",
+       "col": 1,
+       "row": 2,
+       "opens": "db-tooling"
+      }
+     ],
+     "arrows": [
+      {
+       "from": "tables",
+       "to": "client",
+       "label": "imports schema",
+       "at": "lib/db/drizzle.ts:3"
+      },
+      {
+       "from": "client",
+       "to": "queries",
+       "label": "provides db",
+       "at": "lib/db/queries.ts:2"
+      },
+      {
+       "from": "queries",
+       "to": "features",
+       "label": "called by actions",
+       "at": "app/(login)/actions.ts:23"
+      },
+      {
+       "from": "client",
+       "to": "features",
+       "label": "direct writes too",
+       "at": "app/(login)/actions.ts:5"
+      },
+      {
+       "from": "tables",
+       "to": "migration",
+       "label": "generates DDL",
+       "at": "drizzle.config.ts:4"
+      },
+      {
+       "from": "tooling",
+       "to": "client",
+       "label": "inserts seed data",
+       "at": "lib/db/seed.ts:2"
+      }
+     ]
+    },
+    {
+     "kind": "table",
+     "caption": "Environment variables the database layer depends on",
+     "columns": [
+      "Variable",
+      "Purpose",
+      "Set by"
+     ],
+     "state": "derived",
+     "rows": [
+      [
+       "POSTGRES_URL",
+       "PostgreSQL connection string",
+       "setup.ts or manual"
+      ],
+      [
+       "STRIPE_SECRET_KEY",
+       "Stripe API authentication",
+       "setup.ts"
+      ],
+      [
+       "STRIPE_WEBHOOK_SECRET",
+       "Webhook signature verification",
+       "setup.ts"
+      ],
+      [
+       "AUTH_SECRET",
+       "JWT signing key for sessions",
+       "setup.ts"
+      ],
+      [
+       "BASE_URL",
+       "App URL for Stripe redirects",
+       "setup.ts"
+      ]
+     ]
+    }
+   ],
+   "children": [
+    {
+     "id": "db-tables",
+     "title": "Table Definitions",
+     "sub": "Five PostgreSQL tables, their Drizzle relations, exported TypeScript types, and an activity-type enum",
+     "footprint": {
+      "dirs": [
+       "lib/db/schema.ts",
+       "lib/db/migrations/0000_soft_the_anarchist.sql"
+      ],
+      "files": 2
+     },
+     "summary": "5 table schemas, a relationship diagram, and an activity-type enum",
+     "state": "derived",
+     "col": 0,
+     "row": 0,
+     "detail": "All five tables are defined in `schema.ts` using Drizzle's `pgTable`, with separate relation declarations and TypeScript types inferred via `$inferSelect`.",
+     "code": [
+      {
+       "file": "lib/db/schema.ts",
+       "start": 11,
+       "end": 69,
+       "label": "All five pgTable definitions"
+      },
+      {
+       "file": "lib/db/schema.ts",
+       "start": 71,
+       "end": 113,
+       "label": "Drizzle relation declarations"
+      },
+      {
+       "file": "lib/db/schema.ts",
+       "start": 115,
+       "end": 129,
+       "label": "Inferred TypeScript types and TeamDataWithMembers"
+      },
+      {
+       "file": "lib/db/schema.ts",
+       "start": 131,
+       "end": 142,
+       "label": "ActivityType enum"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "diagram",
+       "caption": "The five tables and their foreign-key relationships",
+       "boxes": [
+        {
+         "id": "t-users",
+         "label": "users",
+         "sub": "auth, soft delete",
+         "col": 0,
+         "row": 0
+        },
+        {
+         "id": "t-tm",
+         "label": "team_members",
+         "sub": "junction: user to team",
+         "col": 1,
+         "row": 0
+        },
+        {
+         "id": "t-teams",
+         "label": "teams",
+         "sub": "Stripe subscription data",
+         "col": 2,
+         "row": 0
+        },
+        {
+         "id": "t-inv",
+         "label": "invitations",
+         "sub": "pending or accepted",
+         "col": 1,
+         "row": 1
+        },
+        {
+         "id": "t-al",
+         "label": "activity_logs",
+         "sub": "action audit trail",
+         "col": 1,
+         "row": 2
+        }
+       ],
+       "arrows": [
+        {
+         "from": "t-users",
+         "to": "t-tm",
+         "label": "FK user_id",
+         "at": "lib/db/schema.ts:37"
+        },
+        {
+         "from": "t-teams",
+         "to": "t-tm",
+         "label": "FK team_id",
+         "at": "lib/db/schema.ts:40"
+        },
+        {
+         "from": "t-users",
+         "to": "t-inv",
+         "label": "FK invited_by",
+         "at": "lib/db/schema.ts:65"
+        },
+        {
+         "from": "t-teams",
+         "to": "t-inv",
+         "label": "FK team_id",
+         "at": "lib/db/schema.ts:60"
+        },
+        {
+         "from": "t-users",
+         "to": "t-al",
+         "label": "FK user_id",
+         "at": "lib/db/schema.ts:51"
+        },
+        {
+         "from": "t-teams",
+         "to": "t-al",
+         "label": "FK team_id",
+         "at": "lib/db/schema.ts:49"
+        }
+       ]
+      },
+      {
+       "kind": "schema",
+       "table": "users",
+       "rows": [
+        {
+         "name": "id",
+         "type": "serial",
+         "key": "PK",
+         "state": "derived"
+        },
+        {
+         "name": "name",
+         "type": "varchar(100)",
+         "nullable": true,
+         "state": "derived"
+        },
+        {
+         "name": "email",
+         "type": "varchar(255)",
+         "key": "UQ",
+         "state": "derived"
+        },
+        {
+         "name": "passwordHash",
+         "type": "text",
+         "state": "derived"
+        },
+        {
+         "name": "role",
+         "type": "varchar(20)",
+         "state": "derived",
+         "note": "default 'member', no enum constraint"
+        },
+        {
+         "name": "createdAt",
+         "type": "timestamp",
+         "state": "derived"
+        },
+        {
+         "name": "updatedAt",
+         "type": "timestamp",
+         "state": "derived"
+        },
+        {
+         "name": "deletedAt",
+         "type": "timestamp",
+         "nullable": true,
+         "state": "derived",
+         "note": "soft delete marker"
+        }
+       ]
+      },
+      {
+       "kind": "schema",
+       "table": "teams",
+       "rows": [
+        {
+         "name": "id",
+         "type": "serial",
+         "key": "PK",
+         "state": "derived"
+        },
+        {
+         "name": "name",
+         "type": "varchar(100)",
+         "state": "derived"
+        },
+        {
+         "name": "createdAt",
+         "type": "timestamp",
+         "state": "derived"
+        },
+        {
+         "name": "updatedAt",
+         "type": "timestamp",
+         "state": "derived"
+        },
+        {
+         "name": "stripeCustomerId",
+         "type": "text",
+         "key": "UQ",
+         "nullable": true,
+         "state": "derived"
+        },
+        {
+         "name": "stripeSubscriptionId",
+         "type": "text",
+         "key": "UQ",
+         "nullable": true,
+         "state": "derived"
+        },
+        {
+         "name": "stripeProductId",
+         "type": "text",
+         "nullable": true,
+         "state": "derived"
+        },
+        {
+         "name": "planName",
+         "type": "varchar(50)",
+         "nullable": true,
+         "state": "derived"
+        },
+        {
+         "name": "subscriptionStatus",
+         "type": "varchar(20)",
+         "nullable": true,
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "schema",
+       "table": "team_members",
+       "rows": [
+        {
+         "name": "id",
+         "type": "serial",
+         "key": "PK",
+         "state": "derived"
+        },
+        {
+         "name": "userId",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived"
+        },
+        {
+         "name": "teamId",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived"
+        },
+        {
+         "name": "role",
+         "type": "varchar(50)",
+         "state": "derived",
+         "note": "'owner' or 'member', not constrained"
+        },
+        {
+         "name": "joinedAt",
+         "type": "timestamp",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "schema",
+       "table": "activity_logs",
+       "rows": [
+        {
+         "name": "id",
+         "type": "serial",
+         "key": "PK",
+         "state": "derived"
+        },
+        {
+         "name": "teamId",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived"
+        },
+        {
+         "name": "userId",
+         "type": "integer",
+         "key": "FK",
+         "nullable": true,
+         "state": "derived",
+         "note": "nullable despite always being set in practice"
+        },
+        {
+         "name": "action",
+         "type": "text",
+         "state": "derived",
+         "note": "one of ActivityType values"
+        },
+        {
+         "name": "timestamp",
+         "type": "timestamp",
+         "state": "derived"
+        },
+        {
+         "name": "ipAddress",
+         "type": "varchar(45)",
+         "nullable": true,
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "schema",
+       "table": "invitations",
+       "rows": [
+        {
+         "name": "id",
+         "type": "serial",
+         "key": "PK",
+         "state": "derived"
+        },
+        {
+         "name": "teamId",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived"
+        },
+        {
+         "name": "email",
+         "type": "varchar(255)",
+         "state": "derived"
+        },
+        {
+         "name": "role",
+         "type": "varchar(50)",
+         "state": "derived"
+        },
+        {
+         "name": "invitedBy",
+         "type": "integer",
+         "key": "FK",
+         "state": "derived"
+        },
+        {
+         "name": "invitedAt",
+         "type": "timestamp",
+         "state": "derived"
+        },
+        {
+         "name": "status",
+         "type": "varchar(20)",
+         "state": "derived",
+         "note": "default 'pending'"
+        }
+       ]
+      },
+      {
+       "kind": "chips",
+       "caption": "ActivityType enum values (stored in activity_logs.action)",
+       "rows": [
+        {
+         "label": "SIGN_UP",
+         "state": "derived"
+        },
+        {
+         "label": "SIGN_IN",
+         "state": "derived"
+        },
+        {
+         "label": "SIGN_OUT",
+         "state": "derived"
+        },
+        {
+         "label": "UPDATE_PASSWORD",
+         "state": "derived"
+        },
+        {
+         "label": "DELETE_ACCOUNT",
+         "state": "derived"
+        },
+        {
+         "label": "UPDATE_ACCOUNT",
+         "state": "derived"
+        },
+        {
+         "label": "CREATE_TEAM",
+         "state": "derived"
+        },
+        {
+         "label": "REMOVE_TEAM_MEMBER",
+         "state": "derived"
+        },
+        {
+         "label": "INVITE_TEAM_MEMBER",
+         "state": "derived"
+        },
+        {
+         "label": "ACCEPT_INVITATION",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "No unique constraint on (userId, teamId) in team_members",
+       "detail": "The team_members table has no composite unique index. A bug in application code could insert the same user into the same team twice, and `getUserWithTeam` would silently pick an arbitrary row.",
+       "where": "lib/db/schema.ts:34"
+      },
+      {
+       "title": "Role columns are unconstrained varchars",
+       "detail": "Both `users.role` and `teamMembers.role` accept any string up to their length limit. The app assumes 'owner' or 'member' but the database does not enforce it.",
+       "where": "lib/db/schema.ts:16"
+      }
+     ]
+    },
+    {
+     "id": "db-queries",
+     "title": "Query Functions",
+     "sub": "Six shared database functions consumed by auth, team dashboard, Stripe, and activity features",
+     "footprint": {
+      "dirs": [
+       "lib/db/queries.ts"
+      ],
+      "files": 1
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 1,
+     "detail": "All six live in `queries.ts`; four start by calling `getUser()` to authenticate via the session cookie before querying. Called by server actions, API routes, and the Stripe integration.",
+     "code": [
+      {
+       "file": "lib/db/queries.ts",
+       "start": 7,
+       "end": 37,
+       "label": "getUser: session cookie to verified user row"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 39,
+       "end": 47,
+       "label": "getTeamByStripeCustomerId"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 49,
+       "end": 65,
+       "label": "updateTeamSubscription"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 67,
+       "end": 79,
+       "label": "getUserWithTeam"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 81,
+       "end": 100,
+       "label": "getActivityLogs"
+      },
+      {
+       "file": "lib/db/queries.ts",
+       "start": 102,
+       "end": 130,
+       "label": "getTeamForUser with nested relations"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "table",
+       "caption": "The six exported functions, what they touch, and who calls them",
+       "columns": [
+        "Function",
+        "Reads",
+        "Writes",
+        "Called by"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "getUser()",
+         "session cookie, users",
+         "—",
+         "middleware, actions, API routes, other queries"
+        ],
+        [
+         "getTeamByStripeCustomerId(id)",
+         "teams",
+         "—",
+         "Stripe webhook handler"
+        ],
+        [
+         "updateTeamSubscription(id, data)",
+         "—",
+         "teams (Stripe fields)",
+         "Stripe webhook, checkout route"
+        ],
+        [
+         "getUserWithTeam(userId)",
+         "users ⟕ teamMembers",
+         "—",
+         "server actions (password, delete, invite)"
+        ],
+        [
+         "getActivityLogs()",
+         "activityLogs ⟕ users",
+         "—",
+         "activity page"
+        ],
+        [
+         "getTeamForUser()",
+         "teamMembers → teams → users",
+         "—",
+         "GET /api/team, withTeam middleware"
+        ]
+       ]
+      },
+      {
+       "kind": "sequence",
+       "caption": "Typical auth-check pattern used by getUser, getActivityLogs, and getTeamForUser",
+       "actors": [
+        "Caller",
+        "queries.ts",
+        "session.ts",
+        "PostgreSQL"
+       ],
+       "rows": [
+        {
+         "from": "Caller",
+         "to": "queries.ts",
+         "label": "calls getUser()",
+         "state": "derived"
+        },
+        {
+         "from": "queries.ts",
+         "to": "session.ts",
+         "label": "read session cookie, verifyToken()",
+         "state": "derived"
+        },
+        {
+         "from": "queries.ts",
+         "to": "queries.ts",
+         "label": "check expiry manually",
+         "note": "redundant: JWT exp already checked by jwtVerify",
+         "state": "derived"
+        },
+        {
+         "from": "queries.ts",
+         "to": "PostgreSQL",
+         "label": "SELECT from users WHERE id = ? AND deletedAt IS NULL",
+         "state": "derived"
+        },
+        {
+         "from": "PostgreSQL",
+         "to": "queries.ts",
+         "label": "user row or empty",
+         "state": "derived"
+        },
+        {
+         "from": "queries.ts",
+         "to": "Caller",
+         "label": "User | null",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "What getTeamForUser returns (TeamDataWithMembers)",
+       "value": "{\n  \"id\": 1,\n  \"name\": \"Test Team\",\n  \"stripeCustomerId\": \"cus_abc\",\n  \"planName\": \"Base\",\n  \"subscriptionStatus\": \"active\",\n  \"teamMembers\": [\n    {\n      \"id\": 1,\n      \"role\": \"owner\",\n      \"user\": {\n        \"id\": 1,\n        \"name\": \"Test\",\n        \"email\": \"test@test.com\"\n      }\n    }\n  ]\n}",
+       "notes": [
+        {
+         "label": "nested via",
+         "value": "Drizzle relational query (db.query.teamMembers.findFirst with nested 'with')",
+         "state": "derived"
+        },
+        {
+         "label": "user fields",
+         "value": "only id, name, email — passwordHash excluded via columns filter",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Activity log hardcoded to 10 rows with no pagination",
+       "detail": "getActivityLogs always returns the last 10 entries. There is no offset or cursor parameter, so older activity is permanently invisible in the UI.",
+       "where": "lib/db/queries.ts:99"
+      },
+      {
+       "title": "getUserWithTeam silently picks one team",
+       "detail": "The left join and LIMIT 1 mean that if a user belongs to multiple teams (the schema allows it), only the first is returned. The caller has no way to know others exist.",
+       "where": "lib/db/queries.ts:76"
+      }
+     ]
+    },
+    {
+     "id": "db-connection",
+     "title": "Connection Layer",
+     "sub": "Drizzle ORM client initialization, PostgreSQL driver, migration configuration, and npm scripts",
+     "footprint": {
+      "dirs": [
+       "lib/db/drizzle.ts",
+       "drizzle.config.ts",
+       "lib/db/migrations/"
+      ],
+      "files": 3
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 2,
+     "detail": "`drizzle.ts` creates a single `db` instance using postgres-js and the full schema. `drizzle.config.ts` tells Drizzle Kit where to read the schema and write migration SQL.",
+     "code": [
+      {
+       "file": "lib/db/drizzle.ts",
+       "start": 1,
+       "end": 13,
+       "label": "Client and db instance creation"
+      },
+      {
+       "file": "drizzle.config.ts",
+       "start": 3,
+       "end": 10,
+       "label": "Drizzle Kit config: schema path, output dir, dialect"
+      },
+      {
+       "file": "lib/db/migrations/0000_soft_the_anarchist.sql",
+       "start": 1,
+       "end": 52,
+       "label": "Initial migration: CREATE TABLE statements"
+      },
+      {
+       "file": "lib/db/migrations/0000_soft_the_anarchist.sql",
+       "start": 54,
+       "end": 88,
+       "label": "Initial migration: foreign key constraints"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "facts",
+       "rows": [
+        {
+         "label": "Driver",
+         "value": "postgres-js (postgres npm package)",
+         "state": "derived"
+        },
+        {
+         "label": "ORM",
+         "value": "drizzle-orm with full schema typing",
+         "state": "derived"
+        },
+        {
+         "label": "Migration tool",
+         "value": "drizzle-kit generate + migrate",
+         "state": "derived"
+        },
+        {
+         "label": "Migration count",
+         "value": "1 file (5 tables, 6 FK constraints)",
+         "state": "derived"
+        },
+        {
+         "label": "Connection",
+         "value": "Single global client, created at module load from POSTGRES_URL",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "npm scripts for database management",
+       "columns": [
+        "Script",
+        "Runs",
+        "Purpose"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "pnpm db:setup",
+         "npx tsx lib/db/setup.ts",
+         "Interactive env setup wizard"
+        ],
+        [
+         "pnpm db:seed",
+         "npx tsx lib/db/seed.ts",
+         "Insert test user, team, Stripe products"
+        ],
+        [
+         "pnpm db:generate",
+         "drizzle-kit generate",
+         "Generate migration SQL from schema"
+        ],
+        [
+         "pnpm db:migrate",
+         "drizzle-kit migrate",
+         "Apply pending migrations"
+        ],
+        [
+         "pnpm db:studio",
+         "drizzle-kit studio",
+         "Open Drizzle Studio GUI"
+        ]
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Missing POSTGRES_URL crashes at import time",
+       "detail": "The drizzle.ts module throws immediately if POSTGRES_URL is unset. Any server-side import chain that reaches this module will crash the whole process on startup, not on first query.",
+       "where": "lib/db/drizzle.ts:9"
+      }
+     ]
+    },
+    {
+     "id": "db-tooling",
+     "title": "Dev Setup",
+     "sub": "Interactive CLI setup wizard and database seed script for local development",
+     "footprint": {
+      "dirs": [
+       "lib/db/setup.ts",
+       "lib/db/seed.ts"
+      ],
+      "files": 2
+     },
+     "state": "derived",
+     "col": 0,
+     "row": 3,
+     "detail": "`setup.ts` walks a developer through configuring Stripe CLI, Postgres, and environment variables. `seed.ts` inserts a test user, team, and two Stripe subscription products.",
+     "code": [
+      {
+       "file": "lib/db/setup.ts",
+       "start": 196,
+       "end": 214,
+       "label": "main: orchestrates the 6-step setup flow"
+      },
+      {
+       "file": "lib/db/setup.ts",
+       "start": 80,
+       "end": 96,
+       "label": "getPostgresURL: local Docker or remote choice"
+      },
+      {
+       "file": "lib/db/setup.ts",
+       "start": 186,
+       "end": 194,
+       "label": "writeEnvFile: writes all vars to .env"
+      },
+      {
+       "file": "lib/db/seed.ts",
+       "start": 42,
+       "end": 74,
+       "label": "seed: creates user, team, membership, and Stripe products"
+      },
+      {
+       "file": "lib/db/seed.ts",
+       "start": 6,
+       "end": 40,
+       "label": "createStripeProducts: Base and Plus plans"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "flow",
+       "rows": [
+        {
+         "n": 1,
+         "title": "Check Stripe CLI",
+         "detail": "Verifies Stripe CLI is installed and authenticated; prompts login if needed.",
+         "state": "derived"
+        },
+        {
+         "n": 2,
+         "title": "Choose Postgres",
+         "detail": "Local Docker on port 54322 or a remote instance — user enters POSTGRES_URL.",
+         "state": "derived"
+        },
+        {
+         "n": 3,
+         "title": "Stripe Secret Key",
+         "detail": "User pastes their test-mode secret key from the Stripe dashboard.",
+         "state": "derived"
+        },
+        {
+         "n": 4,
+         "title": "Create Webhook",
+         "detail": "Runs `stripe listen --print-secret` and extracts the whsec_ token.",
+         "state": "derived"
+        },
+        {
+         "n": 5,
+         "title": "Generate AUTH_SECRET",
+         "detail": "Produces a random 32-byte hex string via crypto.randomBytes.",
+         "state": "derived"
+        },
+        {
+         "n": 6,
+         "title": "Write .env",
+         "detail": "Writes POSTGRES_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, BASE_URL, AUTH_SECRET to .env.",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "What the seed script creates",
+       "columns": [
+        "Entity",
+        "Details"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "User",
+         "test@test.com with admin123, role owner"
+        ],
+        [
+         "Team",
+         "Test Team, no Stripe fields"
+        ],
+        [
+         "Team Member",
+         "user to team, role owner"
+        ],
+        [
+         "Stripe Base product",
+         "$8 per month, 7-day trial"
+        ],
+        [
+         "Stripe Plus product",
+         "$12 per month, 7-day trial"
+        ]
+       ]
+      },
+      {
+       "kind": "example",
+       "caption": "Docker Compose generated by setup for local Postgres",
+       "value": "services:\n  postgres:\n    image: postgres:16.4-alpine\n    container_name: next_saas_starter_postgres\n    environment:\n      POSTGRES_DB: postgres\n      POSTGRES_USER: postgres\n      POSTGRES_PASSWORD: postgres\n    ports:\n      - \"54322:5432\"\n    volumes:\n      - postgres_data:/var/lib/postgresql/data",
+       "notes": [
+        {
+         "label": "port",
+         "value": "54322 to avoid conflicts with a system Postgres on 5432",
+         "state": "derived"
+        },
+        {
+         "label": "credentials",
+         "value": "postgres and postgres, plaintext, dev only",
+         "state": "derived"
+        }
+       ]
+      }
+     ],
+     "issues": [
+      {
+       "title": "Trial period mismatch between seed and checkout",
+       "detail": "The seed script creates Stripe prices with a 7-day trial, but createCheckoutSession overrides with a 14-day trial via subscription_data.trial_period_days. The price-level trial is never used.",
+       "where": "lib/db/seed.ts:20"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "E0": [
+  {
+   "from": "landing-page",
+   "to": "signing-in",
+   "label": "links to sign-up in",
+   "order": 1,
+   "state": "derived"
+  },
+  {
+   "from": "signing-in",
+   "to": "choosing-plan",
+   "label": "starts checkout via",
+   "order": 2,
+   "state": "derived"
+  },
+  {
+   "from": "choosing-plan",
+   "to": "managing-team",
+   "label": "redirects into",
+   "order": 3,
+   "state": "derived"
+  },
+  {
+   "from": "managing-team",
+   "to": "account-settings",
+   "label": "navigates to",
+   "order": 4,
+   "state": "derived"
+  }
+ ],
+ "LINKS": []
+}

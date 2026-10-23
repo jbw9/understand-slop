@@ -1,5 +1,5 @@
 //! Shells for the terminal panel. Each one is a real pty running the user's
-//! shell in the mapped repo; its output streams to the webview over a
+//! shell in the open map's checkout; its output streams to the webview over a
 //! `Channel` as raw bytes (xterm decodes UTF-8 itself, so a character split
 //! across two reads is fine), and one final JSON `{"exit": code}` says it ended.
 //!
@@ -15,7 +15,6 @@ use std::sync::{Arc, Mutex};
 use tauri::ipc::{Channel, InvokeResponseBody};
 
 use crate::claude;
-use crate::repo::Repo;
 
 struct Pty {
     master: Box<dyn MasterPty + Send>,
@@ -74,8 +73,8 @@ pub fn pty_spawn(
     rows: u16,
     on_data: Channel<InvokeResponseBody>,
     claude: Option<claude::Launch>,
+    cwd: Option<String>,
     ptys: tauri::State<Ptys>,
-    repo: tauri::State<Repo>,
 ) -> Result<Spawned, String> {
     let pair = native_pty_system().openpty(size(cols, rows)).map_err(|e| e.to_string())?;
     let id = ptys.next.fetch_add(1, Ordering::Relaxed) + 1;
@@ -90,7 +89,9 @@ pub fn pty_spawn(
             (CommandBuilder::new(&program), name)
         }
     };
-    if let Some(dir) = repo.root().ok().or_else(|| std::env::var_os("HOME").map(Into::into)) {
+    // The checkout the page named, if it is really there; home otherwise.
+    let dir = cwd.map(PathBuf::from).filter(|d| d.is_dir());
+    if let Some(dir) = dir.or_else(|| std::env::var_os("HOME").map(Into::into)) {
         cmd.cwd(dir);
     }
     cmd.env("TERM", "xterm-256color");

@@ -1,0 +1,284 @@
+{
+ "repo": "taxonomy",
+ "commit": "298a885",
+ "backend": "bedrock",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 61,
+  "cut": 203,
+  "author": 757,
+  "verify": 107,
+  "total": 1128
+ },
+ "usd": 13.33,
+ "fullUsd": 13.33,
+ "bill": {
+  "summarize": {
+   "calls": 132,
+   "cached": 0,
+   "input": 237733,
+   "output": 47244,
+   "cacheRead": 0,
+   "usd": 0.47395299999999985,
+   "fullUsd": 0.47395299999999985
+  },
+  "cut": {
+   "calls": 1,
+   "cached": 0,
+   "input": 11014,
+   "output": 16993,
+   "cacheRead": 0,
+   "usd": 0.479895,
+   "fullUsd": 0.479895
+  },
+  "author": {
+   "calls": 91,
+   "cached": 0,
+   "input": 394575,
+   "output": 237598,
+   "cacheRead": 2767042,
+   "usd": 9.7894335,
+   "fullUsd": 9.7894335
+  },
+  "verify": {
+   "calls": 49,
+   "cached": 0,
+   "input": 122233,
+   "output": 34817,
+   "cacheRead": 0,
+   "usd": 0.296318,
+   "fullUsd": 0.296318
+  },
+  "verify-review": {
+   "calls": 81,
+   "cached": 0,
+   "input": 351663,
+   "output": 21335,
+   "cacheRead": 0,
+   "usd": 2.2916899999999996,
+   "fullUsd": 2.2916899999999996
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 165,
+  "summarised": 132,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "postcss.config.js",
+   "reason": "Pure build tooling — PostCSS plugin config with no app logic."
+  },
+  {
+   "path": "prettier.config.js",
+   "reason": "Pure formatting tooling — Prettier and import-sort config."
+  }
+ ],
+ "roots": [
+  {
+   "id": "browsing",
+   "title": "Browsing the Site",
+   "accepted": true,
+   "turns": 13,
+   "reads": 26,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "br-blog-post",
+      "claims": [
+       "the bare `null` on line 27 is a no-op expression rather than a `return null`"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "reading-docs",
+   "title": "Reading the Docs",
+   "accepted": true,
+   "turns": 12,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 2,
+    "rewritten": [
+     {
+      "id": "dc-content-mdx",
+      "claims": [
+       "Callout has default, warning, and danger colors — contradicted: Lines 18-19 show only 'danger' (red) and 'warning' (yellow) colors are explicitly styled. The 'default' type (line 12) has no specific styling shown—it uses only the base classes from line 17"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "signing-in",
+   "title": "Signing In",
+   "accepted": true,
+   "turns": 12,
+   "reads": 23,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 3,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "managing-posts",
+   "title": "Managing Posts",
+   "accepted": true,
+   "turns": 11,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "po-editor",
+      "claims": [
+       "The Editor component does not destructure `formState.errors` from `useForm`",
+       "if the title fails the 3–128 character check the form refuses to submit with no visible feedback to the user"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "subscribing",
+   "title": "Subscribing to Pro",
+   "accepted": true,
+   "turns": 18,
+   "reads": 27,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 5,
+    "ok": 5,
+    "flagged": 3,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "ui-kit",
+   "title": "UI Components",
+   "accepted": true,
+   "turns": 15,
+   "reads": 28,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 6,
+    "rewritten": [
+     {
+      "id": "ui-menus",
+      "claims": [
+       "4 menu systems sharing the same sub-component anatomy"
+      ]
+     },
+     {
+      "id": "ui-display",
+      "claims": [
+       "12 presentational components — not_shown",
+       "`Card` with its 6 sub-components is the most composed — not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "app-shell",
+   "title": "The App Shell",
+   "accepted": true,
+   "turns": 10,
+   "reads": 23,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "sh-utils",
+      "claims": [
+       "The `Icons` object maps 22 semantic names to Lucide icons and custom SVGs — contradicted: Lines 31-72 show the Icons object contains 21 entries (logo, close, spinner, chevronLeft, chevronRight, trash, post, page, media, settings, billing, ellipsis, add, warning, user, arrowRight, help, pizza, sun, moon, laptop, gitHub, twitter, check), not 22."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "browsing",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "reading-docs",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "signing-in",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "managing-posts",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "subscribing",
+    "depth": 2,
+    "nodes": 5
+   },
+   {
+    "id": "ui-kit",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "app-shell",
+    "depth": 2,
+    "nodes": 7
+   }
+  ]
+ },
+ "verifyPassRate": 100
+}

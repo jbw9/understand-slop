@@ -1,0 +1,341 @@
+{
+ "repo": "shiori",
+ "commit": "36f3b55",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 119,
+  "cut": 604,
+  "author": 642,
+  "verify": 175,
+  "total": 1540
+ },
+ "usd": 19.2,
+ "fullUsd": 19.2,
+ "bill": {
+  "summarize": {
+   "calls": 236,
+   "cached": 0,
+   "input": 635140,
+   "output": 112791,
+   "cacheRead": 0,
+   "usd": 1.1990950000000002,
+   "fullUsd": 1.1990950000000002
+  },
+  "cut": {
+   "calls": 2,
+   "cached": 0,
+   "input": 70963,
+   "output": 51302,
+   "cacheRead": 0,
+   "usd": 1.637365,
+   "fullUsd": 1.637365
+  },
+  "author": {
+   "calls": 109,
+   "cached": 0,
+   "input": 534663,
+   "output": 199600,
+   "cacheRead": 4403922,
+   "usd": 10.533451,
+   "fullUsd": 10.533451
+  },
+  "verify": {
+   "calls": 72,
+   "cached": 0,
+   "input": 203789,
+   "output": 52016,
+   "cacheRead": 0,
+   "usd": 0.4638689999999999,
+   "fullUsd": 0.4638689999999999
+  },
+  "verify-review": {
+   "calls": 159,
+   "cached": 0,
+   "input": 880016,
+   "output": 38646,
+   "cacheRead": 0,
+   "usd": 5.3662300000000025,
+   "fullUsd": 5.3662300000000025
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 439,
+  "summarised": 236,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "clients/ts/",
+   "reason": "Auto-generated OpenAPI TypeScript client; regenerated from swagger spec."
+  },
+  {
+   "path": "docs/swagger/docs.go",
+   "reason": "Auto-generated Swagger documentation template from code annotations."
+  },
+  {
+   "path": "internal/view/assets/js/client/",
+   "reason": "Auto-generated JavaScript API client for the legacy frontend."
+  },
+  {
+   "path": "internal/testutil/",
+   "reason": "Test helper utilities; not part of production code paths."
+  },
+  {
+   "path": "webapp/eslint.config.ts",
+   "reason": "Linting configuration; pure tooling."
+  },
+  {
+   "path": "webapp/vitest.config.ts",
+   "reason": "Test runner configuration; pure tooling."
+  }
+ ],
+ "roots": [
+  {
+   "id": "launch",
+   "title": "Starting the Server",
+   "accepted": true,
+   "turns": 15,
+   "reads": 29,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 5,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "sv-entry",
+      "claims": [
+       "main() copies linker-injected version/commit/date into model"
+      ]
+     },
+     {
+      "id": "sv-init",
+      "claims": [
+       "Any attacker who reaches the server before the operator changes the password has full admin access — not_shown: The code shows the account is created with `Owner: true`, but the cited lines do not show how authentication works, whether the password is hashed, or what access the Owner role grants. This is a security consequence claim that requires information beyond what is shown."
+      ]
+     },
+     {
+      "id": "sv-middleware",
+      "claims": [
+       "Defaults set `allowedOrigins=[\"*\"]` and `allowCredentials=true`",
+       "The `getAllowOrigin` loop still returns `\"*\"` when credentials are on"
+      ]
+     }
+    ],
+    "downgraded": [
+     "sv-init",
+     "sv-middleware"
+    ]
+   }
+  },
+  {
+   "id": "webapp",
+   "title": "Opening the Web App",
+   "accepted": true,
+   "turns": 15,
+   "reads": 24,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "webapp",
+      "claims": [
+       "shows the router view inside a responsive sidebar layout — not_shown: The cited code does not show the template structure of App.vue or any sidebar layout components. Only the onMounted hook is shown."
+      ]
+     },
+     {
+      "id": "wa-layout",
+      "claims": [
+       "LanguageSelector adds a document click listener in `onMounted` via an anonymous function",
+       "LanguageSelector never removes it in `onUnmounted`",
+       "Each mount leaks one listener"
+      ]
+     },
+     {
+      "id": "wa-ui-kit",
+      "claims": [
+       "display helpers (Toast, Pagination, ViewSelector) — contradicted: Lines 8-10 of [0] export Toast and Pagination, but there is no ViewSelector export in the UI barrel. The detail claims ViewSelector as a display helper, but it is not present in the cited code."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "login",
+   "title": "Logging In",
+   "accepted": true,
+   "turns": 20,
+   "reads": 26,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 8,
+    "flagged": 4,
+    "rewritten": [
+     {
+      "id": "lg-fe-v2",
+      "claims": [
+       "causing a DB query per page transition — not_shown"
+      ]
+     },
+     {
+      "id": "lg-legacy-webserver",
+      "claims": [
+       "Regular users cannot create or update bookmarks via the legacy API, while the same operations work through the v1 API"
+      ]
+     }
+    ],
+    "downgraded": [
+     "lg-fe-v2"
+    ]
+   }
+  },
+  {
+   "id": "bookmarks",
+   "title": "Managing Bookmarks",
+   "accepted": true,
+   "turns": 14,
+   "reads": 28,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 28,
+    "ok": 27,
+    "flagged": 12,
+    "rewritten": [
+     {
+      "id": "bk-create-legacy",
+      "claims": [
+       "Older endpoint still used by the Vue 2 frontend — not_shown: The code shows this is the ApiInsertBookmark handler, but there is no indication in the cited code about which frontend uses it or that it is specifically for Vue 2.",
+       "The caller sees empty title, excerpt, content, and HTML fields until a page refresh — not_shown: The code shows that results[0] is returned at line 258, but the code does not show what fields are populated or empty in the returned bookmark object. The behavior of what the caller sees depends on the state of the bookmark after SaveBookmarks at line 227, which is not shown in the cited code."
+      ]
+     }
+    ],
+    "downgraded": [
+     "bk-create-legacy"
+    ]
+   }
+  },
+  {
+   "id": "tags",
+   "title": "Organizing with Tags",
+   "accepted": true,
+   "turns": 17,
+   "reads": 27,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 6,
+    "ok": 6,
+    "flagged": 3,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "admin",
+   "title": "Admin & Settings",
+   "accepted": true,
+   "turns": 13,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 6,
+    "flagged": 5,
+    "rewritten": [
+     {
+      "id": "ad-accounts-domain",
+      "claims": [
+       "Both happen to be 10 today — not_shown: The code does not show what bcrypt.DefaultCost's current value is. This is a factual claim about the bcrypt library's current state, not shown in the cited code."
+      ]
+     }
+    ],
+    "downgraded": [
+     "ad-accounts-domain"
+    ]
+   }
+  },
+  {
+   "id": "data",
+   "title": "The Data Layer",
+   "accepted": true,
+   "turns": 15,
+   "reads": 31,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 9,
+    "ok": 9,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "dt-mysql",
+      "claims": [
+       "no FTS — contradicted: Line 327 shows `MATCH(title, excerpt, content) AGAINST (? IN BOOLEAN MODE)` which is MySQL's Full-Text Search (FTS) feature, contradicting the claim of 'no FTS'"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "launch",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "webapp",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "login",
+    "depth": 3,
+    "nodes": 9
+   },
+   {
+    "id": "bookmarks",
+    "depth": 3,
+    "nodes": 28
+   },
+   {
+    "id": "tags",
+    "depth": 2,
+    "nodes": 6
+   },
+   {
+    "id": "admin",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "data",
+    "depth": 3,
+    "nodes": 9
+   }
+  ]
+ },
+ "verifyPassRate": 93
+}

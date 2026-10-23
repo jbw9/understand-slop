@@ -12,12 +12,11 @@
  */
 
 /**
- * Where the mapped repository lives is decided by the desktop app
- * (src-tauri/src/repo.rs): `SLOP_REPO_ROOT`, else `~/Desktop/Code/<RUN.repo>`.
- * The fallback is not written out as a literal path: `/Users/<name>/…` is true
- * on one machine, and on every other one the code level silently fell back to
- * the pasted quote it exists to replace.
+ * Where the mapped repository lives: absolute, one per map, resolved by
+ * `rootOf` in `lib/maps.ts` from the map the reader has open. The route hands
+ * it in; nothing caller-supplied ever chooses it.
  */
+export type RepoRoot = string;
 
 export interface SliceRequest {
   /** Repo-relative path. Must stay inside the repo root once resolved. */
@@ -50,7 +49,7 @@ export interface Slice extends SliceRequest {
  * this endpoint reads arbitrary caller-supplied paths, so the containment check
  * is the whole security model.
  */
-export type ReadSlice = (req: SliceRequest) => Promise<Slice>;
+export type ReadSlice = (req: SliceRequest, fixture: string | undefined, root: RepoRoot) => Promise<Slice>;
 
 /**
  * Write an edited slice back.
@@ -83,57 +82,83 @@ export interface WriteResult {
   refused?: string;
 }
 
-export type WriteSlice = (req: WriteRequest) => Promise<WriteResult>;
+export type WriteSlice = (req: WriteRequest, root: RepoRoot) => Promise<WriteResult>;
 
 // ---------------------------------------------------------------------------
 // Implementation. The types above are the frozen contract; everything below
 // satisfies it and adds nothing to it.
 // ---------------------------------------------------------------------------
 
-import { invoke } from "@tauri-apps/api/core";
-import { RUN } from "@/lib/map";
+import { readFile, writeFile, realpath, stat } from "node:fs/promises";
+import { resolve, sep } from "node:path";
 
-/*
- * The filesystem half lives in Rust (src-tauri/src/repo.rs): the containment
- * check that is the whole security model, the clamped read, and the
- * read-compare-write that refuses a stale save. What stays here is what the
- * repository has no opinion about: whether the map's quote still holds, and
- * the diff shown after a save. Rust refusals arrive as a rejected `invoke`
- * whose reason is the refusal string ("outside repo", "not a file").
+/**
+ * The entire security model, in one function.
+ *
+ * `file` arrives from the network, so it is assumed hostile. Three things are
+ * checked, in this order, because each one defeats a different attack:
+ *
+ * 1. `resolve(the repo root, file)` collapses `../` textually — this is what stops
+ *    `../../../etc/passwd` and, because `resolve` discards the base when given
+ *    an absolute second argument, it also folds absolute paths back through the
+ *    same prefix test rather than silently honouring them.
+ * 2. The prefix test uses `root + sep`, not bare `startsWith(root)`. Without the
+ *    separator `/Users/.../taxBuddy-secrets` passes as if it were inside
+ *    `/Users/.../taxBuddy`.
+ * 3. `realpath` resolves symlinks and the prefix test runs AGAIN on the result.
+ *    Step 1 is pure string arithmetic and cannot see a link inside the repo
+ *    pointing out of it; only asking the filesystem can.
+ *
+ * Returns the real absolute path, or null when the path escapes.
  */
+async function contain(repoRoot: RepoRoot, file: string): Promise<string | null> {
+  const root = await realpath(repoRoot);
+  const inside = (p: string) => p === root || p.startsWith(root + sep);
 
-/** Bound once: the first read or write finds the repo the map describes. */
-let opened: Promise<string> | null = null;
-const repo = () => (opened ??= invoke<string>("open_repo", { name: RUN.repo }).catch((e) => {
-  opened = null;
-  throw e;
-}));
+  const target = resolve(root, file);
+  if (!inside(target)) return null;
 
-/** Thrown when a read is refused, carrying the refusal. */
+  // realpath throws ENOENT on a path that does not exist, which is a refusal
+  // here rather than an error: there is nothing to read and nothing to write.
+  let real: string;
+  try {
+    real = await realpath(target);
+  } catch {
+    return null;
+  }
+  return inside(real) ? real : null;
+}
+
+/** Thrown to the route handler, which turns it into a 400 with this message. */
 export class Refused extends Error {}
 
 /**
- * `fixture` is extra, and deliberately not in the contract: it is what the MAP
- * claims sits at these lines, which the repository itself has no opinion about.
- * An optional parameter keeps this assignable to the frozen `ReadSlice` type —
- * asserted below — so callers holding that type are unaffected.
+ * `fixture` is what the MAP claims sits at these lines, which the repository
+ * itself has no opinion about; undefined when the caller made no claim.
  */
 export const readSlice = async (
   req: SliceRequest,
-  fixture?: string,
+  fixture: string | undefined,
+  root: RepoRoot,
 ): Promise<Slice> => {
-  let slice: Omit<Slice, "matchesFixture">;
-  try {
-    await repo();
-    slice = await invoke("read_slice", { file: req.file, start: req.start, end: req.end });
-  } catch (e) {
-    throw new Refused(typeof e === "string" ? e : "unreadable");
-  }
+  const real = await contain(root, req.file);
+  if (!real) throw new Refused("outside repo");
+  if (!(await stat(real)).isFile()) throw new Refused("not a file");
+
+  const lines = (await readFile(real, "utf8")).split("\n");
+  const start = Math.max(1, req.start);
+  const end = Math.min(lines.length, Math.max(start, req.end));
+  const code = lines.slice(start - 1, end).join("\n");
+
   return {
-    ...slice,
+    file: req.file,
+    start,
+    end,
+    code,
+    total: lines.length,
     // No fixture to compare against is not a mismatch — a caller that asked
     // only for the file's text has made no claim that could have drifted.
-    matchesFixture: fixture === undefined || quoteHolds(fixture, slice.code),
+    matchesFixture: fixture === undefined || quoteHolds(fixture, code),
   };
 };
 
@@ -164,16 +189,36 @@ function quoteHolds(fixture: string, disk: string): boolean {
   );
 }
 
-export const writeSlice: WriteSlice = async (req) => {
-  try {
-    await repo();
-    const r = await invoke<{ ok: boolean; refused?: string }>("write_slice", { ...req });
-    return r.ok
-      ? { ok: true, diff: unified(req.file, req.start, req.expected, req.code) }
-      : { ok: false, diff: "", refused: r.refused };
-  } catch (e) {
-    return { ok: false, diff: "", refused: typeof e === "string" ? e : "unwritable" };
+export const writeSlice: WriteSlice = async (req, root) => {
+  const real = await contain(root, req.file);
+  if (!real) return { ok: false, diff: "", refused: "outside repo" };
+  if (!(await stat(real)).isFile()) {
+    return { ok: false, diff: "", refused: "not a file" };
   }
+
+  const lines = (await readFile(real, "utf8")).split("\n");
+  if (req.start < 1 || req.end > lines.length || req.end < req.start) {
+    return { ok: false, diff: "", refused: "stale" };
+  }
+
+  // Optimistic concurrency. The caller read [start, end] at some point and is
+  // now writing back a change to it; if disk no longer holds what they read,
+  // their edit was composed against text that has since been replaced and
+  // applying it would silently destroy whoever made that replacement.
+  const onDisk = lines.slice(req.start - 1, req.end).join("\n");
+  if (onDisk !== req.expected) {
+    return { ok: false, diff: "", refused: "stale" };
+  }
+
+  const replacement = req.code.replace(/\n$/, "").split("\n");
+  const next = [
+    ...lines.slice(0, req.start - 1),
+    ...replacement,
+    ...lines.slice(req.end),
+  ];
+  await writeFile(real, next.join("\n"), "utf8");
+
+  return { ok: true, diff: unified(req.file, req.start, onDisk, req.code) };
 };
 
 /**

@@ -12,8 +12,9 @@ import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Crumbs } from "@/components/chrome";
 import { Menu } from "@/components/menu";
+import { useMap } from "@/components/map-context";
 import { openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
-import { E0, L0, LINKS, RUN, codeAt, describeElement, levelAt, nodeAt } from "@/lib/map";
+import { codeAt, describeElement, type BuiltMap } from "@/lib/map";
 import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
@@ -32,42 +33,6 @@ import { BLURB_LINES, type Shape } from "@/lib/view";
  * one, and the bottom of every branch is the code itself.
  */
 
-
-const byOrder = (a: Edge, b: Edge) => (a.order ?? 0) - (b.order ?? 0);
-
-/**
- * The path everyone walks, in the order E0 chains it: the ordered edges with
- * no lane. Walking them from the first `from` IS the sequence.
- */
-const SPINE = (() => {
-  const sorted = E0.filter((e) => e.order !== undefined && !e.lane).sort(byOrder);
-  return sorted.length ? [sorted[0].from, ...sorted.map((e) => e.to)] : [];
-})();
-
-/** Where the path splits, one ordered branch per lane. Empty if it never does. */
-const LANES = [...new Set(E0.flatMap((e) => (e.lane ? [e.lane] : [])))].map((name) => {
-  const sorted = E0.filter((e) => e.lane === name).sort(byOrder);
-  return { name, from: sorted[0].from, ids: sorted.map((e) => e.to) };
-});
-
-/** Edges with no order: one branch handing something to another. */
-const HANDOFFS = E0.filter((e) => e.order === undefined);
-
-const ON_PATH = new Set([...SPINE, ...LANES.flatMap((l) => l.ids)]);
-
-function roots(ids: string[]) {
-  return ids.map((id) => L0.find((n) => n.id === id)).filter((n): n is Node => n !== undefined);
-}
-
-/** 1-indexed position on the path, counting the shared steps into a lane. */
-function stepOf(id: string): { n: number; of: number; lane?: string } | undefined {
-  const i = SPINE.indexOf(id);
-  if (i !== -1) return { n: i + 1, of: SPINE.length };
-  for (const l of LANES) {
-    const j = l.ids.indexOf(id);
-    if (j !== -1) return { n: SPINE.length + j + 1, of: SPINE.length + l.ids.length, lane: l.name };
-  }
-}
 
 /** Levels below this node: 0 for a leaf. */
 function height(node: Node): number {
@@ -120,6 +85,8 @@ function setNote(node: Node): string | null {
 }
 
 export function Canvas() {
+  const map = useMap();
+  const { LINKS, RUN, levelAt, nodeAt, stepOf, name, maps } = map;
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { nodes, anchor, version } = useWireAnchors();
@@ -138,7 +105,7 @@ export function Canvas() {
   const path = useMemo(() => {
     const asked = params.getAll("at");
     return asked.length && nodeAt(asked) ? asked : [];
-  }, [params]);
+  }, [params, nodeAt]);
   const key = path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
@@ -162,6 +129,8 @@ export function Canvas() {
   // follows it, and so does back/forward.
   const go = useCallback((next: string[]) => {
     const q = new URLSearchParams();
+    const map = new URLSearchParams(window.location.search).get("map");
+    if (map) q.set("map", map);
     for (const id of next) q.append("at", id);
     window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
   }, []);
@@ -190,7 +159,7 @@ export function Canvas() {
       frontier = next;
     }
     return seen;
-  }, [traced]);
+  }, [traced, LINKS]);
 
   // Only row-to-row wires remain: sibling order is drawn by `Sequence` itself,
   // where a wrapping layout can't send a wire across a card. Foreign keys show
@@ -212,7 +181,7 @@ export function Canvas() {
     return LINKS.filter(
       (l) => l.label === "FK" && shown.has(owner(l.from)) && shown.has(owner(l.to)),
     ).map((l) => ({ from: l.from, to: l.to, kind: kind(l), depth: 0, relation: true }));
-  }, [traced, lit, focus, path]);
+  }, [traced, lit, focus, path, LINKS, levelAt]);
 
   /* ── rows that open their own level ───────────────────────── */
 
@@ -227,7 +196,7 @@ export function Canvas() {
       const at = ownerAt === -1 ? [...path, owner] : path.slice(0, ownerAt + 1);
       if (nodeAt([...at, id])) go([...at, id]);
     },
-    [path, go],
+    [path, go, nodeAt],
   );
 
   const ctx = useMemo<RowCtx>(
@@ -279,7 +248,7 @@ export function Canvas() {
     // Anything else on the level — a caption, the space between blocks — is
     // part of the section you are in, so that is what it offers.
     const el = (e.target as Element).closest<HTMLElement | SVGElement>(PICKABLE);
-    const target = el ? targetOf(el, path) : section(path);
+    const target = el ? targetOf(map, el, path) : section(map, path);
     if (!target) return;
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, target });
@@ -292,7 +261,7 @@ export function Canvas() {
     >
       {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
       <main ref={scrollRef} className="dotfield relative min-w-0 flex-1 overflow-y-auto">
-        <Crumbs repo={RUN.repo} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+        <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
         <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
           <WireLayer
             canvasRef={contentRef}
@@ -338,11 +307,11 @@ const PICKABLE = "[data-path], [data-row], [data-pick]";
  * is on screen — `data-pick-text` where the screen leaves something out, like
  * a table row's column names — and its code is the nearest `data-pick-code`.
  */
-function targetOf(el: HTMLElement | SVGElement, level: string[]): Target | null {
+function targetOf(map: BuiltMap, el: HTMLElement | SVGElement, level: string[]): Target | null {
   const d = el.dataset;
   if (d.path !== undefined) {
     const at: string[] = JSON.parse(d.path);
-    return at.length && !nodeAt(at) ? null : section(at);
+    return at.length && !map.nodeAt(at) ? null : section(map, at);
   }
   const shown = ("innerText" in el ? el.innerText : (el.textContent ?? "")).trim();
   const label = (d.pick || shown.split("\n")[0] || "").trim().slice(0, 80);
@@ -351,7 +320,7 @@ function targetOf(el: HTMLElement | SVGElement, level: string[]): Target | null 
   return {
     key: `${sectionKey(level)}#${id}`,
     title: label,
-    text: describeElement(level, label, d.pickText ?? shown, el.closest<HTMLElement>("[data-pick-code]")?.dataset.pickCode),
+    text: describeElement(map, level, label, d.pickText ?? shown, el.closest<HTMLElement>("[data-pick-code]")?.dataset.pickCode),
   };
 }
 
@@ -396,6 +365,7 @@ function blockLabel(b: Anatomy): string {
  * side, and the roots E0 never touches grouped under their own heading.
  */
 function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
+  const { RUN, E0, L0, SPINE, LANES, HANDOFFS, ON_PATH, roots } = useMap();
   const chain = roots(SPINE);
   const outside = L0.filter((n) => !ON_PATH.has(n.id));
   const fork = LANES.length ? L0.find((n) => n.id === LANES[0].from) : undefined;
@@ -408,6 +378,7 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
         title={RUN.repo}
         sub={RUN.about}
         meta={`${RUN.files} files · commit ${RUN.commit}`}
+        link={RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
       />
       <Caption
         count={chain.length}
@@ -472,6 +443,8 @@ function Level({
   ctx: RowCtx;
   onOpen: (p: string[]) => void;
 }) {
+  const map = useMap();
+  const { RUN, nodeAt, stepOf } = map;
   const kids = authored(node);
   const parent = path.length > 1 ? nodeAt(path.slice(0, -1)) : null;
   const step = path.length === 1 ? stepOf(node.id) : undefined;
@@ -487,7 +460,7 @@ function Level({
       .map((box) => box.opens)
       .filter((id): id is string => Boolean(id) && kids.some((k) => k.id === id)),
   );
-  const code = codeAt(path);
+  const code = codeAt(map, path);
   const [codeOpen, setCodeOpen] = useState(false);
 
   return (
@@ -654,6 +627,7 @@ function Steps({
   at: string[];
   onOpen: (p: string[]) => void;
 }) {
+  const { L0, stepOf } = useMap();
   return (
     <ol className="flex max-w-[880px] flex-col">
       {nodes.map((n, i) => {
@@ -811,6 +785,7 @@ function Header({
   detail,
   unsure,
   meta,
+  link,
   shape,
   onCode,
 }: {
@@ -827,6 +802,8 @@ function Header({
   /** Why this level is not certain, shown with the mark it explains. */
   unsure?: string;
   meta?: string;
+  /** Where the code lives, outside this page. */
+  link?: { href: string; label: string };
   shape?: Shape;
   onCode?: () => void;
 }) {
@@ -871,10 +848,15 @@ function Header({
             <Prose text={unsure} />
           </p>
         ) : null}
-        {meta || onCode ? (
+        {meta || link || onCode ? (
           <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             {meta ? (
               <p className="whitespace-pre-wrap font-mono text-[11px] text-faint">{meta}</p>
+            ) : null}
+            {link ? (
+              <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-deep-green hover:underline">
+                {link.label}
+              </a>
             ) : null}
             {onCode ? (
               <button

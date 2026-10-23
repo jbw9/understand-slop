@@ -66,7 +66,7 @@ function exemplar(): string {
 }
 
 let systemCache: Block[] | null = null;
-function system(): Block[] {
+export function system(): Block[] {
   systemCache ??= [
     { type: "text", text: readFileSync("scripts/generate/prompts/rules.md", "utf8") },
     {
@@ -104,7 +104,12 @@ Budget: about 25 tool calls before you submit.`,
   ].filter(Boolean).join("\n\n");
 }
 
-export function runTool(call: { name: string; input: any }, inv: Inventory, known: Set<string>): string {
+/**
+ * One read-only tool call. `known` is what read_file may open; `reach`, when
+ * given, also bounds grep and list, so an update's agent searches only the
+ * part of the repo that changed.
+ */
+export function runTool(call: { name: string; input: any }, inv: Inventory, known: Set<string>, reach?: string[]): string {
   const i = call.input ?? {};
   if (call.name === "read_file") {
     const path = String(i.path ?? "").replace(/^\.?\//, "");
@@ -117,6 +122,7 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   if (call.name === "grep") {
     const args = ["-C", inv.repo, "grep", "-n", "-I", "-E", String(i.pattern ?? "")];
     if (i.under) args.push("--", String(i.under).replace(/^\.?\//, ""));
+    else if (reach) args.push("--", ...reach);
     try {
       const hits = execFileSync("git", args, { encoding: "utf8", maxBuffer: 16 << 20, stdio: ["ignore", "pipe", "pipe"] }).split("\n").filter(Boolean);
       return hits.slice(0, 60).map((h) => h.slice(0, 220)).join("\n") + (hits.length > 60 ? `\n… ${hits.length - 60} more` : "");
@@ -126,7 +132,7 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   }
   if (call.name === "list") {
     const dir = String(i.dir ?? "").replace(/^\.?\//, "").replace(/\/?$/, "/");
-    const hits = inv.files.filter((f) => dir === "/" || f.path.startsWith(dir));
+    const hits = inv.files.filter((f) => (dir === "/" || f.path.startsWith(dir)) && (!reach || known.has(f.path)));
     return hits.slice(0, 200).map((f) => `${f.path} (${f.lines})`).join("\n") + (hits.length > 200 ? `\n… ${hits.length - 200} more` : "") || "Nothing there.";
   }
   return `Unknown tool ${call.name}`;
@@ -169,18 +175,33 @@ export async function authorRoot(
     return { content: `Not accepted. Fix every one of these and submit the whole root again:\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
   };
 
+  const r = await converse<{ node: Node; reads: number; submits: number }>(brief(root, cut, inv, sums), handle, model, "author", MAX_TURNS);
+  // A replayed run calls no tools, so its counts come from the cache.
+  return { ...res, root: r.value?.node ?? null, turns: r.turns, reads: r.value?.reads ?? res.reads, submits: r.value?.submits ?? res.submits };
+}
+
+/**
+ * One agent over TOOLS, on either backend, until `handle` hands back a
+ * `done`: that is the value. Null when the turns ran out first.
+ */
+export async function converse<T>(
+  prompt: string,
+  handle: (name: string, input: any) => Handled,
+  model: string,
+  stage: string,
+  maxTurns: number,
+): Promise<{ value: T | null; turns: number }> {
   if (BACKEND === "claude-code") {
-    const r = await ccAgent<{ node: Node; reads: number; submits: number }>({
-      model, system: system(), prompt: brief(root, cut, inv, sums), tools: TOOLS, handle, effort: "high", stage: "author",
-      maxTurns: MAX_TURNS, nudge: "Continue: use the tools, and finish by calling submit.",
+    return ccAgent<T>({
+      model, system: system(), prompt, tools: TOOLS, handle, effort: "high", stage,
+      maxTurns, nudge: "Continue: use the tools, and finish by calling submit.",
     });
-    // A replayed run calls no tools, so its counts come from the cache.
-    return { ...res, root: r.value?.node ?? null, turns: r.turns, reads: r.value?.reads ?? res.reads, submits: r.value?.submits ?? res.submits };
   }
 
-  const messages: Message[] = [{ role: "user", content: brief(root, cut, inv, sums) }];
-  for (; res.turns < MAX_TURNS; res.turns++) {
-    const r = await invoke({ model, stage: "author", effort: "high", maxTokens: 64000, system: system(), messages: withCacheMark(messages), tools: TOOLS });
+  const messages: Message[] = [{ role: "user", content: prompt }];
+  let turns = 0;
+  for (; turns < maxTurns; turns++) {
+    const r = await invoke({ model, stage, effort: "high", maxTokens: 64000, system: system(), messages: withCacheMark(messages), tools: TOOLS });
     messages.push({ role: "assistant", content: r.content });
     const calls = callsOf(r);
     if (!calls.length) {
@@ -190,15 +211,12 @@ export async function authorRoot(
     const results: Block[] = [];
     for (const c of calls) {
       const h = handle(c.name, c.input);
-      if (h.done) {
-        res.root = (h.done as { node: Node }).node;
-        return res;
-      }
+      if (h.done) return { value: h.done as T, turns };
       // Key order as before, so the requests of maps already made still replay from cache.
       results.push(h.isError ? { type: "tool_result", tool_use_id: c.id, is_error: true, content: h.content } : { type: "tool_result", tool_use_id: c.id, content: h.content });
     }
-    if (res.turns === MAX_TURNS - 6) results.push({ type: "text", text: "You are almost out of turns. Submit the complete root now." });
+    if (turns === maxTurns - 6) results.push({ type: "text", text: "You are almost out of turns. Submit the complete root now." });
     messages.push({ role: "user", content: results });
   }
-  return res;
+  return { value: null, turns };
 }

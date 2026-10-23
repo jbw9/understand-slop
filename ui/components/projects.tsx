@@ -19,7 +19,8 @@ import { cn } from "@/lib/utils";
  */
 
 const OPEN = "slop:projects";
-export const openProjects = () => window.dispatchEvent(new Event(OPEN));
+/** Opens the list; with a folder, ready to import it. */
+export const openProjects = (root?: string) => window.dispatchEvent(new CustomEvent<string | undefined>(OPEN, { detail: root }));
 
 type Listed = Project & { hasMap: boolean; stale: boolean; progress?: string };
 interface List {
@@ -71,7 +72,9 @@ export function ProjectsDialog() {
   }, [router]);
 
   useEffect(() => {
-    const show = () => {
+    const show = (e: Event) => {
+      const asked = (e as CustomEvent<string | undefined>).detail;
+      if (typeof asked === "string") setRoot(asked);
       setOpen(true);
       setError(null);
       void refresh();

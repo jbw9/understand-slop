@@ -39,9 +39,13 @@ export interface Crumb {
 export function useLocation(): { path: string[]; crumbs: Crumb[] } {
   const { nodeAt, stepOf } = useMap();
   const params = useSearchParams();
+  // The deepest level asked for that the map still has: an update can take
+  // a section away while it is open.
   const path = useMemo(() => {
     const asked = params.getAll("at");
-    return asked.length && nodeAt(asked) ? asked : [];
+    let n = asked.length;
+    while (n && !nodeAt(asked.slice(0, n))) n--;
+    return asked.slice(0, n);
   }, [params, nodeAt]);
   const crumbs = useMemo(
     () =>

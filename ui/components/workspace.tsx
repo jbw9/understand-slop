@@ -8,7 +8,7 @@ import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
 import { clearPicks, onHand, onOpenClaude, prompt, retarget, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
-import { openSettings } from "@/lib/settings";
+import { openSettings, readSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 /**
@@ -119,18 +119,21 @@ export function Workspace() {
   // What is in front in each tab: Claude (the launcher keeps a marker), some
   // other program, or the shell at its prompt. Polled, since programs start
   // and quit inside the shell, unseen.
-  const started = tabs.filter((t) => t.pty !== undefined).map((t) => `${t.key}:${t.pty}`).join(",");
+  // A turn of Claude's that edited the checkout, or found the map wrong,
+  // updates that project's map.
+  const started = JSON.stringify(tabs.filter((t) => t.pty !== undefined).map((t) => [t.key, t.pty, t.cwd]));
   useEffect(() => {
-    if (!started) return;
-    const ids = started.split(",").map((s) => s.split(":").map(Number));
+    const ids: [number, number, string][] = JSON.parse(started);
+    if (!ids.length) return;
     const tick = () =>
-      ids.forEach(([key, pty]) =>
-        invoke<{ claude: boolean; busy: boolean }>("pty_state", { id: pty })
-          .then(({ claude: live, busy }) =>
+      ids.forEach(([key, pty, cwd]) =>
+        invoke<{ claude: boolean; busy: boolean; turn: Turn | null }>("pty_state", { id: pty })
+          .then(({ claude: live, busy, turn }) => {
+            if (turn && cwd) void updateMap(cwd, turn);
             setTabs((all) =>
               all.map((x) => (x.key === key && (x.live !== live || x.busy !== busy) ? { ...x, live, busy } : x)),
-            ),
-          )
+            );
+          })
           .catch(() => {}),
       );
     tick();
@@ -394,6 +397,38 @@ export function Workspace() {
     </motion.aside>
   );
 }
+
+/**
+ * A turn of Claude's the map follows (src-tauri/src/claude.rs): its session's
+ * transcript, for what it did and why, and the sections it reported wrong
+ * with slop-map-fix.
+ */
+interface Turn {
+  transcript: string | null;
+  corrections: { section: string; note: string }[];
+}
+
+/**
+ * Asks for the map of the project at `root` to be brought up to its code
+ * (lib/vault.ts): only the sections the edits touched, or the agent found
+ * wrong, are redone, by the same Claude Code the tabs run. Nothing happens
+ * for a map that is not the user's own project.
+ */
+async function updateMap(root: string, turn: Turn) {
+  const found = await invoke<{ path: string } | null>("claude_detect", { configured: readSettings().claudePath || null }).catch(() => null);
+  const res = await fetch("/api/projects", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "update", root, claude: found?.path, turn }),
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+  // Not one of the user's projects: the title bar says so, and offers to import it.
+  if (res?.skipped) window.dispatchEvent(new CustomEvent(UNFOLLOWED, { detail: root }));
+}
+
+/** An agent edited a checkout whose map cannot follow it; the detail is the checkout. */
+export const UNFOLLOWED = "slop:map-unfollowed";
 
 /**
  * Puts text in a program's prompt as a paste, without pressing Enter: agents'

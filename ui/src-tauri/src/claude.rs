@@ -27,13 +27,43 @@ use std::process::Command;
 /// lands in a fresh file for the next prompt rather than being lost.
 const HOOK: &str = r#"f="$SLOP_CONTEXT"; [ -s "$f" ] || exit 0; mv "$f" "$f.sent" && cat "$f.sent""#;
 
+/// After a tool that can change files: this turn may have edited code.
+const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
+/// The tools EDITED follows. Bash among them, since a shell command can edit too.
+const EDITING_TOOLS: &str = "Edit|Write|MultiEdit|NotebookEdit|Bash";
+
+/// When Claude finishes a turn that may have edited code, or that found the
+/// map wrong (slop-map-fix), it says so once: the app takes the marker
+/// (take_turn) and updates the map. The marker holds what the hook was given,
+/// which names the session's transcript: the updater reads from it what the
+/// turn did and why.
+const TURN: &str = r#"f="$SLOP_CONTEXT"; [ -e "$f.dirty" ] || [ -s "$f.fix" ] || exit 0; rm -f "$f.dirty"; cat > "$f.turn.part" && mv "$f.turn.part" "$f.turn"; exit 0"#;
+
+/// What Claude runs when it finds the map wrong: one line per section, kept
+/// beside the tab's queue until the turn ends. Allowed without asking.
+const FIX: &str = r#"#!/bin/sh
+# Tells understand-slop its map is wrong about a section (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in an understand-slop tab; nothing to correct." >&2; exit 1; }
+[ $# -ge 2 ] || { echo 'usage: slop-map-fix "<section title>" "<what the map gets wrong, and what is true>"' >&2; exit 2; }
+printf '%s\t%s\n' "$(printf '%s' "$1" | tr '\t\n' '  ')" "$(printf '%s' "$2" | tr '\t\n' '  ')" >> "$SLOP_CONTEXT.fix"
+echo "Noted. The map's \"$1\" will be corrected after this turn."
+"#;
+
 const SYSTEM: &str = "This session was opened from understand-slop, an app that maps this \
 repository as a tree of sections (user journey, data flow, the code behind each). The user \
 can attach things they picked on the map: a whole section arrives as a block starting with \
 `[Map section:`, one element of a section (a row, a diagram box, a step, a line of code) as \
 one starting with `[Map element:`. Each names where it sits on the map, what it says, and \
 the code behind it. Treat what is attached as what the user is asking about, and read the \
-listed code when it is relevant. Do not edit files unless asked.";
+listed code when it is relevant. Do not edit files unless asked. The map can be wrong: when \
+you find that it is (a listed problem that is not real, a description or a line reference \
+that does not match the code), run `slop-map-fix \"<section title>\" \"<what it gets wrong, \
+and what is true>\"` once per section, and the map is corrected after your turn. Code you \
+change updates the map by itself, deletions included; there is no need to report edits. \
+Keeping the map right is background upkeep, not part of the answer: never tell the user \
+whether you edited files, whether the map is accurate, or that there is nothing to correct, \
+and mention a correction only in passing when you ran slop-map-fix. End on the answer \
+itself.";
 
 #[derive(serde::Deserialize)]
 pub struct Launch {
@@ -121,6 +151,43 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue);
     let _ = std::fs::remove_file(queue.with_extension("md.sent"));
     let _ = std::fs::remove_file(live(queue));
+    let _ = std::fs::remove_file(queue.with_extension("md.dirty"));
+    let _ = std::fs::remove_file(queue.with_extension("md.turn"));
+    let _ = std::fs::remove_file(queue.with_extension("md.fix"));
+}
+
+/// A finished turn the map should follow: where its transcript is, and the
+/// sections Claude found the map wrong about.
+#[derive(serde::Serialize, Debug)]
+pub struct Turn {
+    transcript: Option<String>,
+    corrections: Vec<Correction>,
+}
+
+#[derive(serde::Serialize, Debug, PartialEq)]
+pub struct Correction {
+    section: String,
+    note: String,
+}
+
+/// The turn Claude finished since this was last asked, if it edited code or
+/// found the map wrong. Taking it clears it, so each is reported once.
+pub fn take_turn(queue: &Path) -> Option<Turn> {
+    let marker = queue.with_extension("md.turn");
+    let stop = std::fs::read_to_string(&marker).ok()?;
+    let _ = std::fs::remove_file(&marker);
+    let transcript = serde_json::from_str::<serde_json::Value>(&stop)
+        .ok()
+        .and_then(|v| v.get("transcript_path")?.as_str().map(String::from));
+    let fix = queue.with_extension("md.fix");
+    let corrections = std::fs::read_to_string(&fix)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.split_once('\t'))
+        .map(|(s, n)| Correction { section: s.trim().to_string(), note: n.trim().to_string() })
+        .collect();
+    let _ = std::fs::remove_file(&fix);
+    Some(Turn { transcript, corrections })
 }
 
 /// Present while the launcher's Claude runs in the tab that owns `queue`.
@@ -132,21 +199,28 @@ pub fn running(queue: &Path) -> bool {
     live(queue).exists()
 }
 
-/// The launcher, written where every tab's PATH can find it. Rewritten only
-/// when it differs, so an upgrade of the app replaces an old one.
+/// The launcher, and slop-map-fix beside it, written where every tab's PATH
+/// can find them. Rewritten only when they differ, so an upgrade of the app
+/// replaces old ones.
 fn launcher() -> std::io::Result<PathBuf> {
     let dir = std::env::temp_dir().join("understand-slop").join("bin");
+    install(&dir.join("slop-map-fix"), FIX)?;
     let path = dir.join("slop-claude");
-    if std::fs::read_to_string(&path).ok().as_deref() != Some(LAUNCHER) {
-        std::fs::create_dir_all(&dir)?;
-        std::fs::write(&path, LAUNCHER)?;
+    install(&path, LAUNCHER)?;
+    Ok(path)
+}
+
+fn install(path: &Path, script: &str) -> std::io::Result<()> {
+    if std::fs::read_to_string(path).ok().as_deref() != Some(script) {
+        std::fs::create_dir_all(path.parent().unwrap_or(Path::new(".")))?;
+        std::fs::write(path, script)?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))?;
         }
     }
-    Ok(path)
+    Ok(())
 }
 
 /// What a tab's shell needs so that the launcher works in it: the user's
@@ -155,7 +229,12 @@ fn launcher() -> std::io::Result<PathBuf> {
 pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path) -> std::io::Result<PathBuf> {
     let path = launcher()?;
     let settings = serde_json::json!({
-        "hooks": { "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }] }] }
+        "hooks": {
+            "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }] }],
+            "PostToolUse": [{ "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] }],
+            "Stop": [{ "hooks": [{ "type": "command", "command": TURN }] }]
+        },
+        "permissions": { "allow": ["Bash(slop-map-fix:*)"] }
     });
     cmd.env("SLOP_CONTEXT", queue);
     cmd.env("SLOP_LAUNCHER", &path);
@@ -246,6 +325,61 @@ mod tests {
         assert!(!pending(&q));
         // The next prompt goes without it.
         assert_eq!(run(HOOK, &q), "");
+    }
+
+    /// The stop hook as Claude Code runs it: what it is told arrives on stdin.
+    #[cfg(unix)]
+    fn stop(queue: &Path) -> String {
+        use std::io::Write as _;
+        let mut child = Command::new("sh")
+            .args(["-c", TURN])
+            .env("SLOP_CONTEXT", queue)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(br#"{"transcript_path":"/t/s.jsonl","stop_hook_active":false}"#).unwrap();
+        String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_turn_that_edited_is_reported_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        // A turn that only talked says nothing.
+        stop(&q);
+        assert!(take_turn(&q).is_none());
+        // One that ran an editing tool is reported when it ends, once, with its transcript.
+        run(EDITED, &q);
+        run(EDITED, &q);
+        assert!(take_turn(&q).is_none());
+        assert_eq!(stop(&q), "");
+        let t = take_turn(&q).unwrap();
+        assert_eq!(t.transcript.as_deref(), Some("/t/s.jsonl"));
+        assert!(t.corrections.is_empty());
+        assert!(take_turn(&q).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_correction_alone_makes_a_turn() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let fix = launcher().unwrap().with_file_name("slop-map-fix");
+        let out = Command::new(&fix)
+            .args(["Viewing the Gantt", "The gate is deliberate:\tthe chart is public."])
+            .env("SLOP_CONTEXT", &q)
+            .output()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&out.stdout).contains("corrected"));
+        stop(&q);
+        let t = take_turn(&q).unwrap();
+        assert_eq!(
+            t.corrections,
+            vec![Correction { section: "Viewing the Gantt".into(), note: "The gate is deliberate: the chart is public.".into() }]
+        );
+        assert!(!q.with_extension("md.fix").exists());
     }
 
     /// The launcher as a tab runs it, with `bin` standing in for Claude.

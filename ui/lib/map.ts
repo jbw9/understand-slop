@@ -53,8 +53,8 @@ function deepRows(blocks: Anatomy[]) {
 /**
  * Walk the tree and give every `under`-carrying row a child node.
  *
- * Runs once at module load over the authored tree, so `nodeAt`, `levelAt`,
- * `allNodes` and the canvas all see one uniform structure and none of them
+ * Runs once at module load over the authored tree, so `nodeAt`, `levelAt`
+ * and the canvas all see one uniform structure and none of them
  * needs to know a row was involved.
  */
 function withRowChildren(nodes: Node[]): Node[] {
@@ -167,10 +167,6 @@ export function buildMap(file: MapFile, name: string) {
 
 export type BuiltMap = ReturnType<typeof buildMap>;
 
-/** Every node in the tree, flattened. Used for id lookups and audits. */
-export function allNodes(nodes: Node[]): Node[] {
-  return nodes.flatMap((n) => [n, ...allNodes(n.children ?? [])]);
-}
 
 /**
  * The code behind a level. A row-built level has no refs of its own; the code

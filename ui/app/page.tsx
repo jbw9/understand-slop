@@ -41,7 +41,7 @@ export default async function Home({
         <div className="min-h-0 flex-1">
           <Suspense>
             {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}
-            <DiffMode map={name}>
+            <DiffMode key={name} map={name}>
               <Canvas key={name} />
               {/* Inside the provider: the panel is the diff's own list, and
                   what Claude shows needs both the map and the diff's range. */}

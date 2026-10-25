@@ -82,13 +82,15 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
         let stdout = "", stderr = "";
         p.stdout.on("data", (d) => (stdout += d));
         p.stderr.on("data", (d) => (stderr += d));
+        // A missing binary emits "error", not "close"; unheard, it crashes the run.
+        p.on("error", (e) => resolve({ code: null, stdout: "", stderr: String(e) }));
         p.on("close", (code) => resolve({ code, stdout, stderr }));
         p.stdin.end(prompt);
       });
       let r: Result | null = null;
       try { r = JSON.parse(out.stdout); } catch { /* reported below */ }
       if (r && !r.is_error) return r;
-      const msg = (r?.result ?? out.stderr ?? out.stdout).slice(0, 500);
+      const msg = (r?.result || out.stderr || out.stdout).slice(0, 500);
       // A plan's usage window does not reopen in minutes; retrying only spends the wait.
       if (/usage limit|limit reached|resets? (at|in)/i.test(msg)) throw new Error(`${stage}: Claude plan usage limit reached — ${msg}`);
       if (r?.subtype === "error_max_turns") return r;
@@ -98,7 +100,6 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
   });
 }
 
-/** The flags every run shares: the model, its effort, and our system prompt in place of Claude Code's. */
 /**
  * Claude Code's effort for the API path's. The same word does not buy the same
  * thinking through both doors: at "high", ky's authors through Claude Code
@@ -110,6 +111,7 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
 const THINKING = process.env.SLOP_CC_THINKING ?? "16000";
 const ccEffort = (effort?: string) => (effort ? `${process.env.SLOP_CC_EFFORT ?? effort}/${THINKING}` : undefined);
 
+/** The flags every run shares: the model, its effort, and our system prompt in place of Claude Code's. */
 function base(model: string, system: string, effort?: string): string[] {
   return ["--model", ccModel(model), "--system-prompt", system, ...(effort ? ["--effort", effort.split("/")[0]] : [])];
 }

@@ -252,7 +252,8 @@ function rowDiff(a: Anatomy, b: Anatomy): RowDiff[] | undefined {
       continue;
     }
     out.push({ key: now[j].key, verdict: same(was[from].cells, now[j].cells) ? "untouched" : "changed", before: was[from].cells, after: now[j].cells });
-    i = from + 1;
+    // A row that moved earlier must not rewind `i` over rows already reported.
+    i = Math.max(i, from + 1);
   }
   while (i < was.length) gone(i++);
   return out;
@@ -319,8 +320,10 @@ export function treeDiff(a: MapFile, b: MapFile): { sections: SectionDiff[]; blo
       const d = blockDiff(ids, i, block, other);
       if (d) blocks.push(d);
     }
+    // Added is the mirror of removed: past the count of that kind it had.
     for (const [i, block] of theirs.entries())
-      if (!mine.some((x) => x.kind === block.kind)) blocks.push({ path: ids, at: i, kind: block.kind, verdict: "added" });
+      if (theirs.slice(0, i).filter((x) => x.kind === block.kind).length >= mine.filter((x) => x.kind === block.kind).length)
+        blocks.push({ path: ids, at: i, kind: block.kind, verdict: "added" });
     const fields = (["title", "sub", "detail", "state"] as const).some((k) => node[k] !== to.node[k]);
     sections.push({
       id: node.id,

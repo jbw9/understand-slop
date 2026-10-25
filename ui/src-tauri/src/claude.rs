@@ -388,7 +388,8 @@ pub fn append(queue: &Path, text: &str) -> std::io::Result<()> {
 /// Replaces what is still waiting. Empty clears it.
 pub fn replace(queue: &Path, text: &str) -> std::io::Result<()> {
     if text.trim().is_empty() {
-        forget(queue);
+        // Only the queue: `forget` would also drop the tab's live, map and fix state.
+        let _ = std::fs::remove_file(queue);
         return Ok(());
     }
     if let Some(dir) = queue.parent() {

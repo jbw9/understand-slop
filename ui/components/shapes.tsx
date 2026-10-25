@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import type { Shape } from "@/lib/view";
 
 /**
@@ -240,44 +239,6 @@ export function InlineMarks({ ids, note }: { ids: string[]; note?: string }) {
         );
       })}
     </span>
-  );
-}
-
-/** One glyph + name, or just the name when we have no mark for the id. */
-function Mark({ id }: { id: string }) {
-  const mark = MARKS[id];
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-chip border border-border-gray bg-surface-container-low/70 py-1 pl-1.5 pr-2.5 text-muted-slate">
-      {mark ? (
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
-          role="img"
-          aria-label={mark.name}
-          className="shrink-0 text-on-surface-variant"
-        >
-          <title>{mark.name}</title>
-          {mark.draw}
-        </svg>
-      ) : null}
-      <span className={cn("text-[10.5px] font-medium leading-none", !mark && "pl-1")}>
-        {mark ? mark.name : id}
-      </span>
-    </span>
-  );
-}
-
-function Marks({ ids, note }: { ids: string[]; note?: string }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {ids.map((id) => (
-          <Mark key={id} id={id} />
-        ))}
-      </div>
-      {note ? <p className="text-[10px] leading-snug text-faint">{note}</p> : null}
-    </div>
   );
 }
 
@@ -724,48 +685,20 @@ function Figure({ id, note }: { id: string; note?: string }) {
    TASK 3 — COUNT
    ──────────────────────────────────────────────────────────────────── */
 
-/**
- * One number, large, where the magnitude is the whole point.
- *
- * Tabular numerals per STYLE.md — a count that changes must not jitter.
- */
-function Count({ value, unit }: { value: string; unit: string }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <span className="tnum font-mono text-[26px] font-semibold leading-none tracking-tight text-ink">
-        {value}
-      </span>
-      <span className="text-[10.5px] leading-none text-muted-slate">{unit}</span>
-    </div>
-  );
-}
-
 /* ──────────────────────────────────────────────────────────────────── */
 
 /**
  * The one entry point. Returns `null` for a shape we cannot draw truthfully —
  * a card with nothing true to show gets nothing, never a placeholder.
  */
-export function ShapeView({
-  shape,
-  className,
-}: {
-  shape: Shape;
-  className?: string;
-}) {
+export function ShapeView({ shape }: { shape: Extract<Shape, { kind: "figure" }> }) {
   // A figure id we have no drawing for renders nothing at all. An empty
   // bordered box would claim there is a diagram here and then fail to show it.
-  if (shape.kind === "figure" && !FIGURES[shape.id]) return null;
+  if (!FIGURES[shape.id]) return null;
 
   return (
-    <div className={cn("w-full", className)}>
-      {shape.kind === "marks" ? (
-        <Marks ids={shape.ids} note={shape.note} />
-      ) : shape.kind === "figure" ? (
-        <Figure id={shape.id} note={shape.note} />
-      ) : (
-        <Count value={shape.value} unit={shape.unit} />
-      )}
+    <div className="w-full">
+      <Figure id={shape.id} note={shape.note} />
     </div>
   );
 }

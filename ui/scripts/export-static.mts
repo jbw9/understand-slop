@@ -27,8 +27,9 @@ const out = resolve("out", name);
 rmSync(out, { recursive: true, force: true });
 // A static export cannot hold the route that reads and writes the checkout, so it sits out the build.
 renameSync("app/api", ".api-aside");
+let status: number | null;
 try {
-  const r = spawnSync("npx", ["next", "build"], {
+  status = spawnSync("npx", ["next", "build"], {
     stdio: "inherit",
     env: {
       ...process.env,
@@ -37,11 +38,12 @@ try {
       NEXT_PUBLIC_SOURCE_URL: opt("--source-url") ?? "",
       SLOP_EXPORT_DIR: `out/${name}`,
     },
-  });
-  if (r.status !== 0) process.exit(r.status ?? 1);
+  }).status;
 } finally {
   renameSync(".api-aside", "app/api");
 }
+// After the finally: exiting inside the try would leave app/api renamed.
+if (status !== 0) process.exit(status ?? 1);
 writeFileSync(join(out, "source.json"), JSON.stringify(source));
 // public/shots holds other apps' screens; a map that shows none must not publish them.
 if (!JSON.stringify(file.AUTHORED).includes('"shot"')) rmSync(join(out, "shots"), { recursive: true, force: true });

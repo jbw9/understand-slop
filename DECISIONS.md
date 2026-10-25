@@ -1252,3 +1252,116 @@ rendered black in light mode while dark, being plain CSS under
 `:root[data-theme="dark"]`, looked correct. Both themes are now plain CSS
 outside `@theme`. The same bug was shipped unnoticed in D49's actor colours
 and is fixed with it.
+
+## D53 — Provenance is a second axis, never a fourth state
+
+**Chose:** an optional `Origin { by: "user" | "claude"; at; note? }` on a node
+and on a `note` block, rendered as a quiet mono line beside `StateChip`, never
+instead of it.
+**Beat:** adding `user` to `State`, which was the obvious one-line change.
+
+`State` is an epistemic claim about how well the analysis knows a fact about the
+repository: `derived` was resolved by the compiler, `inferred` is a guess from
+naming. A reader's own sentence is not a weaker form of that — it is true by a
+different authority, theirs. Putting it on the same axis would rank a person's
+words against a compiler's, and because `derived` is deliberately unmarked (D3),
+a fourth mark would make every unmarked thing look like one more kind of
+analysis failure. That is the two-tier read D3 exists to prevent.
+
+`update.ts` already overloads `partial` + `unsure` to mean "the update failed
+here" — a process fact wearing an epistemic label. That is one overload; this
+decision refuses to add a second.
+
+**Cost accepted:** two marks can appear on one level (a section can be both
+`not certain` and partly the reader's), and a reader scanning for "what is mine"
+has no filter — the history panel is the list, not the map.
+**At scale:** a map with hundreds of additions needs the additions findable from
+the map, not only from a dialog.
+
+## D54 — The reader's additions live beside the map, never inside it
+
+**Chose:** `<vault>/projects/<id>/overlay.json` holding additions and edits,
+`history.json` holding every version before this one, composed into the map by
+`apply()` inside `loadMap` — the one seam every reader of a map already passes
+through. `map.json` stays byte-for-byte as the generator wrote it.
+**Beat:** merging additions straight into `map.json`, which is simpler to render
+and needs no composition step.
+
+`map.json` has two writers that rewrite it without asking: `regenerate` replaces
+it wholesale, and every `update.ts` run rewrites the sections whose code moved.
+A reader's note in that file is a note the generator will win against, silently,
+at exactly the moment the reader has most invested in it. Separate files mean the
+two writers never share one.
+
+Composing in `loadMap` rather than in the canvas is what kept this small: the
+renderer, the title bar and the text handed to Claude all see composed content
+with no knowledge that an overlay exists. Verified by replacing a project's
+`map.json` with a completely different map — the entries were kept and reported
+as orphaned, not dropped, and reattached when the original returned.
+
+**Cost accepted:** an entry naming a section that a regenerate renamed is
+orphaned and shows nowhere until the reader deals with it; the alternative is
+deleting their work, so it is kept and reported. Examples under `ui/maps/` get no
+overlay at all — they are committed fixtures shared by every reader of the
+checkout, so they are read-only by construction.
+**At scale:** orphan recovery is manual. Re-attaching a note to a renamed section
+wants fuzzy matching on the old title, which nothing does yet.
+
+## D55 — A reader's correction goes through the updater; their words do not
+
+**Chose:** two routes behind one "Fix this". "Say what's wrong" posts a
+`{section, note}` correction down the path `slop-map-fix` already takes
+(`lib/vault.ts` → `turns.json` → `update.ts`), so the section is re-read against
+the real file and stays code-derived. "Write it myself" stores the reader's text
+in the overlay, marked as theirs, and reads no code.
+**Beat:** one box that always re-authors, and separately, one box that always
+just saves the text.
+
+They answer different questions. "The capacity check is in the edge function
+too" is a claim about the code that the code can settle, and the right outcome is
+a section that cites the line — still `derived`, because the repository is what
+was consulted. "This is the stage that actually costs money" is not in the code
+at all and never will be. Collapsing them either throws away a model's ability to
+go and check, or files a person's judgement as a compiler's finding.
+
+`named()` in `update.ts` already resolved a section by id or title for an agent's
+notes, so the reader's note needed no new pipeline — it joins the queue an agent
+uses, and gets the same checked-and-verified re-author.
+
+**Cost accepted:** "say what's wrong" costs a model call and a wait, and works
+only on the reader's own imported projects; an example describes some other copy
+of its code and says so.
+**At scale:** nothing reconciles the two routes. A reader who writes their own
+words and later corrects the same section via the updater ends up with both, the
+overlay winning.
+
+## D56 — A diff is shown over the map's own pictures, and says when it cannot be
+
+**Chose:** diff mode decorates the normal level — sections tinted, a removed
+section kept on screen struck through in red, a dropped schema row red beside a
+new one in green, a removed diagram box red beside its replacement. Default range
+is the map's commit → working tree, so uncommitted work counts. Any two commits
+can be picked; a range the map's line references cannot speak to returns
+`basis: "files"` with a `why` and no section verdicts.
+**Beat:** a separate diff screen listing changed files, and separately, inventing
+section verdicts for any commit pair.
+
+The question a reader has while reviewing is "what did this do to the
+architecture", and a file list does not answer it — the whole reason the map
+exists is that file lists do not. Section verdicts are only meaningful when the
+map's refs mean something on the `from` side, which holds when `from` is the
+map's own commit; past maps are not stored per commit, so for an arbitrary pair
+the honest answer is a file diff that admits it. `basis` is that admission, and
+it exists so the fallback is visible rather than quietly wrong.
+
+The git half of `update.ts` — `changes`, `diffOf`, `moved`, `touches`, `refs` —
+moved to `scripts/generate/gitdiff.ts` unchanged and is shared. Two copies of
+`moved` would drift into two different answers about the same commit.
+
+**Cost accepted:** the diff re-reads and re-diffs on every range change, with no
+cache. Block-level matching is by id (diagram boxes), column name (schema) and
+first cell plus occurrence index (tables) — the last because a first cell is not
+unique, which was measured: two identical maps reported four changed rows until
+occurrence was counted.
+**At scale:** storing a map per commit would make the both-sides-have-a-map path
+real for any pair, and that path is already written and currently unreachable.

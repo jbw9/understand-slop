@@ -4,9 +4,9 @@
  * .mts as ESM and .ts as CommonJS, and two instances meant the cache and the
  * bill were set in one and read from the other.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Edge, Node } from "@/lib/data";
+import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { authorRoot, type Authored } from "./author";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
@@ -16,6 +16,20 @@ import { cutRepo, type Cut } from "./cut";
 import { inventory } from "./inventory";
 import { summarize } from "./summarize";
 import { verifyTree, type Verdict } from "./verify";
+
+/** Written whole and renamed into place, so the app never parses half a file. */
+function atomic(path: string, body: string) {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, body);
+  renameSync(tmp, path);
+}
+
+export type RootStatus = "queued" | "drafting" | "done" | "failed";
+export interface Progress {
+  startedAt: string;
+  stage: string;
+  roots: { id: string; title: string; status: RootStatus; detail?: string }[];
+}
 
 export async function main(args: string[]) {
   const opt = (k: string) => { const i = args.indexOf(k); return i === -1 ? undefined : args[i + 1]; };
@@ -48,7 +62,27 @@ export async function main(args: string[]) {
     console.log(`· ${stage} done in ${elapsed[stage]}s — $${(bill[stage]?.usd ?? 0).toFixed(2)}`);
     return r;
   };
-  const say = (s: string) => console.log(`  ${s}`);
+  // What the app shows while the run is on: the stage, and once the cut is in,
+  // a line per root. A stale file from a previous run would be read as this
+  // one's, so the first write happens before any work.
+  const progress: Progress = { startedAt: new Date(t0).toISOString(), stage: "summarize", roots: [] };
+  const flush = () => atomic(`${out}/progress.json`, JSON.stringify(progress, null, 1) + "\n");
+  const mark = (id: string, status: RootStatus, detail?: string) => {
+    const r = progress.roots.find((x) => x.id === id);
+    if (!r) return;
+    r.status = status;
+    r.detail = detail;
+    flush();
+  };
+  flush();
+
+  const say = (s: string) => {
+    console.log(`  ${s}`);
+    // All authorRoot's callback reports is each submit's verdict (author.ts),
+    // so "revising" is the one in-flight fact the run actually knows.
+    const m = /^(\S+): submit \d+ — (\d+) problems$/.exec(s);
+    if (m) mark(m[1], "drafting", `revising — ${m[2]} problem${m[2] === "1" ? "" : "s"}`);
+  };
 
   const code = inv.files.filter((f) => f.code && !f.test);
   console.log(`${inv.name} @ ${inv.commit}: ${inv.files.length} files, ${code.length} to summarise, marks [${inv.marks.join(", ")}]`);
@@ -58,6 +92,8 @@ export async function main(args: string[]) {
   );
   writeFileSync(`${out}/.cache/summaries.json`, JSON.stringify(sums, null, 1));
   if (stopAfter === "summarize") return;
+  progress.stage = "cut";
+  flush();
 
   // A re-run with --roots redoes some roots of the map that is there, so it
   // keeps that map's cut: a fresh one could rename every root.
@@ -73,19 +109,76 @@ export async function main(args: string[]) {
   // A re-run with --roots reuses the roots it is not asked to redo.
   const prev: MapFile | null = only && existsSync(`${out}/map.json`) ? JSON.parse(readFileSync(`${out}/map.json`, "utf8")) : null;
   const authored: Record<string, Authored> = {};
+
+  /**
+   * The authored roots as a map file. The row is the root's place in the cut,
+   * not its place among those done, so a root arriving never moves the ones
+   * already on screen; `E0` keeps only edges whose both ends are there.
+   */
+  const assemble = (run: Run): MapFile => {
+    const AUTHORED = cut.roots.flatMap((r, i) => {
+      const n = authored[r.id]?.root;
+      return n ? [{ ...n, col: 0, row: i }] : [];
+    });
+    const present = new Set(AUTHORED.map((n) => n.id));
+    return { RUN: run, AUTHORED, E0: cut.edges.filter((e) => present.has(e.from) && present.has(e.to)).map((e) => ({ ...e, state: "derived" as const })), LINKS: [] };
+  };
+
+  progress.stage = "author";
+  progress.roots = cut.roots.map((r) => ({ id: r.id, title: r.title, status: "queued" as RootStatus, detail: "queued" }));
+  flush();
+
+  // The RUN of a map still being made: the same facts as the final one, with
+  // the time so far in place of the total the run does not have yet.
+  const runNow = (): Run => ({
+    command: `understand-slop map ${inv.name}`,
+    // A scoped map is named for its part and counts only the files it covers.
+    repo: inv.scope ? name : inv.name,
+    about: cut.about,
+    commit: inv.commit,
+    files: inv.scope ? code.length : inv.files.length,
+    elapsed: `${Math.round((Date.now() - t0) / 60000)} min`,
+    root: repo,
+    models,
+  });
+
+  // The roots are authored concurrently, so their partial writes are chained:
+  // each waits for the previous rename. Latest-wins would be enough for the
+  // file's content, but the chain also keeps progress.json and map.json from
+  // disagreeing about which roots exist.
+  let writing = Promise.resolve();
+  const partial = () => {
+    const map = assemble(runNow());
+    writing = writing.then(() => atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n"));
+    return writing;
+  };
+
   await lap("author", () =>
     Promise.all(
       cut.roots.map(async (r) => {
         const kept = prev?.AUTHORED.find((n) => n.id === r.id);
         if (only && !only.includes(r.id) && kept) {
           authored[r.id] = { root: kept, turns: 0, reads: 0, submits: 0, problems: [] };
+          mark(r.id, "done", "kept");
+          await partial();
           return;
         }
+        mark(r.id, "drafting", "drafting");
         authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, say);
         say(`${r.id}: ${authored[r.id].root ? "accepted" : "FAILED"} after ${authored[r.id].turns + 1} turns, ${authored[r.id].reads} reads`);
+        // Accepted means it already passed, inside authorRoot's submit, the
+        // same check() the finished map passes — so showing it now shows
+        // nothing a finished root would not.
+        if (authored[r.id].root) {
+          mark(r.id, "done", "explorable now");
+          await partial();
+        } else mark(r.id, "failed", `${authored[r.id].problems.length} problems unresolved`);
       }),
     ),
   );
+  await writing;
+  progress.stage = "verify";
+  flush();
 
   const verdicts: Record<string, Verdict[]> = {};
   await lap("verify", () =>
@@ -97,12 +190,6 @@ export async function main(args: string[]) {
     ),
   );
 
-  const AUTHORED: Node[] = cut.roots.flatMap((r, i) => {
-    const n = authored[r.id].root;
-    return n ? [{ ...n, col: 0, row: i }] : [];
-  });
-  const present = new Set(AUTHORED.map((n) => n.id));
-  const E0: Edge[] = cut.edges.filter((e) => present.has(e.from) && present.has(e.to)).map((e) => ({ ...e, state: "derived" as const }));
   // A stage replayed wholly from cache took seconds and cost nothing, not what
   // generating it costs; the last report's time and bill for it stand, so the
   // record stays a plan.
@@ -118,24 +205,12 @@ export async function main(args: string[]) {
       for (const [k] of runs) if (last.bill?.[k]) spent[k] = last.bill[k];
     }
   }
-  const map: MapFile = {
-    RUN: {
-      command: `understand-slop map ${inv.name}`,
-      // A scoped map is named for its part and counts only the files it covers.
-      repo: inv.scope ? name : inv.name,
-      about: cut.about,
-      commit: inv.commit,
-      files: inv.scope ? code.length : inv.files.length,
-      elapsed: `${Math.round(total / 60)} min`,
-      root: repo,
-      models,
-    },
-    AUTHORED,
-    E0,
-    LINKS: [],
-  };
+  const map = assemble({ ...runNow(), elapsed: `${Math.round(total / 60)} min` });
+  const { AUTHORED } = map;
   const final = check(map, repo, { generated: true });
   writeFileSync(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+  progress.stage = "done";
+  flush();
 
   const allVerdicts = Object.values(verdicts).flat();
   const usd = Object.values(spent).reduce((a, b) => a + b.usd, 0);

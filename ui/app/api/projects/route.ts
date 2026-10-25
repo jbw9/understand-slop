@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (id) {
     const p = listProjects().find((x) => x.id === id);
-    return Response.json(p ? { id: p.id, update: p.update ?? null } : null);
+    return Response.json(p ? { id: p.id, update: p.update ?? null, progress: p.map.status === "generating" ? progressOf(p.id) : null } : null);
   }
   const projects = listProjects().map((p) => {
     const head = headOf(p.root);

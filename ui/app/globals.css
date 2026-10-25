@@ -55,31 +55,7 @@
   --shadow-panel: 0 1px 2px rgba(26, 26, 46, 0.04);
   --shadow-lift: 0 10px 34px -6px rgba(26, 26, 46, 0.1);
 
-  /* ── actors ───────────────────────────────────────────────
-     One hue per participant in a sequence, assigned by position.
-     A six-message exchange between two identical grey chips makes
-     the reader re-read the labels to track who is speaking; a
-     colour per lifeline answers it at a glance. Four, because no
-     authored sequence has more actors than that. */
-  --color-actor-1: #2f6f5e;
-  --color-actor-1-surface: #e6f1ed;
-  --color-actor-2: #39428a;
-  --color-actor-2-surface: #eceefa;
-  --color-actor-3: #8a5a16;
-  --color-actor-3-surface: #faf0df;
-  --color-actor-4: #7a3570;
-  --color-actor-4-surface: #f7ebf5;
 
-  /* ── the way down ─────────────────────────────────────────
-     A diagram box that opens a part. Its own tint, because
-     "you can go in here" is the most useful thing the picture
-     knows and it was being carried by an 8px corner badge on a
-     box otherwise identical to the scenery around it. Indigo,
-     not the green accent: green already means "derived, solid"
-     on every chip, and a door is not a state. */
-  --color-door-surface: #eef1fb;
-  --color-door-line: #9aa8e0;
-  --color-door-ink: #39428a;
 
   /* ── code ─────────────────────────────────────────────────
      The drawer's syntax colours. Drawn from the families already
@@ -112,6 +88,53 @@
   --text-label--line-height: 1;
   --text-label--letter-spacing: 0.08em;
   --text-label--font-weight: 600;
+}
+
+/* These are referenced only from inline `var()` in SVG attributes and style
+   props, never through a Tailwind class. Tailwind v4's `@theme` emits a
+   variable only where its scanner sees the class that uses it, so declaring
+   them there silently dropped the LIGHT values and left `var()` resolving to
+   nothing — every section box rendered black in light mode while dark, being
+   plain CSS under :root[data-theme], looked fine. Plain CSS in both themes,
+   so nothing can tree-shake them. */
+:root {
+  /* ── sections ─────────────────────────────────────────────
+     One hue per PART a diagram leads into, assigned by the order
+     the parts are declared. A part drawn as three boxes makes
+     those three one colour, and the entry in the list below
+     carries the same dot — so the picture and the index are
+     read as one thing. Seven, because no diagram opens more
+     (measured: the widest is 7). Each pair is a tint for the
+     box and an ink for its label and dot. */
+  --color-sec-1-surface: #e7f1ec;
+  --color-sec-1-ink: #2f6f5e;
+  --color-sec-2-surface: #eceffa;
+  --color-sec-2-ink: #3f4a91;
+  --color-sec-3-surface: #fbefdd;
+  --color-sec-3-ink: #8a5a16;
+  --color-sec-4-surface: #f8ecf6;
+  --color-sec-4-ink: #7d3573;
+  --color-sec-5-surface: #e5f2f7;
+  --color-sec-5-ink: #246079;
+  --color-sec-6-surface: #fdecea;
+  --color-sec-6-ink: #90392a;
+  --color-sec-7-surface: #eff0e6;
+  --color-sec-7-ink: #5d6327;
+
+  /* ── actors ───────────────────────────────────────────────
+     One hue per participant in a sequence, assigned by position.
+     A six-message exchange between two identical grey chips makes
+     the reader re-read the labels to track who is speaking; a
+     colour per lifeline answers it at a glance. Four, because no
+     authored sequence has more actors than that. */
+  --color-actor-1: #2f6f5e;
+  --color-actor-1-surface: #e6f1ed;
+  --color-actor-2: #39428a;
+  --color-actor-2-surface: #eceefa;
+  --color-actor-3: #8a5a16;
+  --color-actor-3-surface: #faf0df;
+  --color-actor-4: #7a3570;
+  --color-actor-4-surface: #f7ebf5;
 }
 
 /* Dark: the same tokens, pointed at night colours, so every class and every
@@ -163,9 +186,20 @@
   --color-actor-4: #e2a3d6;
   --color-actor-4-surface: #2e1c2b;
 
-  --color-door-surface: #1d2133;
-  --color-door-line: #4a5590;
-  --color-door-ink: #aab6f0;
+  --color-sec-1-surface: #17302a;
+  --color-sec-1-ink: #6cc2a4;
+  --color-sec-2-surface: #1e2238;
+  --color-sec-2-ink: #a8b4f0;
+  --color-sec-3-surface: #2e2515;
+  --color-sec-3-ink: #e2c77e;
+  --color-sec-4-surface: #2f1d2c;
+  --color-sec-4-ink: #e2a3d6;
+  --color-sec-5-surface: #152a33;
+  --color-sec-5-ink: #83c3dd;
+  --color-sec-6-surface: #331e1a;
+  --color-sec-6-ink: #f0a58e;
+  --color-sec-7-surface: #26291a;
+  --color-sec-7-ink: #bcc47e;
 
   --color-code: #16181d;
   --color-code-plain: #e3e3e6;

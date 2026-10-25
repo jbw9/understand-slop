@@ -5,7 +5,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
-import { CodeDrawer, ExplainedBlock, WatchOut, isExplained } from "@/components/blocks";
+import { CodeDrawer, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
@@ -520,6 +520,16 @@ function Level({
       .map((box) => box.opens)
       .filter((id): id is string => Boolean(id) && kids.some((k) => k.id === id)),
   );
+  // The order the picture assigns its section hues, so the list below can
+  // carry the same ones. Taken from the first diagram that leads anywhere —
+  // the same one whose boxes the reader just looked at.
+  const hueOrder = sectionOrder(
+    blocks.find(
+      (b): b is Extract<Anatomy, { kind: "diagram" }> =>
+        b.kind === "diagram" && b.boxes.some((x) => x.opens && kids.some((k) => k.id === x.opens)),
+    ) ?? { kind: "diagram", caption: "", boxes: [], arrows: [] },
+    (id) => kids.some((k) => k.id === id),
+  );
   const code = codeAt(map, path);
   const [codeOpen, setCodeOpen] = useState(false);
 
@@ -628,7 +638,7 @@ function Level({
             ) : onDiagram.size ? (
               // The picture is the way down, so the list stops competing with
               // it: names and problems, no cards, no blurbs, no paths (D40).
-              <List nodes={kids} at={path} onOpen={onOpen} />
+              <List nodes={kids} at={path} onOpen={onOpen} hue={hueOrder} />
             ) : (
               <Grid nodes={kids} at={path} onOpen={onOpen} />
             )}
@@ -770,15 +780,19 @@ function List({
   nodes,
   at,
   onOpen,
+  hue = [],
 }: {
   nodes: Node[];
   at: string[];
   onOpen: (p: string[]) => void;
+  /** The order the picture above assigned its section hues, by node id. */
+  hue?: string[];
 }) {
   return (
     <ul className="max-w-[560px]">
       {nodes.map((n) => {
         const go = openable(n) ? () => onOpen([...at, n.id]) : undefined;
+        const sec = hue.indexOf(n.id);
         return (
           <li key={n.id}>
             <button
@@ -792,6 +806,14 @@ function List({
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
               )}
             >
+              {/* The same hue the box carries upstairs. A part with no box
+                  of its own gets no dot rather than a colour that matches
+                  nothing — 3 of 13 levels have one. */}
+              <span
+                aria-hidden
+                className={cn("size-[9px] shrink-0 rounded-full", sec < 0 && "opacity-0")}
+                style={sec >= 0 ? { background: sectionTone(sec).ink } : undefined}
+              />
               <span className="truncate text-[14px] font-medium tracking-[-0.01em] text-ink">
                 {n.title}
               </span>

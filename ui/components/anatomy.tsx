@@ -5,11 +5,12 @@ import { StateChip } from "@/components/state";
 import { rowId, type Anatomy } from "@/lib/data";
 import { ShapeView } from "@/components/shapes";
 import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX, type Shape } from "@/lib/view";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Slice, WriteResult } from "@/lib/repo";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
 import { useMap } from "@/components/map-context";
 import { readSource, SOURCE_URL } from "@/lib/source";
+import { highlight, langOf, TOKEN_COLOR } from "@/lib/highlight";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and every row is a
@@ -893,6 +894,9 @@ export function SourceView({
   // Disk is the truth once we have it; the fixture is the fallback.
   const shown = slice?.code ?? quoted;
   const lines = shown.split("\n");
+  // Tokenized once per text, not per render: a 90-line slice re-scanned on
+  // every trace or hover is work nobody asked for.
+  const painted = useMemo(() => highlight(shown, langOf(block.file)), [shown, block.file]);
   const drifted = slice != null && !slice.matchesFixture;
 
   // Nothing is ever written without an explicit click, so this is only ever
@@ -1054,16 +1058,26 @@ export function SourceView({
         </div>
       ) : (
         /* Real line numbers, counting from the file's own offset. A gutter
-           that restarts at 1 is a quiet lie about where this code lives. */
-        <div className="overflow-x-auto">
-          <pre className="min-w-full py-1.5 font-mono text-[11.5px] leading-[1.55]">
-            {lines.map((line, i) => (
+           that restarts at 1 is a quiet lie about where this code lives.
+           Coloured by lib/highlight.ts: the same reading a code editor gives,
+           since this pane's whole job is to be read. */
+        <div className="overflow-x-auto bg-code">
+          <pre className="min-w-full py-2 font-mono text-[12.5px] leading-[1.65]">
+            {painted.map((line, i) => (
               <div key={i} className="flex">
-                <span className="tnum sticky left-0 shrink-0 select-none border-r border-border-gray bg-pure-white pl-3 pr-2 text-right text-faint">
+                <span className="tnum sticky left-0 shrink-0 select-none border-r border-border-gray bg-code pl-3 pr-2.5 text-right text-faint">
                   {block.start + i}
                 </span>
-                <code className="whitespace-pre pl-2.5 pr-3 text-on-surface">
-                  {line || " "}
+                <code className="whitespace-pre pl-3 pr-4 text-code-plain">
+                  {line.length ? (
+                    line.map((t, j) => (
+                      <span key={j} style={{ color: TOKEN_COLOR[t.kind] }}>
+                        {t.text}
+                      </span>
+                    ))
+                  ) : (
+                    " "
+                  )}
                 </code>
               </div>
             ))}

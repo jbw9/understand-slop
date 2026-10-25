@@ -55,6 +55,48 @@
   --shadow-panel: 0 1px 2px rgba(26, 26, 46, 0.04);
   --shadow-lift: 0 10px 34px -6px rgba(26, 26, 46, 0.1);
 
+  /* ── actors ───────────────────────────────────────────────
+     One hue per participant in a sequence, assigned by position.
+     A six-message exchange between two identical grey chips makes
+     the reader re-read the labels to track who is speaking; a
+     colour per lifeline answers it at a glance. Four, because no
+     authored sequence has more actors than that. */
+  --color-actor-1: #2f6f5e;
+  --color-actor-1-surface: #e6f1ed;
+  --color-actor-2: #39428a;
+  --color-actor-2-surface: #eceefa;
+  --color-actor-3: #8a5a16;
+  --color-actor-3-surface: #faf0df;
+  --color-actor-4: #7a3570;
+  --color-actor-4-surface: #f7ebf5;
+
+  /* ── the way down ─────────────────────────────────────────
+     A diagram box that opens a part. Its own tint, because
+     "you can go in here" is the most useful thing the picture
+     knows and it was being carried by an 8px corner badge on a
+     box otherwise identical to the scenery around it. Indigo,
+     not the green accent: green already means "derived, solid"
+     on every chip, and a door is not a state. */
+  --color-door-surface: #eef1fb;
+  --color-door-line: #9aa8e0;
+  --color-door-ink: #39428a;
+
+  /* ── code ─────────────────────────────────────────────────
+     The drawer's syntax colours. Drawn from the families already
+     on the page — green for what the language itself says, clay
+     for literal text, amber for numbers — so a code pane reads as
+     part of this app and not as a pasted-in editor theme. */
+  --color-code: #fcfcfa;
+  --color-code-plain: #1a1c1b;
+  --color-code-comment: #7d8a85;
+  --color-code-string: #8e3320;
+  --color-code-number: #8a6416;
+  --color-code-keyword: #1f5c4d;
+  --color-code-type: #2f5d8a;
+  --color-code-call: #4a3f87;
+  --color-code-punct: #6b7280;
+  --color-code-annotation: #8a6416;
+
   /* ── type ──────────────────────────────────────────────── */
   --text-display: 30px;
   --text-display--line-height: 1.18;
@@ -112,6 +154,30 @@
   --color-wire: #4a4f5c;
   --color-bezel: #3b3f4a;
 
+  --color-actor-1: #6cc2a4;
+  --color-actor-1-surface: #16302a;
+  --color-actor-2: #aab6f0;
+  --color-actor-2-surface: #1d2133;
+  --color-actor-3: #e2c77e;
+  --color-actor-3-surface: #2b2414;
+  --color-actor-4: #e2a3d6;
+  --color-actor-4-surface: #2e1c2b;
+
+  --color-door-surface: #1d2133;
+  --color-door-line: #4a5590;
+  --color-door-ink: #aab6f0;
+
+  --color-code: #16181d;
+  --color-code-plain: #e3e3e6;
+  --color-code-comment: #6f7a84;
+  --color-code-string: #f0a58e;
+  --color-code-number: #e2c77e;
+  --color-code-keyword: #6cc2a4;
+  --color-code-type: #87b7e6;
+  --color-code-call: #b7a8f0;
+  --color-code-punct: #9aa1ad;
+  --color-code-annotation: #e2c77e;
+
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.5);
 }
@@ -167,9 +233,13 @@
      the signal is carried by the INERT ones receding rather than the live
      ones shouting — otherwise the whole picture shouts (D43). Dimming only
      happens on a diagram that leads somewhere. */
+  /* The live boxes now carry their own tint (TONE.door), so the scenery no
+     longer has to be faded to tell them apart — 0.55 made two thirds of
+     every picture look switched off. A light touch is enough to keep the
+     eye on the doors. */
   .dg-nav > g:not(.dg-live) rect,
   .dg-nav > g:not(.dg-live) text {
-    opacity: 0.55;
+    opacity: 0.82;
   }
   .dg-cue {
     transition: transform 150ms ease;

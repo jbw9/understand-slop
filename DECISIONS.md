@@ -1160,10 +1160,16 @@ light terminal; it is readable, not pretty.
 ## D48 — Colour carries the one fact the picture knows: what opens
 
 **Chose:** a `plain` diagram box that names a part (`opens`) is drawn in its
-own indigo tint (`TONE.door`, derived from `opens` — never authored), and the
-part cards below wear the same indigo as a 3px spine on their leading edge.
-The corner badge adopts that ink too, so the box and its cue say one thing.
+own indigo tint (`TONE.door`, derived from `opens` — never authored). The
+corner badge adopts that ink too, so the box and its cue say one thing.
 Scenery dimming on a navigable diagram lifts from 0.55 to 0.82.
+**Amended:** the same indigo was also put on the part cards below, as a 3px
+spine and a hover tint. The user removed it — "don't see the point of it, the
+diagram colors are nice tho". The cards are a vertical list where every entry
+is openable, so the spine marked a distinction that was not in question; on
+the diagram, where 3 boxes in 9 are inert, the same tint answers a real one.
+Colour earns its place where it separates, not wherever the same fact is
+true.
 **Beat:** the 8px green corner badge alone (D43). **Why:** measured across
 every map, 2,440 of 2,596 boxes are `plain` — so a picture was a field of
 identical rectangles, and the single most useful thing it knew ("you can go in

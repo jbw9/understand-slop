@@ -43,12 +43,17 @@ export function onAnswer(f: (e: Exchange) => void) {
   return () => window.removeEventListener(ANSWERED, on);
 }
 
-/** The reply Claude gave to a drafting prompt, from the same place. */
+/**
+ * The reply Claude gave to a drafting prompt, from the same place. True when a
+ * waiting dialog took it — it cancels the event — so it is not also an answer.
+ */
 const DRAFTED = "slop:drafted";
 export const announceDraft = (said: string) =>
-  window.dispatchEvent(new CustomEvent<string>(DRAFTED, { detail: said }));
-const onDraft = (f: (said: string) => void) => {
-  const on = (ev: Event) => f((ev as CustomEvent<string>).detail);
+  !window.dispatchEvent(new CustomEvent<string>(DRAFTED, { detail: said, cancelable: true }));
+const onDraft = (f: (said: string) => boolean) => {
+  const on = (ev: Event) => {
+    if (f((ev as CustomEvent<string>).detail)) ev.preventDefault();
+  };
   window.addEventListener(DRAFTED, on);
   return () => window.removeEventListener(DRAFTED, on);
 };
@@ -87,10 +92,11 @@ export function KeepAnswer({
   useEffect(
     () =>
       onDraft((said) => {
-        if (!waiting.current) return;
+        if (!waiting.current) return false;
         waiting.current = false;
         const r = parseBlock(said);
         setStage("block" in r ? { at: "preview", block: r.block } : { at: "failed", why: r.error });
+        return true;
       }),
     [],
   );
@@ -244,7 +250,11 @@ export function CorrectSection({ path, onClose }: { path: string[]; onClose: () 
     setBusy(false);
     // Only a project of the reader's own can be re-authored; an example
     // describes some other copy of its code.
-    if (!res || res.skipped) {
+    if (!res || res.error) {
+      setProblem(res?.error ?? "Could not send that.");
+      return;
+    }
+    if (res.skipped) {
       setProblem("This map is an example, so it cannot be re-read. Import the checkout as a project to correct it.");
       return;
     }

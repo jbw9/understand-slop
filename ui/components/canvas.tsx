@@ -123,8 +123,6 @@ export function Canvas() {
     [key],
   );
 
-  const go = goTo;
-
   // A new level starts at its top, not wherever the last one was scrolled to.
   useLayoutEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
@@ -184,9 +182,9 @@ export function Canvas() {
       const owner = id.slice(0, id.lastIndexOf(":"));
       const ownerAt = path.indexOf(owner);
       const at = ownerAt === -1 ? [...path, owner] : path.slice(0, ownerAt + 1);
-      if (nodeAt([...at, id])) go([...at, id]);
+      if (nodeAt([...at, id])) goTo([...at, id]);
     },
-    [path, go, nodeAt],
+    [path, nodeAt],
   );
 
   const ctx = useMemo<RowCtx>(
@@ -209,16 +207,15 @@ export function Canvas() {
       if (e.key === "Escape") {
         // Unwind one layer at a time: the trace first, then one level.
         if (traced) setTraced(null);
-        else if (path.length) go(path.slice(0, -1));
-      } else if (e.key === "0") {
-        go([]);
+        else if (path.length) goTo(path.slice(0, -1));
+      } else if (e.key === "0" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        // ⌘0 belongs to the zoom reset, which listens on window too.
+        goTo([]);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [traced, setTraced, path, go]);
-
-  const open = (next: string[]) => go(next);
+  }, [traced, setTraced, path]);
 
   /* ── handing a section to Claude ──────────────────────────── */
 
@@ -249,7 +246,7 @@ export function Canvas() {
       <main ref={scrollRef} className={cn(GROUND[ground], "relative min-w-0 flex-1 overflow-auto")}>
         {/* In the desktop app the title bar carries where you are. */}
         {desktop ? null : (
-          <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
+          <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => goTo(path.slice(0, d))} />
         )}
         <Zoom scrollRef={scrollRef}>
         <div ref={contentRef} className="relative mx-auto max-w-[1680px] px-10 pb-28 pt-5">
@@ -275,9 +272,9 @@ export function Canvas() {
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
               {focus ? (
-                <Level node={focus} path={path} ctx={ctx} onOpen={open} />
+                <Level node={focus} path={path} ctx={ctx} onOpen={goTo} />
               ) : (
-                <Overview onOpen={open} />
+                <Overview onOpen={goTo} />
               )}
             </motion.div>
           </AnimatePresence>
@@ -539,12 +536,15 @@ function Level({
   // The order the picture assigns its section hues, so the list below can
   // carry the same ones. Taken from the first diagram that leads anywhere —
   // the same one whose boxes the reader just looked at.
+  // A box may open a row-built child too (check.ts allows it), so owning is
+  // tested against every child, not only the authored ones listed below.
+  const owns = (id: string) => Boolean(node.children?.some((k) => k.id === id));
   const hueOrder = sectionOrder(
     blocks.find(
       (b): b is Extract<Anatomy, { kind: "diagram" }> =>
-        b.kind === "diagram" && b.boxes.some((x) => x.opens && kids.some((k) => k.id === x.opens)),
+        b.kind === "diagram" && b.boxes.some((x) => x.opens && owns(x.opens)),
     ) ?? { kind: "diagram", caption: "", boxes: [], arrows: [] },
-    (id) => kids.some((k) => k.id === id),
+    owns,
   );
   const code = codeAt(map, path);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -625,7 +625,7 @@ function Level({
                 <ExplainedBlock
                   block={b}
                   onOpen={(id) =>
-                    kids.some((k) => k.id === id) ? onOpen([...path, id]) : undefined
+                    owns(id) ? onOpen([...path, id]) : undefined
                   }
                   hrefFor={(id) =>
                     `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
@@ -638,7 +638,7 @@ function Level({
             // lifts them to reading size without forking their type scale.
             <div key={i} data-pick={blockLabel(b)}>
               <div className="max-w-[900px] [zoom:1.18]">
-                <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} opened />
+                <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} />
               </div>
             </div>
           ),

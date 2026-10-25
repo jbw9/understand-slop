@@ -120,7 +120,7 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
     return `${path} (lines ${start}-${Math.min(end, total)} of ${total})\n${numbered(inv.repo, path, start, end)}`;
   }
   if (call.name === "grep") {
-    const args = ["-C", inv.repo, "grep", "-n", "-I", "-E", String(i.pattern ?? "")];
+    const args = ["-C", inv.repo, "grep", "-n", "-I", "-E", "-e", String(i.pattern ?? "")];
     if (i.under) args.push("--", String(i.under).replace(/^\.?\//, ""));
     else if (reach) args.push("--", ...reach);
     try {

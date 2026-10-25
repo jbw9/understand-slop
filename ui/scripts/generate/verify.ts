@@ -113,7 +113,8 @@ async function verifyNode(n: Node, inv: Inventory, model: string): Promise<Verdi
   v.flagged = flags.length;
   if (!flags.length) return v;
 
-  const r = await review(n, flags, inv, model);
+  // One failed review leaves this node unreviewed; it must not fail the whole stage.
+  const r = await review(n, flags, inv, model).catch(() => null);
   if (!r) return v;
   v.claims = r.real;
   if (!r.real.length) return v;

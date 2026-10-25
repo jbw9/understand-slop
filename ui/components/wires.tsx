@@ -317,7 +317,7 @@ export function WireLayer({
         const dirOut: 1 | -1 = sameCard ? -1 : rightward ? 1 : -1;
 
         const r = 7; // elbow radius, so corners read as drawn not aliased
-        const gutter = sameCard ? 0 : Math.abs(ex - sx);
+        const gutter = Math.abs(ex - sx);
 
         let dd: string;
 
@@ -378,8 +378,8 @@ export function WireLayer({
             ` H ${ex}`;
         } else {
           // Two tables in one card: bow out into the left margin rather than
-          // crossing the rows between them. Otherwise run the real gutter.
-          const mid = sameCard ? CA.left - 22 : (sx + ex) / 2;
+          // crossing the rows between them.
+          const mid = CA.left - 22;
           const sweepDown = by > ay;
           const vSign = sweepDown ? 1 : -1;
           const canRound = Math.abs(by - ay) > r * 2 + 2;
@@ -685,33 +685,5 @@ export function WireLayer({
         );
       })}
     </svg>
-  );
-}
-
-export function WireLegend() {
-  return (
-    <div className="hidden flex-wrap items-center gap-x-5 gap-y-2 md:flex">
-      <LegendKey kind="derived" label="Resolved by the compiler" />
-      <LegendKey kind="partial" label="Found, known incomplete" />
-      <LegendKey kind="alarm" label="Unproven — worth a look" />
-      <LegendKey kind="inferred" label="Guessed from layout" />
-    </div>
-  );
-}
-
-function LegendKey({ kind, label }: { kind: WireKind; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5 text-[12px] text-muted-slate">
-      <svg width="24" height="8" aria-hidden="true">
-        <path
-          d="M 1 4 L 23 4"
-          stroke={STROKE[kind]}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeDasharray={DASHED[kind]}
-        />
-      </svg>
-      {label}
-    </span>
   );
 }

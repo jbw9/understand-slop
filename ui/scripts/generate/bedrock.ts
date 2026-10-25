@@ -233,18 +233,10 @@ async function assemble(stream: AsyncIterable<StreamEvent>): Promise<Reply> {
   return reply;
 }
 
-/** The text of a reply, thinking dropped. */
-export const textOf = (r: Reply) => r.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-
 /** Every tool call in a reply. */
 export const callsOf = (r: Reply) =>
   r.content.flatMap((b) => (b.type === "tool_use" ? [b as Extract<Block, { type: "tool_use" }>] : []));
 
-/**
- * One structured answer: the model is asked to call `tool` once and nothing
- * else. Forced tool_choice is a 400 on the 5.5 models, so this asks, checks,
- * and asks again with the reason when the call is missing.
- */
 /**
  * What is wrong with a tool answer at the top level, or null. Models now and
  * then send an array as its JSON text (saas-starter's verify stage crashed on
@@ -263,6 +255,11 @@ function shapeOf(tool: Tool, input: Record<string, unknown>): string | null {
   return null;
 }
 
+/**
+ * One structured answer: the model is asked to call `tool` once and nothing
+ * else. Forced tool_choice is a 400 on the 5.5 models, so this asks, checks,
+ * and asks again with the reason when the call is missing.
+ */
 export async function ask<T>(req: Omit<Request, "tools"> & { tool: Tool }): Promise<T> {
   if (BACKEND === "claude-code") return (await import("./claude-code")).ccAsk<T>(req);
   const messages = [...req.messages];

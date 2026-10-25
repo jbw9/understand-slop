@@ -208,7 +208,7 @@ export async function main(args: string[]) {
   const map = assemble({ ...runNow(), elapsed: `${Math.round(total / 60)} min` });
   const { AUTHORED } = map;
   const final = check(map, repo, { generated: true });
-  writeFileSync(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+  atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
   progress.stage = "done";
   flush();
 

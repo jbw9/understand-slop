@@ -66,7 +66,8 @@ export function lastExchange(transcript: string, read: (f: string) => string): E
   const asked = (e: Entry) =>
     e.type === "user" &&
     !e.isMeta &&
-    (typeof content(e) === "string" || (Array.isArray(content(e)) && !content(e as Entry["message"] as never && (content(e) as { type?: string }[]).some((b) => b.type === "tool_result"))));
+    (typeof content(e) === "string" ||
+      (Array.isArray(content(e)) && !(content(e) as { type?: string }[]).some((b) => b.type === "tool_result")));
 
   let question = "";
   let answer = "";

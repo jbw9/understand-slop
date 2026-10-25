@@ -43,7 +43,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  // JSON only: a cross-site form can send text/plain with no preflight.
+  if (!request.headers.get("content-type")?.startsWith("application/json")) return bad("bad request");
+  const body = await request.json().catch(() => null);
   const { file, start, end, code, expected, map } = body ?? {};
   if (
     typeof file !== "string" ||

@@ -140,8 +140,12 @@ export function Workspace() {
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
             acts?.forEach(announceAct);
+            // Same array when nothing moved: a new one every tick would reset
+            // the paste effect's timer below before it could ever fire.
             setTabs((all) =>
-              all.map((x) => (x.key === key && (x.live !== live || x.busy !== busy) ? { ...x, live, busy } : x)),
+              all.some((x) => x.key === key && (x.live !== live || x.busy !== busy))
+                ? all.map((x) => (x.key === key ? { ...x, live, busy } : x))
+                : all,
             );
           })
           .catch(() => {}),
@@ -441,8 +445,8 @@ async function updateMap(root: string, turn: Turn) {
  * Reads back what Claude just asked and answered, and offers it to the map.
  *
  * A draft the reader asked for (components/keep.tsx) comes back as an ordinary
- * answer, so it is announced on its own channel: the dialog is waiting for one
- * and the level is not.
+ * answer, so it is announced on its own channel first: the dialog is waiting
+ * for one and the level is not.
  */
 async function offerAnswer(transcript: string) {
   const r = await fetch(`/api/answer?transcript=${encodeURIComponent(transcript)}`)
@@ -450,8 +454,7 @@ async function offerAnswer(transcript: string) {
     .catch(() => null);
   const e = r?.exchange as Exchange | null | undefined;
   if (!e?.said) return;
-  announceDraft(e.said);
-  announceAnswer(e);
+  if (!announceDraft(e.said)) announceAnswer(e);
 }
 
 /** An agent edited a checkout whose map cannot follow it; the detail is the checkout. */

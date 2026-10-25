@@ -1365,3 +1365,37 @@ unique, which was measured: two identical maps reported four changed rows until
 occurrence was counted.
 **At scale:** storing a map per commit would make the both-sides-have-a-map path
 real for any pair, and that path is already written and currently unreachable.
+
+## D57 — A root is published when it is accepted, not when the run ends
+
+**Chose:** the author stage writes `map.json` each time a root is accepted,
+plus a `progress.json` the project list polls, so finished sections are
+explorable while the rest are still being written. One `assemble()` produces
+both the partial and the final map.
+**Beat:** keeping the map until the run ends and only enriching the progress
+line, which was the safe option and the one the user explicitly allowed
+("if this is not possible without sacrificing output quality dont").
+
+It costs nothing because the gate was already in the right place. `authorRoot`
+only returns a root that passed `shapeProblems` and `check()` inside its own
+submit tool, so "accepted" already means "would have shipped". Publishing at
+that moment shows nothing the end of the run would not have shown. Measured on a
+full run: `verifyPassRate` 100 before and after, 0 check problems before and
+after, 5/5 roots accepted, and `check()` on a mid-run snapshot clean over 123
+refs.
+
+`row` is the root's index in the cut, never its index among those finished, so a
+root that lands fifth takes row 1 if that is its place and moves nothing already
+on screen. Writes go through a serialising chain rather than latest-wins: that is
+not needed for `map.json` alone, but it stops `map.json` and `progress.json`
+disagreeing about which roots exist, which would tell a reader a section is
+explorable before the map they would open contains it.
+
+**Cost accepted:** the statuses are only the ones the generator can report.
+`authorRoot` logs once per submit and `runTool` reports nothing, so `reading
+<file>` — which the approved sketch showed — is not derivable and is not
+claimed. A root in flight shows `drafting`, or `revising — N problems` while the
+repair loop converges.
+**At scale:** a reader can open a half-made map and form a picture of a
+repository from half its sections, with nothing on the level itself saying the
+map is incomplete — only the project list knows.

@@ -8,6 +8,7 @@
  *   <vault>/projects/<id>/map.json    the map, as the generator writes it
  *   <vault>/projects/<id>/report.json what generating it took
  *   <vault>/projects/<id>/generate.log the generator's output, for progress and errors
+ *   <vault>/projects/<id>/progress.json how far a run in flight has got, root by root
  *   <vault>/projects/<id>/.cache/     model replies, so a regenerate is cheap
  *   <vault>/projects/<id>/base.json   the code as the last update saw it (scripts/generate/update.ts)
  *   <vault>/projects/<id>/update.json what the last update did
@@ -249,6 +250,9 @@ export function generate(id: string, claude?: string): Project | undefined {
   // A fresh map starts from the code as it is; what earlier updates saw goes.
   rmSync(join(dir, "base.json"), { force: true });
   rmSync(join(dir, "update.json"), { force: true });
+  // The last run's progress would otherwise read as this one's until the
+  // first stage overwrites it.
+  rmSync(join(dir, "progress.json"), { force: true });
   const log = openSync(join(dir, "generate.log"), "w");
   const child = spawn(
     "npx",
@@ -390,5 +394,27 @@ export function mapFileOf(id: string): string | undefined {
   return existsSync(f) ? f : undefined;
 }
 
-/** What the list shows while a map is being made: the generator's last line. */
-export const progressOf = (id: string) => logTail(id, 1);
+/** How far a map still being made has got (scripts/generate/pipeline.ts writes it). */
+export interface Progress {
+  startedAt: string;
+  stage: string;
+  roots: { id: string; title: string; status: "queued" | "drafting" | "done" | "failed"; detail?: string }[];
+  /** The generator's last line, when it has not written a progress file yet. */
+  line?: string;
+}
+
+/**
+ * What the list shows while a map is being made. The generator's own
+ * progress.json where there is one; until the first stage writes it — and for
+ * a run started before this file existed — the log's last line.
+ */
+export function progressOf(id: string): Progress {
+  const line = logTail(id, 1);
+  try {
+    const p = JSON.parse(readFileSync(join(projectDir(id), "progress.json"), "utf8")) as Progress;
+    if (typeof p.stage === "string" && Array.isArray(p.roots)) return { ...p, line };
+  } catch {
+    /* not written yet, or unreadable: the log still says something */
+  }
+  return { startedAt: "", stage: "", roots: [], line };
+}

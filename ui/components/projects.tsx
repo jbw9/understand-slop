@@ -7,7 +7,7 @@ import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dial
 import { useMap } from "@/components/map-context";
 import { PanelHead } from "@/components/panel";
 import { readSettings } from "@/lib/settings";
-import type { Project } from "@/lib/vault";
+import type { Progress, Project } from "@/lib/vault";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,7 +22,7 @@ const OPEN = "slop:projects";
 /** Opens the list; with a folder, ready to import it. */
 export const openProjects = (root?: string) => window.dispatchEvent(new CustomEvent<string | undefined>(OPEN, { detail: root }));
 
-type Listed = Project & { hasMap: boolean; stale: boolean; progress?: string };
+type Listed = Project & { hasMap: boolean; stale: boolean; progress?: Progress };
 interface List {
   vault: string;
   examples: string[];
@@ -134,8 +134,10 @@ export function ProjectsDialog() {
     }
   };
 
-  const openMap = (id: string) => {
-    router.push(`/?map=${encodeURIComponent(id)}`);
+  // `at` is the level to open at, as chrome.tsx's goTo spells it: a finished
+  // root is explorable from the list while the rest are still being made.
+  const openMap = (id: string, at?: string) => {
+    router.push(`/?map=${encodeURIComponent(id)}${at ? `&at=${encodeURIComponent(at)}` : ""}`);
     close();
   };
 
@@ -191,7 +193,7 @@ export function ProjectsDialog() {
                     p={p}
                     current={p.id === current}
                     busy={busy}
-                    onOpen={() => openMap(p.id)}
+                    onOpen={(at) => openMap(p.id, at)}
                     onRegenerate={() => void regenerate(p.id)}
                     onCancel={() => void act({ action: "cancel", id: p.id })}
                     onRemove={() => void act({ action: "remove", id: p.id })}
@@ -236,6 +238,44 @@ export function ProjectsDialog() {
 
 const minutes = (from: string) => Math.max(1, Math.round((Date.now() - Date.parse(from)) / 60000));
 
+/** What the run is doing before any root exists; once they do, the list below says it. */
+function stageLine(g?: Progress) {
+  if (!g) return "";
+  if (g.roots.length) return "";
+  if (g.stage === "summarize") return "reading the code";
+  if (g.stage === "cut") return "dividing it into parts";
+  return g.line ?? "";
+}
+
+const GLYPH = { done: "✓", drafting: "◷", failed: "✗", queued: "○" } as const;
+
+/**
+ * The parts of a map being made, in the order the cut put them. A finished one
+ * opens straight away: it passed the same check inside the author's submit that
+ * a root of a finished map passes, so there is nothing provisional about it.
+ */
+function Roots({ roots, onOpen }: { roots: Progress["roots"]; onOpen: (at: string) => void }) {
+  return (
+    <ul className="flex flex-col gap-0.5 font-mono text-[11.5px]">
+      {roots.map((r) => (
+        <li key={r.id} className="flex items-baseline gap-2">
+          <span className={cn("w-3 shrink-0", r.status === "done" ? "text-deep-green" : r.status === "failed" ? "text-clay-ink" : r.status === "drafting" ? "text-amber-ink" : "text-faint")}>
+            {GLYPH[r.status]}
+          </span>
+          {r.status === "done" ? (
+            <button type="button" onClick={() => onOpen(r.id)} className="min-w-0 flex-1 cursor-pointer truncate text-left text-ink hover:underline">
+              {r.title}
+            </button>
+          ) : (
+            <span className={cn("min-w-0 flex-1 truncate", r.status === "queued" ? "text-faint" : "text-on-surface-variant")}>{r.title}</span>
+          )}
+          <span className={cn("shrink-0", r.status === "done" ? "text-deep-green" : r.status === "failed" ? "text-clay-ink" : "text-faint")}>{r.detail}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ProjectRow({
   p,
   current,
@@ -248,7 +288,7 @@ function ProjectRow({
   p: Listed;
   current: boolean;
   busy: boolean;
-  onOpen: () => void;
+  onOpen: (at?: string) => void;
   onRegenerate: () => void;
   onCancel: () => void;
   onRemove: () => void;
@@ -264,7 +304,7 @@ function ProjectRow({
         {current ? <span className="font-mono text-[10.5px] text-deep-green">open</span> : null}
         <span className="flex-1" />
         {p.hasMap ? (
-          <button type="button" onClick={onOpen} className={cn(QUIET, "py-1")}>
+          <button type="button" onClick={() => onOpen()} className={cn(QUIET, "py-1")}>
             Open
           </button>
         ) : null}
@@ -297,13 +337,14 @@ function ProjectRow({
         )}
       >
         {status === "generating"
-          ? `◷ Mapping… ${minutes(p.map.startedAt)} min${p.progress ? ` — ${p.progress}` : ""}`
+          ? `◷ Mapping ${p.name}… ${minutes(p.map.startedAt)} min${stageLine(p.progress) ? ` — ${stageLine(p.progress)}` : ""}`
           : status === "ready"
             ? `✓ Mapped at ${p.map.commit ?? "?"}${p.map.seconds ? ` · ${Math.round(p.map.seconds / 60)} min` : ""}${p.stale ? " · the code has changed since" : ""}`
             : status === "cancelled"
               ? "Cancelled."
               : "✗ Mapping failed."}
       </p>
+      {status === "generating" && p.progress?.roots.length ? <Roots roots={p.progress.roots} onOpen={onOpen} /> : null}
       {status === "failed" && p.map.error ? (
         <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-[5px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
           {p.map.error}

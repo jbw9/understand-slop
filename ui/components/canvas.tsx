@@ -1002,14 +1002,9 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
       onClick={go}
       disabled={!go}
       className={cn(
-        // A spine on the leading edge, in the same indigo a diagram box that
-        // opens a part wears: the card and the box are the same offer, so
-        // they look like it. A card that goes nowhere has no spine, which is
-        // the whole signal — on a grid of identical slabs the reader could
-        // not tell the two apart without clicking.
-        "group relative flex w-full items-start gap-3 overflow-hidden rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow,background-color] duration-150",
+        "group flex w-full items-start gap-3 rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
-        go && "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-door-line before:transition-colors hover:border-door-line hover:bg-door-surface/35 hover:shadow-panel hover:before:bg-door-ink",
+        go && "hover:border-border-strong hover:shadow-panel",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
       )}
     >

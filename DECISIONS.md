@@ -1156,3 +1156,64 @@ asks the terminal (OSC 11, which xterm answers), but switching to it is the
 user's global choice, not the app's.
 **Cost accepted:** Claude's dark-theme prompt row is still a dark bar in a
 light terminal; it is readable, not pretty.
+
+## D48 — Colour carries the one fact the picture knows: what opens
+
+**Chose:** a `plain` diagram box that names a part (`opens`) is drawn in its
+own indigo tint (`TONE.door`, derived from `opens` — never authored), and the
+part cards below wear the same indigo as a 3px spine on their leading edge.
+The corner badge adopts that ink too, so the box and its cue say one thing.
+Scenery dimming on a navigable diagram lifts from 0.55 to 0.82.
+**Beat:** the 8px green corner badge alone (D43). **Why:** measured across
+every map, 2,440 of 2,596 boxes are `plain` — so a picture was a field of
+identical rectangles, and the single most useful thing it knew ("you can go in
+here") was carried by a badge smaller than a word. The user's report was that
+the app "feels a bit boring, not inviting … doesn't make it interesting to
+explore more", which is this: nothing on the page looks like an invitation.
+**Why indigo, not the green accent:** green already means `derived` on every
+state chip. A door is not a state, so it gets a hue of its own.
+**Cost accepted:** a fourth hue in a palette that had three. `warn` boxes keep
+amber and show an indigo badge — the tint is the warning, the badge is the way
+in. **At scale:** derived, so it costs no authoring and cannot rot.
+
+## D49 — One hue per actor in a sequence
+
+**Chose:** `actorTone` assigns a colour by position in `actors`; the lifeline,
+the chip and every arrow the actor SENDS take it. A message the map is unsure
+of keeps amber and its dashes — doubt outranks identity.
+**Beat:** two identical grey chips with every arrow in the same green, where
+tracking who spoke over a six-message exchange meant re-reading every label.
+**Cost accepted:** four hues defined; a fifth actor wraps to the first. No
+authored sequence has more than four. **At scale:** assigned, not authored.
+
+## D50 — The code pane is syntax-coloured, and bigger
+
+**Chose:** `lib/highlight.ts`, a dependency-free tokenizer (strings, comments,
+numbers, keywords, types, calls, annotations) with a language resolved from
+the file's extension; 12.5px/1.65 rather than 11.5px/1.55.
+**Beat:** one flat ink for every line. The map exists to make code legible, so
+its own code pane cannot be the least legible pane in the product.
+**Why a tokenizer, not a parser:** the maps cite nine languages; a grammar per
+language to colour a 14-line slice costs more than it returns. The lexical
+layer they share is the part that carries the reading.
+**Cost accepted:** it is lexical, so a word that is a keyword in one of the
+C-family languages is tinted in all of them. Wrong at worst by one word's
+colour, never by hiding a line. **At scale:** one file, no dependency.
+
+## D51 — Prose keeps a measure; pictures take the width
+
+**Chose:** the level's cap goes 1220px → 1680px. The header splits at `xl`
+into prose (≤660px) and a right rail carrying the footprint, the repo link
+and a real "View the code" button. A diagram grows to fill the level, up to
+`DIAGRAM_MAX_SCALE` (1.35), and its caption moves ABOVE it. Sequences and
+tables keep their own widths.
+**Beat:** a 660px header and a 900–1000px block cap on a 1600px window, which
+left the right third empty dots while the diagram — the main thing on the
+level (D40) — rendered at natural size inside a column half again as wide.
+That smallness is what zoom (D45) was invented to work around.
+**Why the caption moved:** it says what you are about to look at, which is
+only useful before you look.
+**Cost accepted:** past ~1.35 the labels read as a poster. Below 1100px the
+header is one column again, in the old order. **At scale:** unchanged — the
+audit (`audit-diagrams.mts`) lays out in viewBox units, so uniform scaling
+cannot introduce an overlap; 23 maps, 0 problems after the change.

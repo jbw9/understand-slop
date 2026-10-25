@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow, Prose } from "@/components/state";
 import { SourceView, type RowCtx } from "@/components/anatomy";
-import type { Anatomy, CodeRef, Issue } from "@/lib/data";
+import type { Anatomy, CodeRef, DiagramBox, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
 import { readSource } from "@/lib/source";
@@ -65,7 +65,32 @@ const TONE = {
   plain: { stroke: "var(--color-border-strong)", fill: "var(--color-pure-white)", ink: "var(--color-ink)", line: "var(--color-wire)" },
   good: { stroke: "var(--color-deep-green)", fill: "var(--color-mint-success)", ink: "var(--color-ink)", line: "var(--color-deep-green)" },
   warn: { stroke: "var(--color-amber-ink)", fill: "var(--color-amber-surface)", ink: "var(--color-amber-ink)", line: "var(--color-amber-ink)" },
+  /**
+   * A box that opens a part (D40). Not an author's tone — it is derived from
+   * `opens`, so it cannot be set wrongly and cannot promise a click the box
+   * does not honour.
+   *
+   * Measured: 2,440 of 2,596 boxes across every map are `plain`, so a picture
+   * is a field of identical white rectangles and the one fact worth seeing —
+   * which of them go somewhere — was carried by an 8px badge in a corner. The
+   * tint says it at a glance, before the hover that used to be the only cue
+   * (D43's problem, one step further).
+   */
+  door: { stroke: "var(--color-door-line)", fill: "var(--color-door-surface)", ink: "var(--color-door-ink)", line: "var(--color-wire)" },
 } as const;
+
+/** What a box is drawn as: an authored tone wins; a plain door reads as one. */
+function toneOf(b: DiagramBox, live: boolean): keyof typeof TONE {
+  const t = b.tone ?? "plain";
+  return t === "plain" && live ? "door" : t;
+}
+
+/**
+ * How far past its natural size a picture may be blown up to fill the level.
+ * Past roughly this the labels read as a poster rather than a diagram, and a
+ * six-box state machine starts looking like a slide.
+ */
+const DIAGRAM_MAX_SCALE = 1.35;
 
 /**
  * Boxes on a grid, arrows routed between them. Drawn at real pixels and never
@@ -89,18 +114,32 @@ function Diagram({
 
   return (
     <figure className="min-w-0">
+      {/* The caption sits ABOVE the picture: it says what you are about to
+          look at, which is only useful before you look. Underneath it was a
+          footnote to a diagram the reader had already tried to decode. */}
+      <figcaption className="mb-3 flex items-baseline gap-2.5">
+        <span className="text-[14px] font-medium text-on-surface">{block.caption}</span>
+        {navigable ? (
+          <span className="shrink-0 rounded-[5px] border border-door-line bg-door-surface px-2 py-[3px] font-mono text-[10.5px] text-door-ink">
+            tinted boxes open
+          </span>
+        ) : null}
+      </figcaption>
       {/* No frame: the picture is the level, not an illustration pasted onto
           it (D41). A border here drew a box around the one thing that should
           read as the page itself. */}
       <div className="overflow-x-auto">
-        {/* Scales down to fit the page — but never below 70%, where the
-            labels stop being readable; past that the frame scrolls. */}
+        {/* Grows into the width the level has, up to DIAGRAM_MAX_SCALE — the
+            picture is the main thing on the page (D40) and was rendering at
+            its natural size inside a column half again as wide, which is the
+            smallness zoom (D45) was invented to work around. Still never
+            below 70%, where the labels stop being readable. */}
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
           aria-label={block.caption}
           className={navigable ? "dg-nav block h-auto" : "block h-auto"}
-          style={{ width: "100%", maxWidth: W, minWidth: W * 0.7 }}
+          style={{ width: "100%", maxWidth: W * DIAGRAM_MAX_SCALE, minWidth: W * 0.7 }}
         >
           <defs>
             {(["plain", "good", "warn"] as const).map((t) => (
@@ -146,9 +185,9 @@ function Diagram({
             </g>
           ))}
           {boxes.map(({ x, y, w, b }) => {
-            const t = TONE[b.tone ?? "plain"];
             // Live only where the author named the part this box belongs to.
             const go = b.opens && onOpen ? () => onOpen(b.opens!) : undefined;
+            const t = TONE[toneOf(b, Boolean(go))];
             return (
               <Box
                 key={b.id}
@@ -191,11 +230,12 @@ function Diagram({
                     hovering (D43). */}
                 {go ? (
                   <g className="dg-cue" aria-hidden>
-                    {/* Green, not the box's own stroke: the accent colour is
-                        what reads as "this does something" everywhere else
-                        on the page, and it stays legible on a warn-tinted
-                        box where the stroke is amber. */}
-                    <circle cx={x + w - 15} cy={y + 15} r="8.5" fill="var(--color-deep-green)" />
+                    {/* The door's own ink, so the badge and the box it sits
+                        on say one thing rather than two. On a warn box —
+                        which keeps its amber — the badge stays indigo, which
+                        is the point: the tint is the warning, the badge is
+                        the way in. */}
+                    <circle cx={x + w - 15} cy={y + 15} r="8.5" fill="var(--color-door-ink)" />
                     <text
                       x={x + w - 15}
                       y={y + 19}
@@ -213,7 +253,6 @@ function Diagram({
           })}
         </svg>
       </div>
-      <figcaption className="mt-2 text-[13px] text-muted-slate">{block.caption}</figcaption>
     </figure>
   );
 }
@@ -328,9 +367,20 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
  * down from it; each message is an arrow between two of those lines, numbered,
  * with its words on top. A message to itself is a note on that actor's line.
  */
+/**
+ * A colour per actor, by position in `actors`. Assigned rather than authored:
+ * which participant is which is already in the data, and an author choosing
+ * hues per sequence would drift between levels of the same map.
+ */
+function actorTone(i: number) {
+  const k = (i % 4) + 1;
+  return { ink: `var(--color-actor-${k})`, surface: `var(--color-actor-${k}-surface)` };
+}
+
 function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) {
   const n = block.actors.length;
   const centre = (a: string) => ((block.actors.indexOf(a) + 0.5) / n) * 100;
+  const toneOfActor = (a: string) => actorTone(block.actors.indexOf(a));
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
@@ -341,18 +391,24 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
             <span
               key={a}
               aria-hidden
-              className="absolute bottom-0 top-9 border-l border-dashed border-border-strong"
-              style={{ left: `${centre(a)}%` }}
+              className="absolute bottom-0 top-9 border-l border-dashed opacity-45"
+              style={{ left: `${centre(a)}%`, borderColor: toneOfActor(a).ink }}
             />
           ))}
           <div className="relative flex">
-            {block.actors.map((a) => (
-              <div key={a} className="flex flex-1 justify-center">
-                <span className="rounded-[5px] border border-border-strong bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink">
-                  {a}
-                </span>
-              </div>
-            ))}
+            {block.actors.map((a) => {
+              const t = toneOfActor(a);
+              return (
+                <div key={a} className="flex flex-1 justify-center">
+                  <span
+                    className="rounded-[5px] border px-3 py-1.5 text-[13px] font-semibold"
+                    style={{ borderColor: t.ink, background: t.surface, color: t.ink }}
+                  >
+                    {a}
+                  </span>
+                </div>
+              );
+            })}
           </div>
           <ol className="relative mt-3">
             {block.rows.map((m, i) => {
@@ -383,14 +439,24 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
                       <p className="line-clamp-2 px-3 text-center text-[12.5px] leading-tight text-on-surface" title={m.label}>
                         {m.label}
                       </p>
-                      <div className={cn("relative mt-1.5 h-0 border-t-[1.5px]", warn ? "border-dashed border-amber-ink" : "border-deep-green/70")}>
+                      {/* The line is the SENDER's colour, so a reply reads as
+                          coming back without reading its label. A message the
+                          map is unsure of keeps amber and its dashes: doubt
+                          outranks identity. */}
+                      <div
+                        className={cn("relative mt-1.5 h-0 border-t-[1.5px]", warn && "border-dashed")}
+                        style={{ borderTopColor: warn ? "var(--color-amber-ink)" : toneOfActor(m.from).ink }}
+                      >
                         <span
                           aria-hidden
                           className={cn(
                             "absolute -top-[6px] size-0 border-y-[5px] border-y-transparent",
                             a < b ? "right-0 border-l-[8px]" : "left-0 border-r-[8px]",
-                            warn ? "border-l-amber-ink border-r-amber-ink" : "border-l-deep-green/70 border-r-deep-green/70",
                           )}
+                          style={{
+                            [a < b ? "borderLeftColor" : "borderRightColor"]:
+                              warn ? "var(--color-amber-ink)" : toneOfActor(m.from).ink,
+                          }}
                         />
                       </div>
                       {m.note ? (

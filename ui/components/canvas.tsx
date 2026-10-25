@@ -249,7 +249,7 @@ export function Canvas() {
           <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => go(path.slice(0, d))} />
         )}
         <Zoom scrollRef={scrollRef}>
-        <div ref={contentRef} className="relative mx-auto max-w-[1220px] px-10 pb-28 pt-5">
+        <div ref={contentRef} className="relative mx-auto max-w-[1680px] px-10 pb-28 pt-5">
           <ZoomedWires
             canvasRef={contentRef}
             nodes={nodes}
@@ -584,7 +584,7 @@ function Level({
         {blocks.map((b, i) =>
           isExplained(b) ? (
             <div key={i} data-pick={blockLabel(b)}>
-              <div className={b.kind === "diagram" ? "" : "max-w-[1000px]"}>
+              <div className={b.kind === "diagram" ? "" : "max-w-[1100px]"}>
                 <ExplainedBlock
                   block={b}
                   onOpen={(id) =>
@@ -645,7 +645,7 @@ function Level({
 
         {code.length ? (
           <div>
-            <div className="max-w-[1000px]">
+            <div className="max-w-[1320px]">
               <CodeDrawer
                 owner={node.id}
                 refs={code}
@@ -869,7 +869,14 @@ function Header({
 }) {
   return (
     <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
-      <div className="min-w-0 max-w-[660px]">
+      {/* Two columns on a wide level: the prose keeps a reading measure on the
+          left, and what used to sit under it as a monospace afterthought —
+          where the code lives, how to open it, what is not certain — moves
+          into a rail on the right. Below 1100px it is one column again, in
+          the old order. The level's pictures still span the full width; the
+          header no longer leaves that width empty. */}
+      <div className="flex flex-col gap-x-14 gap-y-6 xl:flex-row xl:items-start xl:justify-between">
+      <div className="min-w-0 max-w-[660px] xl:flex-1">
         {back ? (
           <button
             onClick={back.onClick}
@@ -908,26 +915,33 @@ function Header({
             <Prose text={unsure} />
           </p>
         ) : null}
-        {meta || link || onCode ? (
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            {meta ? (
-              <p className="whitespace-pre-wrap font-mono text-[11px] text-faint">{meta}</p>
-            ) : null}
-            {link ? (
-              <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-deep-green hover:underline">
-                {link.label}
-              </a>
-            ) : null}
-            {onCode ? (
-              <button
-                onClick={onCode}
-                className="font-mono text-[11px] text-deep-green hover:underline"
-              >
-                {"</>"} view code
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+      </div>
+
+      {/* The rail: where this lives and how to get at it. */}
+      {meta || link || onCode ? (
+        <div className="flex shrink-0 flex-col items-start gap-2.5 xl:w-[320px] xl:items-end xl:text-right">
+          {onCode ? (
+            // A real button, not a faint mono link among the file paths: it
+            // is the one action in the header, and it was reading as part of
+            // the metadata beside it.
+            <button
+              onClick={onCode}
+              className="flex items-center gap-2 rounded-[7px] border border-border-gray bg-pure-white px-3 py-1.5 text-[12.5px] text-on-surface-variant transition-colors hover:border-door-line hover:bg-door-surface/40 hover:text-door-ink"
+            >
+              <span className="font-mono text-[11.5px]">{"</>"}</span>
+              View the code
+            </button>
+          ) : null}
+          {meta ? (
+            <p className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-faint">{meta}</p>
+          ) : null}
+          {link ? (
+            <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-deep-green hover:underline">
+              {link.label}
+            </a>
+          ) : null}
+        </div>
+      ) : null}
       </div>
     </header>
   );
@@ -988,9 +1002,14 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
       onClick={go}
       disabled={!go}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
+        // A spine on the leading edge, in the same indigo a diagram box that
+        // opens a part wears: the card and the box are the same offer, so
+        // they look like it. A card that goes nowhere has no spine, which is
+        // the whole signal — on a grid of identical slabs the reader could
+        // not tell the two apart without clicking.
+        "group relative flex w-full items-start gap-3 overflow-hidden rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow,background-color] duration-150",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
-        go && "hover:border-border-strong hover:shadow-panel",
+        go && "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-door-line before:transition-colors hover:border-door-line hover:bg-door-surface/35 hover:shadow-panel hover:before:bg-door-ink",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
       )}
     >

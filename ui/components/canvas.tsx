@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { AnatomyView, type RowCtx } from "@/components/anatomy";
 import { CodeDrawer, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
 import { InlineMarks, ShapeView } from "@/components/shapes";
-import { Eyebrow, Prose, StateChip } from "@/components/state";
+import { Eyebrow, OriginMark, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Zoom, useZoomScale } from "@/components/zoom";
 import { Crumbs, goTo, useLocation } from "@/components/chrome";
@@ -15,6 +15,9 @@ import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
+import { FixAndKeep, onAnswer } from "@/components/keep";
+import { BlockDiffView, DiffBar, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
+import type { Exchange } from "@/lib/keep";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
 import { readSource } from "@/lib/source";
 import { useSettings, type Ground } from "@/lib/settings";
@@ -295,6 +298,17 @@ const GROUND: Record<Ground, string> = { dots: "dotfield", squares: "gridfield",
 
 const noSubscribe = () => () => {};
 
+/**
+ * The last answer Claude gave, so any level can offer to keep it. Held here
+ * rather than per level: the reader asks from one level and may well want it on
+ * the one they moved to, and a level unmounting must not forget it.
+ */
+function useLatestAnswer(): Exchange | null {
+  const [answer, setAnswer] = useState<Exchange | null>(null);
+  useEffect(() => onAnswer(setAnswer), []);
+  return answer;
+}
+
 const PICKABLE = "[data-path], [data-row], [data-pick]";
 
 /**
@@ -429,6 +443,7 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
   const chain = roots(SPINE);
   const outside = L0.filter((n) => !ON_PATH.has(n.id));
   const fork = LANES.length ? L0.find((n) => n.id === LANES[0].from) : undefined;
+  const answer = useLatestAnswer();
 
   return (
     <>
@@ -439,6 +454,7 @@ function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
         sub={RUN.about}
         meta={`${RUN.files} files · commit ${RUN.commit}`}
         link={RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
+        actions={<FixAndKeep path={[]} answer={answer} />}
       />
       <Caption
         count={chain.length}
@@ -532,9 +548,13 @@ function Level({
   );
   const code = codeAt(map, path);
   const [codeOpen, setCodeOpen] = useState(false);
+  const answer = useLatestAnswer();
+  // Empty outside diff mode, so the block render below is unchanged then.
+  const blockDiffs = useBlockDiffs(path);
 
   return (
     <>
+      <DiffBar />
       <Header
         path={path}
         back={{
@@ -550,6 +570,7 @@ function Level({
         }
         title={node.title}
         state={node.state}
+        origin={node.origin}
         alarm={node.alarm}
         // A row-built node's fallback sub is "Inside <parent>", which the
         // eyebrow already says.
@@ -574,6 +595,7 @@ function Level({
               }
             : undefined
         }
+        actions={<FixAndKeep path={path} answer={answer} />}
       />
 
       {/* One hairline between every block, the full width of the level, so it
@@ -592,7 +614,13 @@ function Level({
         ) : null}
 
         {blocks.map((b, i) =>
-          isExplained(b) ? (
+          blockDiffs.has(i) ? (
+            <div key={i} data-pick={blockLabel(b)}>
+              <div className={b.kind === "diagram" ? "" : "max-w-[1100px]"}>
+                <BlockDiffView block={b} diff={blockDiffs.get(i)!} />
+              </div>
+            </div>
+          ) : isExplained(b) ? (
             <div key={i} data-pick={blockLabel(b)}>
               <div className={b.kind === "diagram" ? "" : "max-w-[1100px]"}>
                 <ExplainedBlock
@@ -644,6 +672,13 @@ function Level({
             )}
           </section>
         ) : null}
+
+        {/* A part the commit deleted stays on screen, in red: the whole point
+            of a diff is seeing what went, beside what replaced it. Outside the
+            parts section, because a level whose only part was deleted has no
+            parts left to hang it under — and that is when it matters most.
+            Renders nothing when there are none, diff mode or not. */}
+        <RemovedSections path={path} />
 
         {node.issues?.length ? (
           <div>
@@ -763,7 +798,9 @@ function Grid({
   return (
     <div className="grid max-w-[1100px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
       {nodes.map((n) => (
-        <Row key={n.id} node={n} at={at} onOpen={onOpen} />
+        <SectionTint key={n.id} path={[...at, n.id]}>
+          <Row node={n} at={at} onOpen={onOpen} />
+        </SectionTint>
       ))}
     </div>
   );
@@ -862,6 +899,7 @@ function Header({
   eyebrow,
   title,
   state,
+  origin,
   alarm,
   sub,
   detail,
@@ -870,6 +908,7 @@ function Header({
   link,
   shape,
   onCode,
+  actions,
 }: {
   /** Where this level is, so it can be handed to Claude from its header. */
   path: string[];
@@ -878,6 +917,8 @@ function Header({
   eyebrow: string;
   title: string;
   state?: Node["state"];
+  /** Set where the reader rewrote this level's own words (lib/overlay.ts). */
+  origin?: Node["origin"];
   alarm?: boolean;
   sub?: string;
   detail?: string;
@@ -888,6 +929,8 @@ function Header({
   link?: { href: string; label: string };
   shape?: Shape;
   onCode?: () => void;
+  /** What the reader can do to this level itself: keep an answer, fix it. */
+  actions?: React.ReactNode;
 }) {
   return (
     <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
@@ -914,6 +957,9 @@ function Header({
             {title}
           </h1>
           {state ? <StateChip state={state} alarm={alarm} /> : null}
+          {/* Beside the state mark, never instead of it: the two answer
+              different questions (see `Origin` in lib/data.ts). */}
+          {origin ? <OriginMark origin={origin} /> : null}
           {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
           {shape?.kind === "count" ? (
             <span className="rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
@@ -940,7 +986,7 @@ function Header({
       </div>
 
       {/* The rail: where this lives and how to get at it. */}
-      {meta || link || onCode ? (
+      {meta || link || onCode || actions ? (
         <div className="flex shrink-0 flex-col items-start gap-2.5 xl:w-[320px] xl:items-end xl:text-right">
           {onCode ? (
             // A real button, not a faint mono link among the file paths: it
@@ -948,12 +994,13 @@ function Header({
             // the metadata beside it.
             <button
               onClick={onCode}
-              className="flex items-center gap-2 rounded-[7px] border border-border-gray bg-pure-white px-3 py-1.5 text-[12.5px] text-on-surface-variant transition-colors hover:border-door-line hover:bg-door-surface/40 hover:text-door-ink"
+              className="flex items-center gap-2 rounded-[7px] border border-border-gray bg-pure-white px-3 py-1.5 text-[12.5px] text-on-surface-variant transition-colors hover:border-border-strong hover:bg-surface-container-low hover:text-ink"
             >
               <span className="font-mono text-[11.5px]">{"</>"}</span>
               View the code
             </button>
           ) : null}
+          {actions ? <div className="flex flex-wrap gap-1.5 xl:justify-end">{actions}</div> : null}
           {meta ? (
             <p className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-faint">{meta}</p>
           ) : null}
@@ -1000,6 +1047,9 @@ function inside(node: Node): string {
       : b.kind === "screen" ? `the ${b.title} screen`
       : b.kind === "example" ? "an example"
       : b.kind === "source" ? null
+      // A reader's note is named as theirs here too: "what you will find if
+      // you open it" is a different promise when part of it is their own.
+      : b.kind === "note" ? "a note of yours"
       : `${b.rows.length} ${BLOCK_NOUN[b.kind]}`,
     )
     .filter(Boolean)

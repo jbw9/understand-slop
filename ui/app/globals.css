@@ -135,6 +135,29 @@
   --color-actor-3-surface: #faf0df;
   --color-actor-4: #7a3570;
   --color-actor-4-surface: #f7ebf5;
+
+  /* ── diff ─────────────────────────────────────────────────
+     Red for what a commit took away, green for what it added.
+     Deliberately NOT the `deep-green`/`clay` families: those are
+     state claims — `derived` means the compiler proved it, `alarm`
+     means act on this — and a diff verdict claims neither. A removed
+     box is not an alarm and an added one is not trustworthy, so the
+     hues are shifted off both (a truer red, a brighter green) and
+     the surfaces are cooler, so the two readings never collide on
+     one picture. Amber for `changed` is the existing `amber-*`
+     family, which already means "look here, incomplete".
+
+     Declared HERE and not in `@theme` on purpose, like `--color-sec-*`
+     above: diagram boxes read these from inline `var()` in SVG `fill`
+     and `stroke`, which Tailwind's scanner never sees as a class, so
+     an `@theme` declaration would be dropped and every box would
+     render black in light mode. */
+  --color-diff-add-ink: #166534;
+  --color-diff-add-surface: #e7f7ec;
+  --color-diff-add-line: #86c79b;
+  --color-diff-remove-ink: #b01c1c;
+  --color-diff-remove-surface: #fdeaea;
+  --color-diff-remove-line: #e59a9a;
 }
 
 /* Dark: the same tokens, pointed at night colours, so every class and every
@@ -211,6 +234,13 @@
   --color-code-call: #b7a8f0;
   --color-code-punct: #9aa1ad;
   --color-code-annotation: #e2c77e;
+
+  --color-diff-add-ink: #74d99a;
+  --color-diff-add-surface: #11301d;
+  --color-diff-add-line: #2f6b44;
+  --color-diff-remove-ink: #f08b8b;
+  --color-diff-remove-surface: #331617;
+  --color-diff-remove-line: #7a3536;
 
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.5);

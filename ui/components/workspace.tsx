@@ -7,8 +7,10 @@ import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } fro
 import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
+import { announceAnswer, announceDraft } from "@/components/keep";
 import { clearPicks, onHand, onOpenClaude, prompt, retarget, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
 import { openSettings, readSettings } from "@/lib/settings";
+import type { Exchange } from "@/lib/keep";
 import { cn } from "@/lib/utils";
 
 /**
@@ -120,16 +122,20 @@ export function Workspace() {
   // other program, or the shell at its prompt. Polled, since programs start
   // and quit inside the shell, unseen.
   // A turn of Claude's that edited the checkout, or found the map wrong,
-  // updates that project's map.
+  // updates that project's map. Separately, EVERY finished turn is offered to
+  // the map as an answer worth keeping (components/keep.tsx) — a turn that only
+  // explained something edits nothing, so `turn` never fires for the very case
+  // a reader most wants to keep.
   const started = JSON.stringify(tabs.filter((t) => t.pty !== undefined).map((t) => [t.key, t.pty, t.cwd]));
   useEffect(() => {
     const ids: [number, number, string][] = JSON.parse(started);
     if (!ids.length) return;
     const tick = () =>
       ids.forEach(([key, pty, cwd]) =>
-        invoke<{ claude: boolean; busy: boolean; turn: Turn | null }>("pty_state", { id: pty })
-          .then(({ claude: live, busy, turn }) => {
+        invoke<{ claude: boolean; busy: boolean; turn: Turn | null; ended: string | null }>("pty_state", { id: pty })
+          .then(({ claude: live, busy, turn, ended }) => {
             if (turn && cwd) void updateMap(cwd, turn);
+            if (ended) void offerAnswer(ended);
             setTabs((all) =>
               all.map((x) => (x.key === key && (x.live !== live || x.busy !== busy) ? { ...x, live, busy } : x)),
             );
@@ -425,6 +431,23 @@ async function updateMap(root: string, turn: Turn) {
     .catch(() => null);
   // Not one of the user's projects: the title bar says so, and offers to import it.
   if (res?.skipped) window.dispatchEvent(new CustomEvent(UNFOLLOWED, { detail: root }));
+}
+
+/**
+ * Reads back what Claude just asked and answered, and offers it to the map.
+ *
+ * A draft the reader asked for (components/keep.tsx) comes back as an ordinary
+ * answer, so it is announced on its own channel: the dialog is waiting for one
+ * and the level is not.
+ */
+async function offerAnswer(transcript: string) {
+  const r = await fetch(`/api/answer?transcript=${encodeURIComponent(transcript)}`)
+    .then((x) => x.json())
+    .catch(() => null);
+  const e = r?.exchange as Exchange | null | undefined;
+  if (!e?.said) return;
+  announceDraft(e.said);
+  announceAnswer(e);
 }
 
 /** An agent edited a checkout whose map cannot follow it; the detail is the checkout. */

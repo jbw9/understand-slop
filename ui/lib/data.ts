@@ -164,6 +164,35 @@ export interface CodeRef {
   label: string;
 }
 
+/**
+ * Who put this here, when a thing on the map did not come from the code.
+ *
+ * Deliberately NOT a fourth `State`. `State` is an epistemic claim about how
+ * well the analysis knows a fact about the repository — `derived` was resolved
+ * by the compiler, `inferred` is a guess from naming. A reader's own note is
+ * not a weaker form of those: it is true by a different authority, theirs. A
+ * fourth state would make every unmarked thing look like an analysis failure,
+ * which is the exact two-tier read D3 exists to prevent, and would put a
+ * person's words on the same axis as a compiler's.
+ *
+ * So provenance is its own axis. A node or block carrying `origin` keeps
+ * whatever `state` it has and renders an extra, quieter mark saying where it
+ * came from. Code-derived content carries none and is unchanged.
+ */
+export interface Origin {
+  /**
+   * `user` wrote it themselves; `claude` drafted it and the user kept it. Both
+   * are the reader's responsibility — the difference is who typed it, which is
+   * worth saying because one of them can be wrong in a way the reader did not
+   * read closely.
+   */
+  by: "user" | "claude";
+  /** ISO 8601, when it was added. */
+  at: string;
+  /** What the reader asked, where that is what makes the addition make sense. */
+  note?: string;
+}
+
 /** Something a developer should know before they touch this. */
 export interface Issue {
   /** Plain words, a few: "Anyone can delete any account". */
@@ -246,6 +275,11 @@ export type Anatomy =
   | { kind: "chips"; caption?: string; rows: Chip[] }
   // in → out. A mapping drawn as a mapping.
   | { kind: "map"; caption?: string; rows: Mapping[] }
+  // Something the reader added, or kept from Claude, because the map did not
+  // say it. Prose, because the thing that made an explanation land is often a
+  // sentence; `origin` is required, since a note only exists because a person
+  // put it there.
+  | { kind: "note"; title?: string; body: string; origin: Origin }
   | Source;
 
 export interface Node {
@@ -286,6 +320,11 @@ export interface Node {
    */
   shape?: Shape;
   state: State;
+  /**
+   * Set only where the reader added or edited this. A generated or authored
+   * node has none. See `Origin`: this does not weaken or replace `state`.
+   */
+  origin?: Origin;
   alarm?: boolean;
   ghost?: boolean;
   col: number;

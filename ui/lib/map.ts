@@ -196,6 +196,23 @@ const trail = ({ nodeAt }: BuiltMap, path: string[]) =>
     .join(" › ");
 
 /**
+ * Every section's name, indented as the tree nests — what Claude reads to
+ * learn what the map calls things (`slop-map-list`, src-tauri/src/claude.rs).
+ *
+ * Titles and one-line subs only, no detail and no code: this is for choosing a
+ * section to show, and a reader asking how sign-ups work is served by Claude
+ * finding the one section called that, not by it reading the whole map first.
+ */
+export function outline(m: BuiltMap): string {
+  const lines = (nodes: Node[], depth = 0): string[] =>
+    nodes.flatMap((n) => [
+      `${"  ".repeat(depth)}- ${n.title}${n.sub ? ` — ${n.sub}` : ""}`,
+      ...lines(n.children ?? [], depth + 1),
+    ]);
+  return [`${m.RUN.repo}: ${m.RUN.about}`, "", ...lines(m.L0)].join("\n");
+}
+
+/**
  * One section of the map as text for Claude: where it sits, what it says, and
  * the code behind it — the last so Claude reads the real thing, not only the
  * map's account of it. `[]` is the repository as a whole.

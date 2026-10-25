@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 
 /* ── the tokens, as the only place that names them ───────────── */
 
-const TINT: Record<Exclude<Verdict, "untouched">, { ink: string; surface: string; line: string; mark: string }> = {
+export const TINT: Record<Exclude<Verdict, "untouched">, { ink: string; surface: string; line: string; mark: string }> = {
   added: { ink: "var(--color-diff-add-ink)", surface: "var(--color-diff-add-surface)", line: "var(--color-diff-add-line)", mark: "+" },
   removed: { ink: "var(--color-diff-remove-ink)", surface: "var(--color-diff-remove-surface)", line: "var(--color-diff-remove-line)", mark: "−" },
   // `changed` borrows the amber family, which already means "look here, this
@@ -38,7 +38,7 @@ const TINT: Record<Exclude<Verdict, "untouched">, { ink: string; surface: string
   changed: { ink: "var(--color-amber-ink)", surface: "var(--color-amber-surface)", line: "var(--color-amber-line)", mark: "~" },
 };
 
-const WORD: Record<Verdict, string> = { added: "new", removed: "gone", changed: "changed", untouched: "unchanged" };
+export const WORD: Record<Verdict, string> = { added: "new", removed: "gone", changed: "changed", untouched: "unchanged" };
 
 /* ── loading one ─────────────────────────────────────────────── */
 
@@ -81,22 +81,29 @@ export function useBlockDiffs(path: string[]): Map<number, BlockDiff> {
  * canvas; `on` turns the mode on and the provider does the fetching, so no
  * level has to know the API exists.
  */
-const TOGGLE = "slop:diff";
-
-/** Anything can ask for diff mode: the title bar's button dispatches this. */
-export const toggleDiff = () => window.dispatchEvent(new Event(TOGGLE));
+export const OPEN_DIFF = "slop:diff";
 
 /**
- * Diff mode, owned here and toggled from anywhere — the same event-bus shape
+ * Anything can ask for diff mode: the title bar's button dispatches this, and
+ * `DiffPanel` (components/diff-panel.tsx) opens on the same event.
+ */
+export const openDiff = () => window.dispatchEvent(new Event(OPEN_DIFF));
+
+/**
+ * Diff mode, owned here and asked for from anywhere — the same event-bus shape
  * Settings and Projects use, so the title bar does not have to hold state the
  * canvas is the one to read.
+ *
+ * The event only ever turns the mode ON. Leaving is `off`, which the panel's
+ * "Leave diff" calls — one way in and one way out, rather than a flip whose
+ * meaning depends on state the title bar cannot see.
  */
 export function DiffMode({ map, children }: { map: string; children: React.ReactNode }) {
   const [on, setOn] = useState(false);
   useEffect(() => {
-    const flip = () => setOn((v) => !v);
-    window.addEventListener(TOGGLE, flip);
-    return () => window.removeEventListener(TOGGLE, flip);
+    const go = () => setOn(true);
+    window.addEventListener(OPEN_DIFF, go);
+    return () => window.removeEventListener(OPEN_DIFF, go);
   }, []);
   return (
     <DiffProvider map={map} on={on} onOff={() => setOn(false)}>
@@ -157,79 +164,8 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-/* ── the bar across the top of a diffed level ────────────────── */
-
-/**
- * What is being compared, and the two pickers to change it. Built as
- * `MapSwitcher` is (components/chrome.tsx): a bare `<select>` given its classes
- * from here, nothing wrapping it.
- */
-export function DiffBar() {
-  const d = useDiff();
-  if (!d) return null;
-  const { diff, loading, error, commits } = d;
-  const counts = diff
-    ? (["added", "removed", "changed"] as const).map((v) => ({ v, n: diff.sections.filter((s) => s.verdict === v).length }))
-    : [];
-  const select = "rounded-[5px] border border-border-strong bg-pure-white px-2 py-1 font-mono text-[11.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green";
-
-  return (
-    <div className="mb-6 rounded-[8px] border border-border-gray bg-surface px-4 py-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-faint">diff</span>
-        <label className="flex items-center gap-1.5">
-          <span className="font-mono text-[10.5px] text-faint">from</span>
-          <select value={d.from ?? ""} aria-label="Compare from" onChange={(e) => d.setRange(e.target.value || undefined, d.to)} className={select}>
-            <option value="">the map&apos;s commit</option>
-            {commits.map((c) => (
-              <option key={c.commit} value={c.commit}>
-                {c.commit} {c.subject.slice(0, 60)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1.5">
-          <span className="font-mono text-[10.5px] text-faint">to</span>
-          <select value={d.to ?? ""} aria-label="Compare to" onChange={(e) => d.setRange(d.from, e.target.value || undefined)} className={select}>
-            <option value="">your working tree</option>
-            {commits.map((c) => (
-              <option key={c.commit} value={c.commit}>
-                {c.commit} {c.subject.slice(0, 60)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className="flex flex-wrap items-center gap-2 text-[12px]">
-          {loading ? <span className="text-muted-slate">reading…</span> : null}
-          {error ? <span style={{ color: TINT.removed.ink }}>{error}</span> : null}
-          {diff && !loading
-            ? counts
-                .filter((c) => c.n)
-                .map((c) => (
-                  <Pill key={c.v} verdict={c.v}>
-                    {c.n} {WORD[c.v]}
-                  </Pill>
-                ))
-            : null}
-          {diff && !loading && counts.every((c) => !c.n) && diff.basis === "sections" ? (
-            <span className="text-muted-slate">No section changed.</span>
-          ) : null}
-        </span>
-        <button onClick={d.off} className="ml-auto text-[12.5px] font-medium text-deep-green hover:underline">
-          Leave diff
-        </button>
-      </div>
-      {/* A file-level answer never pretends to be a section-level one. */}
-      {diff?.basis === "files" ? (
-        <p className="mt-2.5 border-t border-border-gray pt-2.5 text-[12.5px] leading-snug text-on-surface-variant">
-          {diff.why} <FileList diff={diff} />
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouched">; children: React.ReactNode }) {
+/** A verdict as a word in its own colours. Shared with the diff panel. */
+export function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouched">; children: React.ReactNode }) {
   const t = TINT[verdict];
   return (
     <span
@@ -241,7 +177,8 @@ function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouched">; c
   );
 }
 
-function FileList({ diff }: { diff: MapDiff }) {
+/** The changed files with their line counts — the file-level answer. */
+export function FileList({ diff }: { diff: MapDiff }) {
   if (!diff.files.length) return <span className="text-muted-slate">Nothing changed.</span>;
   return (
     <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">

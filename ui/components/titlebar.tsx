@@ -9,7 +9,7 @@ import { MapSwitcher, Trail, goTo, useLocation } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
 import { openHistory } from "@/components/history";
-import { toggleDiff } from "@/components/diff";
+import { openDiff } from "@/components/diff";
 import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
 import { cn } from "@/lib/utils";
 
@@ -96,7 +96,7 @@ export function Titlebar() {
       <Control label="Projects — import one, or switch maps" onClick={() => openProjects()}>
         <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
       </Control>
-      <Control label="What changed in the code — red is gone, green is new" onClick={toggleDiff}>
+      <Control label="What changed in the code — red is gone, green is new" onClick={openDiff}>
         {/* Two states side by side: the old and the new. */}
         <path d="M5.5 13V5.5a2 2 0 0 1 2-2h3M10.5 3l2 2.5-2 2.5" />
         <circle cx="5.5" cy="13" r="1.4" />

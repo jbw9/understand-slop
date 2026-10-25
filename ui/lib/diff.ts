@@ -91,6 +91,11 @@ export interface MapDiff {
   to: string | null;
   /** Why the basis is `files`, where it is. */
   why?: string;
+  /**
+   * How a human-written `from`/`to` was understood, per side, where one was
+   * given. Optional: a diff asked for by sha has nothing to explain.
+   */
+  read?: { from?: string; to?: string };
   files: FileChange[];
   sections: SectionDiff[];
   /** Only where a second map was given to compare against. */
@@ -329,6 +334,90 @@ export function treeDiff(a: MapFile, b: MapFile): { sections: SectionDiff[]; blo
     if (!was.some((p) => p.node.id === id))
       sections.push({ id, title: node.title, path: path.map((n) => n.id), verdict: "added", files: [] });
   return { sections, blocks };
+}
+
+/* ── a ref a human typed ─────────────────────────────────────── */
+
+/**
+ * What `resolveRef` understood, so the UI can show its reading back.
+ *
+ * `commit` is the sha the range side becomes. `span` is true where the phrase
+ * named ONE commit and so means "what that commit did" — see `resolveRef`.
+ */
+export interface Resolved {
+  commit: string;
+  /** A short line for the UI: the reading, the sha, and the subject. */
+  how: string;
+  span?: boolean;
+}
+
+/** `%h "subject"`, for saying which commit a phrase landed on. */
+const describe = (root: string, commit: string) => {
+  const line = git(root, "log", "-1", "--format=%h %s", commit).trim();
+  const at = line.indexOf(" ");
+  return at === -1 ? line : `${line.slice(0, at)} "${line.slice(at + 1)}"`;
+};
+
+/** The phrase as git itself reads it, where git reads it at all. */
+const verify = (root: string, rev: string) => git(root, "rev-parse", "--verify", "--quiet", `${rev}^{commit}`).trim();
+
+/**
+ * A commit from an English phrase, or an error naming what was tried.
+ *
+ * Anything git already understands — a sha, `HEAD`, `HEAD~2`, a tag, a branch —
+ * is passed through first, because a caller who typed a real ref means it. Only
+ * what git refuses is read as English, and only these shapes:
+ *
+ *   last/latest/previous commit [by <author>] · <author>'s last commit
+ *   N commits ago · last N commits
+ *
+ * `span` marks the first group: naming a single commit ("the last commit by
+ * hindra2") is how people say "show me what THAT commit changed", which is
+ * `<it>~1..<it>`, not `<it>..`. The caller opens the range; this only says the
+ * phrase asked for one, and `how` states the range either way so the reading is
+ * never silent. "N commits ago" is a point, not a span — it names where to
+ * start measuring from, so it is left alone.
+ *
+ * No phrase ever falls back to HEAD. A diff against the wrong commit that
+ * claims to be right is worse than an error.
+ */
+export function resolveRef(root: string, phrase: string): Resolved | { error: string } {
+  const raw = phrase.trim();
+  if (!raw) return { error: "No revision given." };
+
+  const asRef = verify(root, raw);
+  if (asRef) return { commit: asRef, how: describe(root, asRef) };
+
+  const text = raw.toLowerCase().replace(/[.!?]+$/, "").trim();
+
+  // "3 commits ago", "last 3 commits" → HEAD~3.
+  const back = /^(?:the\s+)?(?:last|previous)\s+(\d+)\s+commits?$/.exec(text) ?? /^(\d+)\s+commits?\s+(?:ago|back)$/.exec(text);
+  if (back) {
+    const n = Number(back[1]);
+    const commit = verify(root, `HEAD~${n}`);
+    return commit
+      ? { commit, how: `${n} commit${n === 1 ? "" : "s"} before HEAD · ${describe(root, commit)}` }
+      : { error: `Tried HEAD~${n} for "${raw}", and this checkout does not go back that far.` };
+  }
+
+  // "last commit", "the latest commit by hindra2", "hindra2's last commit".
+  const mine = /^(?:the\s+)?(?:last|latest|previous|most\s+recent)\s+commit(?:\s+(?:by|from|of)\s+(.+))?$/.exec(text);
+  const theirs = /^(.+?)(?:'s|s')\s+(?:last|latest|previous|most\s+recent)\s+commit$/.exec(text);
+  if (!mine && !theirs) return { error: `Could not read "${raw}" as a revision: git does not know it, and it is not a phrase this understands (try "last commit", "last commit by <author>", or "2 commits ago").` };
+
+  const author = (mine?.[1] ?? theirs?.[1])?.trim();
+  if (!author) {
+    const commit = verify(root, "HEAD");
+    return commit ? { commit, how: `the last commit · ${describe(root, commit)}`, span: true } : { error: "This checkout has no commits." };
+  }
+  // `git log --author` already matches substrings and regex against both name
+  // and email, so `hindra2` finds `Hindra2 <h@x.com>`. Reimplementing that
+  // against a log dump would only be a worse version of it. `-i` because the
+  // phrase reached here lowercased, and --author is case-sensitive without it:
+  // a full name typed as the user says it would otherwise never match.
+  const commit = git(root, "log", "-1", "-i", "--format=%H", `--author=${author}`).trim();
+  if (!commit) return { error: `No commit by "${author}" in this checkout's history (searched author names and emails with git log --author).` };
+  return { commit, how: `${author}'s last commit · ${describe(root, commit)}`, span: true };
 }
 
 /* ── the answer ──────────────────────────────────────────────── */

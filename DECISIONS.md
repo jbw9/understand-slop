@@ -1399,3 +1399,43 @@ repair loop converges.
 **At scale:** a reader can open a half-made map and form a picture of a
 repository from half its sections, with nothing on the level itself saying the
 map is incomplete — only the project list knows.
+
+## D58 — The diff is a list you navigate from, not a bar on the level you are on
+
+**Chose:** one icon in the title bar opens a panel listing every section with a
+verdict — its title, its trail, and the files behind it — and clicking an entry
+opens that level. The red and green stay where they were (D56): the panel
+routes, the level shows the change.
+
+**Why:** the first build put the verdict counts in a bar across the top of
+whatever level happened to be open. That is the summary of a whole comparison
+rendered on a page showing one of its entries, so finding the three sections
+that moved meant already knowing where they were — the hunt the map exists to
+remove. A changed-files list is how a diff is read everywhere else, and it is
+the one shape that answers "what changed?" before "what changed *here*?".
+
+**Cost accepted:** two surfaces now describe the same comparison, and a reader
+who never opens the panel sees tints with no index to them. Worth it: the index
+is one click away and the tints are where the detail belongs.
+
+## D59 — Claude drives the map through a script, and names sections from an outline
+
+**Chose:** `slop-map-show section "<title>"` / `slop-map-show diff "<from>"
+["<to>"]`, appended to a marker beside the tab's queue and drained on EVERY
+`pty_state` poll rather than at the Stop hook. A second script, `slop-map-list`,
+prints the map's sections from a file written when the tab starts.
+
+**Why:** the channel had to exist anyway — `slop-map-fix` is the same shape, and
+reusing it costs no new transport. Draining mid-turn is the whole point: a
+reader who asks how sign-ups work wants to be looking at sign-ups while the
+answer arrives, and navigation that lands after the explanation has finished is
+navigation they have already done by hand. The outline exists because Claude
+only learns section names when the reader picks one, which for a cold question
+is never — without it, every `section` call would be a guess at a title that may
+not exist. Refs are passed through unresolved (`"last commit by hindra2"`) and
+resolved by `resolveRef`, so Claude never shells out to git to work one out.
+
+**Cost accepted:** a name that resolves to nothing, or to several sections
+equally, moves nobody and says so. That is deliberate — `findSection` refuses an
+ambiguous match rather than opening an arbitrary one of them, because being
+taken to the wrong section mid-answer is worse than not moving.

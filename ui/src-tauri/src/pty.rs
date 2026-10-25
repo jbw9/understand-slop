@@ -66,6 +66,8 @@ pub struct Spawned {
     shell: String,
 }
 
+/// `outline` is the open map's sections, so Claude in this tab can name one it
+/// was not handed (claude.rs's LIST).
 #[tauri::command]
 pub fn pty_spawn(
     cols: u16,
@@ -74,6 +76,7 @@ pub fn pty_spawn(
     launch: Option<claude::Launch>,
     start_claude: bool,
     cwd: Option<String>,
+    outline: Option<String>,
     ptys: tauri::State<Ptys>,
 ) -> Result<Spawned, String> {
     let pair = native_pty_system().openpty(size(cols, rows)).map_err(|e| e.to_string())?;
@@ -87,7 +90,7 @@ pub fn pty_spawn(
     // With Claude found, the launcher works in this tab; asked to, Claude runs
     // first and the user's ordinary interactive shell takes over when it exits.
     if let Some(launch) = &launch {
-        claude::prepare(&mut cmd, launch, &context).map_err(|e| e.to_string())?;
+        claude::prepare(&mut cmd, launch, &context, outline.as_deref()).map_err(|e| e.to_string())?;
         if start_claude && cfg!(unix) {
             cmd.args(["-c", r#""$SLOP_LAUNCHER"; exec "$SHELL""#]);
             cmd.env("SHELL", &program);
@@ -214,6 +217,9 @@ pub struct State {
     /// The transcript of the turn Claude just finished, whatever it did, so the
     /// app can offer to keep the answer on the map; reported once.
     ended: Option<String>,
+    /// What Claude asked the app to show — a section, a diff — taken mid-turn
+    /// so the user is looking at it while the answer streams; reported once.
+    acts: Vec<claude::Act>,
 }
 
 #[tauri::command]
@@ -235,6 +241,7 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
         busy,
         turn: claude::take_turn(&p.context),
         ended: claude::take_ended(&p.context),
+        acts: claude::take_acts(&p.context),
     })
 }
 

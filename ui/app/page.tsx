@@ -1,6 +1,8 @@
 import { Suspense } from "react";
+import { Acts } from "@/components/acts";
 import { Canvas } from "@/components/canvas";
 import { DiffMode } from "@/components/diff";
+import { DiffPanel } from "@/components/diff-panel";
 import { MapProvider } from "@/components/map-context";
 import { ProjectsDialog } from "@/components/projects";
 import { HistoryDialog } from "@/components/history";
@@ -41,6 +43,10 @@ export default async function Home({
             {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}
             <DiffMode map={name}>
               <Canvas key={name} />
+              {/* Inside the provider: the panel is the diff's own list, and
+                  what Claude shows needs both the map and the diff's range. */}
+              <DiffPanel />
+              <Acts />
             </DiffMode>
           </Suspense>
         </div>

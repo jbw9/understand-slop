@@ -1163,13 +1163,14 @@ light terminal; it is readable, not pretty.
 own indigo tint (`TONE.door`, derived from `opens` — never authored). The
 corner badge adopts that ink too, so the box and its cue say one thing.
 Scenery dimming on a navigable diagram lifts from 0.55 to 0.82.
-**Amended:** the same indigo was also put on the part cards below, as a 3px
-spine and a hover tint. The user removed it — "don't see the point of it, the
-diagram colors are nice tho". The cards are a vertical list where every entry
-is openable, so the spine marked a distinction that was not in question; on
-the diagram, where 3 boxes in 9 are inert, the same tint answers a real one.
-Colour earns its place where it separates, not wherever the same fact is
-true.
+**Amended twice, and now superseded by D52.** The indigo first spread to the
+part cards as a spine; the user removed it ("don't see the point of it, the
+diagram colors are nice tho") — a vertical list where every entry opens does
+not need a mark saying so. Then the one shared tint on the boxes went too:
+"it's alr obvious that we can open it by that arrow thing". Both are the same
+error — spending colour to repeat what another cue already says. The corner
+badge (D43) answers "can I open this"; colour is now spent on D52's question
+instead, which nothing else answered.
 **Beat:** the 8px green corner badge alone (D43). **Why:** measured across
 every map, 2,440 of 2,596 boxes are `plain` — so a picture was a field of
 identical rectangles, and the single most useful thing it knew ("you can go in
@@ -1223,3 +1224,31 @@ only useful before you look.
 header is one column again, in the old order. **At scale:** unchanged — the
 audit (`audit-diagrams.mts`) lays out in viewBox units, so uniform scaling
 cannot introduce an overlap; 23 maps, 0 problems after the change.
+
+
+## D52 — A box is coloured by the SECTION it opens, not by the fact that it opens
+
+**Chose:** `sectionOrder` numbers the distinct parts a diagram leads into, in
+the order its boxes first name them, and `sectionTone` gives each a hue from a
+seven-colour ramp. Every box opening that part is drawn in it, and the part's
+entry in the list below carries the same dot. Authored `good`/`warn` tones
+still win — those are claims about the code; a section hue is only an index.
+**Beat:** one shared indigo on every live box (D48), which the user rejected
+because the corner badge already says a box opens. **Why this instead:** the
+picture and the index were two unconnected lists of the same six things, and
+nothing tied a box to its chapter. Colour now answers that, and it answers it
+in the one place it pays most: 64 of 254 diagrams draw a single part as two or
+more boxes, which previously looked like unrelated boxes.
+**Why seven:** measured, the widest diagram opens 7 distinct parts; past that
+the ramp wraps.
+**Cost accepted:** a level whose list is a `Grid` of cards (no diagram) gets no
+dots, and a part with no box of its own gets none either — 3 of 13 levels have
+one. A dot that matched nothing would be worse than no dot.
+**Mechanics, learned the hard way:** these variables are referenced only from
+inline `var()` in SVG attributes, never through a Tailwind class. Tailwind v4's
+`@theme` emits a variable only where its scanner sees a class using it, so
+declaring them there dropped the LIGHT values silently — every section box
+rendered black in light mode while dark, being plain CSS under
+`:root[data-theme="dark"]`, looked correct. Both themes are now plain CSS
+outside `@theme`. The same bug was shipped unnoticed in D49's actor colours
+and is fixed with it.

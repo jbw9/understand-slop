@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow, Prose } from "@/components/state";
 import { SourceView, type RowCtx } from "@/components/anatomy";
-import type { Anatomy, CodeRef, DiagramBox, Issue } from "@/lib/data";
+import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
 import { readSource } from "@/lib/source";
@@ -65,24 +65,40 @@ const TONE = {
   plain: { stroke: "var(--color-border-strong)", fill: "var(--color-pure-white)", ink: "var(--color-ink)", line: "var(--color-wire)" },
   good: { stroke: "var(--color-deep-green)", fill: "var(--color-mint-success)", ink: "var(--color-ink)", line: "var(--color-deep-green)" },
   warn: { stroke: "var(--color-amber-ink)", fill: "var(--color-amber-surface)", ink: "var(--color-amber-ink)", line: "var(--color-amber-ink)" },
-  /**
-   * A box that opens a part (D40). Not an author's tone — it is derived from
-   * `opens`, so it cannot be set wrongly and cannot promise a click the box
-   * does not honour.
-   *
-   * Measured: 2,440 of 2,596 boxes across every map are `plain`, so a picture
-   * is a field of identical white rectangles and the one fact worth seeing —
-   * which of them go somewhere — was carried by an 8px badge in a corner. The
-   * tint says it at a glance, before the hover that used to be the only cue
-   * (D43's problem, one step further).
-   */
-  door: { stroke: "var(--color-door-line)", fill: "var(--color-door-surface)", ink: "var(--color-door-ink)", line: "var(--color-wire)" },
 } as const;
 
-/** What a box is drawn as: an authored tone wins; a plain door reads as one. */
-function toneOf(b: DiagramBox, live: boolean): keyof typeof TONE {
-  const t = b.tone ?? "plain";
-  return t === "plain" && live ? "door" : t;
+/** How many section hues exist. No diagram opens more parts than this. */
+export const SECTION_HUES = 7;
+
+/**
+ * The colour of the Nth part a level declares. Exported so the list below the
+ * picture can carry the same dot, which is the whole point: the box and the
+ * index entry are the same thing seen twice.
+ */
+export function sectionTone(i: number) {
+  const k = (i % SECTION_HUES) + 1;
+  return { ink: `var(--color-sec-${k}-ink)`, surface: `var(--color-sec-${k}-surface)` };
+}
+
+/**
+ * Which part each box opens, as an index into the level's parts — so a box
+ * can be coloured by the SECTION it leads to rather than by the fact that it
+ * leads anywhere at all.
+ *
+ * That fact is already carried by the corner badge (D43), so tinting every
+ * live box one shared colour said a second time what the arrow said once.
+ * Colour is better spent on association: a part drawn as three boxes makes
+ * those three one colour, and 64 of 254 diagrams have such a part.
+ */
+export function sectionOrder(
+  block: Extract<Anatomy, { kind: "diagram" }>,
+  owns: (id: string) => boolean,
+): string[] {
+  const order: string[] = [];
+  for (const b of block.boxes) {
+    if (b.opens && owns(b.opens) && !order.includes(b.opens)) order.push(b.opens);
+  }
+  return order;
 }
 
 /**
@@ -111,17 +127,21 @@ function Diagram({
   // diagram where nothing opens, every box is equally "inert" and dimming
   // them all would just make the picture grey.
   const navigable = Boolean(onOpen) && block.boxes.some((b) => b.opens);
+  // A box counts as leading into a section only where the level actually owns
+  // that part — the same test `onOpen` makes before it navigates.
+  const order = sectionOrder(block, (id) => Boolean(hrefFor?.(id)));
+  const sectionOf = (id: string | undefined) => (id ? order.indexOf(id) : -1);
 
   return (
     <figure className="min-w-0">
       {/* The caption sits ABOVE the picture: it says what you are about to
           look at, which is only useful before you look. Underneath it was a
           footnote to a diagram the reader had already tried to decode. */}
-      <figcaption className="mb-3 flex items-baseline gap-2.5">
+      <figcaption className="mb-3 max-w-[1000px]">
         <span className="text-[14px] font-medium text-on-surface">{block.caption}</span>
         {navigable ? (
-          <span className="shrink-0 rounded-[5px] border border-door-line bg-door-surface px-2 py-[3px] font-mono text-[10.5px] text-door-ink">
-            tinted boxes open
+          <span className="ml-2.5 whitespace-nowrap font-mono text-[10.5px] text-faint">
+            colours match the parts below
           </span>
         ) : null}
       </figcaption>
@@ -187,7 +207,14 @@ function Diagram({
           {boxes.map(({ x, y, w, b }) => {
             // Live only where the author named the part this box belongs to.
             const go = b.opens && onOpen ? () => onOpen(b.opens!) : undefined;
-            const t = TONE[toneOf(b, Boolean(go))];
+            const authored = b.tone && b.tone !== "plain";
+            // An authored tone still wins: `good` and `warn` are claims about
+            // the code, and a section hue is only an index.
+            const sec = authored ? -1 : sectionOf(b.opens);
+            const t = TONE[b.tone ?? "plain"];
+            const fill = sec >= 0 ? sectionTone(sec).surface : t.fill;
+            const stroke = sec >= 0 ? sectionTone(sec).ink : t.stroke;
+            const ink = sec >= 0 ? sectionTone(sec).ink : t.ink;
             return (
               <Box
                 key={b.id}
@@ -202,8 +229,8 @@ function Diagram({
                   width={w}
                   height={BOX_H}
                   rx="6"
-                  fill={t.fill}
-                  stroke={t.stroke}
+                  fill={fill}
+                  stroke={stroke}
                   strokeWidth="1.5"
                   strokeDasharray={b.tone === "warn" ? "5 4" : undefined}
                 />
@@ -215,7 +242,7 @@ function Diagram({
                   textAnchor="middle"
                   fontSize="14.5"
                   fontWeight="600"
-                  fill={t.ink}
+                  fill={ink}
                 >
                   {b.label}
                 </text>
@@ -230,12 +257,12 @@ function Diagram({
                     hovering (D43). */}
                 {go ? (
                   <g className="dg-cue" aria-hidden>
-                    {/* The door's own ink, so the badge and the box it sits
-                        on say one thing rather than two. On a warn box —
-                        which keeps its amber — the badge stays indigo, which
-                        is the point: the tint is the warning, the badge is
-                        the way in. */}
-                    <circle cx={x + w - 15} cy={y + 15} r="8.5" fill="var(--color-door-ink)" />
+                    {/* Green, the accent that means "this does something"
+                        everywhere else on the page. It is deliberately NOT
+                        the section hue: the badge answers "can I open this",
+                        the tint answers "what does it belong to", and those
+                        are different questions. */}
+                    <circle cx={x + w - 15} cy={y + 15} r="8.5" fill="var(--color-deep-green)" />
                     <text
                       x={x + w - 15}
                       y={y + 19}

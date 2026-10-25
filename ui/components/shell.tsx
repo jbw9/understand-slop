@@ -4,6 +4,8 @@ import "@xterm/xterm/css/xterm.css";
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useRef, useState } from "react";
+import { useMap } from "@/components/map-context";
+import { outline } from "@/lib/map";
 import { readSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
@@ -176,6 +178,13 @@ export function Shell({
   useEffect(() => {
     handlers.current = { onTitle, onSpawn, onClaude, onExit };
   });
+  // The map's sections, for `slop-map-list`. Through a ref for the same
+  // reason: a map that updates must not restart the shell.
+  const map = useMap();
+  const sections = useRef(map);
+  useEffect(() => {
+    sections.current = map;
+  });
 
   useEffect(() => {
     if (!isTauri()) {
@@ -279,6 +288,7 @@ export function Shell({
           launch,
           startClaude: startClaude && !!launch,
           cwd: cwd ?? null,
+          outline: outline(sections.current),
         });
         id = spawned.id;
         // Unmounted while the shell was starting: end it rather than leak it.

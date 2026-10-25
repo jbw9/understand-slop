@@ -8,6 +8,7 @@ import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
 import { announceAnswer, announceDraft } from "@/components/keep";
+import { announceAct, type Act } from "@/lib/act";
 import { clearPicks, onHand, onOpenClaude, prompt, retarget, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
 import { openSettings, readSettings } from "@/lib/settings";
 import type { Exchange } from "@/lib/keep";
@@ -132,10 +133,13 @@ export function Workspace() {
     if (!ids.length) return;
     const tick = () =>
       ids.forEach(([key, pty, cwd]) =>
-        invoke<{ claude: boolean; busy: boolean; turn: Turn | null; ended: string | null }>("pty_state", { id: pty })
-          .then(({ claude: live, busy, turn, ended }) => {
+        invoke<{ claude: boolean; busy: boolean; turn: Turn | null; ended: string | null; acts: Act[] }>("pty_state", { id: pty })
+          .then(({ claude: live, busy, turn, ended, acts }) => {
             if (turn && cwd) void updateMap(cwd, turn);
             if (ended) void offerAnswer(ended);
+            // Mid-turn, deliberately: Claude shows a section while it is still
+            // explaining it (lib/act.ts).
+            acts?.forEach(announceAct);
             setTabs((all) =>
               all.map((x) => (x.key === key && (x.live !== live || x.busy !== busy) ? { ...x, live, busy } : x)),
             );

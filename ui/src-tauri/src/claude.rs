@@ -56,6 +56,47 @@ printf '%s\t%s\n' "$(printf '%s' "$1" | tr '\t\n' '  ')" "$(printf '%s' "$2" | t
 echo "Noted. The map's \"$1\" will be corrected after this turn."
 "#;
 
+/// What Claude runs to put the user in front of what it is talking about: one
+/// line per act, taken by the app on its next poll rather than at the end of
+/// the turn. Refs are written as the user said them and resolved by the app.
+/// Allowed without asking.
+const SHOW: &str = r#"#!/bin/sh
+# Drives understand-slop's map: shows a section, or a diff (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in an understand-slop tab; nothing to show." >&2; exit 1; }
+clean() { printf '%s' "$1" | tr '\t\n' '  '; }
+case "$1" in
+section)
+  [ -n "$2" ] || { echo 'usage: slop-map-show section "<section title or id>"' >&2; exit 2; }
+  printf 'section\t%s\t\n' "$(clean "$2")" >> "$SLOP_CONTEXT.act"
+  echo "Showing \"$2\" on the map."
+  ;;
+diff)
+  [ $# -ge 2 ] || { echo 'usage: slop-map-show diff "<from>" ["<to>"]' >&2; exit 2; }
+  printf 'diff\t%s\t%s\n' "$(clean "$2")" "$(clean "$3")" >> "$SLOP_CONTEXT.act"
+  echo "Showing the diff${2:+ from \"$2\"}${3:+ to \"$3\"} on the map."
+  ;;
+*)
+  echo 'usage: slop-map-show section "<section title or id>" | slop-map-show diff "<from>" ["<to>"]' >&2
+  exit 2
+  ;;
+esac
+"#;
+
+/// The map's own table of contents, for naming a section that was not picked.
+///
+/// The user asks "how do sign ups work?" with nothing attached, so the only
+/// section names in context are whatever they happened to pick earlier —
+/// usually none. Without this, `slop-map-show section` would be a guess at a
+/// title that may not exist, which is how a reader ends up somewhere they did
+/// not ask to be. The outline is written beside the tab's queue when the tab
+/// starts (pty.rs), from the map the page already has.
+const LIST: &str = r#"#!/bin/sh
+# Lists understand-slop's map, section by section (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in an understand-slop tab; no map to list." >&2; exit 1; }
+[ -s "$SLOP_CONTEXT.map" ] || { echo "This repository has no map yet." >&2; exit 1; }
+cat "$SLOP_CONTEXT.map"
+"#;
+
 const SYSTEM: &str = "This session was opened from understand-slop, an app that maps this \
 repository as a tree of sections (user journey, data flow, the code behind each). The user \
 can attach things they picked on the map: a whole section arrives as a block starting with \
@@ -67,10 +108,22 @@ you find that it is (a listed problem that is not real, a description or a line 
 that does not match the code), run `slop-map-fix \"<section title>\" \"<what it gets wrong, \
 and what is true>\"` once per section, and the map is corrected after your turn. Code you \
 change updates the map by itself, deletions included; there is no need to report edits. \
+You also drive what the user is looking at. When they ask how something works and nothing \
+is attached, run `slop-map-list` to see what the map actually calls its sections, then, if \
+one of them is what they are asking about, run `slop-map-show section \"<section title>\"` \
+before you explain, naming it exactly as the outline spells it, so \
+they are looking at the thing you are explaining as you explain it; the app takes it \
+immediately, not at the end of your turn. When they ask to see what changed, run \
+`slop-map-show diff \"<from>\" \"<to>\"` — `<to>` may be left off, meaning the working tree, \
+and an empty `<from>` means the commit the map was built from. Pass the refs through as the \
+user said them, `HEAD~1`, a sha, a branch, or a phrase like \"last commit by hindra2\": the \
+app resolves them against the repository, so do not run git to work one out first. \
 Keeping the map right is background upkeep, not part of the answer: never tell the user \
 whether you edited files, whether the map is accurate, or that there is nothing to correct, \
-and mention a correction only in passing when you ran slop-map-fix. End on the answer \
-itself.";
+and mention a correction only in passing when you ran slop-map-fix. What you show is \
+likewise not worth narrating — the user can see it, so never announce that you are taking \
+them somewhere, though naming the section you are explaining is fine where the prose wants \
+it. End on the answer itself.";
 
 #[derive(serde::Deserialize)]
 pub struct Launch {
@@ -161,6 +214,46 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue.with_extension("md.dirty"));
     let _ = std::fs::remove_file(queue.with_extension("md.turn"));
     let _ = std::fs::remove_file(queue.with_extension("md.fix"));
+    let _ = std::fs::remove_file(queue.with_extension("md.act"));
+    let _ = std::fs::remove_file(queue.with_extension("md.map"));
+}
+
+/// Something Claude asked the app to show. Serializes tagged on `verb`, for a
+/// discriminated union on the page: `{"verb":"section","section":"Sign ups"}`,
+/// or `{"verb":"diff","from":"HEAD~1","to":null}` — `from` empty meaning the
+/// map's own commit, `to` null meaning the working tree. Refs arrive as Claude
+/// wrote them; resolving them is the page's job.
+#[derive(serde::Serialize, Debug, PartialEq)]
+#[serde(tag = "verb", rename_all = "lowercase")]
+pub enum Act {
+    Section { section: String },
+    Diff { from: String, to: Option<String> },
+}
+
+/// What Claude has asked to show since this was last asked. Taking it clears
+/// it, so each act happens once.
+///
+/// Deliberately not tied to the end of the turn, unlike `take_turn` and
+/// `take_ended`: Claude shows a section as it starts explaining it, and the
+/// point is that the user is looking at it while the answer streams. So this is
+/// drained on every poll, with no Stop marker involved.
+pub fn take_acts(queue: &Path) -> Vec<Act> {
+    let marker = queue.with_extension("md.act");
+    let Ok(text) = std::fs::read_to_string(&marker) else { return Vec::new() };
+    let _ = std::fs::remove_file(&marker);
+    text.lines()
+        .filter_map(|l| {
+            let mut f = l.split('\t');
+            match (f.next()?, f.next()?.trim(), f.next().unwrap_or("").trim()) {
+                ("section", s, _) if !s.is_empty() => Some(Act::Section { section: s.to_string() }),
+                ("diff", from, to) => Some(Act::Diff {
+                    from: from.to_string(),
+                    to: (!to.is_empty()).then(|| to.to_string()),
+                }),
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 /// A finished turn the map should follow: where its transcript is, and the
@@ -218,12 +311,14 @@ pub fn running(queue: &Path) -> bool {
     live(queue).exists()
 }
 
-/// The launcher, and slop-map-fix beside it, written where every tab's PATH
-/// can find them. Rewritten only when they differ, so an upgrade of the app
-/// replaces old ones.
+/// The launcher, and the scripts Claude talks back through beside it, written
+/// where every tab's PATH can find them. Rewritten only when they differ, so
+/// an upgrade of the app replaces old ones.
 fn launcher() -> std::io::Result<PathBuf> {
     let dir = std::env::temp_dir().join("understand-slop").join("bin");
     install(&dir.join("slop-map-fix"), FIX)?;
+    install(&dir.join("slop-map-show"), SHOW)?;
+    install(&dir.join("slop-map-list"), LIST)?;
     let path = dir.join("slop-claude");
     install(&path, LAUNCHER)?;
     Ok(path)
@@ -245,15 +340,24 @@ fn install(path: &Path, script: &str) -> std::io::Result<()> {
 /// What a tab's shell needs so that the launcher works in it: the user's
 /// `claude`, the hook, the system prompt, and the launcher on PATH. Returns
 /// the launcher's own path, for starting Claude without relying on PATH.
-pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path) -> std::io::Result<PathBuf> {
+pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline: Option<&str>) -> std::io::Result<PathBuf> {
     let path = launcher()?;
+    // The page has the map; this only keeps it where slop-map-list can read it.
+    // Written per tab and cleared with the tab, so it never outlives the map it
+    // was taken from.
+    if let Some(text) = outline.map(str::trim).filter(|t| !t.is_empty()) {
+        if let Some(dir) = queue.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(queue.with_extension("md.map"), format!("{text}\n"))?;
+    }
     let settings = serde_json::json!({
         "hooks": {
             "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }] }],
             "PostToolUse": [{ "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] }],
             "Stop": [{ "hooks": [{ "type": "command", "command": TURN }] }]
         },
-        "permissions": { "allow": ["Bash(slop-map-fix:*)"] }
+        "permissions": { "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)"] }
     });
     cmd.env("SLOP_CONTEXT", queue);
     cmd.env("SLOP_LAUNCHER", &path);
@@ -415,6 +519,83 @@ mod tests {
         assert!(!q.with_extension("md.fix").exists());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn showing_takes_effect_without_waiting_for_the_turn_to_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let show = launcher().unwrap().with_file_name("slop-map-show");
+        let run = |args: &[&str]| {
+            Command::new(&show).args(args).env("SLOP_CONTEXT", &q).output().unwrap()
+        };
+        assert!(take_acts(&q).is_empty());
+
+        let out = run(&["section", "Sign ups\tand in"]);
+        assert!(String::from_utf8_lossy(&out.stdout).contains("Showing"));
+        assert!(run(&["diff", "last commit by hindra2"]).status.success());
+        assert!(run(&["diff", "", "HEAD"]).status.success());
+        // No stop hook has fired, and the acts are already there.
+        assert_eq!(
+            take_acts(&q),
+            vec![
+                Act::Section { section: "Sign ups and in".into() },
+                Act::Diff { from: "last commit by hindra2".into(), to: None },
+                Act::Diff { from: String::new(), to: Some("HEAD".into()) },
+            ]
+        );
+        // Taken once, and nothing left behind.
+        assert!(take_acts(&q).is_empty());
+        assert!(!q.with_extension("md.act").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_map_is_listable_only_once_a_tab_has_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let list = launcher().unwrap().with_file_name("slop-map-list");
+        let run = || Command::new(&list).env("SLOP_CONTEXT", &q).output().unwrap();
+
+        // No map yet: it says so rather than printing nothing, so Claude does
+        // not read an empty outline as an empty map.
+        let out = run();
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("no map yet"));
+
+        std::fs::write(q.with_extension("md.map"), "repo: about\n\n- Sign ups — how people join\n").unwrap();
+        let out = run();
+        assert!(out.status.success());
+        assert!(String::from_utf8_lossy(&out.stdout).contains("Sign ups"));
+
+        // It goes with the tab: a stale outline must never outlive its map.
+        forget(&q);
+        assert!(!q.with_extension("md.map").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_bad_act_is_refused_or_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let show = launcher().unwrap().with_file_name("slop-map-show");
+        for args in [vec!["section"], vec!["diff"], vec!["zoom", "in"], vec![]] {
+            let out = Command::new(&show).args(&args).env("SLOP_CONTEXT", &q).output().unwrap();
+            assert_eq!(out.status.code(), Some(2), "{args:?}");
+            assert!(String::from_utf8_lossy(&out.stderr).contains("usage:"));
+        }
+        // Outside a tab there is nowhere to write to.
+        assert!(!Command::new(&show).args(["section", "A"]).env("SLOP_CONTEXT", "").status().unwrap().success());
+        assert!(!q.with_extension("md.act").exists());
+
+        // A line the app cannot read is dropped, and its neighbours still arrive.
+        std::fs::create_dir_all(dir.path()).unwrap();
+        std::fs::write(q.with_extension("md.act"), "section\tA\t\ngibberish\nsection\t\t\nsection\tB\t\n").unwrap();
+        assert_eq!(
+            take_acts(&q),
+            vec![Act::Section { section: "A".into() }, Act::Section { section: "B".into() }]
+        );
+    }
+
     /// The launcher as a tab runs it, with `bin` standing in for Claude.
     #[cfg(unix)]
     fn launch(queue: &Path, bin: &str) -> std::process::ExitStatus {
@@ -463,3 +644,4 @@ mod tests {
         assert!(!pending(&q) && !q.exists());
     }
 }
+

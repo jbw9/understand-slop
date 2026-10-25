@@ -16,7 +16,7 @@ import { useMap } from "@/components/map-context";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { FixAndKeep, onAnswer } from "@/components/keep";
-import { BlockDiffView, DiffBar, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
+import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
 import type { Exchange } from "@/lib/keep";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
 import { readSource } from "@/lib/source";
@@ -554,7 +554,6 @@ function Level({
 
   return (
     <>
-      <DiffBar />
       <Header
         path={path}
         back={{

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Eyebrow, Prose } from "@/components/state";
+import { Eyebrow, OriginMark, Prose } from "@/components/state";
 import { SourceView, type RowCtx } from "@/components/anatomy";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
@@ -19,11 +19,11 @@ import { BOX_H, CUE_ROOM, layoutDiagram } from "@/lib/diagram";
 
 export type Explained = Extract<
   Anatomy,
-  { kind: "diagram" | "table" | "sequence" | "screen" | "example" }
+  { kind: "diagram" | "table" | "sequence" | "screen" | "example" | "note" }
 >;
 
 export function isExplained(b: Anatomy): b is Explained {
-  return ["diagram", "table", "sequence", "screen", "example"].includes(b.kind);
+  return ["diagram", "table", "sequence", "screen", "example", "note"].includes(b.kind);
 }
 
 export function ExplainedBlock({
@@ -50,6 +50,8 @@ export function ExplainedBlock({
       return <Screen block={block} />;
     case "example":
       return <Example block={block} />;
+    case "note":
+      return <Note block={block} />;
   }
 }
 
@@ -664,6 +666,26 @@ function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
           ))}
         </dl>
       ) : null}
+    </div>
+  );
+}
+
+/* ── note ────────────────────────────────────────────────────── */
+
+/**
+ * The reader's own words on the level. Set at the same reading size as the
+ * blocks around it so it belongs, but given a left edge and a tinted ground
+ * rather than a white card: a block that looks like the generator's own work
+ * would quietly claim the code's authority for a sentence a person wrote.
+ */
+function Note({ block }: { block: Extract<Anatomy, { kind: "note" }> }) {
+  return (
+    <div className="min-w-0 border-l-2 border-border-strong bg-surface-container-low/60 py-2 pl-4">
+      <Caption>{block.title}</Caption>
+      <p className="text-[13.5px] leading-relaxed text-on-surface">
+        <Prose text={block.body} />
+      </p>
+      <OriginMark origin={block.origin} className="mt-2.5 block" />
     </div>
   );
 }

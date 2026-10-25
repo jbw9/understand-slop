@@ -11,6 +11,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
+import { apply, readOverlay } from "@/lib/overlay";
 import { listProjects, mapFileOf, markOpened } from "@/lib/vault";
 
 const MAPS = join(process.cwd(), "maps");
@@ -49,7 +50,11 @@ export function loadMap(name: string | undefined): { name: string; file: MapFile
     markOpened(project.id);
     const map: MapFile = JSON.parse(readFileSync(file, "utf8"));
     map.RUN.root = project.root;
-    return { name: project.id, file: map };
+    // What the reader added, composed in here so every consumer sees it. Only
+    // a project gets one: an example is a committed fixture, read-only by
+    // design and shared by every reader of this checkout.
+    const { file: composed } = apply(map, readOverlay(project.id));
+    return { name: project.id, file: composed };
   }
   const pick = name && listExamples().includes(name) ? name : DEFAULT_MAP;
   return { name: pick, file: JSON.parse(readFileSync(join(MAPS, pick, "map.json"), "utf8")) };

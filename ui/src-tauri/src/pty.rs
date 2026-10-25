@@ -211,6 +211,9 @@ pub struct State {
     busy: bool,
     /// Claude finished a turn the map should follow; reported once.
     turn: Option<claude::Turn>,
+    /// The transcript of the turn Claude just finished, whatever it did, so the
+    /// app can offer to keep the answer on the map; reported once.
+    ended: Option<String>,
 }
 
 #[tauri::command]
@@ -227,7 +230,12 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
     };
     #[cfg(not(unix))]
     let busy = false;
-    Ok(State { claude: claude::running(&p.context), busy, turn: claude::take_turn(&p.context) })
+    Ok(State {
+        claude: claude::running(&p.context),
+        busy,
+        turn: claude::take_turn(&p.context),
+        ended: claude::take_ended(&p.context),
+    })
 }
 
 /// Queues a section for the next prompt to Claude in this tab.

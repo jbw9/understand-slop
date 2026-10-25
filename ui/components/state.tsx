@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { State } from "@/lib/data";
+import type { Origin, State } from "@/lib/data";
 
 /**
  * The three states, rendered as a material property rather than a badge.
@@ -85,5 +85,27 @@ export function Prose({ text }: { text: string }) {
         ),
       )}
     </>
+  );
+}
+
+/**
+ * Where a thing on the map came from, when it did not come from the code.
+ *
+ * A line, not a chip. The three states already own the chip shape beside a
+ * title, and provenance is a different axis (see `Origin`) — given the same
+ * shape it would read as a fourth state, which is the one thing that axis
+ * exists to avoid. Never green: green is `derived` everywhere else.
+ */
+export function OriginMark({ origin, className }: { origin: Origin; className?: string }) {
+  const when = new Date(origin.at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return (
+    <span
+      // The reader's own question, where they asked one: hovering says why
+      // this is on the map at all.
+      title={origin.note}
+      className={cn("font-mono text-[10px] leading-none text-faint", className)}
+    >
+      {origin.by === "user" ? "Added by you" : "From Claude, kept by you"} · {when}
+    </span>
   );
 }

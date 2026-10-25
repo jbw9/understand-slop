@@ -8,6 +8,8 @@ import { openSettings } from "@/lib/settings";
 import { MapSwitcher, Trail, goTo, useLocation } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
+import { openHistory } from "@/components/history";
+import { toggleDiff } from "@/components/diff";
 import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +95,16 @@ export function Titlebar() {
       <MapUpdates key={name} id={name} root={RUN.root} local={maps.some((m) => m.id === name && m.local)} />
       <Control label="Projects — import one, or switch maps" onClick={() => openProjects()}>
         <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
+      </Control>
+      <Control label="What changed in the code — red is gone, green is new" onClick={toggleDiff}>
+        {/* Two states side by side: the old and the new. */}
+        <path d="M5.5 13V5.5a2 2 0 0 1 2-2h3M10.5 3l2 2.5-2 2.5" />
+        <circle cx="5.5" cy="13" r="1.4" />
+      </Control>
+      <Control label="What you added to this map — and a way back" onClick={openHistory}>
+        {/* A clock turned back: the history of the reader's own additions. */}
+        <circle cx="8" cy="8" r="6" />
+        <path d="M8 4.5V8l2.5 1.5" />
       </Control>
       <Control label="Claude Code & terminal (Ctrl+`)" onClick={toggleWorkspace}>
         <rect x="1.5" y="2.5" width="13" height="11" rx="2" />

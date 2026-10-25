@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import { Canvas } from "@/components/canvas";
+import { DiffMode } from "@/components/diff";
 import { MapProvider } from "@/components/map-context";
 import { ProjectsDialog } from "@/components/projects";
+import { HistoryDialog } from "@/components/history";
 import { SettingsDialog } from "@/components/settings";
 import { Titlebar } from "@/components/titlebar";
 import { Workspace } from "@/components/workspace";
@@ -37,12 +39,15 @@ export default async function Home({
         <div className="min-h-0 flex-1">
           <Suspense>
             {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}
-            <Canvas key={name} />
+            <DiffMode map={name}>
+              <Canvas key={name} />
+            </DiffMode>
           </Suspense>
         </div>
         <Workspace />
         <SettingsDialog />
         <ProjectsDialog />
+        <HistoryDialog />
       </div>
     </MapProvider>
   );

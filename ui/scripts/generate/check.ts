@@ -110,21 +110,32 @@ export function check(
 
   const walk = (n: any, d: number): number => {
     ids.set(n.id, (ids.get(n.id) ?? 0) + 1);
-    if (!/^[A-Z0-9"]/.test(n.title)) problems.push(`TITLE ${n.id} "${n.title}" — start with a capital`);
-    if (n.title.split(/\s+/).length > 4) problems.push(`TITLE ${n.id} "${n.title}" — more than 4 words`);
-    // D42: no file paths on a card.
-    for (const [k, v] of [["title", n.title], ["sub", n.sub]])
-      if (/[\w-]+\/[\w.-]+|\b[\w-]+\.(tsx?|jsx?|py|go|rb|rs|java|sql|json)\b/.test(v ?? "")) problems.push(`PATH ${n.id} ${k} "${v}" — no file paths on a card`);
-    // D38: two short sentences at most; the rest is pictures.
-    const words = (n.detail ?? "").split(/\s+/).filter(Boolean).length;
-    const sentences = (n.detail ?? "").split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
-    if (words > 40) problems.push(`DETAIL ${n.id} — ${words} words (max 40)`);
-    if (sentences > 2) problems.push(`DETAIL ${n.id} — ${sentences} sentences (max 2)`);
-    if (n.state !== "derived" && !n.unsure) problems.push(`UNSURE ${n.id} is ${n.state} but gives no reason`);
-    if (gen && n.shape?.kind === "figure") problems.push(`SHAPE ${n.id} — figures are hand-drawn; use marks, count, or none`);
-    if (n.shape?.kind === "marks")
-      for (const m of n.shape.ids) if (!MARK_IDS.includes(m)) problems.push(`SHAPE ${n.id} mark "${m}" has no drawing (have: ${MARK_IDS.join(", ")})`);
-    if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);
+    // What the reader added or rewrote (lib/overlay.ts) answers to them, not
+    // to this. Every rule below is about generated prose: a label is short
+    // because a model will ramble, a node cites code because a model must show
+    // its work. A person writing their own sentence about their own repository
+    // has already decided, and failing their words here would make a map they
+    // had deliberately corrected report itself as broken. Their children are
+    // still walked, and everything structural — ids, edges, diagram layout —
+    // still applies to the blocks they added.
+    const own = Boolean(n.origin);
+    if (!own) {
+      if (!/^[A-Z0-9"]/.test(n.title)) problems.push(`TITLE ${n.id} "${n.title}" — start with a capital`);
+      if (n.title.split(/\s+/).length > 4) problems.push(`TITLE ${n.id} "${n.title}" — more than 4 words`);
+      // D42: no file paths on a card.
+      for (const [k, v] of [["title", n.title], ["sub", n.sub]])
+        if (/[\w-]+\/[\w.-]+|\b[\w-]+\.(tsx?|jsx?|py|go|rb|rs|java|sql|json)\b/.test(v ?? "")) problems.push(`PATH ${n.id} ${k} "${v}" — no file paths on a card`);
+      // D38: two short sentences at most; the rest is pictures.
+      const words = (n.detail ?? "").split(/\s+/).filter(Boolean).length;
+      const sentences = (n.detail ?? "").split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
+      if (words > 40) problems.push(`DETAIL ${n.id} — ${words} words (max 40)`);
+      if (sentences > 2) problems.push(`DETAIL ${n.id} — ${sentences} sentences (max 2)`);
+      if (n.state !== "derived" && !n.unsure) problems.push(`UNSURE ${n.id} is ${n.state} but gives no reason`);
+      if (gen && n.shape?.kind === "figure") problems.push(`SHAPE ${n.id} — figures are hand-drawn; use marks, count, or none`);
+      if (n.shape?.kind === "marks")
+        for (const m of n.shape.ids) if (!MARK_IDS.includes(m)) problems.push(`SHAPE ${n.id} mark "${m}" has no drawing (have: ${MARK_IDS.join(", ")})`);
+      if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);
+    }
     for (const c of n.code ?? []) {
       refs++;
       const lines = linesOf(c.file);

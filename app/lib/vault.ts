@@ -21,7 +21,7 @@
  */
 
 import { execFileSync, spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -38,7 +38,8 @@ export const VAULT = process.env.SLOP_VAULT ?? join(dataDir(), IDENTIFIER);
 const INDEX = join(VAULT, "projects.json");
 export const projectDir = (id: string) => join(VAULT, "projects", id);
 
-export type MapStatus = "generating" | "ready" | "failed" | "cancelled";
+/** `empty`: a project started from scratch, with no code to map yet. */
+export type MapStatus = "generating" | "ready" | "failed" | "cancelled" | "empty";
 
 export interface Project {
   /** The `?map=` key: unique across examples and projects, safe as a directory name. */
@@ -234,6 +235,36 @@ export function importProject(rootIn: string, nameIn: string | undefined, exampl
   v.projects.push(project);
   writeVault(v);
   return generate(id, claude) ?? project;
+}
+
+/**
+ * Start a project from scratch: make `<parent>/<name>` as an empty git
+ * checkout and register it. There is no code to map yet, so nothing runs;
+ * the reader maps it from the list once there is.
+ */
+export function createProject(parentIn: string, nameIn: string, examples: string[]): Project {
+  const name = nameIn.trim();
+  if (!name || /[\\/]/.test(name) || name === "." || name === "..") throw new ImportError("Give it a folder name, without slashes.");
+  const parent = resolve(parentIn.replace(/^~(?=$|\/)/, homedir()));
+  const root = join(parent, name);
+  if (existsSync(root) && (!statSync(root).isDirectory() || readdirSync(root).length))
+    throw new ImportError(`${root} already exists. Use an existing folder instead.`);
+  const v = readVault();
+  const same = v.projects.find((p) => p.root === root);
+  if (same) throw new ImportError(`Already imported as "${same.name}".`);
+  mkdirSync(root, { recursive: true });
+  git(root, "init");
+  const now = new Date().toISOString();
+  const project: Project = {
+    id: freeId(name, new Set([...examples, ...v.projects.map((p) => p.id)])),
+    name,
+    root,
+    addedAt: now,
+    map: { status: "empty", startedAt: now },
+  };
+  v.projects.push(project);
+  writeVault(v);
+  return project;
 }
 
 /**

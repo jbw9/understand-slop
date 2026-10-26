@@ -1,13 +1,14 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { listExamples } from "@/lib/maps";
-import { cancel, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
- * The reader's projects (lib/vault.ts): list them, import one, regenerate,
+ * The reader's projects (lib/vault.ts): list them, start or import one, regenerate,
  * cancel or forget one, or bring one's map up to its code after an edit. Paths arrive from the page, but only as the reader's
  * own choice of a directory on their own machine — nothing here reads or
- * writes inside it except the generator, which only reads.
+ * writes inside it except the generator, which only reads, and starting a
+ * project, which makes it as an empty git checkout.
  */
 
 const bad = (message: string, status = 400) => Response.json({ error: message }, { status });
@@ -63,6 +64,9 @@ export async function POST(request: Request) {
       case "import":
         if (!str(root)) return bad("Choose a directory.");
         return Response.json(importProject(root as string, str(name), listExamples(), str(claude)));
+      case "create":
+        if (!str(root) || !str(name)) return bad("Choose where it goes and what it is called.");
+        return Response.json(createProject(root as string, name as string, listExamples()));
       case "regenerate":
         if (!str(id)) return bad("bad request");
         return Response.json(generate(id as string, str(claude)) ?? null);

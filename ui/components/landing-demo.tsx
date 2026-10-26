@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STATIC_MAP } from "@/lib/source";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,14 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const [open, setOpen] = useState(maps[0].id);
   const [loaded, setLoaded] = useState<string | null>(null);
   const current = maps.find((m) => m.id === open)!;
+  const frame = useRef<HTMLIFrameElement>(null);
+
+  // The first frame is server-rendered and can finish loading before React
+  // hydrates, so its load event is missed. Read the document instead.
+  useEffect(() => {
+    const doc = frame.current?.contentDocument;
+    if (doc?.readyState === "complete" && doc.URL !== "about:blank") setLoaded(open);
+  }, [open]);
 
   return (
     <div>
@@ -32,7 +40,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
             aria-selected={m.id === open}
             onClick={() => setOpen(m.id)}
             className={cn(
-              "rounded-[8px] px-3 py-1.5 text-[13px] transition-[background-color,color] focus-visible:outline-2 focus-visible:outline-deep-green",
+              "rounded-[8px] px-2.5 py-1.5 text-[13px] transition-[background-color,color] sm:px-3 focus-visible:outline-2 focus-visible:outline-deep-green",
               m.id === open
                 ? "bg-pure-white font-medium text-ink shadow-panel ring-1 ring-border-gray"
                 : "text-muted-slate hover:bg-surface-container-low hover:text-ink",
@@ -65,6 +73,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
           ) : null}
           <iframe
             key={open}
+            ref={frame}
             src={STATIC_MAP ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${open}/` : `/?map=${open}&embed`}
             title={`${current.label}, explored`}
             onLoad={() => setLoaded(open)}
@@ -92,7 +101,7 @@ export function StarCount({ repo }: { repo: string }) {
       .then((d) => d && setCount(d.stargazers_count))
       .catch(() => {});
   }, [repo]);
-  if (count === null) return null;
+  if (!count) return null;
   return (
     <span className="flex items-center gap-1 border-l border-border-gray pl-2 font-mono text-[12px] text-muted-slate tnum">
       <svg viewBox="0 0 16 16" aria-hidden className="size-3 fill-current">

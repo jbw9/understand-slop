@@ -203,7 +203,7 @@ export function Crumbs({
             );
           })}
         </ol>
-        <div className="flex shrink-0 items-center gap-3 pt-0.5 font-mono text-[10.5px] text-faint">
+        <div className="hidden shrink-0 items-center gap-3 pt-0.5 font-mono text-[10.5px] text-faint sm:flex">
           <Hint k="esc">back</Hint>
           <Hint k="0">top</Hint>
         </div>

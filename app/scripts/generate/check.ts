@@ -18,6 +18,12 @@ export interface CheckResult {
   sources: { ok: number; bad: number };
 }
 
+/** A detail's length as D38 counts it: two short sentences at most. */
+export const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
+/** A card's `sub` is a glance, not a summary: its children already name its parts. */
+export const SUB_WORDS = 8;
+export const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
+
 /** Lines of repo files, read once per run. */
 export function fileReader(repo: string) {
   const cache = new Map<string, string[] | null>();
@@ -126,10 +132,11 @@ export function check(
       for (const [k, v] of [["title", n.title], ["sub", n.sub]])
         if (/[\w-]+\/[\w.-]+|\b[\w-]+\.(tsx?|jsx?|py|go|rb|rs|java|sql|json)\b/.test(v ?? "")) problems.push(`PATH ${n.id} ${k} "${v}" — no file paths on a card`);
       // D38: two short sentences at most; the rest is pictures.
-      const words = (n.detail ?? "").split(/\s+/).filter(Boolean).length;
-      const sentences = (n.detail ?? "").split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
-      if (words > 40) problems.push(`DETAIL ${n.id} — ${words} words (max 40)`);
-      if (sentences > 2) problems.push(`DETAIL ${n.id} — ${sentences} sentences (max 2)`);
+      const w = words(n.detail ?? "");
+      const ss = sentences(n.detail ?? "");
+      if (gen && words(n.sub ?? "") > SUB_WORDS) problems.push(`SUB ${n.id} "${n.sub}" — ${words(n.sub)} words (max ${SUB_WORDS}); say what it is, not what it contains`);
+      if (w > 40) problems.push(`DETAIL ${n.id} — ${w} words (max 40)`);
+      if (ss > 2) problems.push(`DETAIL ${n.id} — ${ss} sentences (max 2)`);
       if (n.state !== "derived" && !n.unsure) problems.push(`UNSURE ${n.id} is ${n.state} but gives no reason`);
       if (gen && n.shape?.kind === "figure") problems.push(`SHAPE ${n.id} — figures are hand-drawn; use marks, count, or none`);
       if (n.shape?.kind === "marks")

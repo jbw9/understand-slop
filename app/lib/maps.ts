@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { apply, readOverlay } from "@/lib/overlay";
-import { listProjects, mapFileOf, markOpened } from "@/lib/vault";
+import { listProjects, mapFileOf, markOpened, projectDir } from "@/lib/vault";
 
 const MAPS = join(process.cwd(), "maps");
 export const DEFAULT_MAP = "explorify";
@@ -28,6 +28,18 @@ export interface MapEntry {
 /** The committed examples. */
 export function listExamples(): string[] {
   return readdirSync(MAPS).filter((d) => existsSync(join(MAPS, d, "map.json"))).sort();
+}
+
+/**
+ * How the map was made: the audit.md its last run wrote beside it
+ * (scripts/generate/audit.ts). Only for a listed project or example, so the
+ * id, which arrives from the page, never names a path; null when its map
+ * was made before runs kept one.
+ */
+export function auditOf(id: string): string | null {
+  const dir = listProjects().some((p) => p.id === id) ? projectDir(id) : listExamples().includes(id) ? join(MAPS, id) : null;
+  const f = dir && join(dir, "audit.md");
+  return f && existsSync(f) ? readFileSync(f, "utf8") : null;
 }
 
 /** Every map that can be opened: the reader's projects that have one, then the examples. */
@@ -63,6 +75,20 @@ export function loadMap(name: string | undefined): { name: string; file: MapFile
   }
   const pick = name && listExamples().includes(name) ? name : DEFAULT_MAP;
   return { name: pick, file: JSON.parse(readFileSync(join(MAPS, pick, "map.json"), "utf8")) };
+}
+
+const baked = new Map<string, Record<string, string>>();
+
+/**
+ * An example's cited files as they were when its map was made, committed
+ * beside it as `maps/<name>/source.json`, for a machine without its checkout.
+ * Keyed by repo-relative path, so a caller's path never reaches the disk.
+ */
+export function bakedSource(name: string | undefined): Record<string, string> | undefined {
+  if (!name || !listExamples().includes(name)) return undefined;
+  const file = join(MAPS, name, "source.json");
+  if (!baked.has(name) && existsSync(file)) baked.set(name, JSON.parse(readFileSync(file, "utf8")));
+  return baked.get(name);
 }
 
 /** Where checkouts usually live, under home, in the order they are tried. */

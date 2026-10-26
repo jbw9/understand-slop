@@ -13,11 +13,10 @@ import { readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
 import { ccAgent, type Handled } from "./claude-code";
-import { check } from "./check";
 import type { Cut, Root } from "./cut";
 import { owners } from "./cut";
-import { numbered, type Inventory } from "./inventory";
-import { shapeProblems, typeReference } from "./schema";
+import { isSource, numbered, type Inventory } from "./inventory";
+import { submitProblems, typeReference } from "./schema";
 import { full, oneLine, type FileSummary } from "./summarize";
 
 export interface Authored {
@@ -44,13 +43,15 @@ function stepOf(name: string, input: any, content: string, problems?: string[]):
   if (name === "read_file") return { tool: name, what: `${i.path}${i.start || i.end ? ` ${i.start ?? 1}-${i.end ?? "end"}` : ""}`, result: /^\d/.test(content) ? `${content.split("\n").length} lines` : content.split("\n")[0].slice(0, 120) };
   if (name === "grep") return { tool: name, what: `/${i.pattern}/${i.under ? ` under ${i.under}` : ""}`, result: content === "No matches." ? "no matches" : `${content.split("\n").length} matches` };
   if (name === "list") return { tool: name, what: String(i.dir ?? ""), result: `${content.split("\n").length} entries` };
-  return { tool: name, what: "the whole root", result: problems?.length ? `rejected — ${problems.length} problems: ${problems.slice(0, 8).join("; ")}${problems.length > 8 ? "; …" : ""}` : "accepted" };
+  const fixes = i.root ? null : typeof i.replace === "string" ? tryJson(i.replace) : i.replace;
+  const what = Array.isArray(fixes) ? `fixes to ${fixes.map((n: any) => n?.id).filter(Boolean).join(", ")}` : "the whole root";
+  return { tool: name, what, result: problems?.length ? `rejected — ${problems.length} problems: ${problems.slice(0, 8).join("; ")}${problems.length > 8 ? "; …" : ""}` : "accepted" };
 }
 
 export const TOOLS: Tool[] = [
   {
     name: "read_file",
-    description: "Read a file from the repository with line numbers. At most 400 lines per call; read the ranges you need.",
+    description: "Read a file from the repository with line numbers, at most 400 lines per call. A file of 400 lines or fewer: leave out start and end and read it whole, once. Ask for every read you already know you need in the same turn.",
     input_schema: { type: "object", required: ["path"], properties: { path: { type: "string" }, start: { type: "integer" }, end: { type: "integer" } } },
   },
   {
@@ -65,8 +66,14 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "submit",
-    description: "Hand in the complete root node, with every descendant. It is checked; if anything fails you get the list back and must submit again with everything fixed.",
-    input_schema: { type: "object", required: ["root"], properties: { root: { type: "object", description: "A Node (see the types): the root and its whole subtree." } } },
+    description: "Hand in the complete root node, with every descendant. It is checked — every detail at most two sentences and 40 words — and if anything fails you get the list back. Then send `replace` instead of `root`: only the nodes you changed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        root: { type: "object", description: "A Node (see the types): the root and its whole subtree." },
+        replace: { type: "array", items: { type: "object" }, description: "After a rejected submit: the fixed nodes, each replacing the node with its id in that submit. A node without `children` keeps the children it had." },
+      },
+    },
   },
 ];
 
@@ -89,7 +96,7 @@ export function system(): Block[] {
     { type: "text", text: readFileSync("scripts/generate/prompts/rules.md", "utf8") },
     {
       type: "text",
-      text: `# The types (lib/data.ts) — every field's comment is part of the standard\n\n${typeReference()}\n\n# A worked example: one root of a hand-authored map, at the standard to match\n\nIt was written before diagram arrows carried \`at\`; yours must. It is from a different repository — match its depth, density and honesty, not its content.\n\n${exemplar()}`,
+      text: `# The types (lib/data.ts) — every field's comment is part of the standard\n\n${typeReference()}\n\n# A worked example: one root of a hand-authored map, at the standard to match\n\nIt was written before diagram arrows carried \`at\` and before a \`sub\` was held to 8 words; yours must do both. It is from a different repository — match its depth, density and honesty, not its content.\n\n${exemplar()}`,
       cache_control: { type: "ephemeral" },
     },
   ];
@@ -97,7 +104,7 @@ export function system(): Block[] {
 }
 
 function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
-  const mine = inv.files.filter((f) => f.code && !f.test && owners(cut, f.path).includes(root.id));
+  const mine = inv.files.filter((f) => isSource(f) && owners(cut, f.path).includes(root.id));
   const mineSet = new Set(mine.map((f) => f.path));
   // Files just across the boundary: what this root imports, and what imports it.
   const near = new Set<string>();
@@ -107,7 +114,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
       if (mineSet.has(to) && !mineSet.has(from)) near.add(from);
     }
   return [
-    `# Repository: ${inv.name} @ ${inv.commit}`,
+    `# Repository: ${inv.name} @ ${inv.commit}${inv.dirty.length ? ` (with uncommitted edits to ${inv.dirty.length} files, which you read as they are on disk)` : ""}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
     ...(inv.scope ? [`## Scope\nThis map covers only part of the repository. Its reader: ${inv.scope.focus} Files outside it can still be read and cited.`] : []),
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
@@ -123,9 +130,9 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     `## Files this root owns (${mine.length}), with what each does\n${mine.map((f) => (sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`)).join("\n")}`,
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
     `## Task
-Read the code you need — use the symbol line ranges above to read targeted ranges, not whole files — then submit this root with its full subtree.
+Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
 Aim for 2-3 levels, 3-6 children per node, a diagram on most levels whose boxes open the children they show, and real issues where the code has them.
-Budget: about 25 tool calls before you submit.`,
+Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -163,6 +170,30 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   return `Unknown tool ${call.name}`;
 }
 
+const tryJson = (s: string) => {
+  try { return JSON.parse(s); } catch { return null; }
+};
+
+/** `tree` with each fix put in place of the node with its id; ids with no such node go to `missing`. */
+export function patched(tree: Node, fixes: Node[], missing: string[]): Node {
+  const out = structuredClone(tree);
+  const swap = (n: Node, fix: Node): boolean => {
+    const kids = n.children ?? [];
+    const i = kids.findIndex((k) => k.id === fix.id);
+    if (i >= 0) {
+      kids[i] = { ...fix, children: fix.children ?? kids[i].children };
+      return true;
+    }
+    return kids.some((k) => swap(k, fix));
+  };
+  for (const fix of fixes) {
+    if (!fix || typeof fix !== "object" || !fix.id) continue;
+    if (fix.id === out.id) Object.assign(out, { ...fix, children: fix.children ?? out.children });
+    else if (!swap(out, fix)) missing.push(String(fix.id));
+  }
+  return out;
+}
+
 /** The last block of the last message carries the cache mark, so each turn re-reads the conversation from cache. */
 function withCacheMark(messages: Message[]): Message[] {
   const out = messages.map((m) => ({ ...m, content: typeof m.content === "string" ? [{ type: "text", text: m.content } as Block] : m.content.map((b) => ({ ...b })) }));
@@ -171,17 +202,22 @@ function withCacheMark(messages: Message[]): Message[] {
   return out;
 }
 
+/**
+ * `onSubmit` hears each submit's verdict as it comes, the one in-flight fact
+ * the run's progress can show.
+ */
 export async function authorRoot(
   root: Root,
   cut: Cut,
   inv: Inventory,
   sums: Record<string, FileSummary>,
   model: string,
-  log: (s: string) => void,
+  onSubmit: (submit: number, problems: number) => void,
 ): Promise<Authored> {
   const known = new Set(inv.files.map((f) => f.path));
   const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
-  const MAX_TURNS = 45;
+  // The last tree handed in, so a fix after a rejection resends only the nodes it changed.
+  let last: Node | null = null;
 
   /** One tool call, answered the same way whichever backend made it. */
   const handle = (name: string, input: any): Handled => {
@@ -192,59 +228,72 @@ export async function authorRoot(
       return { content };
     }
     res.submits++;
-    const node = input?.root;
+    const fixes = typeof input?.replace === "string" ? tryJson(input.replace) : input?.replace;
+    const missing: string[] = [];
+    const node = Array.isArray(fixes) && last && !input?.root ? patched(last, fixes, missing) : input?.root;
     if (node && typeof node === "object" && node.id !== root.id) node.id = root.id;
-    const problems = shapeProblems(node, root.prefix);
-    if (!problems.length) problems.push(...check({ AUTHORED: [node], E0: [], LINKS: [] }, inv.repo, { generated: true }).problems);
+    if (node && typeof node === "object") last = structuredClone(node);
+    const problems = missing.length
+      ? missing.map((id) => `REPLACE no node "${id}" in your last submit — send it with its parent, or send the whole root`)
+      : submitProblems(node, root.prefix, inv.repo);
     res.problems = problems;
     res.trail.push(stepOf(name, input, "", problems));
-    log(`${root.id}: submit ${res.submits} — ${problems.length ? `${problems.length} problems` : "clean"}`);
-    if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { node, reads: res.reads, submits: res.submits, trail: res.trail } };
-    return { content: `Not accepted. Fix every one of these and submit the whole root again:\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
+    onSubmit(res.submits, problems.length);
+    // The whole result rides on `done`: Claude Code caches it, and a replay calls no tools.
+    if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { ...res, root: node } };
+    return { content: `Not accepted. Fix every one of these, then submit with \`replace\`: only the nodes you changed.\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
   };
 
-  const r = await converse<{ node: Node; reads: number; submits: number; trail?: Step[] }>(brief(root, cut, inv, sums), handle, model, "author", MAX_TURNS);
-  // A replayed run calls no tools, so its counts and steps come from the cache
-  // (a run cached before steps were kept has none).
-  return { ...res, root: r.value?.node ?? null, turns: r.turns, reads: r.value?.reads ?? res.reads, submits: r.value?.submits ?? res.submits, trail: r.value?.trail ?? res.trail };
+  const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 45 });
+  return { ...(r.value ?? res), turns: r.turns };
+}
+
+/** How an agent runs, beyond its prompt and tools. The defaults are the author's. */
+interface Agent {
+  prompt: string;
+  handle: (name: string, input: any) => Handled;
+  model: string;
+  stage: string;
+  maxTurns: number;
+  system?: string | Block[];
+  tools?: Tool[];
+  /** Through Claude Code, which gives Opus thinking no budget (see claude-code.ts). */
+  ccEffort?: "low" | "medium" | "high";
+  nudge?: string;
 }
 
 /**
- * One agent over TOOLS, on either backend, until `handle` hands back a
- * `done`: that is the value. Null when the turns ran out first.
+ * One agent, on either backend, until `handle` hands back a `done`: that is
+ * the value. Null when the turns ran out first. The API loop below is the
+ * author's and the updater's only; its requests are what their caches replay,
+ * so it stays as it was.
  */
-export async function converse<T>(
-  prompt: string,
-  handle: (name: string, input: any) => Handled,
-  model: string,
-  stage: string,
-  maxTurns: number,
-): Promise<{ value: T | null; turns: number }> {
+export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: number }> {
+  const nudge = a.nudge ?? "Continue: use the tools, and finish by calling submit.";
   if (BACKEND === "claude-code") {
-    return ccAgent<T>({
-      model, system: system(), prompt, tools: TOOLS, handle, effort: "high", stage,
-      maxTurns, nudge: "Continue: use the tools, and finish by calling submit.",
-    });
+    // Medium, not the API path's high: at high one root thought for 32k
+    // tokens in a reply. Medium halved that root's time (1118s to 614s) with a map as full.
+    return ccAgent<T>({ model: a.model, system: a.system ?? system(), prompt: a.prompt, tools: a.tools ?? TOOLS, handle: a.handle, effort: a.ccEffort ?? "medium", stage: a.stage, maxTurns: a.maxTurns, nudge });
   }
 
-  const messages: Message[] = [{ role: "user", content: prompt }];
+  const messages: Message[] = [{ role: "user", content: a.prompt }];
   let turns = 0;
-  for (; turns < maxTurns; turns++) {
-    const r = await invoke({ model, stage, effort: "high", maxTokens: 64000, system: system(), messages: withCacheMark(messages), tools: TOOLS });
+  for (; turns < a.maxTurns; turns++) {
+    const r = await invoke({ model: a.model, stage: a.stage, effort: "high", maxTokens: 64000, system: system(), messages: withCacheMark(messages), tools: TOOLS });
     messages.push({ role: "assistant", content: r.content });
     const calls = callsOf(r);
     if (!calls.length) {
-      messages.push({ role: "user", content: r.stop_reason === "max_tokens" ? "Your reply was cut off at the token limit. Submit again; keep labels short." : "Continue: use the tools, and finish by calling submit." });
+      messages.push({ role: "user", content: r.stop_reason === "max_tokens" ? "Your reply was cut off at the token limit. Submit again; keep labels short." : nudge });
       continue;
     }
     const results: Block[] = [];
     for (const c of calls) {
-      const h = handle(c.name, c.input);
+      const h = a.handle(c.name, c.input);
       if (h.done) return { value: h.done as T, turns };
       // Key order as before, so the requests of maps already made still replay from cache.
       results.push(h.isError ? { type: "tool_result", tool_use_id: c.id, is_error: true, content: h.content } : { type: "tool_result", tool_use_id: c.id, content: h.content });
     }
-    if (turns === maxTurns - 6) results.push({ type: "text", text: "You are almost out of turns. Submit the complete root now." });
+    if (turns === a.maxTurns - 6) results.push({ type: "text", text: "You are almost out of turns. Submit the complete root now." });
     messages.push({ role: "user", content: results });
   }
   return { value: null, turns };

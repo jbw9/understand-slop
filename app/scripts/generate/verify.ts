@@ -16,9 +16,8 @@
  */
 import type { CodeRef, Node } from "@/lib/data";
 import { ask, BACKEND, callsOf, invoke, MODELS, type Block, type Message } from "./bedrock";
-import { ccAgent } from "./claude-code";
-import { runTool, TOOLS } from "./author";
-import { fileReader } from "./check";
+import { converse, runTool, TOOLS } from "./author";
+import { fileReader, sentences, words } from "./check";
 import { numbered, type Inventory } from "./inventory";
 
 export interface Verdict {
@@ -30,6 +29,8 @@ export interface Verdict {
   claims: string[];
   /** Every claim the first reader questioned, with its verdict, before review. */
   flags?: string[];
+  /** The detail as the reviewer corrected it, when it changed. */
+  fixed?: string;
 }
 
 const SCREEN = {
@@ -45,11 +46,11 @@ const SCREEN = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["claim", "verdict"],
+          required: ["claim", "why", "verdict"],
           properties: {
             claim: { type: "string", description: "The claim, quoted briefly." },
+            why: { type: "string", description: "What the shown code says about it, worked out before the verdict." },
             verdict: { type: "string", enum: ["supported", "contradicted", "not_shown", "intended"], description: "supported: the cited lines show it. contradicted: they show otherwise. not_shown: nothing cited bears on it. intended (issues only): the lines show it, but it is behaviour the code means to have — a documented rule, a deliberate error for misuse, standard language behaviour — not something going wrong." },
-            why: { type: "string" },
           },
         },
       },
@@ -79,9 +80,27 @@ const REVIEW = {
   },
 };
 
-function evidence(n: Node, inv: Inventory): string {
+/** A file this short is shown whole; a longer one, the cited lines with this much either side. */
+const WHOLE = 250;
+const AROUND = 30;
+
+/**
+ * Each cited range with the code around it. With only the cited lines, most
+ * of what the screen flagged was a constant or call just outside them, and the
+ * reviewer's searches to dismiss those cost more than the rest of the run's
+ * checking (understand-slop: 39 flags, 4 upheld).
+ */
+export function evidence(n: Node, inv: Inventory): string {
+  const shown = new Set<string>();
   return (n.code ?? [])
-    .map((c, i) => `[${i}] ${c.label} — ${c.file}:${c.start}-${c.end}\n${numbered(inv.repo, c.file, c.start, Math.min(c.end, c.start + 150))}`)
+    .map((c, i) => {
+      const head = `[${i}] ${c.label} — ${c.file}:${c.start}-${c.end}`;
+      const total = inv.files.find((f) => f.path === c.file)?.lines ?? c.end;
+      if (total > WHOLE) return `${head}, with the lines around it\n${numbered(inv.repo, c.file, Math.max(1, c.start - AROUND), Math.min(c.end, c.start + 150) + AROUND)}`;
+      if (shown.has(c.file)) return `${head} (the whole file is shown above)`;
+      shown.add(c.file);
+      return `${head}, in the whole file\n${numbered(inv.repo, c.file)}`;
+    })
     .join("\n\n");
 }
 
@@ -89,28 +108,82 @@ function claims(n: Node): string {
   return JSON.stringify({ title: n.title, sub: n.sub, detail: n.detail, issues: n.issues ?? [], code_labels: (n.code ?? []).map((c) => c.label) }, null, 1);
 }
 
-const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
-const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
 
-async function verifyNode(n: Node, inv: Inventory, model: string): Promise<Verdict> {
-  const v: Verdict = { id: n.id, ok: true, flagged: 0, rewritten: false, downgraded: false, claims: [] };
-  type Screen = { claims: { claim: string; verdict: string; why?: string }[] };
+type Screen = { claims: { claim: string; verdict: string; why?: string }[] };
+
+const SCREEN_SYSTEM = "You check a short explanation of code against the code it cites, shown with the code around it; anything in what you are shown counts. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not. An issue must be something going wrong; one that describes deliberate behaviour is intended, even when it is accurate.";
+
+/** The first reader on one node. Null when it gave no answer. */
+async function screenOne(n: Node, inv: Inventory): Promise<Screen | null> {
   const screenWith = (maxTokens: number) => ask<Screen>({
     model: MODELS.haiku,
     stage: "verify",
     maxTokens,
-    system: "You check a short explanation of code against the code it cites. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not. An issue must be something going wrong; one that describes deliberate behaviour is intended, even when it is accurate.",
+    system: SCREEN_SYSTEM,
     messages: [{ role: "user", content: `## The node\n${claims(n)}\n\n## The cited code\n${evidence(n, inv)}` }],
     tool: SCREEN,
   });
   // A node with many claims can outrun the first answer's room (umami's did);
   // it gets more, and if it still has no answer it is unverified, not fatal.
-  let screen: Screen;
-  try {
-    screen = await screenWith(4000).catch(() => screenWith(16000));
-  } catch {
-    return { ...v, ok: false, claims: ["the verify screen gave no answer"] };
+  return screenWith(4000).catch(() => screenWith(16000)).catch(() => null);
+}
+
+const SCREENS = {
+  name: "screens",
+  description: "For each node shown, one verdict per factual claim in it.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["nodes"],
+    properties: {
+      nodes: {
+        type: "array",
+        items: { type: "object", additionalProperties: false, required: ["id", "claims"], properties: { id: { type: "string" }, claims: SCREEN.input_schema.properties.claims } },
+      },
+    },
+  },
+};
+
+/** Evidence a batch of screens may carry, in characters, and nodes per batch. */
+const BATCH_CHARS = 60_000;
+const BATCH_NODES = 8;
+
+/**
+ * The first reader on many nodes at once, for Claude Code: every `claude -p`
+ * pays its own start-up and prompt, which one call per node multiplied by the
+ * whole map. A node the batch leaves out is screened on its own.
+ */
+async function screenMany(nodes: Node[], inv: Inventory): Promise<Map<string, Screen | null>> {
+  const parts = nodes.map((n) => ({ n, text: `# Node ${n.id}\n## The node\n${claims(n)}\n\n## The cited code\n${evidence(n, inv)}` }));
+  const batches: (typeof parts)[] = [];
+  for (const p of parts) {
+    const b = batches[batches.length - 1];
+    if (b && b.length < BATCH_NODES && b.reduce((a, x) => a + x.text.length, 0) + p.text.length <= BATCH_CHARS) b.push(p);
+    else batches.push([p]);
   }
+  const out = new Map<string, Screen | null>();
+  await Promise.all(
+    batches.map(async (b) => {
+      if (b.length > 1) {
+        const r = await ask<{ nodes: ({ id: string } & Screen)[] }>({
+          model: MODELS.haiku,
+          stage: "verify",
+          system: `${SCREEN_SYSTEM} Each node is checked against its own cited code only. Answer for every node shown, by its id.`,
+          messages: [{ role: "user", content: b.map((p) => p.text).join("\n\n") }],
+          tool: SCREENS,
+        }).catch(() => null);
+        for (const x of r?.nodes ?? []) if (b.some((p) => p.n.id === x.id)) out.set(x.id, { claims: x.claims });
+      }
+      await Promise.all(b.filter((p) => !out.has(p.n.id)).map(async (p) => out.set(p.n.id, await screenOne(p.n, inv))));
+    }),
+  );
+  return out;
+}
+
+/** What the screen's flags come to: dismissed, rewritten, or the node marked partial. */
+async function settle(n: Node, screen: Screen | null, inv: Inventory, model: string): Promise<Verdict> {
+  const v: Verdict = { id: n.id, ok: true, flagged: 0, rewritten: false, downgraded: false, claims: [] };
+  if (!screen) return { ...v, ok: false, claims: ["the verify screen gave no answer"] };
   const flags = screen.claims.filter((c) => c.verdict !== "supported").map((c) => `${c.claim} — ${c.verdict}${c.why ? `: ${c.why}` : ""}`);
   v.flagged = flags.length;
   v.flags = flags;
@@ -122,7 +195,7 @@ async function verifyNode(n: Node, inv: Inventory, model: string): Promise<Verdi
   v.claims = r.real;
   if (!r.real.length) return v;
   // A rewrite that still breaks the length rule is not applied; the node keeps its own detail.
-  if (words(r.detail) <= 40 && sentences(r.detail) <= 2) n.detail = r.detail;
+  if (words(r.detail) <= 40 && sentences(r.detail) <= 2 && r.detail !== n.detail) n.detail = v.fixed = r.detail;
   n.issues = r.issues.length ? r.issues : undefined;
   (n.code ?? []).forEach((c, i) => { if (r.code_labels[i]) c.label = r.code_labels[i]; });
   const linesOf = fileReader(inv.repo);
@@ -146,7 +219,7 @@ interface Review { real: string[]; detail: string; issues: { title: string; deta
 async function review(n: Node, flags: string[], inv: Inventory, model: string): Promise<Review | null> {
   const known = new Set(inv.files.map((f) => f.path));
   const tools = [...TOOLS.filter((t) => t.name !== "submit"), REVIEW];
-  const system = `You rule on flags a first reader raised against an explanation of code. The first reader saw only the cited lines, so many flags are false alarms or true claims that were simply not cited.
+  const system = `You rule on flags a first reader raised against an explanation of code. The first reader saw only the cited lines and a little around them, so many flags are false alarms or true claims that were simply not cited.
 - A false alarm: dismiss it.
 - A true claim whose lines were not cited: find them (read_file, grep) and add them in add_refs.
 - A wrong claim: correct the wording so every claim is shown by code — never add what the code does not show.
@@ -158,8 +231,8 @@ The detail must stay at most two sentences and 40 words. Finish by calling revie
   const lengthError = (out: Review) => `The detail has ${words(out.detail)} words and ${sentences(out.detail)} sentences; the limit is 40 words and 2 sentences. Call review again.`;
 
   if (BACKEND === "claude-code") {
-    const r = await ccAgent<Review>({
-      model, system, prompt, tools, effort: "medium", stage: "verify-review", maxTurns: 10, nudge: "Finish by calling review.",
+    const r = await converse<Review>({
+      prompt, model, system, tools, stage: "verify-review", maxTurns: 10, nudge: "Finish by calling review.",
       handle: (name, input) => {
         if (name !== "review") return { content: runTool({ name, input }, inv, known) };
         const out = input as Review;
@@ -169,6 +242,7 @@ The detail must stay at most two sentences and 40 words. Finish by calling revie
     return r.value;
   }
 
+  // The API path keeps its own loop: its requests are what the committed maps' caches replay.
   const messages: Message[] = [{ role: "user", content: prompt }];
   for (let turn = 0; turn < 10; turn++) {
     const r = await invoke({ model, stage: "verify-review", effort: "medium", maxTokens: 8000, system, messages, tools });
@@ -193,5 +267,13 @@ export async function verifyTree(root: Node, inv: Inventory, model: string): Pro
   const nodes: Node[] = [];
   const walk = (n: Node) => { nodes.push(n); (n.children ?? []).forEach(walk); };
   walk(root);
-  return Promise.all(nodes.map((n) => (n.code?.length ? verifyNode(n, inv, model) : Promise.resolve({ id: n.id, ok: false, flagged: 0, rewritten: false, downgraded: false, claims: ["no code refs"] }))));
+  const cited = nodes.filter((n) => n.code?.length);
+  const screens = BACKEND === "claude-code" ? await screenMany(cited, inv) : null;
+  return Promise.all(
+    nodes.map(async (n) =>
+      n.code?.length
+        ? settle(n, screens ? (screens.get(n.id) ?? null) : await screenOne(n, inv), inv, model)
+        : { id: n.id, ok: false, flagged: 0, rewritten: false, downgraded: false, claims: ["no code refs"] },
+    ),
+  );
 }

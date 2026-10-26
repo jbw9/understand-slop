@@ -21,7 +21,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cacheFile, chargeUsage, slot, type Message, type Tool } from "./bedrock";
+import { cacheFile, chargeUsage, slot, type Message, type Reply, type Tool } from "./bedrock";
 
 /** Bedrock profile → the name Claude Code takes for the same model. */
 const CC_MODEL: Record<string, string> = {
@@ -45,11 +45,12 @@ interface Result {
   modelUsage?: Record<string, { inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number }>;
 }
 
-/** What one `claude -p` run used, summed over every model it called. */
-type Usage = { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number };
-function usageOf(r: Result): Usage {
+type Usage = Reply["usage"];
+
+/** What `claude -p` runs used, summed over every run and every model each called. */
+function usageOf(...runs: Result[]): Usage {
   const u = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
-  for (const m of Object.values(r.modelUsage ?? {})) {
+  for (const m of runs.flatMap((r) => Object.values(r.modelUsage ?? {}))) {
     u.input_tokens += m.inputTokens;
     u.output_tokens += m.outputTokens;
     u.cache_read_input_tokens += m.cacheReadInputTokens;
@@ -57,18 +58,24 @@ function usageOf(r: Result): Usage {
   }
   return u;
 }
-const addUsage = (a: Usage, b: Usage): Usage => ({
-  input_tokens: a.input_tokens + b.input_tokens,
-  output_tokens: a.output_tokens + b.output_tokens,
-  cache_read_input_tokens: a.cache_read_input_tokens + b.cache_read_input_tokens,
-  cache_creation_input_tokens: a.cache_creation_input_tokens + b.cache_creation_input_tokens,
-});
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RETRYABLE = /overloaded|529|500|502|503|rate.?limit|429|ECONNRESET|timed? ?out/i;
 
-/** One `claude -p` run, prompt on stdin, retried on transient failures. */
-async function claude(args: string[], prompt: string, stage: string): Promise<Result> {
+/**
+ * Claude Code's effort for the API path's. The same word does not buy the same
+ * thinking through both doors: at "high", ky's authors through Claude Code
+ * thought for up to 43k tokens in one reply (13 minutes) where the API never
+ * passed 10k. Claude Code (2.1.310) gives models with adaptive thinking, Opus
+ * among them, no budget: MAX_THINKING_TOKENS only turns thinking on or off, so
+ * effort is the one bound, and callers pick a lower one than the API path's.
+ * SLOP_CC_EFFORT overrides it for every call.
+ */
+const ccEffort = (effort?: string) => (effort ? process.env.SLOP_CC_EFFORT ?? effort : undefined);
+
+/** One `claude -p` run, prompt on stdin, retried on transient failures. No effort means no thinking, as on the API path. */
+async function claude(args: string[], prompt: string, stage: string, effort?: string): Promise<Result> {
+  const flags = [...args, ...(effort ? ["--effort", effort] : [])];
   return slot(async () => {
     for (let attempt = 0; ; attempt++) {
       const out = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve) => {
@@ -76,9 +83,8 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
         const env = { ...process.env };
         delete env.CLAUDECODE;
         delete env.CLAUDE_CODE_ENTRYPOINT;
-        // No effort means no thinking, as on the API path; with one, thinking is capped (see ccEffort).
-        env.MAX_THINKING_TOKENS = args.includes("--effort") ? THINKING : "0";
-        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...args], { cwd: cwd(), env });
+        env.MAX_THINKING_TOKENS = effort ? "16000" : "0";
+        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...flags], { cwd: cwd(), env });
         let stdout = "", stderr = "";
         p.stdout.on("data", (d) => (stdout += d));
         p.stderr.on("data", (d) => (stderr += d));
@@ -100,21 +106,8 @@ async function claude(args: string[], prompt: string, stage: string): Promise<Re
   });
 }
 
-/**
- * Claude Code's effort for the API path's. The same word does not buy the same
- * thinking through both doors: at "high", ky's authors through Claude Code
- * thought for up to 43k tokens in one reply (13 minutes) where the API never
- * passed 10k. A 16k cap per reply kept the effort and the maps' quality and
- * halved the time. SLOP_CC_EFFORT and SLOP_CC_THINKING recalibrate; both are
- * part of the cache key.
- */
-const THINKING = process.env.SLOP_CC_THINKING ?? "16000";
-const ccEffort = (effort?: string) => (effort ? `${process.env.SLOP_CC_EFFORT ?? effort}/${THINKING}` : undefined);
-
-/** The flags every run shares: the model, its effort, and our system prompt in place of Claude Code's. */
-function base(model: string, system: string, effort?: string): string[] {
-  return ["--model", ccModel(model), "--system-prompt", system, ...(effort ? ["--effort", effort.split("/")[0]] : [])];
-}
+/** The flags every run shares: the model and our system prompt in place of Claude Code's. */
+const base = (model: string, system: string) => ["--model", ccModel(model), "--system-prompt", system];
 
 /** A conversation as one prompt. The API path's retries carry the previous answer and what was wrong with it; so does this. */
 function transcript(messages: Message[]): string {
@@ -153,7 +146,7 @@ export async function ccAsk<T>(req: { model: string; system: string | { type: st
   const hit = cached<{ value: T }>(key, req.stage, req.model);
   if (hit) return hit.value;
   // Two built-in turns at least: the answer, then the structured-output call.
-  const r = await claude([...base(req.model, system, effort), "--tools", "", "--json-schema", schema, "--max-turns", "4", "--no-session-persistence"], prompt, req.stage);
+  const r = await claude([...base(req.model, system), "--tools", "", "--json-schema", schema, "--max-turns", "4", "--no-session-persistence"], prompt, req.stage, effort);
   if (r.structured_output === undefined) throw new Error(`${req.stage}: claude -p returned no structured output (${r.subtype})`);
   const usage = usageOf(r);
   chargeUsage(req.stage, req.model, usage, false);
@@ -241,21 +234,22 @@ export async function ccAgent<T>(req: {
   sessions.set(id, session);
   const config = JSON.stringify({ mcpServers: { slop: { type: "http", url: `http://127.0.0.1:${port}/mcp/${id}` } } });
   const allowed = req.tools.map((t) => `mcp__slop__${t.name}`).join(",");
-  let usage: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const runs: Result[] = [];
   let turns = 0;
   try {
     let prompt = req.prompt;
     for (let run = 0; run < 3 && session.done === undefined && turns < req.maxTurns; run++) {
       // A nudge continues the same session, reads and all, as the API loop's next turn does.
-      const flags = [...base(req.model, system, effort), "--tools", "", "--mcp-config", config, "--allowedTools", allowed, "--max-turns", String(req.maxTurns - turns)];
-      const r = await claude(run === 0 ? [...flags, "--session-id", id] : [...flags, "--resume", id], prompt, req.stage);
-      usage = addUsage(usage, usageOf(r));
+      const flags = [...base(req.model, system), "--tools", "", "--mcp-config", config, "--allowedTools", allowed, "--max-turns", String(req.maxTurns - turns)];
+      const r = await claude([...flags, ...(run === 0 ? ["--session-id", id] : ["--resume", id])], prompt, req.stage, effort);
+      runs.push(r);
       turns += r.num_turns;
       prompt = req.nudge;
     }
   } finally {
     sessions.delete(id);
   }
+  const usage = usageOf(...runs);
   chargeUsage(req.stage, req.model, usage, false);
   const out = { value: (session.done as T | undefined) ?? null, turns, calls: session.calls, usage };
   store(key, out);

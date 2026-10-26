@@ -8,6 +8,7 @@ import { openSettings } from "@/lib/settings";
 import { MapSwitcher, Trail, goTo, useLocation } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
+import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
 import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
@@ -102,6 +103,11 @@ export function Titlebar() {
         {/* Two states side by side: the old and the new. */}
         <path d="M5.5 13V5.5a2 2 0 0 1 2-2h3M10.5 3l2 2.5-2 2.5" />
         <circle cx="5.5" cy="13" r="1.4" />
+      </Control>
+      <Control label="How this map was made — what the agent read and decided" onClick={() => openAudit(name)}>
+        {/* A page with a check: the run's record, read back. */}
+        <path d="M4 1.5h5.5L12 4v10.5H4z" />
+        <path d="m6 9 1.5 1.5L10 8" />
       </Control>
       <Control label="What you added to this map — and a way back" onClick={openHistory}>
         {/* A clock turned back: the history of the reader's own additions. */}

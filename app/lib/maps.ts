@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { apply, readOverlay } from "@/lib/overlay";
-import { listProjects, mapFileOf, markOpened } from "@/lib/vault";
+import { listProjects, mapFileOf, markOpened, projectDir } from "@/lib/vault";
 
 const MAPS = join(process.cwd(), "maps");
 export const DEFAULT_MAP = "explorify";
@@ -28,6 +28,18 @@ export interface MapEntry {
 /** The committed examples. */
 export function listExamples(): string[] {
   return readdirSync(MAPS).filter((d) => existsSync(join(MAPS, d, "map.json"))).sort();
+}
+
+/**
+ * How the map was made: the audit.md its last run wrote beside it
+ * (scripts/generate/audit.ts). Only for a listed project or example, so the
+ * id, which arrives from the page, never names a path; null when its map
+ * was made before runs kept one.
+ */
+export function auditOf(id: string): string | null {
+  const dir = listProjects().some((p) => p.id === id) ? projectDir(id) : listExamples().includes(id) ? join(MAPS, id) : null;
+  const f = dir && join(dir, "audit.md");
+  return f && existsSync(f) ? readFileSync(f, "utf8") : null;
 }
 
 /** Every map that can be opened: the reader's projects that have one, then the examples. */

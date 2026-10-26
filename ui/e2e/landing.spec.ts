@@ -65,7 +65,7 @@ test("headings stay tight when they wrap", async ({ page }) => {
 
 test("a zero star count is not shown", async ({ page }) => {
   await page.goto("/landing");
-  await expect(page.getByRole("link", { name: "Star on GitHub", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View on GitHub", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /GitHub\s*0/ })).toHaveCount(0);
 });
 
@@ -73,7 +73,7 @@ test("a real star count is shown", async ({ page }) => {
   await page.unrouteAll();
   await stars(page, 42);
   await page.goto("/landing");
-  await expect(page.getByRole("link", { name: "Star on GitHub 42", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View on GitHub 42", exact: true })).toBeVisible();
 });
 
 test("the framed map keeps its repo name on one line on a phone", async ({ page, isMobile }) => {

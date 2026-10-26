@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 /**
  * The project list: the reader's own projects, imported from this machine and
  * kept in the app's vault (lib/vault.ts), and the examples that ship with the
- * app. Importing one maps it straight away through the reader's Claude Code;
+ * app. Starting one (a short wizard) either makes a new empty folder, or maps
+ * an existing one straight away through the reader's Claude Code;
  * the list follows the run, and the map opens from here or the picker once
  * it is made.
  */
@@ -59,6 +60,9 @@ export function ProjectsDialog() {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wizard, setWizard] = useState(false);
+  // Whether the wizard makes a new folder or maps an existing one; unasked yet when null.
+  const [fresh, setFresh] = useState<boolean | null>(null);
   const close = useCallback(() => setOpen(false), []);
 
   // Which maps were ready last time, so a run finishing refreshes the picker.
@@ -75,6 +79,8 @@ export function ProjectsDialog() {
     const show = (e: Event) => {
       const asked = (e as CustomEvent<string | undefined>).detail;
       if (typeof asked === "string") setRoot(asked);
+      setWizard(typeof asked === "string");
+      setFresh(typeof asked === "string" ? false : null);
       setOpen(true);
       setError(null);
       void refresh();
@@ -110,16 +116,19 @@ export function ProjectsDialog() {
 
   const browse = async () => {
     const { open: pick } = await import("@tauri-apps/plugin-dialog");
-    const dir = await pick({ directory: true, title: "Choose a project folder" });
+    const dir = await pick({ directory: true, title: fresh ? "Choose where the new folder goes" : "Choose a project folder" });
     if (typeof dir === "string") setRoot(dir);
   };
 
   const importIt = async () => {
     try {
-      const claude = await claudePath();
-      if (await act({ action: "import", root: root.trim(), name: label.trim(), claude })) {
+      const body = fresh
+        ? { action: "create", root: root.trim(), name: label.trim() }
+        : { action: "import", root: root.trim(), name: label.trim(), claude: await claudePath() };
+      if (await act(body)) {
         setRoot("");
         setLabel("");
+        setWizard(false);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -149,39 +158,32 @@ export function ProjectsDialog() {
           note={list ? `Your projects stay on this machine, in ${list.vault}` : "Loading…"}
         />
         <div className="flex min-h-0 flex-col gap-6 overflow-y-auto px-5 py-5">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void importIt();
-            }}
-            className="flex flex-col gap-4 rounded-[8px] border border-border-gray bg-surface px-4 py-4"
-          >
-            <Field label="Import a project" hint="A folder on this machine. Its map is made right away with your Claude Code — about 20 minutes for a mid-sized repo, counted against your plan's usage.">
-              <div className="flex gap-2">
-                <input
-                  value={root}
-                  onChange={(e) => setRoot(e.target.value)}
-                  placeholder="~/code/my-app"
-                  spellCheck={false}
-                  className={INPUT}
-                />
-                {isTauri() ? (
-                  <button type="button" onClick={() => void browse()} className={cn(QUIET, "shrink-0 border border-border-gray bg-pure-white")}>
-                    Browse…
-                  </button>
-                ) : null}
-              </div>
-            </Field>
-            <Field label="Name" hint="Blank uses the folder's name.">
-              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="my-app" spellCheck={false} className={INPUT} />
-            </Field>
-            <div className="flex items-center justify-end gap-3">
-              {error ? <p className="mr-auto text-[12.5px] text-clay-ink">{error}</p> : null}
-              <button type="submit" disabled={busy || !root.trim()} className={PRIMARY}>
-                Import and map it
+          {wizard ? (
+            <NewProject
+              fresh={fresh}
+              setFresh={setFresh}
+              root={root}
+              setRoot={setRoot}
+              label={label}
+              setLabel={setLabel}
+              busy={busy}
+              error={error}
+              onBrowse={isTauri() ? () => void browse() : undefined}
+              onStart={() => void importIt()}
+              onCancel={() => {
+                setWizard(false);
+                setFresh(null);
+                setError(null);
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-between gap-4 rounded-[8px] border border-border-gray bg-surface px-4 py-3">
+              <p className="text-[12.5px] text-muted-slate">Start a project from scratch, or map a folder on this machine.</p>
+              <button type="button" onClick={() => setWizard(true)} className={cn(PRIMARY, "shrink-0")}>
+                New project…
               </button>
             </div>
-          </form>
+          )}
 
           <section>
             <h3 className="mb-2 text-[13px] font-semibold text-ink">Your projects</h3>
@@ -201,7 +203,7 @@ export function ProjectsDialog() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] text-faint">{list ? "None yet. Import one above." : "Loading…"}</p>
+              <p className="text-[12.5px] text-faint">{list ? "None yet. Start one above." : "Loading…"}</p>
             )}
           </section>
 
@@ -233,6 +235,152 @@ export function ProjectsDialog() {
         </div>
       </div>
     </Overlay>
+  );
+}
+
+const STEPS = ["Start", "Folder", "Name", "Review"] as const;
+const folderName = (root: string) => root.trim().replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+const joinPath = (parent: string, name: string) => `${parent.trim().replace(/[\\/]+$/, "")}/${name}`;
+
+/**
+ * Starting a project, one question at a time: from scratch or from a folder
+ * already here, where, what to call it, then what happens before anything
+ * does. A new project is just an empty folder made for it; an existing one
+ * is mapped, so the last step says what that costs. Folders are checked by
+ * the server, so a bad one comes back on the last step with Back to fix it.
+ */
+function NewProject({
+  fresh,
+  setFresh,
+  root,
+  setRoot,
+  label,
+  setLabel,
+  busy,
+  error,
+  onBrowse,
+  onStart,
+  onCancel,
+}: {
+  fresh: boolean | null;
+  setFresh: (v: boolean) => void;
+  root: string;
+  setRoot: (v: string) => void;
+  label: string;
+  setLabel: (v: string) => void;
+  busy: boolean;
+  error: string | null;
+  onBrowse?: () => void;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  // Opened on a folder already chosen (the titlebar's import), it starts at the folder.
+  const [step, setStep] = useState(fresh === false ? 1 : 0);
+  const name = label.trim() || (fresh ? "" : folderName(root));
+  const canNext = [fresh !== null, Boolean(root.trim()), !fresh || Boolean(label.trim())][step] ?? true;
+  const last = step === STEPS.length - 1;
+  const choose = (v: boolean) => {
+    setFresh(v);
+    setStep(1);
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (last) onStart();
+        else if (canNext) setStep(step + 1);
+      }}
+      className="flex flex-col gap-4 rounded-[8px] border border-border-gray bg-surface px-4 py-4"
+    >
+      <ol className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.09em]">
+        {STEPS.map((s, i) => (
+          <li key={s} className={i === step ? "text-deep-green" : i < step ? "text-on-surface-variant" : "text-faint"}>
+            {i < step ? "✓" : i + 1} {s}
+          </li>
+        ))}
+      </ol>
+
+      {step === 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { v: true, title: "Start from scratch", note: "Make a new, empty folder for it." },
+            { v: false, title: "Use an existing folder", note: "Map code already on this machine." },
+          ].map((o) => (
+            <button
+              key={o.title}
+              type="button"
+              onClick={() => choose(o.v)}
+              className={cn(
+                "flex cursor-pointer flex-col gap-1 rounded-[6px] border bg-pure-white px-3 py-3 text-left transition-colors hover:border-deep-green",
+                fresh === o.v ? "border-deep-green" : "border-border-gray",
+              )}
+            >
+              <span className="text-[13px] font-semibold text-ink">{o.title}</span>
+              <span className="text-[12px] text-muted-slate">{o.note}</span>
+            </button>
+          ))}
+        </div>
+      ) : step === 1 ? (
+        <Field
+          label={fresh ? "Where should it go?" : "Which folder?"}
+          hint={fresh ? "The folder the new project is made inside." : "A project on this machine, usually a git checkout."}
+        >
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={root}
+              onChange={(e) => setRoot(e.target.value)}
+              placeholder={fresh ? "~/code" : "~/code/my-app"}
+              spellCheck={false}
+              className={INPUT}
+            />
+            {onBrowse ? (
+              <button type="button" onClick={onBrowse} className={cn(QUIET, "shrink-0 border border-border-gray bg-pure-white")}>
+                Browse…
+              </button>
+            ) : null}
+          </div>
+        </Field>
+      ) : step === 2 ? (
+        <Field label="What should it be called?" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>
+          <input
+            autoFocus
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={(!fresh && folderName(root)) || "my-app"}
+            spellCheck={false}
+            className={INPUT}
+          />
+        </Field>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12.5px]">
+            <dt className="text-muted-slate">Folder</dt>
+            <dd className="truncate font-mono text-ink" title={root}>
+              {fresh ? joinPath(root, name) : root.trim()}
+            </dd>
+            <dt className="text-muted-slate">Name</dt>
+            <dd className="truncate font-mono text-ink">{name}</dd>
+          </dl>
+          <p className="text-[12px] text-muted-slate">
+            {fresh
+              ? "A new empty folder is made there, as a git checkout. There's nothing to map yet: once it has code, map it from the list below."
+              : "Its map is made right away with your Claude Code — about 20 minutes for a mid-sized repo, counted against your plan's usage. You can follow it below and open each part as it finishes."}
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-3">
+        {error && last ? <p className="mr-auto text-[12.5px] text-clay-ink">{error}</p> : null}
+        <button type="button" onClick={step ? () => setStep(step - 1) : onCancel} className={QUIET}>
+          {step ? "Back" : "Cancel"}
+        </button>
+        <button type="submit" disabled={busy || !canNext} className={PRIMARY}>
+          {last ? (fresh ? "Create project" : "Start mapping") : "Next"}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -314,7 +462,7 @@ function ProjectRow({
           </button>
         ) : (
           <button type="button" onClick={onRegenerate} disabled={busy} className={cn(QUIET, "py-1")}>
-            {status === "ready" ? "Regenerate" : "Retry"}
+            {status === "ready" ? "Regenerate" : status === "empty" ? "Map it" : "Retry"}
           </button>
         )}
         <button
@@ -342,7 +490,9 @@ function ProjectRow({
             ? `✓ Mapped at ${p.map.commit ?? "?"}${p.map.seconds ? ` · ${Math.round(p.map.seconds / 60)} min` : ""}${p.stale ? " · the code has changed since" : ""}`
             : status === "cancelled"
               ? "Cancelled."
-              : "✗ Mapping failed."}
+              : status === "empty"
+                ? "New and empty — map it once it has code."
+                : "✗ Mapping failed."}
       </p>
       {status === "generating" && p.progress?.roots.length ? <Roots roots={p.progress.roots} onOpen={onOpen} /> : null}
       {status === "failed" && p.map.error ? (

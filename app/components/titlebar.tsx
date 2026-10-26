@@ -66,9 +66,11 @@ export function Titlebar() {
     >
       {/* Outside the drag region, so a click opens it rather than moving the window. */}
       <label className="relative flex items-center">
+        {/* Only the reader's own projects; an example is opened from Projects,
+            and listed here just while it is the one open. */}
         <MapSwitcher
           map={name}
-          maps={maps}
+          maps={maps.filter((m) => m.local || m.id === name)}
           className="cursor-pointer appearance-none rounded-[5px] bg-transparent py-1 pl-2 pr-6 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
         />
         <svg
@@ -93,7 +95,7 @@ export function Titlebar() {
       </span>
       <div data-tauri-drag-region className="h-full flex-1" />
       <MapUpdates key={name} id={name} root={RUN.root} local={maps.some((m) => m.id === name && m.local)} />
-      <Control label="Projects — import one, or switch maps" onClick={() => openProjects()}>
+      <Control label="Projects — start a new one, or switch maps" onClick={() => openProjects()}>
         <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
       </Control>
       <Control label="What changed in the code — red is gone, green is new" onClick={openDiff}>

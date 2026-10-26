@@ -41,10 +41,15 @@ export function listMaps(): MapEntry[] {
 /**
  * `name` arrives from the URL, so only a listed map is ever read. A project's
  * map is given the project's directory as its root: that is where the reader
- * keeps it, whatever the generator recorded.
+ * keeps it, whatever the generator recorded. With no name the reader's most
+ * recently opened project opens, and only with none of their own an example.
  */
 export function loadMap(name: string | undefined): { name: string; file: MapFile } {
-  const project = name ? listProjects().find((p) => p.id === name) : undefined;
+  const projects = listProjects();
+  const opened = (p: (typeof projects)[number]) => Date.parse(p.openedAt ?? p.addedAt);
+  const project = name
+    ? projects.find((p) => p.id === name)
+    : projects.filter((p) => mapFileOf(p.id)).sort((a, b) => opened(b) - opened(a))[0];
   const file = project && mapFileOf(project.id);
   if (project && file) {
     markOpened(project.id);

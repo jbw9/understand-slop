@@ -25,6 +25,8 @@ export default async function Home({
 }) {
   // A static export serves one map and must not read the request.
   const asked = STATIC_MAP ?? (await searchParams).map;
+  // The landing page frames one map at a time and switches between them itself.
+  const embed = !STATIC_MAP && (await searchParams).embed !== undefined;
   const { name, file } = loadMap(typeof asked === "string" ? asked : undefined);
   file.RUN.url ??= remoteOf(file.RUN);
   // A published page has no checkout to read, and must not carry this machine's paths.
@@ -32,7 +34,7 @@ export default async function Home({
   if (STATIC_MAP) delete file.RUN.root;
   else file.RUN.root = rootOf(file.RUN);
   return (
-    <MapProvider name={name} file={file} maps={STATIC_MAP ? [{ id: STATIC_MAP, label: STATIC_MAP, local: false }] : listMaps()}>
+    <MapProvider name={name} file={file} maps={STATIC_MAP || embed ? [{ id: name, label: name, local: false }] : listMaps()}>
       <div className="flex h-full flex-col">
         {/* The title bar reads the open level from the URL, as the map does. */}
         <Suspense>

@@ -508,8 +508,9 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
 /* ── screen ──────────────────────────────────────────────────── */
 
 /**
- * What the user sees, top to bottom, in a phone-shaped frame, with what each
- * numbered thing does written beside it rather than on top of it.
+ * What the user sees, top to bottom, in the frame of what it runs on — a
+ * phone, or a browser window for a web page — with what each numbered thing
+ * does written beside it rather than on top of it.
  */
 function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
   const noted = block.items.map((it, i) => ({ ...it, i })).filter((it) => it.note);
@@ -542,6 +543,29 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
               the real screen · sample data
             </figcaption>
           </figure>
+        ) : block.device !== "phone" ? (
+          // A web page: a browser window, its address bar showing the route.
+          <div className="w-[440px] max-w-full shrink-0 overflow-hidden rounded-[10px] border-[1.5px] border-border-strong bg-pure-white shadow-panel">
+            <div className="flex items-center gap-3 border-b border-border-gray bg-surface-container px-3 py-2">
+              <div className="flex shrink-0 gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="size-[9px] rounded-full bg-border-strong" />
+                ))}
+              </div>
+              {/* Empty without a route: the title is just below, and an older map has none. */}
+              <p className="h-[22px] min-w-0 flex-1 truncate rounded-[5px] bg-pure-white px-2.5 py-1 font-mono text-[11px] leading-[14px] text-muted-slate">
+                {block.route}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 px-5 pb-5 pt-4">
+              <p className="mb-1 text-[13px] font-semibold text-ink">{block.title}</p>
+              {block.items.map((it, i) => (
+                <div key={i} data-pick={it.label}>
+                  <ScreenThing type={it.type} label={it.label} n={num.get(i)} />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="w-[280px] shrink-0 rounded-[30px] border-[1.5px] border-border-strong bg-pure-white p-3 shadow-panel">
             <div className="mx-auto mb-3 h-[5px] w-16 rounded-full bg-surface-container" />
@@ -557,7 +581,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
         )}
         {noted.length ? (
           // Reading size, not caption size (D44). This list sits beside a
-          // ~700px phone with room to spare, so it was set small and tight
+          // ~700px screen with room to spare, so it was set small and tight
           // against a column of empty space. It is the explanation of the
           // screen — the main text of the block — and is typeset as such.
           <ol className="flex min-w-[280px] max-w-[760px] flex-1 flex-col gap-4 pt-10">

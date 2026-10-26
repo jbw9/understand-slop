@@ -43,6 +43,8 @@ The level itself, `node` open:
    - `sequence`: who talks to whom, in order. Every `from`/`to` must be one of `actors`.
    - `table`: real values, such as the categories, the env vars, the fields a form sends, the routes. Every row must have exactly as many cells as `columns`.
    - `screen`: what a user sees on one screen, as `items` top to bottom, read from the JSX or template. No `shot`.
+     - `device` is what it runs on: `phone` for a mobile app's screen, `web` for a page in a browser. The brief says which this repo has; never default to `phone`.
+     - A `web` screen gives `route`, the URL path it is at (`/settings/billing`, `/invite/[token]`), when the code shows it — a URL, never a file path.
    - `example`: what a stored value or payload looks like. It is labelled as an example, synthesized from the code.
    - `flow` (numbered steps), `facts` (label/value pairs), `chips` (a closed set), `map` (in → out rules), `schema` (table columns), `routes` (HTTP routes).
 5. `issues`: real problems a developer should know before touching this, shown as "Watch out".
@@ -59,4 +61,4 @@ The level itself, `node` open:
 - `screen.shot` and `source` blocks. Code is read live through `code` refs.
 - `under` on rows. A deeper part is a real child node, not a row that unfolds.
 - File paths in any `title` or `sub`. No exceptions.
-- `fromRow`, `ghost`, `col`/`row` other than the child's index (`col: 0`, `row: i`).
+- On a child of a node (not a diagram box): `fromRow`, `ghost`, or `col`/`row` other than the child's index (`col: 0`, `row: i`). Diagram boxes keep their own grid `col`/`row`.

@@ -259,7 +259,11 @@ export type Anatomy =
   // (scripts/capture/phone.mjs, sample data), served from ui/public — e.g.
   // "/shots/explorify/ce-home.png". With a shot, `items` that carry a `note`
   // become the callouts beside it; without one, `items` are drawn (D37).
-  | { kind: "screen"; title: string; caption?: string; shot?: string; items: ScreenItem[] }
+  // `device` is what the screen runs on, from the app's own framework: a
+  // mobile app's (React Native, Expo, Flutter) is `phone`, a page in a
+  // browser is `web`; absent reads as `web`. `route` is the URL path a web
+  // screen lives at ("/settings/billing"), never a file path.
+  | { kind: "screen"; title: string; caption?: string; shot?: string; device?: "phone" | "web"; route?: string; items: ScreenItem[] }
   // What a stored value looks like. Synthesized and labelled as an example.
   | { kind: "example"; caption: string; value: string; notes?: Pair[] }
   | { kind: "schema"; table: string; rows: Column[]; rel?: string[] }

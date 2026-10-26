@@ -1,6 +1,6 @@
 /**
  * Server-side: every map the app can open, and the repo each one reads its
- * code from. Two kinds: the examples committed under `ui/maps/<name>/map.json`,
+ * code from. Two kinds: the examples committed under `app/maps/<name>/map.json`,
  * and the reader's own projects in the vault (lib/vault.ts), which stay on
  * their machine.
  */

@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/generate/audit-diagrams.mts [map…]
+// usage (from app/): npx -y tsx --tsconfig tsconfig.json scripts/generate/audit-diagrams.mts [map…]
 //   Lays out every diagram in every map (or the named ones) exactly as the page does and reports
 //   text drawn over text or over a box, lines drawn through a box they do not connect, and pictures
 //   too wide to read. A label across another line is counted, not failed: it is drawn with a halo.

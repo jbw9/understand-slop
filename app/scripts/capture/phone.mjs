@@ -6,7 +6,7 @@
 // bundle (see the Fetch.requestPaused handler). explorify's files are not edited.
 //
 // Needs Expo web running:  cd ~/Desktop/Code/explorify && CI=1 npx expo start --web --port 8099
-// usage (from ui/):        node scripts/capture/phone.mjs public/shots/explorify <none|student|org> <route> step...
+// usage (from app/):        node scripts/capture/phone.mjs public/shots/explorify <none|student|org> <route> step...
 //   steps: shot:name | tap:<exact text> | type:<placeholder>=<value> | wait:ms | eval:js | scroll:y
 //   Students and organisations should start at "/" and let the app route them;
 //   a shot is saved as <outdir>/<name>.png at 390x844 @2x.

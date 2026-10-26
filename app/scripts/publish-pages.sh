@@ -1,5 +1,5 @@
 #!/bin/sh
-# usage (from ui/): sh scripts/publish-pages.sh <map>
+# usage (from app/): sh scripts/publish-pages.sh <map>
 #   puts out/<map> (built by export-static.mts) at <map>/ on the gh-pages branch and pushes it.
 #   The other maps already on the branch stay; the push is a plain fast-forward.
 set -e

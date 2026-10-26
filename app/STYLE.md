@@ -2,7 +2,7 @@
 
 The look of the canvas: warm paper ground, hairline-bordered white cards, one
 green accent, and motion that never surprises you. Everything below is in use in
-`ui/` — this is a record of what the code does and why, not an aspiration.
+`app/` — this is a record of what the code does and why, not an aspiration.
 
 Tokens live in `app/globals.css` under Tailwind v4's `@theme`. There is no
 `tailwind.config.ts` and there should not be one.

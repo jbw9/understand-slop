@@ -256,7 +256,7 @@ export type Anatomy =
   // Who talks to whom, in order — phone, Supabase, email, a table.
   | { kind: "sequence"; caption?: string; actors: string[]; rows: Message[] }
   // What the user sees on one screen. `shot` is a real capture of the app
-  // (scripts/capture/phone.mjs, sample data), served from ui/public — e.g.
+  // (scripts/capture/phone.mjs, sample data), served from app/public — e.g.
   // "/shots/explorify/ce-home.png". With a shot, `items` that carry a `note`
   // become the callouts beside it; without one, `items` are drawn (D37).
   // `device` is what the screen runs on, from the app's own framework: a

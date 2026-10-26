@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/export-static.mts <map> --base-path /repo/map --source-url https://github.com/o/r/blob/<sha> [--root <checkout>]
+// usage (from app/): npx -y tsx --tsconfig tsconfig.json scripts/export-static.mts <map> --base-path /repo/map --source-url https://github.com/o/r/blob/<sha> [--root <checkout>]
 //   builds one map as a static site in out/<map>/, ready for GitHub Pages. The files the map
 //   cites are baked into source.json, so the drawer reads code with no server; each code card
 //   links to --source-url instead of offering an edit.

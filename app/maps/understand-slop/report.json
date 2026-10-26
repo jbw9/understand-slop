@@ -75,19 +75,19 @@
  },
  "excluded": [
   {
-   "path": "ui/eslint.config.mjs",
+   "path": "app/eslint.config.mjs",
    "reason": "Pure linting tooling config, not part of product behaviour."
   },
   {
-   "path": "ui/postcss.config.mjs",
+   "path": "app/postcss.config.mjs",
    "reason": "Pure CSS build tooling config."
   },
   {
-   "path": "ui/scripts/capture/fixtures.mjs",
+   "path": "app/scripts/capture/fixtures.mjs",
    "reason": "Screenshot capture tooling — mocks Supabase for headless Chrome, not part of the map product."
   },
   {
-   "path": "ui/scripts/capture/phone.mjs",
+   "path": "app/scripts/capture/phone.mjs",
    "reason": "Screenshot capture tooling — drives headless Chrome, not part of the map product."
   }
  ],

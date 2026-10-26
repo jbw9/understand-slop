@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/check-map.mts <map name | fixture module> <repo dir> [--roots a,b,c] [--generated]
+// usage (from app/): npx -y tsx --tsconfig tsconfig.json scripts/check-map.mts <map name | fixture module> <repo dir> [--roots a,b,c] [--generated]
 //   e.g. scripts/check-map.mts explorify ~/Desktop/Code/explorify --roots signup,launch
 //        scripts/check-map.mts @/lib/explorify ~/Desktop/Code/explorify
 // The rules live in scripts/generate/check.ts.

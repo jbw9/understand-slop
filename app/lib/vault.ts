@@ -2,7 +2,7 @@
  * Server-side: the project vault — the reader's own projects, imported from
  * their machine. It lives in the app's data directory, never in this repo, so
  * an imported project and its map stay local: the only maps ever committed are
- * the examples under `ui/maps/`.
+ * the examples under `app/maps/`.
  *
  *   <vault>/projects.json             the list below
  *   <vault>/projects/<id>/map.json    the map, as the generator writes it

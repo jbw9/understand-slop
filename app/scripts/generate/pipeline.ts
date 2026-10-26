@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
+import { auditMarkdown } from "./audit";
 import { authorRoot, type Authored } from "./author";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
@@ -97,9 +98,10 @@ export async function main(args: string[]) {
 
   // A re-run with --roots redoes some roots of the map that is there, so it
   // keeps that map's cut: a fresh one could rename every root.
-  const { cut, leftover } =
-    only && existsSync(`${out}/.cache/cut.json`)
-      ? { cut: JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8")) as Cut, leftover: [] as string[] }
+  const cutReused = Boolean(only && existsSync(`${out}/.cache/cut.json`));
+  const { cut, leftover, rejected } =
+    cutReused
+      ? { cut: JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8")) as Cut, leftover: [] as string[], rejected: [] as string[][] }
       : await lap("cut", () => cutRepo(inv, sums, models.cut));
   writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(cut, null, 1));
   for (const r of cut.roots) say(`${r.id.padEnd(18)} ${r.title} — ${r.files.length} paths`);
@@ -158,7 +160,7 @@ export async function main(args: string[]) {
       cut.roots.map(async (r) => {
         const kept = prev?.AUTHORED.find((n) => n.id === r.id);
         if (only && !only.includes(r.id) && kept) {
-          authored[r.id] = { root: kept, turns: 0, reads: 0, submits: 0, problems: [] };
+          authored[r.id] = { root: kept, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
           mark(r.id, "done", "kept");
           await partial();
           return;
@@ -250,6 +252,10 @@ export async function main(args: string[]) {
     if (nodes) report.verifyPassRate = Math.round((100 * v.reduce((a, x) => a + (x.ok ?? x.nodes - x.downgraded.length), 0)) / nodes);
   }
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1) + "\n");
+  writeFileSync(
+    `${out}/audit.md`,
+    auditMarkdown({ inv, cut, rejected, leftover, cutReused, authored, verdicts, only, backend: BACKEND, models, seconds: total, checkProblems: final.problems }),
+  );
   console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));
   await ccClose();

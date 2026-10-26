@@ -35,6 +35,8 @@ export interface Inventory {
   deps: string[];
   /** Brand marks this repo has a real dependency for (D25). */
   marks: string[];
+  /** What its screens run on, from its frameworks: a mobile app's, a browser's, or both (a mobile app beside a web one). */
+  device: "phone" | "web" | "both";
   /** A map of part of a large repo: the paths it covers and what a reader of it does. */
   scope?: { paths: string[]; focus: string };
   /** TS/JS only: repo-relative imports per file. */
@@ -75,6 +77,20 @@ const MARK_DEPS: Record<string, RegExp> = {
 
 function git(repo: string, ...args: string[]) {
   return execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
+}
+
+// A mobile framework, by dependency or by the project files it leaves —
+// not Tauri's generated mobile shell, which wraps the same web UI.
+const PHONE_DEPS = /^(react-native|expo|@capacitor\/core|@ionic\/react|@ionic\/angular|nativescript)$/;
+const PHONE_FILES = /(^|\/)(pubspec\.yaml|AndroidManifest\.xml|[^/]+\.xcodeproj\/project\.pbxproj)$/;
+// A web front end of its own. Not react-dom: an Expo app's web build pulls it
+// in; and not Flask or Django, which beside a mobile app are its API.
+const WEB_DEPS = /^(next|vite|nuxt|@sveltejs\/kit|astro|@remix-run\/.+|@angular\/core|gatsby)$/;
+
+function deviceOf(deps: string[], files: string[]): Inventory["device"] {
+  const phone = deps.some((d) => PHONE_DEPS.test(d)) || files.some((f) => PHONE_FILES.test(f) && !f.includes("src-tauri/"));
+  if (!phone) return "web";
+  return deps.some((d) => WEB_DEPS.test(d)) ? "both" : "phone";
 }
 
 function manifests(repo: string, files: string[]): string[] {
@@ -161,6 +177,7 @@ export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inv
     readme: readmeFile ? readFileSync(join(repo, readmeFile), "utf8").slice(0, 8000) : "",
     deps,
     marks: MARK_IDS.filter((m) => MARK_DEPS[m] && deps.some((d) => MARK_DEPS[m].test(d))),
+    device: deviceOf(deps, listed),
     imports,
   };
 }

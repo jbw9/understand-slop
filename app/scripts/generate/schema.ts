@@ -65,6 +65,9 @@ export function shapeProblems(node: any, prefix: string, isRoot = true): string[
     if (b.kind === "table" && (!Array.isArray(b.columns) || !Array.isArray(b.rows) || b.rows.some((r: any) => !Array.isArray(r)))) out.push(at(`anatomy[${i}]`) + " table needs columns: string[] and rows: string[][]");
     if (b.kind === "screen" && (b.items ?? []).some((x: any) => !["heading", "text", "field", "choice", "button", "list", "image"].includes(x?.type)))
       out.push(at(`anatomy[${i}]`) + " screen item type must be heading/text/field/choice/button/list/image");
+    if (b.kind === "screen" && !["phone", "web"].includes(b.device)) out.push(at(`anatomy[${i}]`) + ' screen needs device: "phone" or "web" — see the brief');
+    if (b.kind === "screen" && b.route !== undefined && !(isStr(b.route) && b.route.startsWith("/")))
+      out.push(at(`anatomy[${i}]`) + ' screen route is a URL path starting with "/", not a file path');
   }
   if (node.children !== undefined && !Array.isArray(node.children)) out.push(at("children") + " must be an array");
   (node.children ?? []).forEach((c: any, i: number) => {

@@ -113,6 +113,13 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   const i = call.input ?? {};
   if (call.name === "read_file") {
     const path = String(i.path ?? "").replace(/^\.?\//, "");
+    `Screens: ${
+      inv.device === "phone"
+        ? "this is a mobile app, so every screen block is device \"phone\"."
+        : inv.device === "web"
+          ? "no mobile framework is in its dependencies, so every screen block is device \"web\", with the route it is at."
+          : "it has both a mobile app and a web one — give each screen block the device of the code it is read from."
+    }`,
     if (!known.has(path)) return `No such file in the repository listing: ${path}`;
     const start = Math.max(1, Number(i.start) || 1);
     const end = Math.min(start + 399, Number(i.end) || start + 399);

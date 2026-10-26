@@ -64,8 +64,11 @@ export function useLocation(): { path: string[]; crumbs: Crumb[] } {
  */
 export function goTo(next: string[]) {
   const q = new URLSearchParams();
-  const map = new URLSearchParams(window.location.search).get("map");
+  const now = new URLSearchParams(window.location.search);
+  const map = now.get("map");
   if (map) q.set("map", map);
+  // The landing page's frame stays an embed as the visitor goes deeper.
+  if (now.has("embed")) q.set("embed", "");
   for (const id of next) q.append("at", id);
   window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
 }

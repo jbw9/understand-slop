@@ -14,20 +14,9 @@ export interface HowProps {
 }
 
 const TABS = [
-  {
-    title: "Start with the steps",
-    body: "The steps the program takes, in order.",
-    icon: (
-      <>
-        <path d="M9 6h11M9 12h11M9 18h11" />
-        <circle cx="4.5" cy="6" r="1.1" />
-        <circle cx="4.5" cy="12" r="1.1" />
-        <circle cx="4.5" cy="18" r="1.1" />
-      </>
-    ),
-  },
-  { title: "Click a step to open it", body: "Only that step's parts appear.", icon: <path d="M6 3.5v15l4-3.8 2.8 5.8 2.6-1.2-2.8-5.7H18z" /> },
-  { title: "Keep going to the code", body: "A part cites the lines it describes.", icon: <path d="M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5" /> },
+  { title: "Start with the steps", body: "The steps the program takes, in order." },
+  { title: "Click a step to open it", body: "Only that step's parts appear." },
+  { title: "Keep going to the code", body: "A part cites the lines it describes." },
 ];
 
 const KEYWORDS = /\b(if|else|return|def|for|in|not|None|True|False)\b/;
@@ -68,8 +57,8 @@ export function LandingHow({ name, steps, opened, cited }: HowProps) {
   );
 
   return (
-    <section className={s.how} aria-labelledby="how-title">
-      <h2 id="how-title">How it works.</h2>
+    <section id="how" className={s.how} aria-labelledby="how-title">
+      <h2 id="how-title">From the whole repo to one line.</h2>
       <div ref={box} className={`${s.frame} ${s.box}`}>
         <div className={s.rail} role="tablist" aria-label="How it works" aria-orientation="vertical">
           {TABS.map((t, i) => (
@@ -82,9 +71,7 @@ export function LandingHow({ name, steps, opened, cited }: HowProps) {
               tabIndex={i === 0 ? 0 : -1}
               data-tab
             >
-              <svg viewBox="0 0 24 24" aria-hidden>
-                {t.icon}
-              </svg>
+              <i aria-hidden>{i + 1}</i>
               <b>{t.title}</b>
               <span>{t.body}</span>
             </button>

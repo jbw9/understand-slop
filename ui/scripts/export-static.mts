@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/export-static.mts <map> --base-path /repo/map --source-url https://github.com/o/r/blob/<sha>
+// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/export-static.mts <map> --base-path /repo/map --source-url https://github.com/o/r/blob/<sha> [--root <checkout>]
 //   builds one map as a static site in out/<map>/, ready for GitHub Pages. The files the map
 //   cites are baked into source.json, so the drawer reads code with no server; each code card
 //   links to --source-url instead of offering an edit.
@@ -14,7 +14,8 @@ const name = args[0];
 const { name: found, file } = loadMap(name);
 if (found !== name) throw new Error(`no map named ${name}`);
 
-const root = rootOf(file.RUN);
+// --root: the checkout to read, when it is not where the map was made.
+const root = opt("--root") ?? rootOf(file.RUN);
 const cited = new Set<string>();
 const walk = (n: Node) => {
   for (const c of n.code ?? []) cited.add(c.file);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { STATIC_MAP } from "@/lib/source";
 import { cn } from "@/lib/utils";
 
 export interface DemoMap {
@@ -12,7 +13,9 @@ export interface DemoMap {
 
 /**
  * The real canvas, framed. Each tab reloads the iframe on another committed
- * map, so what a visitor explores is the product itself, not a recording.
+ * map, so what a visitor explores is the product itself, not a recording. A
+ * static export has no server to read maps, so each tab opens that map's own
+ * export, published beside this page.
  */
 export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const [open, setOpen] = useState(maps[0].id);
@@ -62,7 +65,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
           ) : null}
           <iframe
             key={open}
-            src={`/?map=${open}&embed`}
+            src={STATIC_MAP ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${open}/` : `/?map=${open}&embed`}
             title={`${current.label}, explored`}
             onLoad={() => setLoaded(open)}
             className={cn(
@@ -77,5 +80,25 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
         goes back.
       </p>
     </div>
+  );
+}
+
+/** Fetched in the browser, so a static export shows today's count, not the build's. */
+export function StarCount({ repo }: { repo: string }) {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    fetch(`https://api.github.com/repos/${repo}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCount(d.stargazers_count))
+      .catch(() => {});
+  }, [repo]);
+  if (count === null) return null;
+  return (
+    <span className="flex items-center gap-1 border-l border-border-gray pl-2 font-mono text-[12px] text-muted-slate tnum">
+      <svg viewBox="0 0 16 16" aria-hidden className="size-3 fill-current">
+        <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z" />
+      </svg>
+      {count}
+    </span>
   );
 }

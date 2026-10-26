@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { LandingDemo, type DemoMap } from "@/components/landing-demo";
-import { listExamples, loadMap } from "@/lib/maps";
+import { LandingDemo, StarCount, type DemoMap } from "@/components/landing-demo";
+import { loadMap } from "@/lib/maps";
 
 export const metadata: Metadata = {
   title: "TBD",
@@ -21,9 +21,6 @@ const DEMOS = [
   { id: "ky", label: "ky" },
   { id: "umami", label: "Umami" },
 ];
-
-// The open-source examples; the rest under maps/ are personal projects or re-runs.
-const MAPPED = ["flask", "fastapi", "ky", "umami", "documenso", "shiori", "taxonomy", "ai-chatbot", "saas-starter", "realworld"];
 
 const PROBLEMS = [
   {
@@ -46,24 +43,11 @@ interface Report {
   roots: { title: string; verify: { rewritten: { claims: string[] }[] } }[];
 }
 
-async function stars(): Promise<number | null> {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}`, { next: { revalidate: 3600 } });
-    return res.ok ? ((await res.json()).stargazers_count as number) : null;
-  } catch {
-    return null;
-  }
-}
-
-export default async function Landing() {
-  const count = await stars();
+export default function Landing() {
   const maps: DemoMap[] = DEMOS.map((d) => {
     const { RUN } = loadMap(d.id).file;
     return { ...d, files: RUN.files ?? 0, elapsed: RUN.elapsed ?? "" };
   });
-  // Counted by repository: a re-run of the same repo is not another map.
-  const repos = new Map(listExamples().map((id) => [loadMap(id).file.RUN.repo, loadMap(id).file.RUN.files ?? 0]));
-  const files = [...repos.values()].reduce((a, b) => a + b, 0);
 
   const flask = loadMap("flask").file;
   const report: Report = JSON.parse(readFileSync(join(process.cwd(), "maps/flask/report.json"), "utf8"));
@@ -75,11 +59,9 @@ export default async function Landing() {
     <div className="h-full overflow-y-auto bg-warm-cream text-ink">
       <header className="sticky top-0 z-10 bg-warm-cream/85 backdrop-blur-sm">
         <nav className="mx-auto flex max-w-[1180px] items-center justify-between px-6 py-4">
-          <a href="/landing" className="text-[15px] font-semibold tracking-[-0.01em]">
-            TBD
-          </a>
+          <span className="text-[15px] font-semibold tracking-[-0.01em]">TBD</span>
           <div className="flex items-center gap-2">
-            <GithubButton count={count} compact />
+            <GithubButton compact />
             <DownloadButton compact />
           </div>
         </nav>
@@ -103,27 +85,13 @@ export default async function Landing() {
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <DownloadButton />
-              <GithubButton count={count} />
+              <GithubButton />
             </div>
           </div>
         </section>
 
         <section aria-label="Live demo" className="mx-auto max-w-[1180px] px-6">
           <LandingDemo maps={maps} />
-        </section>
-
-        <section className="mx-auto max-w-[1180px] px-6 pt-20">
-          <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.09em] text-faint">
-            <span className="tnum">{repos.size}</span> repositories mapped so far ·{" "}
-            <span className="tnum">{files.toLocaleString("en-US")}</span> files
-          </p>
-          <ul className="mx-auto mt-5 flex max-w-[820px] flex-wrap justify-center gap-x-7 gap-y-3">
-            {MAPPED.map((m) => (
-              <li key={m} className="font-mono text-[13.5px] text-muted-slate">
-                {m}
-              </li>
-            ))}
-          </ul>
         </section>
 
         <Section eyebrow="The problem" title="Nobody reads the code anymore.">
@@ -252,7 +220,7 @@ export default async function Landing() {
             <h2 className="text-[28px] font-semibold tracking-[-0.02em]">See your own codebase.</h2>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
               <DownloadButton />
-              <GithubButton count={count} />
+              <GithubButton />
             </div>
           </div>
         </section>
@@ -323,7 +291,7 @@ function DownloadButton({ compact }: { compact?: boolean }) {
   );
 }
 
-function GithubButton({ count, compact }: { count: number | null; compact?: boolean }) {
+function GithubButton({ compact }: { compact?: boolean }) {
   return (
     <a
       href={GITHUB}
@@ -337,14 +305,7 @@ function GithubButton({ count, compact }: { count: number | null; compact?: bool
         <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
       </svg>
       {compact ? "GitHub" : "Star on GitHub"}
-      {count === null ? null : (
-        <span className="flex items-center gap-1 border-l border-border-gray pl-2 font-mono text-[12px] text-muted-slate tnum">
-          <svg viewBox="0 0 16 16" aria-hidden className="size-3 fill-current">
-            <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z" />
-          </svg>
-          {count}
-        </span>
-      )}
+      <StarCount repo={REPO} />
     </a>
   );
 }

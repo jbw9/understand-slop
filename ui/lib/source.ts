@@ -15,6 +15,13 @@ export const SOURCE_URL = process.env.NEXT_PUBLIC_SOURCE_URL;
 
 let baked: Promise<Record<string, string>> | undefined;
 
+/** Lines `start`–`end` of a file, cut from its whole text. */
+export function sliceOf(text: string, q: { file: string; start: number; end: number; fixture?: string }): Slice {
+  const lines = text.split("\n");
+  const code = lines.slice(q.start - 1, q.end).join("\n");
+  return { file: q.file, start: q.start, end: q.end, code, total: lines.length, matchesFixture: q.fixture === undefined || code === q.fixture };
+}
+
 export async function readSource(
   q: { map: string; file: string; start: number; end: number; fixture?: string },
   signal?: AbortSignal,
@@ -29,9 +36,5 @@ export async function readSource(
   baked ??= fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/source.json`).then((r) => r.json());
   const text = (await baked)[q.file];
   if (text === undefined) return { refused: "not in this export" };
-  const lines = text.split("\n");
-  const code = lines.slice(q.start - 1, q.end).join("\n");
-  return {
-    slice: { file: q.file, start: q.start, end: q.end, code, total: lines.length, matchesFixture: q.fixture === undefined || code === q.fixture },
-  };
+  return { slice: sliceOf(text, q) };
 }

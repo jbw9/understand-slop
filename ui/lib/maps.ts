@@ -60,6 +60,20 @@ export function loadMap(name: string | undefined): { name: string; file: MapFile
   return { name: pick, file: JSON.parse(readFileSync(join(MAPS, pick, "map.json"), "utf8")) };
 }
 
+const baked = new Map<string, Record<string, string>>();
+
+/**
+ * An example's cited files as they were when its map was made, committed
+ * beside it as `maps/<name>/source.json`, for a machine without its checkout.
+ * Keyed by repo-relative path, so a caller's path never reaches the disk.
+ */
+export function bakedSource(name: string | undefined): Record<string, string> | undefined {
+  if (!name || !listExamples().includes(name)) return undefined;
+  const file = join(MAPS, name, "source.json");
+  if (!baked.has(name) && existsSync(file)) baked.set(name, JSON.parse(readFileSync(file, "utf8")));
+  return baked.get(name);
+}
+
 /** Where checkouts usually live, under home, in the order they are tried. */
 const CODE_DIRS = ["Desktop/Code", "projects", "Projects", "code", "Code", "src", "dev", "repos", "git"];
 

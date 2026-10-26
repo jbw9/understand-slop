@@ -98,23 +98,42 @@ test("a tour starts on the first map, and can be skipped and taken again", async
   await page.goto("/landing");
   const tip = page.getByRole("status");
   await expect(tip).toContainText("Each card is one step");
-  await expect(tip).toContainText("1 / 4");
+  await expect(tip).toContainText("1 / 5");
   await tip.getByRole("button", { name: "Skip tour" }).click();
   await expect(tip).toBeHidden();
   await page.getByRole("button", { name: "Take the tour" }).click();
-  await expect(tip).toContainText("1 / 4");
+  await expect(tip).toContainText("1 / 5");
 });
 
 test("clicking the card the tour points at moves it on", async ({ page }) => {
   await page.goto("/landing");
-  await expect(page.getByRole("status")).toContainText("1 / 4");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
   await clickRing(page);
-  await expect(page.getByRole("status")).toContainText("2 / 4");
+  await expect(page.getByRole("status")).toContainText("2 / 5");
+});
+
+test("a visitor who reads before clicking still gets the next step", async ({ page }) => {
+  await page.goto("/landing");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
+  await page.waitForTimeout(5000);
+  await clickRing(page);
+  await expect(page.getByRole("status")).toContainText("2 / 5");
+});
+
+test("going off script shows the step for where the visitor is", async ({ page }) => {
+  await page.goto("/landing");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
+  const frame = page.frameLocator("iframe");
+  // Not the card the tour rings: the second one.
+  await frame.locator("button[data-path]:not([disabled])").nth(1).click();
+  await expect(page.getByRole("status")).toContainText("2 / 5");
+  await frame.locator("body").press("Escape");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
 });
 
 test("switching repository ends the tour", async ({ page }) => {
   await page.goto("/landing");
-  await expect(page.getByRole("status")).toContainText("1 / 4");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
   await page.getByRole("tab", { name: "Flask" }).click();
   await expect(page.getByRole("status")).toBeHidden();
   await expect(page.getByRole("button", { name: "Take the tour" })).toBeVisible();
@@ -123,16 +142,27 @@ test("switching repository ends the tour", async ({ page }) => {
 test("opening the code inside the demo never scrolls the page", async ({ page }) => {
   await page.goto("/landing");
   const tip = page.getByRole("status");
-  await expect(tip).toContainText("1 / 4");
-  for (const n of [2, 3]) {
+  await expect(tip).toContainText("1 / 5");
+  for (const n of [2, 3, 4]) {
     await clickRing(page);
-    await expect(tip).toContainText(`${n} / 4`);
+    await expect(tip).toContainText(`${n} / 5`);
   }
-  // "View the code" scrolls the code into view, which must stay inside the frame.
+  // Opening a row scrolls its lines into view, which must stay inside the frame.
   const before = await clickRing(page);
-  await expect(tip).toContainText("4 / 4");
+  await expect(tip).toContainText("5 / 5");
   await page.waitForTimeout(1000);
   expect(await scrollTop(page)).toBe(before);
+});
+
+test("Esc on the lines ends the tour", async ({ page }) => {
+  await page.goto("/landing");
+  const tip = page.getByRole("status");
+  for (const n of [2, 3, 4, 5]) {
+    await clickRing(page);
+    await expect(tip).toContainText(`${n} / 5`);
+  }
+  await page.keyboard.press("Escape");
+  await expect(tip).toContainText("That's the whole loop");
 });
 
 test("each How it works tab shows its own window", async ({ page }) => {

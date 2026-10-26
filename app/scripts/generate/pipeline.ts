@@ -8,13 +8,14 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
+import { parseArgs } from "./args";
 import { auditMarkdown } from "./audit";
 import { authorRoot, type Authored } from "./author";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
 import { check } from "./check";
 import { cutRepo, type Cut } from "./cut";
-import { inventory } from "./inventory";
+import { inventory, isSource } from "./inventory";
 import { summarize } from "./summarize";
 import { verifyTree, type Verdict } from "./verify";
 
@@ -33,9 +34,9 @@ export interface Progress {
 }
 
 export async function main(args: string[]) {
-  const opt = (k: string) => { const i = args.indexOf(k); return i === -1 ? undefined : args[i + 1]; };
+  const { opt, has, repo: dir } = parseArgs(args);
 
-  const repo = resolve(args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"))!);
+  const repo = resolve(dir!);
   const inv = inventory(repo);
   const name = opt("--name") ?? inv.name.toLowerCase();
   // --scope maps part of a large repo; the rest stays readable to the authors.
@@ -53,7 +54,7 @@ export async function main(args: string[]) {
   // imported project's map never lands in this repo's committed examples.
   const out = opt("--out") ?? `maps/${name}`;
   mkdirSync(out, { recursive: true });
-  cacheIn(`${out}/.cache`, { fresh: args.includes("--fresh") });
+  cacheIn(`${out}/.cache`, { fresh: has("--fresh") });
   const t0 = Date.now();
   const elapsed: Record<string, number> = {};
   const lap = async <T,>(stage: string, fn: () => Promise<T>): Promise<T> => {
@@ -77,15 +78,15 @@ export async function main(args: string[]) {
   };
   flush();
 
-  const say = (s: string) => {
-    console.log(`  ${s}`);
-    // All authorRoot's callback reports is each submit's verdict (author.ts),
-    // so "revising" is the one in-flight fact the run actually knows.
-    const m = /^(\S+): submit \d+ — (\d+) problems$/.exec(s);
-    if (m) mark(m[1], "drafting", `revising — ${m[2]} problem${m[2] === "1" ? "" : "s"}`);
+  const say = (s: string) => console.log(`  ${s}`);
+  // Each submit's verdict is the one in-flight fact an author reports, so
+  // "revising" is all the app can say of a root being drafted.
+  const submitted = (id: string) => (n: number, problems: number) => {
+    say(`${id}: submit ${n} — ${problems ? `${problems} problems` : "clean"}`);
+    if (problems) mark(id, "drafting", `revising — ${problems} problem${problems === 1 ? "" : "s"}`);
   };
 
-  const code = inv.files.filter((f) => f.code && !f.test);
+  const code = inv.files.filter(isSource);
   console.log(`${inv.name} @ ${inv.commit}: ${inv.files.length} files, ${code.length} to summarise, marks [${inv.marks.join(", ")}]`);
 
   const sums = await lap("summarize", () =>
@@ -166,7 +167,7 @@ export async function main(args: string[]) {
           return;
         }
         mark(r.id, "drafting", "drafting");
-        authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, say);
+        authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, submitted(r.id));
         say(`${r.id}: ${authored[r.id].root ? "accepted" : "FAILED"} after ${authored[r.id].turns + 1} turns, ${authored[r.id].reads} reads`);
         // Accepted means it already passed, inside authorRoot's submit, the
         // same check() the finished map passes — so showing it now shows

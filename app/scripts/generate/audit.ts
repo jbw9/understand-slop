@@ -48,7 +48,7 @@ export function auditMarkdown(a: AuditInput): string {
   out.push(
     `# How the map of ${inv.name} was made`,
     "",
-    `Commit \`${inv.commit}\` · ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC · ${a.backend} · ${Math.round(a.seconds / 60)} min`,
+    `Commit \`${inv.commit}\`${inv.dirty.length ? `, with uncommitted edits to ${inv.dirty.slice(0, 8).map((f) => `\`${f}\``).join(", ")}${inv.dirty.length > 8 ? ` and ${inv.dirty.length - 8} more` : ""} (read as they were on disk)` : ""} · ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC · ${a.backend} · ${Math.round(a.seconds / 60)} min`,
     "",
     `Models: ${Object.entries(a.models).map(([k, v]) => `${k} \`${v}\``).join(", ")}.`,
     ...(a.only ? ["", `A repair run: only ${a.only.map((id) => title.get(id) ?? id).join(", ")} were redone; the other roots were kept from the map that was there.`] : []),
@@ -60,7 +60,7 @@ export function auditMarkdown(a: AuditInput): string {
   else if (a.rejected.length)
     a.rejected.forEach((p, i) => out.push(`- Round ${i + 1} was sent back: ${p.slice(0, 10).join("; ")}${p.length > 10 ? `; and ${p.length - 10} more` : ""}`));
   else out.push("- The first cut passed its checks.");
-  out.push("", "| Root | Why it is a root | Owns |", "|---|---|---|");
+  if (cut.roots.length) out.push("", "| Root | Why it is a root | Owns |", "|---|---|---|");
   for (const r of cut.roots) out.push(`| ${r.title} | ${r.why.replace(/\|/g, "\\|")} | ${r.files.length} path${r.files.length === 1 ? "" : "s"} |`);
   if (cut.edges.length) out.push("", `The path through them: ${cut.edges.map((e) => `${title.get(e.from) ?? e.from} → ${title.get(e.to) ?? e.to}${e.label ? ` (${e.label})` : ""}`).join(", ")}.`);
   const roots = new Set(cut.edges.flatMap((e) => [e.from, e.to]));
@@ -91,22 +91,25 @@ export function auditMarkdown(a: AuditInput): string {
       out.push("<details><summary>What the agent did, step by step</summary>", "");
       w.trail.forEach((s, i) => out.push(`${i + 1}. ${s.tool === "submit" ? "**submit**" : s.tool} ${s.what} — ${s.result}`));
       out.push("", "</details>", "");
-    } else out.push("_Its steps were replayed from a cache made before steps were kept; regenerate with --fresh to record them._", "");
+    }
     if (w.root) out.push("What it settled on:", "", ...outline(w.root));
   }
 
   // 3. Verification.
-  out.push("", "## 3. What verification changed", "", "A second model read each node against the lines it cites. Questioned claims went to a reviewer that could read the repo, which dismissed them, added the missing citation, corrected the wording, or marked the node unsure.");
+  out.push("", "## 3. What verification changed", "", "A second model read each node against the lines it cites and the code around them. Questioned claims went to a reviewer that could read the repo, which dismissed them, added the missing citation, corrected the wording, or marked the node unsure.");
   for (const r of cut.roots) {
     const v = a.verdicts[r.id];
     if (!v) continue;
     const flagged = v.filter((x) => x.flagged);
-    out.push("", `### ${r.title}`, "", `${v.length} nodes checked: ${v.filter((x) => x.ok).length} passed as written, ${flagged.length} questioned, ${v.filter((x) => x.rewritten).length} rewritten, ${v.filter((x) => x.downgraded).length} marked unsure.`);
+    const changed = v.filter((x) => x.rewritten || x.downgraded).length;
+    out.push("", `### ${r.title}`, "", `${v.length} nodes checked: ${v.length - changed} kept as written, ${flagged.length} questioned, ${v.filter((x) => x.rewritten).length} rewritten, ${v.filter((x) => x.downgraded).length} marked unsure.`);
     for (const x of flagged) {
       const what = x.downgraded ? "marked unsure" : x.rewritten ? "rewritten" : "every flag dismissed";
       out.push("", `- \`${x.id}\` — ${what}`);
-      for (const f of x.flags ?? []) out.push(`  - questioned: ${f}`);
-      for (const c of x.claims) out.push(`  - confirmed wrong: ${c}`);
+      // The reviewer quotes the flags it upholds, not always word for word: match on the claim.
+      const upheld = new Set(x.claims.map(claimOf));
+      for (const f of x.flags ?? []) out.push(`  - ${upheld.has(claimOf(f)) ? "upheld" : "dismissed"}: ${f}`);
+      if (x.fixed) out.push(`  - now reads: ${x.fixed}`);
     }
   }
 
@@ -118,3 +121,6 @@ export function auditMarkdown(a: AuditInput): string {
   } else out.push("The finished map passed every check.");
   return out.join("\n") + "\n";
 }
+
+/** A flag's claim, without its verdict and reasons. */
+const claimOf = (flag: string) => flag.split(" — ")[0].trim();

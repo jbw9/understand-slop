@@ -7,8 +7,8 @@
  * which is also what an incremental map will need.
  */
 
-import { ask, MODELS } from "./bedrock";
-import { numbered, type Inventory } from "./inventory";
+import { ask, BACKEND, MODELS } from "./bedrock";
+import { isSource, numbered, type Inventory, type RepoFile } from "./inventory";
 
 export interface FileSummary {
   path: string;
@@ -58,28 +58,80 @@ Never guess at code you cannot see. Call the summary tool once.`;
 /** Larger files are read in their first part only; the summary says so. */
 const MAX_LINES = 1500;
 
+const shown = (inv: Inventory, f: RepoFile) =>
+  `File: ${f.path} (${f.lines} lines)${f.lines > MAX_LINES ? `\n(Only lines 1-${MAX_LINES} of ${f.lines} are shown.)` : ""}\n\n${numbered(inv.repo, f.path, 1, MAX_LINES)}`;
+
+async function one(inv: Inventory, f: RepoFile): Promise<FileSummary> {
+  try {
+    const s = await ask<Omit<FileSummary, "path">>({
+      model: MODELS.haiku,
+      stage: "summarize",
+      maxTokens: 4000,
+      system: SYSTEM,
+      messages: [{ role: "user", content: `Repository: ${inv.name}\n${shown(inv, f)}` }],
+      tool: TOOL,
+    });
+    return { path: f.path, ...s };
+  } catch (e) {
+    // One unreadable file is a gap the cut is told about, not a failed run.
+    return { path: f.path, purpose: `(not summarised: ${(e as Error).message.slice(0, 120)})`, kind: "other", symbols: [], reads: [], writes: [], external: [], user_sees: "" };
+  }
+}
+
+const MANY = {
+  name: "summaries",
+  description: "Record what each file shown does.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["files"],
+    properties: {
+      files: {
+        type: "array",
+        items: { ...TOOL.input_schema, required: ["path", ...TOOL.input_schema.required], properties: { path: { type: "string", description: "The file's path exactly as shown." }, ...TOOL.input_schema.properties } },
+      },
+    },
+  },
+};
+
+/** Lines a batch may carry, and files per batch. */
+const BATCH_LINES = 3000;
+const BATCH_FILES = 8;
+
+/**
+ * Small files in one call, for Claude Code: every `claude -p` pays its own
+ * start-up and prompt, which one call per file multiplied by the repository.
+ * A file the batch leaves out is summarised on its own.
+ */
+async function many(inv: Inventory, files: RepoFile[]): Promise<FileSummary[]> {
+  let got: FileSummary[] = [];
+  if (files.length > 1)
+    got = (await ask<{ files: FileSummary[] }>({
+      model: MODELS.haiku,
+      stage: "summarize",
+      system: `${SYSTEM.replace("one source file", "several source files").replace("Call the summary tool once.", "Record every file shown, each by its path.")}`,
+      messages: [{ role: "user", content: `Repository: ${inv.name}\n\n${files.map((f) => shown(inv, f)).join("\n\n")}` }],
+      tool: MANY,
+    }).catch(() => ({ files: [] }))).files.filter((x) => files.some((f) => f.path === x.path));
+  const left = files.filter((f) => !got.some((x) => x.path === f.path));
+  return [...got, ...(await Promise.all(left.map((f) => one(inv, f))))];
+}
+
 export async function summarize(inv: Inventory, onDone: (n: number, of: number) => void): Promise<Record<string, FileSummary>> {
-  const todo = inv.files.filter((f) => f.code && !f.test);
+  const todo = inv.files.filter(isSource);
+  const batches: RepoFile[][] = [];
+  for (const f of todo) {
+    const b = batches[batches.length - 1];
+    const lines = (x: RepoFile) => Math.min(x.lines, MAX_LINES);
+    if (BACKEND === "claude-code" && b && b.length < BATCH_FILES && b.reduce((a, x) => a + lines(x), 0) + lines(f) <= BATCH_LINES) b.push(f);
+    else batches.push([f]);
+  }
   const out: Record<string, FileSummary> = {};
   let n = 0;
   await Promise.all(
-    todo.map(async (f) => {
-      const cut = f.lines > MAX_LINES ? `\n(Only lines 1-${MAX_LINES} of ${f.lines} are shown.)` : "";
-      try {
-        const s = await ask<Omit<FileSummary, "path">>({
-          model: MODELS.haiku,
-          stage: "summarize",
-          maxTokens: 4000,
-          system: SYSTEM,
-          messages: [{ role: "user", content: `Repository: ${inv.name}\nFile: ${f.path} (${f.lines} lines)${cut}\n\n${numbered(inv.repo, f.path, 1, MAX_LINES)}` }],
-          tool: TOOL,
-        });
-        out[f.path] = { path: f.path, ...s };
-      } catch (e) {
-        // One unreadable file is a gap the cut is told about, not a failed run.
-        out[f.path] = { path: f.path, purpose: `(not summarised: ${(e as Error).message.slice(0, 120)})`, kind: "other", symbols: [], reads: [], writes: [], external: [], user_sees: "" };
-      }
-      onDone(++n, todo.length);
+    batches.map(async (b) => {
+      for (const s of b.length > 1 ? await many(inv, b) : [await one(inv, b[0])]) out[s.path] = s;
+      for (let i = 0; i < b.length; i++) onDone(++n, todo.length);
     }),
   );
   return Object.fromEntries(Object.keys(out).sort().map((k) => [k, out[k]]));

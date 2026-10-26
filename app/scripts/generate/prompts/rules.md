@@ -32,7 +32,7 @@ The reader is a developer who has to *explain* this system under questioning: wh
 The level itself, `node` open:
 
 1. `title`: the thing's own name in 1–4 words, Title Case, everyday words a newcomer would use. Good: "Organisation Sign-Up", "Interest Categories", "Choosing The Home Screen". Bad: nicknames such as "Org Wizard" or "Role Lookup", code identifiers such as `rsvp` or `fetchAllEvents`, and file paths. Code identifiers belong in `detail` in backticks.
-2. `sub`: one plain line saying what this IS. Never a file path.
+2. `sub`: at most 8 words saying what this IS, plainly: "Add a repo and watch it get mapped". Not a list of its parts (the children already name them) and never a file path.
 3. `detail`: **at most two sentences and at most 40 words.** The one thing to know before looking at the pictures. Everything else is a block.
 4. `anatomy`: blocks drawn as the thing they describe. Use whichever fit; most levels have 1–3:
    - `diagram`: how the pieces connect. This is the main picture of a level.

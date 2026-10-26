@@ -217,7 +217,7 @@ export default function Landing() {
             className="dotfield absolute inset-0 [mask-image:radial-gradient(ellipse_at_bottom,black,transparent_70%)]"
           />
           <div className="relative mx-auto max-w-[1180px] px-6 py-28 text-center">
-            <h2 className="text-[28px] font-semibold tracking-[-0.02em]">See your own codebase.</h2>
+            <h2 className="text-[28px] font-semibold leading-[1.2] tracking-[-0.02em]">See your own codebase.</h2>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
               <DownloadButton />
               <GithubButton />
@@ -242,7 +242,7 @@ function Section({ eyebrow, title, children }: { eyebrow: string; title: string;
   return (
     <section className="mx-auto max-w-[1180px] px-6 pt-28">
       <p className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-faint">{eyebrow}</p>
-      <h2 className="mb-10 mt-3 text-[28px] font-semibold tracking-[-0.02em]">{title}</h2>
+      <h2 className="mb-10 mt-3 text-[28px] font-semibold leading-[1.2] tracking-[-0.02em]">{title}</h2>
       {children}
     </section>
   );

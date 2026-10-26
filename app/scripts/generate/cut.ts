@@ -125,7 +125,7 @@ function problems(cut: Cut, inv: Inventory): string[] {
   return out;
 }
 
-export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>, model: string): Promise<{ cut: Cut; leftover: string[] }> {
+export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>, model: string): Promise<{ cut: Cut; leftover: string[]; rejected: string[][] }> {
   // Only what bears on the cut: rules for writing a level change often, and
   // each change would otherwise re-cut every repository and rename its roots.
   const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
@@ -152,10 +152,13 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   const system = [{ type: "text" as const, text: rules, cache_control: { type: "ephemeral" as const } }];
 
   let cut: Cut | null = null;
+  // Each round sent back, with why: the audit's account of how the cut settled.
+  const rejected: string[][] = [];
   for (let round = 0; round < 3; round++) {
     cut = await ask<Cut>({ model, stage: "cut", effort: "high", maxTokens: 32000, system, messages, tool: TOOL });
     const p = problems(cut, inv);
-    if (!p.length) return { cut, leftover: [] };
+    if (!p.length) return { cut, leftover: [], rejected };
+    rejected.push(p);
     messages.push(
       { role: "assistant", content: [{ type: "text", text: JSON.stringify(cut) }] },
       { role: "user", content: `That cut has problems. Fix them and call cut again with the complete corrected cut:\n- ${p.join("\n- ")}` },
@@ -164,5 +167,5 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   // Still uncovered after three rounds: recorded, not silently dropped.
   const leftover = inv.files.filter((f) => f.code && !f.test && !owners(cut!, f.path).length && !excludedBy(cut!, f.path)).map((f) => f.path);
   cut!.excluded.push(...leftover.map((path) => ({ path, reason: "left unassigned by the cut after three rounds" })));
-  return { cut: cut!, leftover };
+  return { cut: cut!, leftover, rejected };
 }

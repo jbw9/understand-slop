@@ -28,6 +28,8 @@ export interface Verdict {
   rewritten: boolean;
   downgraded: boolean;
   claims: string[];
+  /** Every claim the first reader questioned, with its verdict, before review. */
+  flags?: string[];
 }
 
 const SCREEN = {
@@ -111,6 +113,7 @@ async function verifyNode(n: Node, inv: Inventory, model: string): Promise<Verdi
   }
   const flags = screen.claims.filter((c) => c.verdict !== "supported").map((c) => `${c.claim} — ${c.verdict}${c.why ? `: ${c.why}` : ""}`);
   v.flagged = flags.length;
+  v.flags = flags;
   if (!flags.length) return v;
 
   // One failed review leaves this node unreviewed; it must not fail the whole stage.

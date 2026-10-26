@@ -27,6 +27,24 @@ export interface Authored {
   submits: number;
   /** The checker's last word when the root never came back clean. */
   problems: string[];
+  /** What the agent did, in order: each read, search and submit, for the run's audit. */
+  trail: Step[];
+}
+
+/** One agent action, in words: "read app/page.tsx 1-80", and what came of it. */
+export interface Step {
+  tool: string;
+  what: string;
+  result: string;
+}
+
+/** A tool call as a line of the audit: the call, and what it found. */
+function stepOf(name: string, input: any, content: string, problems?: string[]): Step {
+  const i = input ?? {};
+  if (name === "read_file") return { tool: name, what: `${i.path}${i.start || i.end ? ` ${i.start ?? 1}-${i.end ?? "end"}` : ""}`, result: /^\d/.test(content) ? `${content.split("\n").length} lines` : content.split("\n")[0].slice(0, 120) };
+  if (name === "grep") return { tool: name, what: `/${i.pattern}/${i.under ? ` under ${i.under}` : ""}`, result: content === "No matches." ? "no matches" : `${content.split("\n").length} matches` };
+  if (name === "list") return { tool: name, what: String(i.dir ?? ""), result: `${content.split("\n").length} entries` };
+  return { tool: name, what: "the whole root", result: problems?.length ? `rejected — ${problems.length} problems: ${problems.slice(0, 8).join("; ")}${problems.length > 8 ? "; …" : ""}` : "accepted" };
 }
 
 export const TOOLS: Tool[] = [
@@ -95,6 +113,13 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
     `## Your root\nid: ${root.id}\ntitle: ${root.title}\nsub: ${root.sub}\nscope: ${root.why}\nEvery node id under it starts with "${root.prefix}-".`,
     `Brand marks you may use: ${inv.marks.length ? inv.marks.join(", ") : "none"}.`,
+    `Screens: ${
+      inv.device === "phone"
+        ? "this is a mobile app, so every screen block is device \"phone\"."
+        : inv.device === "web"
+          ? "no mobile framework is in its dependencies, so every screen block is device \"web\", with the route it is at."
+          : "it has both a mobile app and a web one — give each screen block the device of the code it is read from."
+    }`,
     `## Files this root owns (${mine.length}), with what each does\n${mine.map((f) => (sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`)).join("\n")}`,
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
     `## Task
@@ -113,13 +138,6 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   const i = call.input ?? {};
   if (call.name === "read_file") {
     const path = String(i.path ?? "").replace(/^\.?\//, "");
-    `Screens: ${
-      inv.device === "phone"
-        ? "this is a mobile app, so every screen block is device \"phone\"."
-        : inv.device === "web"
-          ? "no mobile framework is in its dependencies, so every screen block is device \"web\", with the route it is at."
-          : "it has both a mobile app and a web one — give each screen block the device of the code it is read from."
-    }`,
     if (!known.has(path)) return `No such file in the repository listing: ${path}`;
     const start = Math.max(1, Number(i.start) || 1);
     const end = Math.min(start + 399, Number(i.end) || start + 399);
@@ -162,14 +180,16 @@ export async function authorRoot(
   log: (s: string) => void,
 ): Promise<Authored> {
   const known = new Set(inv.files.map((f) => f.path));
-  const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [] };
+  const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
   const MAX_TURNS = 45;
 
   /** One tool call, answered the same way whichever backend made it. */
   const handle = (name: string, input: any): Handled => {
     if (name !== "submit") {
       res.reads++;
-      return { content: runTool({ name, input }, inv, known) };
+      const content = runTool({ name, input }, inv, known);
+      res.trail.push(stepOf(name, input, content));
+      return { content };
     }
     res.submits++;
     const node = input?.root;
@@ -177,14 +197,16 @@ export async function authorRoot(
     const problems = shapeProblems(node, root.prefix);
     if (!problems.length) problems.push(...check({ AUTHORED: [node], E0: [], LINKS: [] }, inv.repo, { generated: true }).problems);
     res.problems = problems;
+    res.trail.push(stepOf(name, input, "", problems));
     log(`${root.id}: submit ${res.submits} — ${problems.length ? `${problems.length} problems` : "clean"}`);
-    if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { node, reads: res.reads, submits: res.submits } };
+    if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { node, reads: res.reads, submits: res.submits, trail: res.trail } };
     return { content: `Not accepted. Fix every one of these and submit the whole root again:\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
   };
 
-  const r = await converse<{ node: Node; reads: number; submits: number }>(brief(root, cut, inv, sums), handle, model, "author", MAX_TURNS);
-  // A replayed run calls no tools, so its counts come from the cache.
-  return { ...res, root: r.value?.node ?? null, turns: r.turns, reads: r.value?.reads ?? res.reads, submits: r.value?.submits ?? res.submits };
+  const r = await converse<{ node: Node; reads: number; submits: number; trail?: Step[] }>(brief(root, cut, inv, sums), handle, model, "author", MAX_TURNS);
+  // A replayed run calls no tools, so its counts and steps come from the cache
+  // (a run cached before steps were kept has none).
+  return { ...res, root: r.value?.node ?? null, turns: r.turns, reads: r.value?.reads ?? res.reads, submits: r.value?.submits ?? res.submits, trail: r.value?.trail ?? res.trail };
 }
 
 /**

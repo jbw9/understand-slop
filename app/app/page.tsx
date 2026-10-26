@@ -5,6 +5,7 @@ import { DiffMode } from "@/components/diff";
 import { DiffPanel } from "@/components/diff-panel";
 import { MapProvider } from "@/components/map-context";
 import { ProjectsDialog } from "@/components/projects";
+import { AuditDialog } from "@/components/audit";
 import { HistoryDialog } from "@/components/history";
 import { SettingsDialog } from "@/components/settings";
 import { Titlebar } from "@/components/titlebar";
@@ -56,6 +57,7 @@ export default async function Home({
         <SettingsDialog />
         <ProjectsDialog />
         <HistoryDialog />
+        <AuditDialog />
       </div>
     </MapProvider>
   );

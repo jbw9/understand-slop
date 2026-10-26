@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/export-map.mts <fixture module> <name>
+// usage (from app/): npx -y tsx --tsconfig tsconfig.json scripts/export-map.mts <fixture module> <name>
 //   e.g. scripts/export-map.mts @/lib/explorify explorify  →  maps/explorify/map.json
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 

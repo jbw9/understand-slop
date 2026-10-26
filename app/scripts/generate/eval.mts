@@ -1,4 +1,4 @@
-// usage (from ui/): npx -y tsx --tsconfig tsconfig.json scripts/generate/eval.mts [--stability <name> <fresh cut.json>]
+// usage (from app/): npx -y tsx --tsconfig tsconfig.json scripts/generate/eval.mts [--stability <name> <fresh cut.json>]
 //   One row per map under maps/: shape of the tree against the explorify benchmark, check problems,
 //   verify pass rate, cost and time. --stability compares a map's cut with a second, fresh cut.
 import { existsSync, readdirSync, readFileSync } from "node:fs";

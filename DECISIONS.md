@@ -325,7 +325,7 @@ checkpoints accumulated, which is how 11 unpushed commits went up at once on
 
 ## D11 — Re-author the fixture against taxBuddy, don't rename it
 
-**Chose:** delete `ui/lib/visulearn.ts` and write `ui/lib/taxbuddy.ts` from a
+**Chose:** delete `app/lib/visulearn.ts` and write `app/lib/taxbuddy.ts` from a
 fresh read of the target repo.
 **Beat:** find-and-replace the repo name, keeping the tree and swapping labels.
 
@@ -377,7 +377,7 @@ Driving the taxBuddy board found it: clicking any root frames the card and
 leaves its children below the fold. One scroll reaches them, and every deeper
 level is framed correctly.
 
-**It is not a regression.** `git show HEAD:ui/components/canvas.tsx` has
+**It is not a regression.** `git show HEAD:app/components/canvas.tsx` has
 `if (path.length < 2) return;` in the post-commit framing effect and
 `frame({ x: p.x, y: p.y, w, h })` — no `"top"` anchor — in `drillInto`. So a
 first-level drill has always taken the centred pre-commit guess and never the
@@ -450,7 +450,7 @@ branch with nothing more to say stops, and that is information.
 
 ## D15 — `onOpenRow` resolves the owner with `lastIndexOf`, not `indexOf`
 
-`ui/components/canvas.tsx`. A row id is `rowId(owner, key)` = `${owner}:${key}`.
+`app/components/canvas.tsx`. A row id is `rowId(owner, key)` = `${owner}:${key}`.
 When a row lives inside another row's `under`, its owner is itself a row node,
 so the id carries two colons: `eng-path:2:not expired`, owned by `eng-path:2`.
 `indexOf(":")` cut at the first colon and returned `eng-path` — a real node, but
@@ -999,8 +999,8 @@ spans. **At scale:** unchanged — it is a per-node height check.
 
 ## D37 — Screens are real screenshots of the app, on sample data
 
-**Chose:** `screen.shot` points at a PNG under `ui/public/shots/<repo>/`, taken by
-`ui/scripts/capture/phone.mjs`. The script drives explorify's own Expo web build in
+**Chose:** `screen.shot` points at a PNG under `app/public/shots/<repo>/`, taken by
+`app/scripts/capture/phone.mjs`. The script drives explorify's own Expo web build in
 headless Chrome at 390x844 @2x. Every `*supabase.co` request is answered from
 `fixtures.mjs` (made-up people and events), and the served bundle is patched
 in memory for three web-only gaps: `Appearance.setColorScheme`, NativeWind's
@@ -1301,7 +1301,7 @@ as orphaned, not dropped, and reattached when the original returned.
 
 **Cost accepted:** an entry naming a section that a regenerate renamed is
 orphaned and shows nowhere until the reader deals with it; the alternative is
-deleting their work, so it is kept and reported. Examples under `ui/maps/` get no
+deleting their work, so it is kept and reported. Examples under `app/maps/` get no
 overlay at all — they are committed fixtures shared by every reader of the
 checkout, so they are read-only by construction.
 **At scale:** orphan recovery is manual. Re-attaching a note to a renamed section

@@ -32,7 +32,7 @@
    "detail": "A CLI script runs five stages in sequence: inventory, summarize, cut, author, verify. Each stage caches its output to disk, and a final report records timing, cost, and verification pass rate.",
    "footprint": {
     "dirs": [
-     "ui/scripts/generate/"
+     "app/scripts/generate/"
     ],
     "files": 11
    },
@@ -42,25 +42,25 @@
    },
    "code": [
     {
-     "file": "ui/scripts/generate/pipeline.ts",
+     "file": "app/scripts/generate/pipeline.ts",
      "start": 20,
      "end": 69,
      "label": "main() runs stages: inventory, summarize, cut, author, verify"
     },
     {
-     "file": "ui/scripts/generate/pipeline.ts",
+     "file": "app/scripts/generate/pipeline.ts",
      "start": 98,
      "end": 136,
      "label": "Assembles AUTHORED nodes, runs check(), writes map.json"
     },
     {
-     "file": "ui/scripts/generate/pipeline.ts",
+     "file": "app/scripts/generate/pipeline.ts",
      "start": 141,
      "end": 176,
      "label": "Writes report.json with timing, costs, and verdicts"
     },
     {
-     "file": "ui/scripts/generate/evaluate.ts",
+     "file": "app/scripts/generate/evaluate.ts",
      "start": 14,
      "end": 52,
      "label": "evaluate(): computes benchmark metrics for comparing maps"
@@ -133,37 +133,37 @@
        "from": "scan",
        "to": "sum",
        "label": "file list",
-       "at": "ui/scripts/generate/pipeline.ts:54"
+       "at": "app/scripts/generate/pipeline.ts:54"
       },
       {
        "from": "sum",
        "to": "cut",
        "label": "summaries",
-       "at": "ui/scripts/generate/pipeline.ts:65"
+       "at": "app/scripts/generate/pipeline.ts:65"
       },
       {
        "from": "cut",
        "to": "auth",
        "label": "roots + files",
-       "at": "ui/scripts/generate/pipeline.ts:82"
+       "at": "app/scripts/generate/pipeline.ts:82"
       },
       {
        "from": "auth",
        "to": "ver",
        "label": "node trees",
-       "at": "ui/scripts/generate/pipeline.ts:93"
+       "at": "app/scripts/generate/pipeline.ts:93"
       },
       {
        "from": "ver",
        "to": "mapjson",
        "label": "writes output",
-       "at": "ui/scripts/generate/pipeline.ts:136"
+       "at": "app/scripts/generate/pipeline.ts:136"
       },
       {
        "from": "backend",
        "to": "cut",
        "label": "calls Claude",
-       "at": "ui/scripts/generate/cut.ts:156"
+       "at": "app/scripts/generate/cut.ts:156"
       }
      ]
     },
@@ -245,32 +245,32 @@
      "row": 0,
      "footprint": {
       "dirs": [
-       "ui/scripts/generate/inventory.ts"
+       "app/scripts/generate/inventory.ts"
       ],
       "files": 1
      },
      "detail": "Runs `git ls-files`, filters out build artifacts and lockfiles, classifies each file as code or test, parses manifests for dependency names, and resolves TypeScript import aliases into a cross-file import map.",
      "code": [
       {
-       "file": "ui/scripts/generate/inventory.ts",
+       "file": "app/scripts/generate/inventory.ts",
        "start": 120,
        "end": 161,
        "label": "inventory() main: list, filter, hash, resolve imports"
       },
       {
-       "file": "ui/scripts/generate/inventory.ts",
+       "file": "app/scripts/generate/inventory.ts",
        "start": 44,
        "end": 55,
        "label": "CODE extensions, SKIP patterns, TEST regex"
       },
       {
-       "file": "ui/scripts/generate/inventory.ts",
+       "file": "app/scripts/generate/inventory.ts",
        "start": 60,
        "end": 74,
        "label": "MARK_DEPS: brand mark detection from dependency names"
       },
       {
-       "file": "ui/scripts/generate/inventory.ts",
+       "file": "app/scripts/generate/inventory.ts",
        "start": 108,
        "end": 118,
        "label": "resolveImport(): maps import specifiers to repo paths"
@@ -358,32 +358,32 @@
      "row": 1,
      "footprint": {
       "dirs": [
-       "ui/scripts/generate/summarize.ts"
+       "app/scripts/generate/summarize.ts"
       ],
       "files": 1
      },
      "detail": "Each non-test source file is sent to Haiku with numbered line text. The model calls a `summary` tool recording purpose, kind, symbols with line ranges, what the file reads and writes, and external calls.",
      "code": [
       {
-       "file": "ui/scripts/generate/summarize.ts",
+       "file": "app/scripts/generate/summarize.ts",
        "start": 61,
        "end": 86,
        "label": "summarize(): parallel Haiku calls for all source files"
       },
       {
-       "file": "ui/scripts/generate/summarize.ts",
+       "file": "app/scripts/generate/summarize.ts",
        "start": 13,
        "end": 22,
        "label": "FileSummary interface: path, purpose, kind, symbols, reads, writes"
       },
       {
-       "file": "ui/scripts/generate/summarize.ts",
+       "file": "app/scripts/generate/summarize.ts",
        "start": 26,
        "end": 52,
        "label": "TOOL schema: what Haiku must return"
       },
       {
-       "file": "ui/scripts/generate/summarize.ts",
+       "file": "app/scripts/generate/summarize.ts",
        "start": 89,
        "end": 96,
        "label": "oneLine(): compact format the cut stage reads"
@@ -502,32 +502,32 @@
      "row": 2,
      "footprint": {
       "dirs": [
-       "ui/scripts/generate/cut.ts"
+       "app/scripts/generate/cut.ts"
       ],
       "files": 1
      },
      "detail": "Claude receives one-line summaries of every file and partitions them into 4–10 roots, each a user journey owning specific files. The cut is validated mechanically and retried up to three times.",
      "code": [
       {
-       "file": "ui/scripts/generate/cut.ts",
+       "file": "app/scripts/generate/cut.ts",
        "start": 128,
        "end": 168,
        "label": "cutRepo(): call Claude up to 3 times, validate each round"
       },
       {
-       "file": "ui/scripts/generate/cut.ts",
+       "file": "app/scripts/generate/cut.ts",
        "start": 34,
        "end": 82,
        "label": "TOOL schema: roots, excluded files, edges"
       },
       {
-       "file": "ui/scripts/generate/cut.ts",
+       "file": "app/scripts/generate/cut.ts",
        "start": 112,
        "end": 126,
        "label": "problems(): validation rules for the cut"
       },
       {
-       "file": "ui/scripts/generate/cut.ts",
+       "file": "app/scripts/generate/cut.ts",
        "start": 96,
        "end": 108,
        "label": "owners(): which roots claim a file path"
@@ -609,9 +609,9 @@
      "row": 3,
      "footprint": {
       "dirs": [
-       "ui/scripts/generate/author.ts",
-       "ui/scripts/generate/schema.ts",
-       "ui/scripts/generate/check.ts"
+       "app/scripts/generate/author.ts",
+       "app/scripts/generate/schema.ts",
+       "app/scripts/generate/check.ts"
       ],
       "files": 3
      },
@@ -622,25 +622,25 @@
      "detail": "An agent loop gives Claude four tools (`read_file`, `grep`, `list`, `submit`) and up to 45 turns to read code and hand in a validated node tree for one root.",
      "code": [
       {
-       "file": "ui/scripts/generate/author.ts",
+       "file": "app/scripts/generate/author.ts",
        "start": 143,
        "end": 204,
        "label": "authorRoot(): main agent loop, Bedrock and Claude Code paths"
       },
       {
-       "file": "ui/scripts/generate/author.ts",
+       "file": "app/scripts/generate/author.ts",
        "start": 32,
        "end": 53,
        "label": "TOOLS: four tool definitions for the agent"
       },
       {
-       "file": "ui/scripts/generate/author.ts",
+       "file": "app/scripts/generate/author.ts",
        "start": 56,
        "end": 66,
        "label": "exemplar(): explorify check-in root as worked example"
       },
       {
-       "file": "ui/scripts/generate/author.ts",
+       "file": "app/scripts/generate/author.ts",
        "start": 81,
        "end": 105,
        "label": "brief(): builds initial prompt with repo context and task"
@@ -696,33 +696,33 @@
          "from": "brief",
          "to": "agent",
          "label": "task + context",
-         "at": "ui/scripts/generate/author.ts:181"
+         "at": "app/scripts/generate/author.ts:181"
         },
         {
          "from": "agent",
          "to": "tools",
          "label": "tool calls",
-         "at": "ui/scripts/generate/author.ts:159"
+         "at": "app/scripts/generate/author.ts:159"
         },
         {
          "from": "agent",
          "to": "submit",
          "label": "submit call",
-         "at": "ui/scripts/generate/author.ts:161"
+         "at": "app/scripts/generate/author.ts:161"
         },
         {
          "from": "submit",
          "to": "agent",
          "label": "problems → retry",
          "tone": "warn",
-         "at": "ui/scripts/generate/author.ts:169"
+         "at": "app/scripts/generate/author.ts:169"
         },
         {
          "from": "submit",
          "to": "accepted",
          "label": "clean → done",
          "tone": "good",
-         "at": "ui/scripts/generate/author.ts:168"
+         "at": "app/scripts/generate/author.ts:168"
         }
        ]
       },
@@ -772,19 +772,19 @@
        "detail": "The model reads code files, searches with grep, and lists directories until it calls `submit`. If validation fails, errors go back as the tool response, and the model fixes and resubmits.",
        "code": [
         {
-         "file": "ui/scripts/generate/author.ts",
+         "file": "app/scripts/generate/author.ts",
          "start": 182,
          "end": 202,
          "label": "Bedrock path: message loop up to MAX_TURNS"
         },
         {
-         "file": "ui/scripts/generate/author.ts",
+         "file": "app/scripts/generate/author.ts",
          "start": 172,
          "end": 178,
          "label": "Claude Code path: ccAgent with same tools and handle"
         },
         {
-         "file": "ui/scripts/generate/author.ts",
+         "file": "app/scripts/generate/author.ts",
          "start": 156,
          "end": 170,
          "label": "handle(): routes tool calls, validates submit, returns errors or acceptance"
@@ -838,13 +838,13 @@
        "detail": "Four tools exposed to the Claude agent: `read_file` reads numbered lines, `grep` searches with `git grep`, `list` shows directory contents, and `submit` validates and accepts the root.",
        "code": [
         {
-         "file": "ui/scripts/generate/author.ts",
+         "file": "app/scripts/generate/author.ts",
          "start": 32,
          "end": 53,
          "label": "TOOLS array: four tool definitions with JSON schemas"
         },
         {
-         "file": "ui/scripts/generate/author.ts",
+         "file": "app/scripts/generate/author.ts",
          "start": 107,
          "end": 133,
          "label": "runTool(): executes read_file, grep, list against the inventory"
@@ -895,25 +895,25 @@
        "detail": "Each submitted node is checked in two passes: `shapeProblems` validates field types and required properties, then `check` tests code refs, diagram layout, title length, and generated-map rules.",
        "code": [
         {
-         "file": "ui/scripts/generate/schema.ts",
+         "file": "app/scripts/generate/schema.ts",
          "start": 42,
          "end": 76,
          "label": "shapeProblems(): validates node shape recursively, mutates col/row"
         },
         {
-         "file": "ui/scripts/generate/check.ts",
+         "file": "app/scripts/generate/check.ts",
          "start": 39,
          "end": 158,
          "label": "check(): validates map structure, code refs, diagrams, sequences"
         },
         {
-         "file": "ui/scripts/generate/check.ts",
+         "file": "app/scripts/generate/check.ts",
          "start": 168,
          "end": 191,
          "label": "layoutProblems(): detects diagram rendering collisions"
         },
         {
-         "file": "ui/scripts/generate/schema.ts",
+         "file": "app/scripts/generate/schema.ts",
          "start": 12,
          "end": 15,
          "label": "typeReference(): extracts types from lib/data.ts for the system prompt"
@@ -991,7 +991,7 @@
      "row": 4,
      "footprint": {
       "dirs": [
-       "ui/scripts/generate/verify.ts"
+       "app/scripts/generate/verify.ts"
       ],
       "files": 1
      },
@@ -1001,19 +1001,19 @@
      "detail": "Haiku screens every factual claim against the code it cites, flagging what is contradicted or not shown. A second reader dismisses false alarms, corrects wrong claims, or marks the node `partial`.",
      "code": [
       {
-       "file": "ui/scripts/generate/verify.ts",
+       "file": "app/scripts/generate/verify.ts",
        "start": 93,
        "end": 137,
        "label": "verifyNode(): screens claims then calls review on flags"
       },
       {
-       "file": "ui/scripts/generate/verify.ts",
+       "file": "app/scripts/generate/verify.ts",
        "start": 142,
        "end": 186,
        "label": "review(): second reader with repo access rules on flags"
       },
       {
-       "file": "ui/scripts/generate/verify.ts",
+       "file": "app/scripts/generate/verify.ts",
        "start": 188,
        "end": 193,
        "label": "verifyTree(): walks the node tree, verifies each in parallel"
@@ -1067,32 +1067,32 @@
          "from": "node",
          "to": "screen",
          "label": "claims + evidence",
-         "at": "ui/scripts/generate/verify.ts:101"
+         "at": "app/scripts/generate/verify.ts:101"
         },
         {
          "from": "screen",
          "to": "flags",
          "label": "flags found",
-         "at": "ui/scripts/generate/verify.ts:112"
+         "at": "app/scripts/generate/verify.ts:112"
         },
         {
          "from": "screen",
          "to": "result",
          "label": "all supported",
          "tone": "good",
-         "at": "ui/scripts/generate/verify.ts:114"
+         "at": "app/scripts/generate/verify.ts:114"
         },
         {
          "from": "flags",
          "to": "review",
          "label": "for ruling",
-         "at": "ui/scripts/generate/verify.ts:116"
+         "at": "app/scripts/generate/verify.ts:116"
         },
         {
          "from": "review",
          "to": "result",
          "label": "corrected node",
-         "at": "ui/scripts/generate/verify.ts:121"
+         "at": "app/scripts/generate/verify.ts:121"
         }
        ]
       }
@@ -1101,7 +1101,7 @@
       {
        "title": "Flagged claims pass if review times out",
        "detail": "When the review loop runs 10 turns without calling the review tool, it returns null. verifyNode returns the verdict as ok=true even though Haiku flagged claims as contradicted or not shown. The node keeps its uncorrected prose.",
-       "where": "ui/scripts/generate/verify.ts:117"
+       "where": "app/scripts/generate/verify.ts:117"
       }
      ],
      "edges": [
@@ -1124,19 +1124,19 @@
        "detail": "Haiku receives the node's title, sub, detail, issues, and code labels alongside the cited source lines. It calls a `verdicts` tool giving each claim one of four verdicts.",
        "code": [
         {
-         "file": "ui/scripts/generate/verify.ts",
+         "file": "app/scripts/generate/verify.ts",
          "start": 93,
          "end": 114,
          "label": "verifyNode() first half: send to Haiku, extract flags"
         },
         {
-         "file": "ui/scripts/generate/verify.ts",
+         "file": "app/scripts/generate/verify.ts",
          "start": 33,
          "end": 56,
          "label": "SCREEN tool: one verdict per factual claim"
         },
         {
-         "file": "ui/scripts/generate/verify.ts",
+         "file": "app/scripts/generate/verify.ts",
          "start": 80,
          "end": 88,
          "label": "evidence() and claims(): format node and code for Haiku"
@@ -1181,19 +1181,19 @@
        "detail": "The second reader can `read_file` and `grep` the repository before ruling on flags. It corrects wording, adds missing code refs, drops intended issues, and marks unresolvable claims `partial`.",
        "code": [
         {
-         "file": "ui/scripts/generate/verify.ts",
+         "file": "app/scripts/generate/verify.ts",
          "start": 142,
          "end": 186,
          "label": "review(): agent loop with repo tools, up to 10 turns"
         },
         {
-         "file": "ui/scripts/generate/verify.ts",
+         "file": "app/scripts/generate/verify.ts",
          "start": 58,
          "end": 78,
          "label": "REVIEW tool: rulings, corrected wording, added refs, unresolvable"
         },
         {
-         "file": "ui/scripts/generate/verify.ts",
+         "file": "app/scripts/generate/verify.ts",
          "start": 116,
          "end": 136,
          "label": "Applying review results: rewrite detail, update issues, add code refs"
@@ -1255,8 +1255,8 @@
      },
      "footprint": {
       "dirs": [
-       "ui/scripts/generate/bedrock.ts",
-       "ui/scripts/generate/claude-code.ts"
+       "app/scripts/generate/bedrock.ts",
+       "app/scripts/generate/claude-code.ts"
       ],
       "files": 2
      },
@@ -1267,25 +1267,25 @@
      "detail": "Two interchangeable paths to Claude, selected by `SLOP_BACKEND`: the AWS Bedrock API with streaming, or the `claude -p` CLI. Both cache replies to disk by SHA-256 content hash and track per-stage billing.",
      "code": [
       {
-       "file": "ui/scripts/generate/bedrock.ts",
+       "file": "app/scripts/generate/bedrock.ts",
        "start": 149,
        "end": 200,
        "label": "invoke(): streaming Bedrock call with retries and caching"
       },
       {
-       "file": "ui/scripts/generate/bedrock.ts",
+       "file": "app/scripts/generate/bedrock.ts",
        "start": 90,
        "end": 109,
        "label": "bill tracking: calls, tokens, USD per stage"
       },
       {
-       "file": "ui/scripts/generate/claude-code.ts",
+       "file": "app/scripts/generate/claude-code.ts",
        "start": 145,
        "end": 160,
        "label": "ccAsk(): structured answer through claude -p"
       },
       {
-       "file": "ui/scripts/generate/claude-code.ts",
+       "file": "app/scripts/generate/claude-code.ts",
        "start": 219,
        "end": 261,
        "label": "ccAgent(): multi-turn agent loop over MCP-served tools"
@@ -1332,13 +1332,13 @@
          "from": "api",
          "to": "bedrock",
          "label": "streams response",
-         "at": "ui/scripts/generate/bedrock.ts:175"
+         "at": "app/scripts/generate/bedrock.ts:175"
         },
         {
          "from": "cc",
          "to": "cli",
          "label": "spawns process",
-         "at": "ui/scripts/generate/claude-code.ts:81"
+         "at": "app/scripts/generate/claude-code.ts:81"
         }
        ]
       },
@@ -1410,25 +1410,25 @@
        "detail": "`invoke()` sends a request to AWS Bedrock via `InvokeModelWithResponseStreamCommand`, assembles the streamed reply, retries on throttles with exponential backoff, and enforces a global concurrency limit.",
        "code": [
         {
-         "file": "ui/scripts/generate/bedrock.ts",
+         "file": "app/scripts/generate/bedrock.ts",
          "start": 149,
          "end": 200,
          "label": "invoke(): cache check, slot, stream, retry, cache write"
         },
         {
-         "file": "ui/scripts/generate/bedrock.ts",
+         "file": "app/scripts/generate/bedrock.ts",
          "start": 205,
          "end": 234,
          "label": "assemble(): builds Reply from stream events"
         },
         {
-         "file": "ui/scripts/generate/bedrock.ts",
+         "file": "app/scripts/generate/bedrock.ts",
          "start": 132,
          "end": 141,
          "label": "slot(): global concurrency limiter with FIFO queue"
         },
         {
-         "file": "ui/scripts/generate/bedrock.ts",
+         "file": "app/scripts/generate/bedrock.ts",
          "start": 266,
          "end": 282,
          "label": "ask(): single tool call with shape validation and retry"
@@ -1482,25 +1482,25 @@
        "detail": "`ccAsk` spawns `claude -p` for structured answers with `--json-schema`. `ccAgent` drives a multi-turn loop by serving the pipeline's own tools over a local MCP server.",
        "code": [
         {
-         "file": "ui/scripts/generate/claude-code.ts",
+         "file": "app/scripts/generate/claude-code.ts",
          "start": 71,
          "end": 99,
          "label": "claude(): spawns claude -p with retries on transient failures"
         },
         {
-         "file": "ui/scripts/generate/claude-code.ts",
+         "file": "app/scripts/generate/claude-code.ts",
          "start": 176,
          "end": 207,
          "label": "mcp(): minimal HTTP MCP server for tool dispatch"
         },
         {
-         "file": "ui/scripts/generate/claude-code.ts",
+         "file": "app/scripts/generate/claude-code.ts",
          "start": 219,
          "end": 261,
          "label": "ccAgent(): drives loop over MCP tools until done, resumes with nudge"
         },
         {
-         "file": "ui/scripts/generate/claude-code.ts",
+         "file": "app/scripts/generate/claude-code.ts",
          "start": 145,
          "end": 160,
          "label": "ccAsk(): structured single-answer calls with --json-schema"
@@ -1577,9 +1577,9 @@
    },
    "footprint": {
     "dirs": [
-     "ui/app",
-     "ui/components",
-     "ui/lib"
+     "app/app",
+     "app/components",
+     "app/lib"
     ],
     "files": 12
    },
@@ -1590,19 +1590,19 @@
    "detail": "The canvas shows one level at a time, with the open path in the URL as `?at=` parameters so every level is a history entry. `buildMap` transforms the authored JSON once so every consumer sees one uniform tree.",
    "code": [
     {
-     "file": "ui/components/canvas.tsx",
+     "file": "app/components/canvas.tsx",
      "start": 83,
      "end": 270,
      "label": "Canvas: reads path from URL, manages navigation, renders level with animation"
     },
     {
-     "file": "ui/lib/map.ts",
+     "file": "app/lib/map.ts",
      "start": 104,
      "end": 166,
      "label": "buildMap derives the tree, spine, lanes, and navigation functions"
     },
     {
-     "file": "ui/app/page.tsx",
+     "file": "app/app/page.tsx",
      "start": 9,
      "end": 28,
      "label": "Server component loads map by name and renders MapProvider"
@@ -1674,37 +1674,37 @@
        "from": "map_json",
        "to": "page",
        "label": "loadMap reads file",
-       "at": "ui/app/page.tsx:16"
+       "at": "app/app/page.tsx:16"
       },
       {
        "from": "page",
        "to": "provider",
        "label": "renders with data",
-       "at": "ui/app/page.tsx:21"
+       "at": "app/app/page.tsx:21"
       },
       {
        "from": "provider",
        "to": "canvas_box",
        "label": "useMap context",
-       "at": "ui/components/canvas.tsx:84"
+       "at": "app/components/canvas.tsx:84"
       },
       {
        "from": "canvas_box",
        "to": "crumbs_box",
        "label": "renders",
-       "at": "ui/components/canvas.tsx:236"
+       "at": "app/components/canvas.tsx:236"
       },
       {
        "from": "canvas_box",
        "to": "level_box",
        "label": "renders level",
-       "at": "ui/components/canvas.tsx:260"
+       "at": "app/components/canvas.tsx:260"
       },
       {
        "from": "canvas_box",
        "to": "wire_box",
        "label": "renders SVG",
-       "at": "ui/components/canvas.tsx:238"
+       "at": "app/components/canvas.tsx:238"
       }
      ]
     },
@@ -1750,10 +1750,10 @@
      "row": 0,
      "footprint": {
       "dirs": [
-       "ui/app/page.tsx",
-       "ui/lib/maps.ts",
-       "ui/lib/map.ts",
-       "ui/components/map-context.tsx"
+       "app/app/page.tsx",
+       "app/lib/maps.ts",
+       "app/lib/map.ts",
+       "app/components/map-context.tsx"
       ],
       "files": 4
      },
@@ -1763,25 +1763,25 @@
      "detail": "`page.tsx` reads `?map=` from the URL, `loadMap` validates the name and reads JSON, `buildMap` transforms the tree once, and `MapProvider` shares the result via React context.",
      "code": [
       {
-       "file": "ui/app/page.tsx",
+       "file": "app/app/page.tsx",
        "start": 9,
        "end": 28,
        "label": "Server component reads map name and renders MapProvider"
       },
       {
-       "file": "ui/lib/maps.ts",
+       "file": "app/lib/maps.ts",
        "start": 21,
        "end": 23,
        "label": "loadMap validates name and reads JSON"
       },
       {
-       "file": "ui/lib/map.ts",
+       "file": "app/lib/map.ts",
        "start": 104,
        "end": 166,
        "label": "buildMap creates L0 tree, nodeAt, SPINE, LANES"
       },
       {
-       "file": "ui/components/map-context.tsx",
+       "file": "app/components/map-context.tsx",
        "start": 9,
        "end": 22,
        "label": "MapProvider builds map once via useMemo and provides context"
@@ -1865,13 +1865,13 @@
        "detail": "`listMaps` scans the maps directory for subdirectories with a map file. `loadMap` checks the requested name is listed before reading, so unknown names fall back to the `explorify` default.",
        "code": [
         {
-         "file": "ui/lib/maps.ts",
+         "file": "app/lib/maps.ts",
          "start": 16,
          "end": 23,
          "label": "listMaps scans directory, loadMap validates and reads"
         },
         {
-         "file": "ui/app/page.tsx",
+         "file": "app/app/page.tsx",
          "start": 14,
          "end": 16,
          "label": "Name from URL params or static config, passed to loadMap"
@@ -1883,7 +1883,7 @@
          "rows": [
           {
            "label": "Map directory",
-           "value": "maps/<name>/map.json under ui/",
+           "value": "maps/<name>/map.json under app/",
            "state": "derived"
           },
           {
@@ -1910,13 +1910,13 @@
        "detail": "`withRowChildren` walks the authored tree and synthesizes a child node for every `map` or `flow` row whose `under` is set. The function recurses into synthesized children so depth is unlimited.",
        "code": [
         {
-         "file": "ui/lib/map.ts",
+         "file": "app/lib/map.ts",
          "start": 28,
          "end": 51,
          "label": "deepRows extracts map and flow rows carrying under"
         },
         {
-         "file": "ui/lib/map.ts",
+         "file": "app/lib/map.ts",
          "start": 60,
          "end": 99,
          "label": "withRowChildren recursively builds child nodes from under rows"
@@ -1957,7 +1957,7 @@
        "detail": "`buildMap` runs once per map load, calling `withRowChildren` to create L0 then deriving the spine from ordered unlaned edges. Lanes come from lane-tagged edges, and handoffs from edges with no order.",
        "code": [
         {
-         "file": "ui/lib/map.ts",
+         "file": "app/lib/map.ts",
          "start": 104,
          "end": 166,
          "label": "buildMap: L0, nodeAt, levelAt, SPINE, LANES, HANDOFFS, stepOf"
@@ -2029,7 +2029,7 @@
      "row": 1,
      "footprint": {
       "dirs": [
-       "ui/components/canvas.tsx"
+       "app/components/canvas.tsx"
       ],
       "files": 1
      },
@@ -2040,7 +2040,7 @@
      "detail": "The `Canvas` component reads `?at=` from the URL and validates the path with `nodeAt`. It renders either `Overview` at the root or `Level` at any deeper node, animated with `AnimatePresence`.",
      "code": [
       {
-       "file": "ui/components/canvas.tsx",
+       "file": "app/components/canvas.tsx",
        "start": 83,
        "end": 270,
        "label": "Canvas: reads path, manages navigation, renders level with animation"
@@ -2094,13 +2094,13 @@
        "detail": "`useSearchParams().getAll('at')` reads the path, and `nodeAt` validates it — missing ids fall back to `[]` (repo root). The `go` function builds a new URL preserving `?map=` and calls `pushState`.",
        "code": [
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 99,
          "end": 103,
          "label": "Path read from useSearchParams, validated by nodeAt"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 125,
          "end": 131,
          "label": "go() preserves ?map=, appends ?at= values, calls pushState"
@@ -2141,19 +2141,19 @@
        "detail": "A global keydown listener handles Esc (clear trace, then go up) and 0 (return to root). `AnimatePresence mode='wait'` slides levels in a direction derived from the depth change.",
        "code": [
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 211,
          "end": 224,
          "label": "Keyboard handler: Esc unwinds trace then level, 0 goes to root"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 107,
          "end": 113,
          "label": "Slide direction derived from depth change during render"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 245,
          "end": 258,
          "label": "AnimatePresence slides levels in/out with direction"
@@ -2195,13 +2195,13 @@
        "detail": "A trace walks the `LINKS` graph breadth-first from the clicked row, up to 6 hops, collecting reachable ids in a `lit` Set. While active, only wires between lit rows are shown.",
        "code": [
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 140,
          "end": 157,
          "label": "lit: breadth-first walk of LINKS graph from traced row, 6 hops max"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 162,
          "end": 179,
          "label": "Wire filtering: trace active shows lit wires, otherwise FK wires only"
@@ -2250,7 +2250,7 @@
      "row": 2,
      "footprint": {
       "dirs": [
-       "ui/components/canvas.tsx"
+       "app/components/canvas.tsx"
       ],
       "files": 1
      },
@@ -2261,13 +2261,13 @@
      "detail": "When the path is empty `Overview` renders the repo root; otherwise `Level` renders one open node. The children section chooses `Steps` for sequences, `Grid` for sets, or `List` when a diagram opens all parts.",
      "code": [
       {
-       "file": "ui/components/canvas.tsx",
+       "file": "app/components/canvas.tsx",
        "start": 280,
        "end": 335,
        "label": "Overview: spine steps, lanes side by side, outside nodes as grid"
       },
       {
-       "file": "ui/components/canvas.tsx",
+       "file": "app/components/canvas.tsx",
        "start": 347,
        "end": 505,
        "label": "Level: header, anatomy blocks, children section, issues, code drawer"
@@ -2323,7 +2323,7 @@
        "detail": "`Overview` renders when the path is empty: SPINE roots as `Steps`, LANES in a two-column grid after the fork point each continuing the spine's numbering. Nodes not on any path appear under a separate heading.",
        "code": [
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 280,
          "end": 335,
          "label": "Overview: header with repo info, spine steps, lanes, outside grid"
@@ -2373,13 +2373,13 @@
        "detail": "The `Level` function renders a `Header` with back button, eyebrow context, title, state chip, and marks. Below it: figure shapes, anatomy blocks, a children section, `WatchOut` issues, and a `CodeDrawer`.",
        "code": [
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 347,
          "end": 505,
          "label": "Level: assembles header, anatomy, children, issues, code drawer"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 679,
          "end": 773,
          "label": "Header: back button, eyebrow, title, state chip, marks, detail, code link"
@@ -2444,31 +2444,31 @@
        "detail": "`Steps` draws a vertical numbered line, `Grid` uses CSS `auto-fill` at 340 px minimum, and `List` shows only names and issue counts. `List` is chosen when at least one child already has a box on the parent's diagram.",
        "code": [
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 516,
          "end": 584,
          "label": "Steps: numbered dots, connecting lines, handoff labels"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 587,
          "end": 603,
          "label": "Grid: responsive auto-fill grid of Row cards"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 612,
          "end": 660,
          "label": "List: minimal index of names and issue counts"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 366,
          "end": 373,
          "label": "onDiagram: children whose box already opens them"
         },
         {
-         "file": "ui/components/canvas.tsx",
+         "file": "app/components/canvas.tsx",
          "start": 473,
          "end": 481,
          "label": "Layout selection: Steps → List → Grid"
@@ -2535,7 +2535,7 @@
      "row": 3,
      "footprint": {
       "dirs": [
-       "ui/components/wires.tsx"
+       "app/components/wires.tsx"
       ],
       "files": 1
      },
@@ -2545,13 +2545,13 @@
      "detail": "Wire endpoints register DOM elements via `useWireAnchors`, then `measure` reads `getBoundingClientRect`, assigns lanes to grouped wires, and routes paths around intermediate cards. The output is SVG `<path>` elements with styled markers.",
      "code": [
       {
-       "file": "ui/components/wires.tsx",
+       "file": "app/components/wires.tsx",
        "start": 110,
        "end": 146,
        "label": "useWireAnchors: stable ref callbacks, coalesced version bumps"
       },
       {
-       "file": "ui/components/wires.tsx",
+       "file": "app/components/wires.tsx",
        "start": 148,
        "end": 689,
        "label": "WireLayer: measure positions, route paths, render SVG with markers"
@@ -2592,13 +2592,13 @@
          "from": "anchors",
          "to": "measure_fn",
          "label": "nodes Map",
-         "at": "ui/components/wires.tsx:242"
+         "at": "app/components/wires.tsx:242"
         },
         {
          "from": "measure_fn",
          "to": "svg",
          "label": "Path[] via state",
-         "at": "ui/components/wires.tsx:572"
+         "at": "app/components/wires.tsx:572"
         }
        ]
       },
@@ -2656,7 +2656,7 @@
        "detail": "Each wire endpoint calls `anchor(id)` to get a stable ref callback cached in a `Map`, so React never detaches and re-attaches on re-render. Multiple mounts per frame are coalesced into one `setVersion` bump via `requestAnimationFrame`.",
        "code": [
         {
-         "file": "ui/components/wires.tsx",
+         "file": "app/components/wires.tsx",
          "start": 110,
          "end": 146,
          "label": "useWireAnchors: cached callbacks, coalesced version bumps"
@@ -2673,13 +2673,13 @@
        "detail": "For each wire, `measure` reads `getBoundingClientRect`, converts to world-space, and builds an orthogonal SVG path. Midpoints are pushed clear of intermediate cards in up to 3 passes; FK wires route through gutters and many-to-one wires use a shared bus lane.",
        "code": [
         {
-         "file": "ui/components/wires.tsx",
+         "file": "app/components/wires.tsx",
          "start": 173,
          "end": 572,
          "label": "measure: world-space math, obstacle avoidance, lane assignment, SVG path generation"
         },
         {
-         "file": "ui/components/wires.tsx",
+         "file": "app/components/wires.tsx",
          "start": 93,
          "end": 108,
          "label": "assignLanes: group wires by corridor and assign symmetric offsets"
@@ -2733,25 +2733,25 @@
        "detail": "Derived wires are solid green, partial dashed amber, alarm dashed clay-brown, inferred dotted gray. ER relationships draw crow's foot at the many end and a bar at the one end; plain wires get chevron arrowheads.",
        "code": [
         {
-         "file": "ui/components/wires.tsx",
+         "file": "app/components/wires.tsx",
          "start": 607,
          "end": 689,
          "label": "SVG rendering: defs markers, ER terminals, plain wire paths with arrows"
         },
         {
-         "file": "ui/components/wires.tsx",
+         "file": "app/components/wires.tsx",
          "start": 67,
          "end": 79,
          "label": "STROKE and DASHED records keyed by WireKind"
         },
         {
-         "file": "ui/components/wires.tsx",
+         "file": "app/components/wires.tsx",
          "start": 691,
          "end": 717,
          "label": "WireLegend: four entries with stroke samples"
         },
         {
-         "file": "ui/app/globals.css",
+         "file": "app/app/globals.css",
          "start": 34,
          "end": 34,
          "label": "CSS variable --color-clay-ink resolves to #8e3320 (clay-brown)"
@@ -2793,20 +2793,20 @@
      "row": 4,
      "footprint": {
       "dirs": [
-       "ui/components/chrome.tsx"
+       "app/components/chrome.tsx"
       ],
       "files": 1
      },
      "detail": "`Crumbs` renders the repo name followed by each open level's title as a clickable button, with `onJump(depth)` to navigate. When more than one map exists, a dropdown switches via `router.push`.",
      "code": [
       {
-       "file": "ui/components/chrome.tsx",
+       "file": "app/components/chrome.tsx",
        "start": 17,
        "end": 94,
        "label": "Crumbs: breadcrumb trail, map selector, keyboard hints"
       },
       {
-       "file": "ui/components/chrome.tsx",
+       "file": "app/components/chrome.tsx",
        "start": 96,
        "end": 105,
        "label": "Hint: keyboard shortcut badge"
@@ -2864,9 +2864,9 @@
    "sub": "Detail views that render anatomy blocks — schema tables, API routes, diagrams, sequences, code drawers — with live source fetching, editing, and drift detection.",
    "footprint": {
     "dirs": [
-     "ui/components",
-     "ui/lib",
-     "ui/app/api/source"
+     "app/components",
+     "app/lib",
+     "app/app/api/source"
     ],
     "files": 9
    },
@@ -2886,37 +2886,37 @@
    "detail": "AnatomyView iterates a node's anatomy blocks, dispatching each by kind across 14 types defined in the Anatomy union. Source blocks load code live via `readSource`, which fetches `/api/source` at render time and detects drift.",
    "code": [
     {
-     "file": "ui/components/anatomy.tsx",
+     "file": "app/components/anatomy.tsx",
      "start": 44,
      "end": 80,
      "label": "AnatomyView iterates blocks for a card"
     },
     {
-     "file": "ui/components/anatomy.tsx",
+     "file": "app/components/anatomy.tsx",
      "start": 193,
      "end": 204,
      "label": "Block function dispatches by block.kind"
     },
     {
-     "file": "ui/components/blocks.tsx",
+     "file": "app/components/blocks.tsx",
      "start": 29,
      "end": 54,
      "label": "ExplainedBlock routes to diagram/table/sequence/screen/example"
     },
     {
-     "file": "ui/lib/data.ts",
+     "file": "app/lib/data.ts",
      "start": 220,
      "end": 249,
      "label": "The Anatomy union: 14 block kinds"
     },
     {
-     "file": "ui/components/anatomy.tsx",
+     "file": "app/components/anatomy.tsx",
      "start": 869,
      "end": 891,
      "label": "Source block fetches live code via readSource on mount"
     },
     {
-     "file": "ui/lib/source.ts",
+     "file": "app/lib/source.ts",
      "start": 18,
      "end": 37,
      "label": "readSource fetches /api/source (or baked JSON in static export)"
@@ -2989,43 +2989,43 @@
        "from": "types",
        "to": "dispatch",
        "label": "Anatomy types",
-       "at": "ui/components/anatomy.tsx:5"
+       "at": "app/components/anatomy.tsx:5"
       },
       {
        "from": "dispatch",
        "to": "explained",
        "label": "explained kinds",
-       "at": "ui/components/anatomy.tsx:350"
+       "at": "app/components/anatomy.tsx:350"
       },
       {
        "from": "layout",
        "to": "explained",
        "label": "positions",
-       "at": "ui/components/blocks.tsx:84"
+       "at": "app/components/blocks.tsx:84"
       },
       {
        "from": "dispatch",
        "to": "source",
        "label": "SourceView reads",
-       "at": "ui/components/anatomy.tsx:872"
+       "at": "app/components/anatomy.tsx:872"
       },
       {
        "from": "explained",
        "to": "source",
        "label": "CodeDrawer reads",
-       "at": "ui/components/blocks.tsx:636"
+       "at": "app/components/blocks.tsx:636"
       },
       {
        "from": "source",
        "to": "api",
        "label": "fetch",
-       "at": "ui/lib/source.ts:25"
+       "at": "app/lib/source.ts:25"
       },
       {
        "from": "api",
        "to": "repo",
        "label": "readSlice",
-       "at": "ui/app/api/source/route.ts:38"
+       "at": "app/app/api/source/route.ts:38"
       }
      ]
     },
@@ -3119,8 +3119,8 @@
      "sub": "How the 14 anatomy block types dispatch and render inside a node's detail view",
      "footprint": {
       "dirs": [
-       "ui/components/anatomy.tsx",
-       "ui/components/blocks.tsx"
+       "app/components/anatomy.tsx",
+       "app/components/blocks.tsx"
       ],
       "files": 2
      },
@@ -3134,19 +3134,19 @@
      "detail": "The `Block` function dispatches by `block.kind` — nine kinds render inline on cards while five \"explained\" kinds delegate to `blocks.tsx` at reading size. The code drawer is a separate collapsible section for `CodeRef` entries.",
      "code": [
       {
-       "file": "ui/components/anatomy.tsx",
+       "file": "app/components/anatomy.tsx",
        "start": 193,
        "end": 350,
        "label": "Block dispatches schema, routes, source, then delegates explained kinds"
       },
       {
-       "file": "ui/components/blocks.tsx",
+       "file": "app/components/blocks.tsx",
        "start": 20,
        "end": 27,
        "label": "isExplained checks for the five explained kinds"
       },
       {
-       "file": "ui/components/anatomy.tsx",
+       "file": "app/components/anatomy.tsx",
        "start": 148,
        "end": 153,
        "label": "Assertion that pair-row breakpoint matches view.ts constants"
@@ -3208,31 +3208,31 @@
          "from": "anatomy-view",
          "to": "block-fn",
          "label": "each block",
-         "at": "ui/components/anatomy.tsx:76"
+         "at": "app/components/anatomy.tsx:76"
         },
         {
          "from": "block-fn",
          "to": "card-renderers",
          "label": "schema, routes, ...",
-         "at": "ui/components/anatomy.tsx:204"
+         "at": "app/components/anatomy.tsx:204"
         },
         {
          "from": "block-fn",
          "to": "source-view",
          "label": "source kind",
-         "at": "ui/components/anatomy.tsx:346"
+         "at": "app/components/anatomy.tsx:346"
         },
         {
          "from": "block-fn",
          "to": "explained-fn",
          "label": "isExplained",
-         "at": "ui/components/anatomy.tsx:350"
+         "at": "app/components/anatomy.tsx:350"
         },
         {
          "from": "code-drawer",
          "to": "source-view",
          "label": "reuses SourceView",
-         "at": "ui/components/blocks.tsx:657"
+         "at": "app/components/blocks.tsx:657"
         }
        ]
       }
@@ -3248,31 +3248,31 @@
        "detail": "Each kind has its own rendering branch inside `Block`, and every row registers as a wire endpoint via `ctx.anchor(id)`. Rows with `under` drill into nested levels via `ctx.onOpenRow` with `stopPropagation` to prevent the card click from collapsing.",
        "code": [
         {
-         "file": "ui/components/anatomy.tsx",
+         "file": "app/components/anatomy.tsx",
          "start": 204,
          "end": 286,
          "label": "Schema block: column rows with key badges"
         },
         {
-         "file": "ui/components/anatomy.tsx",
+         "file": "app/components/anatomy.tsx",
          "start": 288,
          "end": 344,
          "label": "Routes block: HTTP method badges with path"
         },
         {
-         "file": "ui/components/anatomy.tsx",
+         "file": "app/components/anatomy.tsx",
          "start": 390,
          "end": 476,
          "label": "Map block: from→to rows, drillable when under exists"
         },
         {
-         "file": "ui/components/anatomy.tsx",
+         "file": "app/components/anatomy.tsx",
          "start": 643,
          "end": 723,
          "label": "Flow block: numbered steps with connecting rail"
         },
         {
-         "file": "ui/components/anatomy.tsx",
+         "file": "app/components/anatomy.tsx",
          "start": 739,
          "end": 824,
          "label": "Facts: folds past FACTS_VISIBLE (3) on closed cards"
@@ -3362,31 +3362,31 @@
        "detail": "`ExplainedBlock` routes to `Diagram`, `Table`, `Sequence`, `Screen`, or `Example`. Diagrams are navigable — boxes with `opens` become `<a>` tags that focus, accept Enter, and open a child node.",
        "code": [
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 75,
          "end": 219,
          "label": "Diagram: SVG boxes with arrows, navigation cues, and clickable links"
         },
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 270,
          "end": 316,
          "label": "Table: HTML table with fold/unfold past TABLE_ROWS_FOLDED (12)"
         },
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 325,
          "end": 400,
          "label": "Sequence: lifelines with numbered messages and directional arrows"
         },
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 408,
          "end": 473,
          "label": "Screen: phone mockup or wireframe with numbered callouts"
         },
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 537,
          "end": 563,
          "label": "Example: pre block with annotation notes"
@@ -3451,13 +3451,13 @@
        "detail": "`CodeDrawer` lists each `CodeRef` as a clickable entry. Expanding one triggers `CodePlace` to lazy-load code via `readSource`, then renders it through `SourceView`.",
        "code": [
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 593,
          "end": 625,
          "label": "CodeDrawer: toggle button and ref list"
         },
         {
-         "file": "ui/components/blocks.tsx",
+         "file": "app/components/blocks.tsx",
          "start": 627,
          "end": 669,
          "label": "CodePlace: lazy-loads code on expand via readSource, renders SourceView"
@@ -3518,8 +3518,8 @@
      "sub": "How code is fetched from the repository — live API or static JSON — and delivered to the renderers",
      "footprint": {
       "dirs": [
-       "ui/lib",
-       "ui/app/api/source"
+       "app/lib",
+       "app/app/api/source"
       ],
       "files": 3
      },
@@ -3529,25 +3529,25 @@
      "detail": "`readSource` has two modes: in development it calls `/api/source` which reads files through `repo.ts` with a three-stage containment check, and in static exports it reads from pre-baked `source.json`. Both return a `Slice` with the code and a drift flag.",
      "code": [
       {
-       "file": "ui/lib/source.ts",
+       "file": "app/lib/source.ts",
        "start": 18,
        "end": 37,
        "label": "readSource: live fetch or static baked JSON"
       },
       {
-       "file": "ui/app/api/source/route.ts",
+       "file": "app/app/api/source/route.ts",
        "start": 24,
        "end": 43,
        "label": "GET handler: reads a file slice via readSlice"
       },
       {
-       "file": "ui/lib/repo.ts",
+       "file": "app/lib/repo.ts",
        "start": 114,
        "end": 130,
        "label": "contain: three-stage path security (resolve, prefix, realpath)"
       },
       {
-       "file": "ui/lib/repo.ts",
+       "file": "app/lib/repo.ts",
        "start": 139,
        "end": 163,
        "label": "readSlice: reads lines, checks fixture drift via quoteHolds"
@@ -3637,7 +3637,7 @@
       {
        "title": "Static drift check is stricter than live",
        "detail": "Live mode uses `quoteHolds` which allows the fixture's last line to be a prefix of the real line. Static mode uses strict equality (`code === q.fixture`), so a quote ending mid-line passes live but shows drifted in a static export.",
-       "where": "ui/lib/source.ts:35"
+       "where": "app/lib/source.ts:35"
       }
      ]
     },
@@ -3647,7 +3647,7 @@
      "sub": "Positions boxes on a grid and routes arrows between them with collision avoidance",
      "footprint": {
       "dirs": [
-       "ui/lib/diagram.ts"
+       "app/lib/diagram.ts"
       ],
       "files": 1
      },
@@ -3657,31 +3657,31 @@
      "detail": "`layoutDiagram` takes boxes with col/row grid positions, computes pixel widths per column, routes arrows as right-angled polylines avoiding boxes, and places labels beside lines without overlapping.",
      "code": [
       {
-       "file": "ui/lib/diagram.ts",
+       "file": "app/lib/diagram.ts",
        "start": 43,
        "end": 78,
        "label": "Box positioning: column widths from label lengths, gap from arrow labels"
       },
       {
-       "file": "ui/lib/diagram.ts",
+       "file": "app/lib/diagram.ts",
        "start": 95,
        "end": 128,
        "label": "Arrow routing: plain route, then cheapest detour avoiding boxes and collinear runs"
       },
       {
-       "file": "ui/lib/diagram.ts",
+       "file": "app/lib/diagram.ts",
        "start": 139,
        "end": 174,
        "label": "Label placement: candidate spots beside each line, pick fewest clashes"
       },
       {
-       "file": "ui/lib/diagram.ts",
+       "file": "app/lib/diagram.ts",
        "start": 269,
        "end": 290,
        "label": "laneOffsets: side-by-side lanes for arrows sharing a column gap"
       },
       {
-       "file": "ui/lib/diagram.ts",
+       "file": "app/lib/diagram.ts",
        "start": 297,
        "end": 313,
        "label": "route: the basic right-angled path between two boxes"
@@ -3756,9 +3756,9 @@
      "sub": "How source code is edited inline, written back with optimistic concurrency, and how drift is detected",
      "footprint": {
       "dirs": [
-       "ui/components",
-       "ui/lib",
-       "ui/app/api/source"
+       "app/components",
+       "app/lib",
+       "app/app/api/source"
       ],
       "files": 3
      },
@@ -3768,37 +3768,37 @@
      "detail": "`SourceView` toggles between read and edit mode; on save it POSTs to `/api/source` which calls `writeSlice` with optimistic concurrency. Drift is flagged when `quoteHolds` finds the fixture quote no longer matches disk.",
      "code": [
       {
-       "file": "ui/components/anatomy.tsx",
+       "file": "app/components/anatomy.tsx",
        "start": 856,
        "end": 860,
        "label": "SourceView state: slice, failed, editing, draft, saved"
       },
       {
-       "file": "ui/components/anatomy.tsx",
+       "file": "app/components/anatomy.tsx",
        "start": 901,
        "end": 926,
        "label": "save(): POST draft, re-read disk on success"
       },
       {
-       "file": "ui/components/anatomy.tsx",
+       "file": "app/components/anatomy.tsx",
        "start": 1000,
        "end": 1007,
        "label": "Drift banner: the file no longer says what the map quoted"
       },
       {
-       "file": "ui/lib/repo.ts",
+       "file": "app/lib/repo.ts",
        "start": 192,
        "end": 222,
        "label": "writeSlice: optimistic concurrency check then write"
       },
       {
-       "file": "ui/lib/repo.ts",
+       "file": "app/lib/repo.ts",
        "start": 180,
        "end": 190,
        "label": "quoteHolds: fixture vs disk, last line prefix allowed"
       },
       {
-       "file": "ui/components/anatomy.tsx",
+       "file": "app/components/anatomy.tsx",
        "start": 1090,
        "end": 1109,
        "label": "DraftDiff: shows all-removals then all-additions before save"
@@ -3882,7 +3882,7 @@
       {
        "title": "POST handler has no try/catch",
        "detail": "The GET handler wraps `readSlice` in try/catch, turning `Refused` into 400 and unknowns into 'unreadable'. The POST handler calls `writeSlice` without try/catch, so a filesystem error (permission denied, disk full) returns an unhandled 500 with no meaningful message.",
-       "where": "ui/app/api/source/route.ts:58"
+       "where": "app/app/api/source/route.ts:58"
       }
      ]
     },
@@ -3892,7 +3892,7 @@
      "sub": "TypeScript types defining what a node contains: anatomy blocks, code refs, state tracking, edges, and the fixture data",
      "footprint": {
       "dirs": [
-       "ui/lib/data.ts"
+       "app/lib/data.ts"
       ],
       "files": 1
      },
@@ -3902,49 +3902,49 @@
      "detail": "`Node` carries id, col/row, state, anatomy blocks, code refs, issues, and optional children; the `Anatomy` union has 14 members, one per visualization kind. The file also holds L0/E0/L1/LINKS fixture data for the prototype map.",
      "code": [
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 251,
        "end": 332,
        "label": "Node interface: id, title, col/row, state, anatomy, children, edges"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 220,
        "end": 249,
        "label": "Anatomy union: 14 visualization block kinds"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 17,
        "end": 17,
        "label": "State type: derived | partial | inferred"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 1057,
        "end": 1060,
        "label": "rowId: stable wire anchor id from owner + key"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 1062,
        "end": 1100,
        "label": "LINKS: 20 row-level connections (FK, writes, reads, routes)"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 394,
        "end": 394,
        "label": "L0 fixture: top-level nodes"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 508,
        "end": 508,
        "label": "E0 fixture: top-level edges"
       },
       {
-       "file": "ui/lib/data.ts",
+       "file": "app/lib/data.ts",
        "start": 529,
        "end": 529,
        "label": "L1 fixture: second-level nodes by parent"
@@ -4036,7 +4036,7 @@
    "row": 3,
    "footprint": {
     "dirs": [
-     "ui/lib/explorify/"
+     "app/lib/explorify/"
     ],
     "files": 10
    },
@@ -4047,37 +4047,37 @@
    },
    "code": [
     {
-     "file": "ui/lib/explorify/index.ts",
+     "file": "app/lib/explorify/index.ts",
      "start": 63,
      "end": 65,
      "label": "The nine root nodes assembled into one array"
     },
     {
-     "file": "ui/lib/explorify/index.ts",
+     "file": "app/lib/explorify/index.ts",
      "start": 53,
      "end": 61,
      "label": "Map metadata: repo, commit, file count"
     },
     {
-     "file": "ui/lib/explorify/index.ts",
+     "file": "app/lib/explorify/index.ts",
      "start": 75,
      "end": 87,
      "label": "Seven edges forming the lifecycle pipeline"
     },
     {
-     "file": "ui/lib/explorify/index.ts",
+     "file": "app/lib/explorify/index.ts",
      "start": 94,
      "end": 103,
      "label": "Four cross-feature links between features"
     },
     {
-     "file": "ui/lib/explorify/index.ts",
+     "file": "app/lib/explorify/index.ts",
      "start": 1,
      "end": 14,
      "label": "Header comment: hand-authored map of a real repo"
     },
     {
-     "file": "ui/lib/maps.ts",
+     "file": "app/lib/maps.ts",
      "start": 14,
      "end": 14,
      "label": "Explorify is the default map"
@@ -4174,43 +4174,43 @@
        "from": "signup",
        "to": "launch",
        "label": "every later open",
-       "at": "ui/lib/explorify/index.ts:76"
+       "at": "app/lib/explorify/index.ts:76"
       },
       {
        "from": "launch",
        "to": "feed",
        "label": "routes students",
-       "at": "ui/lib/explorify/index.ts:79"
+       "at": "app/lib/explorify/index.ts:79"
       },
       {
        "from": "launch",
        "to": "create",
        "label": "routes orgs",
-       "at": "ui/lib/explorify/index.ts:81"
+       "at": "app/lib/explorify/index.ts:81"
       },
       {
        "from": "feed",
        "to": "rsvp",
        "label": "opens",
-       "at": "ui/lib/explorify/index.ts:80"
+       "at": "app/lib/explorify/index.ts:80"
       },
       {
        "from": "create",
        "to": "checkin",
        "label": "details open",
-       "at": "ui/lib/explorify/index.ts:83"
+       "at": "app/lib/explorify/index.ts:83"
       },
       {
        "from": "create",
        "to": "feed",
        "label": "publishes into",
-       "at": "ui/lib/explorify/index.ts:85"
+       "at": "app/lib/explorify/index.ts:85"
       },
       {
        "from": "rsvp",
        "to": "checkin",
        "label": "fills list for",
-       "at": "ui/lib/explorify/index.ts:86"
+       "at": "app/lib/explorify/index.ts:86"
       }
      ]
     },
@@ -4318,38 +4318,38 @@
      "row": 0,
      "footprint": {
       "dirs": [
-       "ui/lib/explorify/index.ts"
+       "app/lib/explorify/index.ts"
       ],
       "files": 1
      },
      "detail": "The assembly module imports all nine nodes, defines seven edges tracing one event's lifecycle through two lanes (students and organisations), and four links where data written in one feature is read by another.",
      "code": [
       {
-       "file": "ui/lib/explorify/index.ts",
+       "file": "app/lib/explorify/index.ts",
        "start": 40,
        "end": 49,
        "label": "Imports of all nine feature files"
       },
       {
-       "file": "ui/lib/explorify/index.ts",
+       "file": "app/lib/explorify/index.ts",
        "start": 63,
        "end": 65,
        "label": "AUTHORED array of the nine nodes"
       },
       {
-       "file": "ui/lib/explorify/index.ts",
+       "file": "app/lib/explorify/index.ts",
        "start": 75,
        "end": 87,
        "label": "E0: seven lifecycle edges with lanes"
       },
       {
-       "file": "ui/lib/explorify/index.ts",
+       "file": "app/lib/explorify/index.ts",
        "start": 94,
        "end": 103,
        "label": "LINKS: four cross-feature data links"
       },
       {
-       "file": "ui/lib/explorify/index.ts",
+       "file": "app/lib/explorify/index.ts",
        "start": 105,
        "end": 107,
        "label": "linksFor helper to filter links by node id"
@@ -4474,8 +4474,8 @@
      "row": 1,
      "footprint": {
       "dirs": [
-       "ui/lib/explorify/signup.ts",
-       "ui/lib/explorify/launch.ts"
+       "app/lib/explorify/signup.ts",
+       "app/lib/explorify/launch.ts"
       ],
       "files": 2
      },
@@ -4485,61 +4485,61 @@
      "detail": "The signup file exports the deepest tree (3 levels, 10 nodes) covering both user types, abandoned accounts, and 8 interest categories. The launch file (6 nodes) covers table-based role routing, login, three duplicate checks, and phone caching.",
      "code": [
       {
-       "file": "ui/lib/explorify/signup.ts",
+       "file": "app/lib/explorify/signup.ts",
        "start": 6,
        "end": 26,
        "label": "The signup root node definition"
       },
       {
-       "file": "ui/lib/explorify/signup.ts",
+       "file": "app/lib/explorify/signup.ts",
        "start": 85,
        "end": 95,
        "label": "Four children: student, org, categories, quitting"
       },
       {
-       "file": "ui/lib/explorify/launch.ts",
+       "file": "app/lib/explorify/launch.ts",
        "start": 6,
        "end": 23,
        "label": "The launch root node definition"
       },
       {
-       "file": "ui/lib/explorify/launch.ts",
+       "file": "app/lib/explorify/launch.ts",
        "start": 75,
        "end": 80,
        "label": "Four children: lookup, login, copies, cache"
       },
       {
-       "file": "ui/lib/explorify/signup.ts",
+       "file": "app/lib/explorify/signup.ts",
        "start": 135,
        "end": 360,
        "label": "su-student's 4 children (level 3): su-email, su-code, su-password, su-finish"
       },
       {
-       "file": "ui/lib/explorify/signup.ts",
+       "file": "app/lib/explorify/signup.ts",
        "start": 442,
        "end": 507,
        "label": "su-org's child (level 3): su-campus"
       },
       {
-       "file": "ui/lib/explorify/signup.ts",
+       "file": "app/lib/explorify/signup.ts",
        "start": 600,
        "end": 656,
        "label": "su-abandon: quitting halfway through"
       },
       {
-       "file": "ui/lib/explorify/signup.ts",
+       "file": "app/lib/explorify/signup.ts",
        "start": 511,
        "end": 598,
        "label": "su-cats: the 8 interest categories"
       },
       {
-       "file": "ui/lib/explorify/launch.ts",
+       "file": "app/lib/explorify/launch.ts",
        "start": 201,
        "end": 307,
        "label": "ln-copies: three duplicate launch checks (with child ln-token)"
       },
       {
-       "file": "ui/lib/explorify/launch.ts",
+       "file": "app/lib/explorify/launch.ts",
        "start": 309,
        "end": 389,
        "label": "ln-cache: profile and events saved on the phone"
@@ -4596,26 +4596,26 @@
          "from": "su",
          "to": "ln",
          "label": "every later open",
-         "at": "ui/lib/explorify/index.ts:76"
+         "at": "app/lib/explorify/index.ts:76"
         },
         {
          "from": "ln",
          "to": "student",
          "label": "individual row",
-         "at": "ui/lib/explorify/launch.ts:43"
+         "at": "app/lib/explorify/launch.ts:43"
         },
         {
          "from": "ln",
          "to": "org",
          "label": "organizations row",
-         "at": "ui/lib/explorify/launch.ts:45"
+         "at": "app/lib/explorify/launch.ts:45"
         },
         {
          "from": "ln",
          "to": "stuck",
          "label": "no row",
          "tone": "warn",
-         "at": "ui/lib/explorify/launch.ts:46"
+         "at": "app/lib/explorify/launch.ts:46"
         }
        ]
       }
@@ -4639,50 +4639,50 @@
        "row": 0,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/signup.ts"
+         "app/lib/explorify/signup.ts"
         ],
         "files": 1
        },
        "detail": "Exports 10 nodes in 3 levels: a root with a lifecycle diagram, student branch with 4 stage children, organisation branch with a campus grandchild, the 8 interest categories, and the abandoned-signup dead end.",
        "code": [
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 6,
          "end": 84,
          "label": "Root node: diagram, stages table, facts, one issue"
         },
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 87,
          "end": 359,
          "label": "su-student with 4 stage children (email, code, password, finish)"
         },
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 363,
          "end": 508,
          "label": "su-org with su-campus grandchild (unreachable screen)"
         },
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 512,
          "end": 599,
          "label": "su-cats: the 8 interest categories"
         },
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 601,
          "end": 656,
          "label": "su-abandon: the stuck state after quitting"
         },
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 253,
          "end": 297,
          "label": "su-password child of su-student"
         },
         {
-         "file": "ui/lib/explorify/signup.ts",
+         "file": "app/lib/explorify/signup.ts",
          "start": 298,
          "end": 359,
          "label": "su-finish child of su-student"
@@ -4749,35 +4749,35 @@
           {
            "from": "root",
            "to": "stu",
-           "at": "ui/lib/explorify/signup.ts:87"
+           "at": "app/lib/explorify/signup.ts:87"
           },
           {
            "from": "root",
            "to": "orgn",
-           "at": "ui/lib/explorify/signup.ts:363"
+           "at": "app/lib/explorify/signup.ts:363"
           },
           {
            "from": "root",
            "to": "cats",
-           "at": "ui/lib/explorify/signup.ts:512"
+           "at": "app/lib/explorify/signup.ts:512"
           },
           {
            "from": "root",
            "to": "abandon",
-           "at": "ui/lib/explorify/signup.ts:601"
+           "at": "app/lib/explorify/signup.ts:601"
           },
           {
            "from": "stu",
            "to": "email",
            "label": "stage 2",
-           "at": "ui/lib/explorify/signup.ts:137"
+           "at": "app/lib/explorify/signup.ts:137"
           },
           {
            "from": "orgn",
            "to": "campus",
            "label": "unreachable child",
            "tone": "warn",
-           "at": "ui/lib/explorify/signup.ts:444"
+           "at": "app/lib/explorify/signup.ts:444"
           }
          ]
         },
@@ -4831,38 +4831,38 @@
        "row": 1,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/launch.ts"
+         "app/lib/explorify/launch.ts"
         ],
         "files": 1
        },
        "detail": "Exports 6 nodes in 3 levels: the root with a role-routing diagram, then children for lookup, login, duplicate checks, and phone cache — with `ln-token` as a grandchild documenting an undefined variable.",
        "code": [
         {
-         "file": "ui/lib/explorify/launch.ts",
+         "file": "app/lib/explorify/launch.ts",
          "start": 6,
          "end": 73,
          "label": "Root node: diagram, routing table, check comparison table"
         },
         {
-         "file": "ui/lib/explorify/launch.ts",
+         "file": "app/lib/explorify/launch.ts",
          "start": 77,
          "end": 139,
          "label": "ln-lookup: flow (5 steps), sequence, 3 issues"
         },
         {
-         "file": "ui/lib/explorify/launch.ts",
+         "file": "app/lib/explorify/launch.ts",
          "start": 141,
          "end": 199,
          "label": "ln-login: screen, sequence, facts, 1 issue"
         },
         {
-         "file": "ui/lib/explorify/launch.ts",
+         "file": "app/lib/explorify/launch.ts",
          "start": 202,
          "end": 307,
          "label": "ln-copies: diagram, comparison table, ln-token grandchild"
         },
         {
-         "file": "ui/lib/explorify/launch.ts",
+         "file": "app/lib/explorify/launch.ts",
          "start": 310,
          "end": 389,
          "label": "ln-cache: 3 tables, example of cached user"
@@ -4934,10 +4934,10 @@
      "row": 2,
      "footprint": {
       "dirs": [
-       "ui/lib/explorify/create-event.ts",
-       "ui/lib/explorify/feed.ts",
-       "ui/lib/explorify/rsvp.ts",
-       "ui/lib/explorify/check-in.ts"
+       "app/lib/explorify/create-event.ts",
+       "app/lib/explorify/feed.ts",
+       "app/lib/explorify/rsvp.ts",
+       "app/lib/explorify/check-in.ts"
       ],
       "files": 4
      },
@@ -4947,25 +4947,25 @@
      "detail": "Four files trace one event from creation to check-in, exporting 27 nodes total. The `events.rsvp` JSON text — one string per event holding the full guest list — is the shared data connecting join and check-in.",
      "code": [
       {
-       "file": "ui/lib/explorify/create-event.ts",
+       "file": "app/lib/explorify/create-event.ts",
        "start": 5,
        "end": 18,
        "label": "createEvent root: form, draft, publish pipeline"
       },
       {
-       "file": "ui/lib/explorify/feed.ts",
+       "file": "app/lib/explorify/feed.ts",
        "start": 7,
        "end": 23,
        "label": "feed root: campus, download, rank, search"
       },
       {
-       "file": "ui/lib/explorify/rsvp.ts",
+       "file": "app/lib/explorify/rsvp.ts",
        "start": 7,
        "end": 19,
        "label": "rsvp root: drawer, storage, cancel, buttons, saved tab"
       },
       {
-       "file": "ui/lib/explorify/check-in.ts",
+       "file": "app/lib/explorify/check-in.ts",
        "start": 5,
        "end": 18,
        "label": "checkIn root: details page, attendee list, the tap"
@@ -5022,38 +5022,38 @@
          "from": "ce",
          "to": "fd",
          "label": "publishes into",
-         "at": "ui/lib/explorify/index.ts:85"
+         "at": "app/lib/explorify/index.ts:85"
         },
         {
          "from": "fd",
          "to": "rv",
          "label": "opens",
-         "at": "ui/lib/explorify/index.ts:80"
+         "at": "app/lib/explorify/index.ts:80"
         },
         {
          "from": "rv",
          "to": "ci",
          "label": "fills list for",
-         "at": "ui/lib/explorify/index.ts:86"
+         "at": "app/lib/explorify/index.ts:86"
         },
         {
          "from": "ce",
          "to": "ci",
          "label": "details open",
-         "at": "ui/lib/explorify/index.ts:83"
+         "at": "app/lib/explorify/index.ts:83"
         },
         {
          "from": "rv",
          "to": "rsvpcol",
          "label": "writes",
-         "at": "ui/lib/explorify/rsvp.ts:46"
+         "at": "app/lib/explorify/rsvp.ts:46"
         },
         {
          "from": "ci",
          "to": "rsvpcol",
          "label": "rewrites all",
          "tone": "warn",
-         "at": "ui/lib/explorify/check-in.ts:44"
+         "at": "app/lib/explorify/check-in.ts:44"
         }
        ]
       }
@@ -5091,38 +5091,38 @@
        "row": 0,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/create-event.ts"
+         "app/lib/explorify/create-event.ts"
         ],
         "files": 1
        },
        "detail": "The largest event file (774 lines, 9 nodes) uses `group: { ordering: \"sequence\" }` with edges home→form→draft→publish. Three grandchildren (campus, dates, picture) nest under the form.",
        "code": [
         {
-         "file": "ui/lib/explorify/create-event.ts",
+         "file": "app/lib/explorify/create-event.ts",
          "start": 5,
          "end": 101,
          "label": "Root node: diagram, event states table, sequence, 2 issues, 4 edges"
         },
         {
-         "file": "ui/lib/explorify/create-event.ts",
+         "file": "app/lib/explorify/create-event.ts",
          "start": 97,
          "end": 102,
          "label": "Four edges forming the creation sequence"
         },
         {
-         "file": "ui/lib/explorify/create-event.ts",
+         "file": "app/lib/explorify/create-event.ts",
          "start": 105,
          "end": 189,
          "label": "ce-home: org home screen with 3 list screens"
         },
         {
-         "file": "ui/lib/explorify/create-event.ts",
+         "file": "app/lib/explorify/create-event.ts",
          "start": 191,
          "end": 568,
          "label": "ce-form: 11-field form with 3 children (campus, dates, picture)"
         },
         {
-         "file": "ui/lib/explorify/create-event.ts",
+         "file": "app/lib/explorify/create-event.ts",
          "start": 571,
          "end": 771,
          "label": "ce-draft, ce-publish, ce-edit: saving and publishing"
@@ -5192,38 +5192,38 @@
        "row": 1,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/feed.ts"
+         "app/lib/explorify/feed.ts"
         ],
         "files": 1
        },
        "detail": "Exports 7 nodes in 2 levels. The root's diagram shows GPS and campus picker feeding one download, cached on the phone, then read by You Might Like (5-rule scoring), Happening This Week, and Search.",
        "code": [
         {
-         "file": "ui/lib/explorify/feed.ts",
+         "file": "app/lib/explorify/feed.ts",
          "start": 7,
          "end": 119,
          "label": "Root node: diagram, screen, trade-off table, sequence, 2 issues"
         },
         {
-         "file": "ui/lib/explorify/feed.ts",
+         "file": "app/lib/explorify/feed.ts",
          "start": 121,
          "end": 267,
          "label": "fd-campus: GPS nearest of 61, picker, distance table"
         },
         {
-         "file": "ui/lib/explorify/feed.ts",
+         "file": "app/lib/explorify/feed.ts",
          "start": 268,
          "end": 337,
          "label": "fd-fetch: download query, what comes along (guest lists)"
         },
         {
-         "file": "ui/lib/explorify/feed.ts",
+         "file": "app/lib/explorify/feed.ts",
          "start": 429,
          "end": 540,
          "label": "fd-ranked: 5-rule scoring, max 13 points per event"
         },
         {
-         "file": "ui/lib/explorify/feed.ts",
+         "file": "app/lib/explorify/feed.ts",
          "start": 541,
          "end": 641,
          "label": "fd-search: text + 8 category buttons"
@@ -5283,44 +5283,44 @@
        "row": 2,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/rsvp.ts"
+         "app/lib/explorify/rsvp.ts"
         ],
         "files": 1
        },
        "detail": "Exports 6 nodes covering the swipe-to-join drawer, the dual write to `events.rsvp` and `individual.rsvp`, four copies of cancel (one working, one broken, two unused), button memory that resets each launch, and the Saved tab.",
        "code": [
         {
-         "file": "ui/lib/explorify/rsvp.ts",
+         "file": "app/lib/explorify/rsvp.ts",
          "start": 7,
          "end": 75,
          "label": "Root node: writers/readers diagram, join sequence"
         },
         {
-         "file": "ui/lib/explorify/rsvp.ts",
+         "file": "app/lib/explorify/rsvp.ts",
          "start": 78,
          "end": 184,
          "label": "rv-swipe: the drawer, screens, dietary table, swipe diagram"
         },
         {
-         "file": "ui/lib/explorify/rsvp.ts",
+         "file": "app/lib/explorify/rsvp.ts",
          "start": 185,
          "end": 295,
          "label": "rv-column: race condition sequence, guest list example, writers table"
         },
         {
-         "file": "ui/lib/explorify/rsvp.ts",
+         "file": "app/lib/explorify/rsvp.ts",
          "start": 296,
          "end": 390,
          "label": "rv-cancel: four copies table, Saved tab crash example"
         },
         {
-         "file": "ui/lib/explorify/rsvp.ts",
+         "file": "app/lib/explorify/rsvp.ts",
          "start": 391,
          "end": 486,
          "label": "rv-state: disconnected-props diagram, truth table"
         },
         {
-         "file": "ui/lib/explorify/rsvp.ts",
+         "file": "app/lib/explorify/rsvp.ts",
          "start": 487,
          "end": 545,
          "label": "rv-saved: two-list screens, download sequence"
@@ -5375,38 +5375,38 @@
        "row": 3,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/check-in.ts"
+         "app/lib/explorify/check-in.ts"
         ],
         "files": 1
        },
        "detail": "Exports 5 nodes; the root and ci-tap use `group: { ordering: \"sequence\" }`. The root documents the stale-copy problem; ci-tap shows through a sequence how a check-in can erase newer RSVPs.",
        "code": [
         {
-         "file": "ui/lib/explorify/check-in.ts",
+         "file": "app/lib/explorify/check-in.ts",
          "start": 5,
          "end": 82,
          "label": "Root node: diagram, writers table, sequence, stale-copy issue, 2 edges"
         },
         {
-         "file": "ui/lib/explorify/check-in.ts",
+         "file": "app/lib/explorify/check-in.ts",
          "start": 85,
          "end": 174,
          "label": "ci-data: RSVP entry fields, dietary options, example JSON"
         },
         {
-         "file": "ui/lib/explorify/check-in.ts",
+         "file": "app/lib/explorify/check-in.ts",
          "start": 176,
          "end": 239,
          "label": "ci-details: event details screen, fetch sequence"
         },
         {
-         "file": "ui/lib/explorify/check-in.ts",
+         "file": "app/lib/explorify/check-in.ts",
          "start": 241,
          "end": 296,
          "label": "ci-list: attendee list screen, dietary tally"
         },
         {
-         "file": "ui/lib/explorify/check-in.ts",
+         "file": "app/lib/explorify/check-in.ts",
          "start": 298,
          "end": 372,
          "label": "ci-tap: the flow and race sequence"
@@ -5458,9 +5458,9 @@
      "row": 3,
      "footprint": {
       "dirs": [
-       "ui/lib/explorify/account.ts",
-       "ui/lib/explorify/supabase.ts",
-       "ui/lib/explorify/server.ts"
+       "app/lib/explorify/account.ts",
+       "app/lib/explorify/supabase.ts",
+       "app/lib/explorify/server.ts"
       ],
       "files": 3
      },
@@ -5471,49 +5471,49 @@
      "detail": "These three nodes sit off the lifecycle pipeline. The Supabase file is the deepest (3 levels, 9 nodes) reconstructing every table schema and inferring access rules from queries; most nodes are marked `partial`, others `derived` or `inferred`.",
      "code": [
       {
-       "file": "ui/lib/explorify/account.ts",
+       "file": "app/lib/explorify/account.ts",
        "start": 6,
        "end": 27,
        "label": "account root: dual screens, diff table, action diagram"
       },
       {
-       "file": "ui/lib/explorify/supabase.ts",
+       "file": "app/lib/explorify/supabase.ts",
        "start": 8,
        "end": 28,
        "label": "supabase root: marked partial, no schema in repo"
       },
       {
-       "file": "ui/lib/explorify/server.ts",
+       "file": "app/lib/explorify/server.ts",
        "start": 5,
        "end": 27,
        "label": "server root: one working function, three leftovers"
       },
       {
-       "file": "ui/lib/explorify/supabase.ts",
+       "file": "app/lib/explorify/supabase.ts",
        "start": 83,
        "end": 86,
        "label": "children array begins: level 2 (sb-client)"
       },
       {
-       "file": "ui/lib/explorify/supabase.ts",
+       "file": "app/lib/explorify/supabase.ts",
        "start": 131,
        "end": 137,
        "label": "sb-tables node, state partial"
       },
       {
-       "file": "ui/lib/explorify/supabase.ts",
+       "file": "app/lib/explorify/supabase.ts",
        "start": 190,
        "end": 196,
        "label": "sb-individual: level 3 child of sb-tables, state partial"
       },
       {
-       "file": "ui/lib/explorify/supabase.ts",
+       "file": "app/lib/explorify/supabase.ts",
        "start": 487,
        "end": 494,
        "label": "sb-missing: state derived, not partial"
       },
       {
-       "file": "ui/lib/explorify/supabase.ts",
+       "file": "app/lib/explorify/supabase.ts",
        "start": 533,
        "end": 541,
        "label": "sb-rls: level 3 child of sb-missing, state inferred"
@@ -5569,24 +5569,24 @@
          "from": "acc",
          "to": "sup",
          "label": "reads and writes",
-         "at": "ui/lib/explorify/account.ts:88"
+         "at": "app/lib/explorify/account.ts:88"
         },
         {
          "from": "acc",
          "to": "srv",
          "label": "delete calls",
-         "at": "ui/lib/explorify/account.ts:90"
+         "at": "app/lib/explorify/account.ts:90"
         },
         {
          "from": "srv",
          "to": "deluser",
-         "at": "ui/lib/explorify/server.ts:43"
+         "at": "app/lib/explorify/server.ts:43"
         },
         {
          "from": "srv",
          "to": "delorg",
          "tone": "warn",
-         "at": "ui/lib/explorify/server.ts:44"
+         "at": "app/lib/explorify/server.ts:44"
         }
        ]
       }
@@ -5601,38 +5601,38 @@
        "row": 0,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/account.ts"
+         "app/lib/explorify/account.ts"
         ],
         "files": 1
        },
        "detail": "Exports 6 nodes: a root with dual Account tab screens and a diff table, plus children for editing (with photo grandchild), reset, signout, and delete — the last three marked `partial`.",
        "code": [
         {
-         "file": "ui/lib/explorify/account.ts",
+         "file": "app/lib/explorify/account.ts",
          "start": 6,
          "end": 95,
          "label": "Root node: 2 screens, diff table, action diagram"
         },
         {
-         "file": "ui/lib/explorify/account.ts",
+         "file": "app/lib/explorify/account.ts",
          "start": 97,
          "end": 236,
          "label": "ac-profile with ac-photo grandchild"
         },
         {
-         "file": "ui/lib/explorify/account.ts",
+         "file": "app/lib/explorify/account.ts",
          "start": 237,
          "end": 345,
          "label": "ac-reset: two-step password reset, 4 issues"
         },
         {
-         "file": "ui/lib/explorify/account.ts",
+         "file": "app/lib/explorify/account.ts",
          "start": 346,
          "end": 385,
          "label": "ac-signout: clear phone then sign out"
         },
         {
-         "file": "ui/lib/explorify/account.ts",
+         "file": "app/lib/explorify/account.ts",
          "start": 386,
          "end": 465,
          "label": "ac-delete: calls missing function for orgs, 2 issues"
@@ -5693,38 +5693,38 @@
        "row": 1,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/supabase.ts"
+         "app/lib/explorify/supabase.ts"
         ],
         "files": 1
        },
        "detail": "Exports 9 nodes in 4 levels—6 `partial`, 2 `derived`, and `sb-rls` `inferred`—because no schema or migrations exist in the repo. Three grandchildren use `schema` anatomy.",
        "code": [
         {
-         "file": "ui/lib/explorify/supabase.ts",
+         "file": "app/lib/explorify/supabase.ts",
          "start": 8,
          "end": 83,
          "label": "Root node: diagram, sequence, missing-schema issue"
         },
         {
-         "file": "ui/lib/explorify/supabase.ts",
+         "file": "app/lib/explorify/supabase.ts",
          "start": 85,
          "end": 130,
          "label": "sb-client: Supabase client init, session management"
         },
         {
-         "file": "ui/lib/explorify/supabase.ts",
+         "file": "app/lib/explorify/supabase.ts",
          "start": 132,
          "end": 413,
          "label": "sb-tables with 3 schema children (individual, organizations, events)"
         },
         {
-         "file": "ui/lib/explorify/supabase.ts",
+         "file": "app/lib/explorify/supabase.ts",
          "start": 416,
          "end": 486,
          "label": "sb-storage: two public buckets, double-upload issue"
         },
         {
-         "file": "ui/lib/explorify/supabase.ts",
+         "file": "app/lib/explorify/supabase.ts",
          "start": 488,
          "end": 579,
          "label": "sb-missing with sb-rls grandchild: inferred access rules"
@@ -5805,42 +5805,42 @@
           {
            "from": "root",
            "to": "client",
-           "at": "ui/lib/explorify/supabase.ts:85"
+           "at": "app/lib/explorify/supabase.ts:85"
           },
           {
            "from": "root",
            "to": "tables",
-           "at": "ui/lib/explorify/supabase.ts:132"
+           "at": "app/lib/explorify/supabase.ts:132"
           },
           {
            "from": "root",
            "to": "storage",
-           "at": "ui/lib/explorify/supabase.ts:416"
+           "at": "app/lib/explorify/supabase.ts:416"
           },
           {
            "from": "root",
            "to": "missing",
-           "at": "ui/lib/explorify/supabase.ts:488"
+           "at": "app/lib/explorify/supabase.ts:488"
           },
           {
            "from": "tables",
            "to": "ind",
-           "at": "ui/lib/explorify/supabase.ts:192"
+           "at": "app/lib/explorify/supabase.ts:192"
           },
           {
            "from": "tables",
            "to": "orgs",
-           "at": "ui/lib/explorify/supabase.ts:255"
+           "at": "app/lib/explorify/supabase.ts:255"
           },
           {
            "from": "tables",
            "to": "events",
-           "at": "ui/lib/explorify/supabase.ts:309"
+           "at": "app/lib/explorify/supabase.ts:309"
           },
           {
            "from": "missing",
            "to": "rls",
-           "at": "ui/lib/explorify/supabase.ts:535"
+           "at": "app/lib/explorify/supabase.ts:535"
           }
          ]
         },
@@ -5875,38 +5875,38 @@
        "row": 2,
        "footprint": {
         "dirs": [
-         "ui/lib/explorify/server.ts"
+         "app/lib/explorify/server.ts"
         ],
         "files": 1
        },
        "detail": "Exports 5 nodes: the root diagram shows which functions are called and which are dead code, while `sv-delete` uses sequenced flow, routes, and sequence anatomy.",
        "code": [
         {
-         "file": "ui/lib/explorify/server.ts",
+         "file": "app/lib/explorify/server.ts",
          "start": 5,
          "end": 62,
          "label": "Root node: caller diagram, inventory table"
         },
         {
-         "file": "ui/lib/explorify/server.ts",
+         "file": "app/lib/explorify/server.ts",
          "start": 64,
          "end": 140,
          "label": "sv-delete: sequence, routes, flow, reply table, history table"
         },
         {
-         "file": "ui/lib/explorify/server.ts",
+         "file": "app/lib/explorify/server.ts",
          "start": 141,
          "end": 184,
          "label": "sv-delorg: partial node, the missing function"
         },
         {
-         "file": "ui/lib/explorify/server.ts",
+         "file": "app/lib/explorify/server.ts",
          "start": 185,
          "end": 228,
          "label": "sv-archive: untouched Supabase hello-world template"
         },
         {
-         "file": "ui/lib/explorify/server.ts",
+         "file": "app/lib/explorify/server.ts",
          "start": 229,
          "end": 278,
          "label": "sv-flask: unused Python app with config errors"

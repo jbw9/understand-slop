@@ -76,7 +76,7 @@ export function check(
         });
       if (b.kind === "screen" && b.shot) {
         if (gen) problems.push(`SHOT ${owner} — generated maps have no screenshots; describe the screen with items`);
-        else if (!existsSync(join(process.cwd(), "public", b.shot))) problems.push(`SHOT ${owner} ${b.shot} does not exist under ui/public`);
+        else if (!existsSync(join(process.cwd(), "public", b.shot))) problems.push(`SHOT ${owner} ${b.shot} does not exist under app/public`);
       }
       if (b.kind === "diagram") {
         const cells = new Set<string>();

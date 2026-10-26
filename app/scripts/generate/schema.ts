@@ -7,6 +7,8 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- validates untrusted model output */
 import { readFileSync } from "node:fs";
+import type { Node } from "@/lib/data";
+import { check } from "./check";
 
 /** lib/data.ts from `State` to just before the old inline fixture. */
 export function typeReference(): string {
@@ -76,4 +78,33 @@ export function shapeProblems(node: any, prefix: string, isRoot = true): string[
   });
   if (isRoot) { node.col = 0; node.row = 0; }
   return out;
+}
+
+/** Every id in a node's subtree, its own included. */
+export function idsOf(n: Node, out = new Set<string>()): Set<string> {
+  out.add(n.id);
+  (n.children ?? []).forEach((c) => idsOf(c, out));
+  return out;
+}
+
+/**
+ * Everything wrong with a submitted node, as the agent gets it back: its
+ * shape first (a malformed node would crash the checker), then ids already
+ * `taken` elsewhere in the map, then the checks the finished map is held to.
+ * A section is checked inside its root (`within` puts it there), and only the
+ * problems with its own ids, or duplicate ids, are its to fix.
+ */
+export function submitProblems(
+  node: any,
+  prefix: string,
+  repo: string,
+  opts: { isRoot?: boolean; taken?: Set<string>; within?: (node: Node) => Node } = {},
+): string[] {
+  const shape = shapeProblems(node, prefix, opts.isRoot ?? true);
+  if (shape.length) return shape;
+  const mine = idsOf(node);
+  const clash = [...mine].filter((id) => opts.taken?.has(id));
+  if (clash.length) return clash.map((id) => `${id}: already used elsewhere in the map`);
+  const problems = check({ AUTHORED: [opts.within ? opts.within(node) : node], E0: [], LINKS: [] }, repo, { generated: true }).problems;
+  return opts.within ? problems.filter((p) => [...mine].some((id) => p.includes(id)) || p.startsWith("DUP")) : problems;
 }

@@ -43,26 +43,38 @@
   position: relative;
   isolation: isolate;
 }
-/* The canvas's own dot ground, fading out below the headline. */
-.top::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1100px;
-  z-index: -1;
-  background-image: radial-gradient(var(--dim) 1px, transparent 1.2px);
-  background-size: 22px 22px;
-  background-position: center 11px;
-  mask-image: radial-gradient(ellipse 70% 62% at 50% 0%, #000 30%, transparent 100%);
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 0;
+}
+.mark {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.nav nav {
+  display: flex;
+  gap: 26px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.nav nav a:hover {
+  color: var(--ink);
 }
 .hero {
-  padding: 120px 0 72px;
-  text-align: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 28px 72px;
+  padding: 72px 0 56px;
 }
 /* Two lines at every width: the size follows the line that has to fit. */
 .hero h1 {
-  margin: 0 auto;
-  font-size: min(96px, (100vw - 2 * var(--gutter)) / 9.8);
+  margin: 0;
+  font-size: min(80px, 4.6vw);
   line-height: 1;
   letter-spacing: -0.045em;
   font-weight: 500;
@@ -73,19 +85,18 @@
   font-style: normal;
   color: var(--green);
 }
-.hero p {
-  margin: 28px auto 40px;
-  max-width: 32em;
-  font-size: clamp(18px, 1.7vw, 23px);
+.pitch p {
+  max-width: 28em;
+  margin: 0 0 28px;
+  font-size: clamp(17px, 1.4vw, 20px);
   line-height: 1.5;
   color: var(--variant);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 .ctas {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: 12px;
 }
 .btn {
@@ -155,8 +166,7 @@
 /* ── the demo ─────────────────────────────────────────── */
 .switcher {
   display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .tabs {
   display: flex;
@@ -303,11 +313,10 @@
 }
 .cap {
   max-width: 40em;
-  margin: 20px auto 0;
+  margin: 18px 0 0;
   font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
-  text-align: center;
   text-wrap: balance;
 }
 .cap kbd {
@@ -490,31 +499,60 @@
 .how {
   margin-top: var(--gap);
 }
-.how h2 {
-  margin: 0 0 56px;
-  font-size: clamp(38px, 5.6vw, 76px);
+.how h2,
+.struck h2,
+.section h2 {
+  margin: 0;
+  font-size: clamp(36px, 4.8vw, 68px);
   line-height: 1;
   letter-spacing: -0.045em;
   font-weight: 500;
-  text-align: center;
+  text-wrap: balance;
+}
+.how h2 {
+  margin-bottom: 48px;
 }
 .box {
   display: grid;
   grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
   gap: 16px;
 }
+/* The steps hang on the app's own wire: solid up to the open one, dashed past it. */
 .rail {
+  --at: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 0 8px 0 4px;
 }
+.rail:has(> :nth-child(2)[aria-selected="true"]) {
+  --at: 1;
+}
+.rail:has(> :nth-child(3)[aria-selected="true"]) {
+  --at: 2;
+}
+.rail::before,
+.rail::after {
+  content: "";
+  position: absolute;
+  left: 35px;
+  top: calc(100% / 6);
+}
+.rail::before {
+  bottom: calc(100% / 6);
+  border-left: 1.5px dashed var(--strong);
+}
+.rail::after {
+  height: calc(var(--at) * 100% / 3);
+  border-left: 1.5px solid var(--green);
+  transition: height 0.45s var(--ease);
+}
 .rail button {
-  display: flex;
+  display: grid;
   flex: 1 1 0;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 4px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-content: center;
+  gap: 4px 16px;
   padding: 22px 18px;
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -527,21 +565,29 @@
 .rail button:last-child {
   border-bottom: 0;
 }
-.rail svg {
-  box-sizing: border-box;
-  width: 44px;
-  height: 44px;
-  margin-bottom: 16px;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--low);
+.rail i {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--strong);
+  border-radius: 50%;
+  background: var(--white);
+  font: normal 600 12px var(--font-mono);
   color: var(--muted);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: background-color 0.25s ease-out, color 0.25s ease-out;
+  transition: background-color 0.25s ease-out, border-color 0.25s ease-out, color 0.25s ease-out;
+}
+.rail button:has(~ [aria-selected="true"]) i {
+  border-color: var(--green);
+  color: var(--green);
+}
+.rail button[aria-selected="true"] i {
+  border-color: var(--green);
+  background: var(--green);
+  color: var(--white);
 }
 .rail b {
   font-size: 16px;
@@ -557,10 +603,6 @@
 .rail button:hover,
 .rail button[aria-selected="true"] {
   color: var(--ink);
-}
-.rail button[aria-selected="true"] svg {
-  background: var(--mint);
-  color: var(--green);
 }
 .page .rail button:focus-visible {
   outline-offset: -2px;
@@ -854,6 +896,314 @@
   transition-duration: 0.12s;
 }
 
+/* ── what the checker took out ───────────────────────── */
+.struck {
+  margin-top: var(--gap);
+  --v-ink: var(--muted);
+  --v-surface: var(--low);
+  --v-line: var(--strong);
+}
+.intro {
+  max-width: 34em;
+  margin: 22px 0 0;
+  font-size: clamp(17px, 1.4vw, 20px);
+  line-height: 1.5;
+  color: var(--variant);
+}
+.tally {
+  margin: 14px 0 0;
+  font: 12px var(--font-mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.errata {
+  margin: 48px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.errata li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-areas: "where where" "claim why";
+  gap: 12px 64px;
+  padding: 30px 0 34px;
+  border-bottom: 1px solid var(--border);
+}
+.errata li[data-verdict="alarm"] {
+  --v-ink: var(--color-clay-ink);
+  --v-surface: var(--color-clay-surface);
+  --v-line: var(--color-clay-line);
+}
+.where {
+  grid-area: where;
+  margin: 0;
+  font: 11.5px var(--font-mono);
+  color: var(--faint);
+}
+.claim {
+  grid-area: claim;
+  margin: 0;
+  font-size: clamp(20px, 1.9vw, 26px);
+  line-height: 1.35;
+  letter-spacing: -0.018em;
+  font-weight: 500;
+}
+/* A background, not text-decoration, so the strike can grow along the lines in order. */
+.claim del {
+  text-decoration: none;
+  color: var(--muted);
+  background: linear-gradient(var(--v-ink), var(--v-ink)) 0 58% / 100% 2px no-repeat;
+}
+@supports (animation-timeline: view()) {
+  .claim del {
+    animation: strike linear both;
+    animation-timeline: view();
+    animation-range: entry 100% cover 45%;
+  }
+}
+@keyframes strike {
+  from {
+    color: var(--ink);
+    background-size: 0% 2px;
+  }
+}
+.why {
+  grid-area: why;
+}
+.chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid var(--v-line);
+  border-radius: 999px;
+  background: var(--v-surface);
+  font: 10px/1.6 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v-ink);
+}
+.why p {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--variant);
+}
+.errata code {
+  font: 0.86em var(--font-mono);
+}
+
+/* ── beside your agent ───────────────────────────────── */
+.section {
+  margin-top: var(--gap);
+}
+.agent {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 40px 72px;
+}
+.agent .intro + .intro {
+  margin-top: 14px;
+}
+/* A workspace drawn small: the agent's tab on the left, the map it changed on the right. */
+.desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--frame-p);
+}
+.term,
+.mini {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--screen-r);
+  overflow: hidden;
+}
+.term {
+  background: var(--color-code);
+}
+.termTabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.termTabs b,
+.termTabs span {
+  padding: 6px 12px;
+  border-radius: 8px 8px 0 0;
+  font-weight: 500;
+}
+.termTabs b {
+  background: var(--white);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.termTabs span {
+  color: var(--muted);
+}
+.term pre {
+  margin: 0;
+  padding: 18px 16px 22px;
+  font: 12px/1.9 var(--font-mono);
+  color: var(--color-code-plain);
+  white-space: pre-wrap;
+}
+.picked {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--mint);
+  color: var(--green);
+}
+.prompt {
+  color: var(--green);
+}
+.faintText {
+  color: var(--muted);
+}
+.mini {
+  padding: 14px;
+  background: var(--white);
+}
+.mini .winName {
+  display: block;
+  margin: 0 0 12px;
+}
+.mini ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mini li {
+  --s: var(--low);
+  --c: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mini .n {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+.mini li[data-changed] {
+  --s: var(--white);
+  --c: var(--color-amber-ink);
+  border-color: var(--color-amber-line);
+  background: var(--color-amber-surface);
+}
+.mini em {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid var(--color-amber-line);
+  border-radius: 5px;
+  font: normal 9.5px/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-amber-ink);
+}
+
+/* ── your own repo, and questions ─────────────────────── */
+.steps {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  margin: 48px 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* The same wire as How it works, drawn across. */
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: calc((100% - 64px) / 3);
+  border-top: 1.5px solid var(--green);
+}
+.steps li {
+  position: relative;
+}
+.steps i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  font: normal 600 12px var(--font-mono);
+  color: var(--white);
+}
+.steps b {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.steps p {
+  max-width: 30em;
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--variant);
+}
+.section .cap {
+  margin-top: 36px;
+}
+.section .cap a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--strong);
+}
+.faq {
+  max-width: 820px;
+  margin-top: 36px;
+}
+.faq details {
+  border-top: 1px solid var(--border);
+}
+.faq details:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.faq summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: "+";
+  font: 18px/1 var(--font-mono);
+  color: var(--green);
+}
+.faq details[open] summary::after {
+  content: "−";
+}
+.faq details p {
+  max-width: 64ch;
+  margin: -6px 0 22px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--variant);
+}
+
 .end {
   display: flex;
   align-items: center;
@@ -875,6 +1225,29 @@
   color: var(--ink);
 }
 
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 48px;
+  }
+  .nav nav a:not(:last-child) {
+    display: none;
+  }
+  .agent,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .steps::before {
+    display: none;
+  }
+  .hero h1 {
+    font-size: min(80px, (100vw - 2 * var(--gutter)) / 9.8);
+  }
+  .errata li {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "where" "claim" "why";
+  }
+}
 @media (max-width: 1080px) {
   .box {
     grid-template-columns: minmax(0, 1fr);
@@ -889,12 +1262,19 @@
     padding: 10px 10px 12px;
     border-bottom: 0;
   }
-  .rail svg {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 8px;
-    padding: 7px;
-    border-radius: 8px;
+  .rail::before,
+  .rail::after {
+    display: none;
+  }
+  .rail button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rail i {
+    grid-row: auto;
+    width: 24px;
+    height: 24px;
+    margin-bottom: 4px;
+    font-size: 11px;
   }
   .rail b {
     font-size: 13px;
@@ -1004,10 +1384,10 @@
     --screen-r: 12px;
   }
   .hero {
-    padding: 72px 0 40px;
+    padding: 32px 0 36px;
   }
-  .hero p {
-    margin: 22px auto 32px;
+  .desk {
+    grid-template-columns: minmax(0, 1fr);
   }
   .ctas .btn {
     flex: 1 1 0;
@@ -1060,6 +1440,7 @@
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .ring::after,
+  .claim del,
   .progress span[data-now="true"]::after {
     animation: none;
   }
@@ -1077,7 +1458,8 @@
   .list li,
   .codeBtn,
   .rail button,
-  .rail svg,
+  .rail i,
+  .rail::after,
   .btn {
     transition: none;
   }

@@ -35,14 +35,15 @@ import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "nod
 import { resolve } from "node:path";
 import type { Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
+import { parseArgs } from "./args";
 import { converse, runTool } from "./author";
 import { changes, moved, refs, touches, type Base, type Change } from "./gitdiff";
 import { bill, cacheIn, MODELS } from "./bedrock";
 import { ccClose, type Handled } from "./claude-code";
 import { check } from "./check";
 import { owners, type Cut, type Root } from "./cut";
-import { inventory, type Inventory } from "./inventory";
-import { shapeProblems } from "./schema";
+import { inventory, isSource, type Inventory } from "./inventory";
+import { idsOf, submitProblems } from "./schema";
 import { full, oneLine, summarize, type FileSummary } from "./summarize";
 import { verifyTree } from "./verify";
 
@@ -188,12 +189,6 @@ function named(map: MapFile, name: string): Placed | null {
 
 /* ── 4. redoing one ──────────────────────────────────────────── */
 
-function ids(n: Node, out = new Set<string>()): Set<string> {
-  out.add(n.id);
-  (n.children ?? []).forEach((c) => ids(c, out));
-  return out;
-}
-
 function brief(t: Placed, root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>, mine: Change[], reach: string[], told: Told): string {
   const trail = t.path.map((n) => n.title).join(" › ");
   const cap = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}\n… (cut at ${n} characters)` : s);
@@ -246,8 +241,8 @@ async function redo(
   const known = new Set(inv.files.map((f) => f.path).filter((p) => reach.has(p)));
   const list = [...known].sort();
   // Ids taken outside this section, which a new one may not reuse.
-  const mineIds = ids(t.node);
-  const elsewhere = new Set([...map.AUTHORED.flatMap((r) => [...ids(r)])].filter((id) => !mineIds.has(id)));
+  const mineIds = idsOf(t.node);
+  const elsewhere = new Set([...map.AUTHORED.flatMap((r) => [...idsOf(r)])].filter((id) => !mineIds.has(id)));
   let submits = 0;
   const handle = (name: string, input: any): Handled => {
     if (name !== "submit") return { content: runTool({ name, input }, inv, known, list) };
@@ -258,22 +253,13 @@ async function redo(
       return { content: "Accepted: the section is taken out. Stop now.", done: { node: { id: t.node.id, removed: true } } };
     }
     if (node && typeof node === "object") node.id = t.node.id;
-    const problems = shapeProblems(node, root.prefix, t.path.length === 1);
-    if (!problems.length) {
-      const clash = [...ids(node)].filter((id) => elsewhere.has(id));
-      if (clash.length) problems.push(...clash.map((id) => `${id}: already used elsewhere in the map`));
-      else {
-        // The whole root with this section in it, checked as a full run checks it.
-        const whole = spliced(rootNode, t, node);
-        const theirs = ids(node);
-        problems.push(...check({ AUTHORED: [whole], E0: [], LINKS: [] }, inv.repo, { generated: true }).problems.filter((p) => [...theirs].some((id) => p.includes(id)) || p.startsWith("DUP")));
-      }
-    }
+    // The whole root with this section in it, checked as a full run checks it.
+    const problems = submitProblems(node, root.prefix, inv.repo, { isRoot: t.path.length === 1, taken: elsewhere, within: (n) => spliced(rootNode, t, n) });
     say(`${t.node.id}: submit ${submits} — ${problems.length ? `${problems.length} problems` : "clean"}`);
     if (!problems.length) return { content: "Accepted. This section is done; stop now.", done: { node } };
     return { content: `Not accepted. Fix every one of these and submit the whole section again:\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
   };
-  const r = await converse<{ node: Node | Removed }>(brief(t, root, cut, inv, sums, mine, list, told), handle, model, "update", 30);
+  const r = await converse<{ node: Node | Removed }>({ prompt: brief(t, root, cut, inv, sums, mine, list, told), handle, model, stage: "update", maxTurns: 30 });
   return r.value?.node ?? null;
 }
 
@@ -303,8 +289,8 @@ function spliced(root: Node, t: Placed, node: Node): Node {
 /* ── the run ─────────────────────────────────────────────────── */
 
 export async function update(args: string[]) {
-  const opt = (k: string) => { const i = args.indexOf(k); return i === -1 ? undefined : args[i + 1]; };
-  const repo = resolve(args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"))!);
+  const { opt, has, repo: dir } = parseArgs(args);
+  const repo = resolve(dir!);
   const out = opt("--out") ?? `maps/${opt("--name") ?? repo.split("/").pop()!.toLowerCase()}`;
   const t0 = Date.now();
   const result = (r: Record<string, unknown>) =>
@@ -325,7 +311,7 @@ export async function update(args: string[]) {
   let turns: Turn[] = [];
   if (existsSync(`${out}/turns.json`)) {
     // A dry run only looks.
-    const taken = args.includes("--dry-run") ? `${out}/turns.json` : `${out}/turns.taken.json`;
+    const taken = has("--dry-run") ? `${out}/turns.json` : `${out}/turns.taken.json`;
     if (taken !== `${out}/turns.json`) renameSync(`${out}/turns.json`, taken);
     turns = JSON.parse(readFileSync(taken, "utf8"));
     if (taken !== `${out}/turns.json`) rmSync(taken);
@@ -344,7 +330,7 @@ export async function update(args: string[]) {
   if (corrections.length) console.log(`${corrections.length} corrections from the agent${unmatched.length ? `; no section named ${unmatched.join(", ")}` : ""}`);
 
   const inv = inventory(repo, { untracked: true });
-  const isCode = new Map(inv.files.map((f) => [f.path, f.code && !f.test]));
+  const isCode = new Map(inv.files.map((f) => [f.path, isSource(f)]));
   const citedAnywhere = new Set(walk(map.AUTHORED).flatMap((p) => refs(p.node).map((r) => r.file)));
   // Only code the map covers or could: a lockfile or a test changing moves nothing.
   const found = changes(repo, map.RUN.commit, base).filter((c) => (c.after === null ? citedAnywhere.has(c.path) : isCode.get(c.path)));
@@ -362,7 +348,7 @@ export async function update(args: string[]) {
   console.log(`${picked.length} sections to redo: ${picked.map((p) => p.node.id).join(", ")}`);
   // A section redone takes the notes on it and on anything inside it.
   const notesFor = (t: Placed) => [...wrong].filter(([p]) => p.path.includes(t.node)).flatMap(([p, n]) => n.map((x) => (p === t ? x : `${p.node.title}: ${x}`)));
-  if (args.includes("--dry-run")) {
+  if (has("--dry-run")) {
     for (const p of picked) console.log(`  ${p.path.map((n) => n.id).join(" › ")}${notesFor(p).length ? ` — notes: ${notesFor(p).join(" | ")}` : ""}`);
     if (said) console.log(`the agent's account:\n${said}`);
     if (homeless.length) console.log(`  no section can take: ${homeless.join(", ")}`);

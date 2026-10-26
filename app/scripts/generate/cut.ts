@@ -11,7 +11,8 @@
 import { readFileSync } from "node:fs";
 import type { Edge } from "@/lib/data";
 import { ask, type Message } from "./bedrock";
-import type { Inventory } from "./inventory";
+import { SUB_WORDS, words } from "./check";
+import { isSource, type Inventory } from "./inventory";
 import { oneLine, type FileSummary } from "./summarize";
 
 export interface Root {
@@ -50,7 +51,7 @@ const TOOL = {
             id: { type: "string", description: "kebab-case, short: 'sign-up', 'billing'." },
             prefix: { type: "string", description: "2-3 lowercase letters, unique per root; every node id under this root starts with '<prefix>-'." },
             title: { type: "string", description: "1-4 words, Title Case, everyday words." },
-            sub: { type: "string", description: "One plain line: what this is. No file paths." },
+            sub: { type: "string", description: "At most 8 words, plainly: what someone does here. 'Add a repo and watch it get mapped.' Not a list of its parts. No file paths." },
             why: { type: "string", description: "One sentence for the author of this root: what it covers and where its boundary with the neighbouring roots is." },
             files: { type: "array", items: { type: "string" }, description: "Paths this root owns. A path ending in '/' claims every file under it. A shared file may appear in more than one root." },
           },
@@ -71,7 +72,7 @@ const TOOL = {
           properties: {
             from: { type: "string" },
             to: { type: "string" },
-            label: { type: "string", description: "A few words read as '<label> <to title>': 'routes students to', 'publishes into'." },
+            label: { type: "string", description: "One or two words, read as '<label> <to title>': 'then', 'produces', 'feeds'. Never restate the next root's title." },
             order: { type: "integer", description: "1-indexed position in the path or lane. Omit for a hand-off." },
             lane: { type: "string", description: "Only where the path genuinely forks (e.g. by account type): the branch name." },
           },
@@ -118,9 +119,13 @@ function problems(cut: Cut, inv: Inventory): string[] {
     if (!/^[a-z]{2,3}$/.test(r.prefix) || prefixes.has(r.prefix)) out.push(`root ${r.id}: prefix "${r.prefix}" must be 2-3 lowercase letters and unique`);
     prefixes.add(r.prefix);
     if (r.title.split(/\s+/).length > 4) out.push(`root ${r.id}: title "${r.title}" has more than 4 words`);
+    if (words(r.sub) > SUB_WORDS) out.push(`root ${r.id}: sub "${r.sub}" has more than ${SUB_WORDS} words`);
   }
-  for (const e of cut.edges) for (const k of [e.from, e.to]) if (!ids.has(k)) out.push(`edge ${e.from}→${e.to}: "${k}" is not a root id`);
-  const missing = inv.files.filter((f) => f.code && !f.test && !owners(cut, f.path).length && !excludedBy(cut, f.path)).map((f) => f.path);
+  for (const e of cut.edges) {
+    for (const k of [e.from, e.to]) if (!ids.has(k)) out.push(`edge ${e.from}→${e.to}: "${k}" is not a root id`);
+    if (words(e.label ?? "") > 2) out.push(`edge ${e.from}→${e.to}: label "${e.label}" has more than 2 words`);
+  }
+  const missing = inv.files.filter((f) => isSource(f) && !owners(cut, f.path).length && !excludedBy(cut, f.path)).map((f) => f.path);
   if (missing.length) out.push(`${missing.length} source files are in no root and not excluded:\n${missing.slice(0, 300).join("\n")}`);
   return out;
 }
@@ -131,7 +136,7 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
   const rules = all.slice(0, all.indexOf("## What a level shows"));
   const listing = inv.files
-    .filter((f) => f.code && !f.test)
+    .filter(isSource)
     .map((f) => (sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`))
     .join("\n");
   const other = inv.files.filter((f) => (!f.code || f.test) && !f.outside).map((f) => f.path);
@@ -143,7 +148,7 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
         `## README\n${inv.readme || "(none)"}`,
         ...(inv.scope ? [`## Scope\nThis map covers only part of the repository: ${inv.scope.paths.join(", ")}. Its reader: ${inv.scope.focus} Cut the roots by what that reader does with this part. Code outside the scope is not listed and needs no root.`] : []),
         `## Dependencies\n${inv.deps.join(", ") || "(none)"}`,
-        `## Source files (${inv.files.filter((f) => f.code && !f.test).length}), one line each\n${listing}`,
+        `## Source files (${inv.files.filter(isSource).length}), one line each\n${listing}`,
         `## Other files (tests, config, docs, assets) — need no root\n${other.slice(0, 400).join("\n")}${other.length > 400 ? `\n… and ${other.length - 400} more` : ""}`,
         INSTRUCTIONS,
       ].join("\n\n"),
@@ -165,7 +170,7 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
     );
   }
   // Still uncovered after three rounds: recorded, not silently dropped.
-  const leftover = inv.files.filter((f) => f.code && !f.test && !owners(cut!, f.path).length && !excludedBy(cut!, f.path)).map((f) => f.path);
+  const leftover = inv.files.filter((f) => isSource(f) && !owners(cut!, f.path).length && !excludedBy(cut!, f.path)).map((f) => f.path);
   cut!.excluded.push(...leftover.map((path) => ({ path, reason: "left unassigned by the cut after three rounds" })));
   return { cut: cut!, leftover, rejected };
 }

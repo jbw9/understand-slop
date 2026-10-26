@@ -7,7 +7,8 @@ export interface DemoMap {
   id: string;
   label: string;
   files: number;
-  elapsed: string;
+  /** The commit the map describes. */
+  commit: string;
 }
 
 // Built, each map's own export beside this page; in dev, the live app on this origin (next.config.ts).
@@ -82,7 +83,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
               <span>Take the tour</span>
             </button>
             <span className={s.meta}>
-              {current.files.toLocaleString("en-US")} files · mapped in {current.elapsed}
+              {current.files.toLocaleString("en-US")} files · {current.commit}
             </span>
           </div>
           <div ref={stage} className={s.stage} data-ready={loaded === open}>
@@ -109,25 +110,38 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   );
 }
 
-type Step = { text: string; key?: string; find: ((d: Document) => Element | undefined) | null };
+type Step = { text: string; find: (d: Document) => Element | undefined };
 
 const STEPS: Step[] = [
   { text: "Each card is one step the program takes. Click one to open it.", find: (d) => openable(d, 1) },
   { text: "These are that step's parts. Click one to see what it does.", find: (d) => openable(d, 2) },
+  { text: "A part cites the code it describes. Click to see where.", find: (d) => drawers(d)[0] },
+  { text: "Each row is a place in the code. Click one to read its lines.", find: (d) => refs(d)[0] },
   {
-    text: "A part cites the code it describes. Click to see the lines.",
-    find: (d) => visible(d, "button").find((b) => b.textContent?.includes("View the code")),
-  },
-  {
-    text: "These are the exact lines it cites. Press <kbd>Esc</kbd> to go back one level.",
-    key: "Escape",
-    find: (d) => visible(d, "button").find((b) => /:\d+(–\d+)?/.test(b.textContent ?? "") && !b.closest("header")),
+    text: "These are the exact lines. Press <kbd>Esc</kbd> to go back up a level.",
+    find: (d) => refs(d).find(isOpen)?.parentElement ?? undefined,
   },
 ];
 
 const visible = (d: Document, sel: string) => [...d.querySelectorAll<HTMLElement>(sel)].filter((e) => e.offsetWidth);
 const openable = (d: Document, depth: number) =>
   visible(d, "button[data-path]:not([disabled])").find((b) => JSON.parse(b.dataset.path!).length === depth);
+const isOpen = (b: Element) => b.getAttribute("aria-expanded") === "true";
+/** The buttons that fold the code drawer: one on the level's header, and one above the drawer once it's open. */
+const drawers = (d: Document) => visible(d, "button").filter((b) => /(View|Hide) the code/.test(b.textContent ?? ""));
+/** The code drawer's rows, one per place in the code, each naming its `file:line`. */
+const refs = (d: Document) =>
+  visible(d, "button[aria-expanded]").filter((b) => /:\d+(–\d+)?/.test(b.textContent ?? "") && !b.closest("header"));
+
+/**
+ * Where the visitor is decides the step, not which click they were asked
+ * for: going off script, or back up, shows the step for where they are.
+ */
+function stepOf(d: Document) {
+  if (refs(d).some(isOpen)) return 4;
+  if (drawers(d).some(isOpen)) return 3;
+  return Math.min(new URLSearchParams(d.defaultView!.location.search).getAll("at").length, 2);
+}
 
 /** Scrolls `el` inside its own scroller in the frame, never the page around it. */
 function within(el: Element, align: "start" | "center", behavior: ScrollBehavior) {
@@ -159,10 +173,10 @@ function contain(d: Document) {
 }
 
 /**
- * Points at one real element in the frame per step and moves on when the
- * visitor does what it asks. Runs on the DOM directly: every animation frame
- * it follows the target, which the canvas moves and replaces as the visitor
- * explores.
+ * Points at one real element in the frame per step. Runs on the DOM
+ * directly: every animation frame it reads where the visitor is, picks the
+ * step for it, and follows that step's element, which the canvas moves and
+ * replaces as the visitor explores.
  */
 function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, replay: HTMLButtonElement) {
   const root = stage.querySelector<HTMLElement>("[data-tour]")!;
@@ -171,7 +185,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
   const text = tip.querySelector<HTMLElement>("[data-text]")!;
   const count = tip.querySelector<HTMLElement>("[data-count]")!;
   const end = tip.querySelector<HTMLElement>("[data-end]")!;
-  const steps = STEPS.map((x) => ({ ...x }));
   const doc = () => {
     try {
       return frame.contentDocument?.body ? frame.contentDocument : null;
@@ -179,58 +192,63 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
       return null;
     }
   };
+  let on = false;
   let at = -1;
-  let target: Element | null = null;
-  let raf = 0;
   let since = 0;
+  let target: Element | null = null;
+  // The element last scrolled into view, so a visitor scrolling away is left alone.
+  let shown: Element | null = null;
+  let raf = 0;
   let seen = false;
+  let ending = false;
   let hooked: Document | null = null;
   let finished = 0;
   const timers: number[] = [];
   const after = (ms: number, f: () => void) => timers.push(window.setTimeout(f, ms));
 
-  const reveal = (el: Element) => {
-    const r = el.getBoundingClientRect();
-    if (r.top < 0 || r.bottom > el.ownerDocument.defaultView!.innerHeight) within(el, "center", "smooth");
+  // Placed where it is measured, without sliding there from the last spot.
+  const jump = (el: HTMLElement) => {
+    el.style.transition = "none";
+    requestAnimationFrame(() => requestAnimationFrame(() => (el.style.transition = "")));
   };
 
   const place = () => {
     raf = requestAnimationFrame(place);
     const d = doc();
-    const step = steps[at];
-    if (!d || !step) return;
+    if (!d || ending) return;
+    const now = stepOf(d);
+    if (now !== at) {
+      at = now;
+      since = performance.now();
+      text.innerHTML = STEPS[at].text;
+      count.textContent = `${at + 1} / ${STEPS.length}`;
+    }
+    target = STEPS[at].find(d) ?? null;
+    // A new level takes a moment to draw its cards: wait for them before falling back to the middle.
+    if (!target && performance.now() - since < 700) {
+      ring.hidden = tip.hidden = true;
+      return;
+    }
     const W = stage.clientWidth;
     const H = stage.clientHeight;
-    // Measured once shown, and placed there without sliding in.
-    const fresh = tip.hidden;
-    if (fresh) {
-      tip.style.transition = "none";
+    if (tip.hidden) {
+      jump(tip);
       tip.hidden = false;
     }
     const tw = tip.offsetWidth;
     const th = tip.offsetHeight;
-    let x: number;
-    let y: number;
-    if (step.find) {
-      if (!target?.isConnected) {
-        target = step.find(d) ?? null;
-        if (target) reveal(target);
-        else if (performance.now() - since > 4000) {
-          if (!step.key) return finish();
-          step.find = null;
-        }
-      }
-      if (!target) {
-        ring.hidden = tip.hidden = true;
-        return;
-      }
+    if (target && target !== shown) {
+      shown = target;
       const r = target.getBoundingClientRect();
-      const off = r.bottom < 0 || r.top > H;
-      if (ring.hidden && !off) {
-        ring.style.transition = "none";
-        requestAnimationFrame(() => (ring.style.transition = ""));
-      }
-      ring.hidden = off;
+      if (r.top < 0 || r.bottom > H) within(target, "center", "smooth");
+    }
+    let x = (W - tw) / 2;
+    let y = H - th - 28;
+    const r = target?.getBoundingClientRect();
+    const off = !r || r.bottom < 0 || r.top > H;
+    if (ring.hidden && !off) jump(ring);
+    ring.hidden = off;
+    if (r && !off) {
       ring.style.width = `${r.width + 10}px`;
       ring.style.height = `${r.height + 10}px`;
       ring.style.transform = `translate(${r.left - 5}px, ${r.top - 5}px)`;
@@ -241,59 +259,48 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
         y = r.top - th - 16;
         if (y < 12) y = r.bottom + 16;
       }
-    } else {
-      ring.hidden = true;
-      x = (W - tw) / 2;
-      y = H - th - 28;
     }
     x = Math.max(12, Math.min(x, W - tw - 12));
     y = Math.max(12, Math.min(y, H - th - 12));
     tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-    if (fresh) requestAnimationFrame(() => (tip.style.transition = ""));
   };
 
-  const onClick = (e: Event) => {
-    if (steps[at]?.find && !steps[at].key && target?.contains(e.target as Node)) after(450, () => go(at + 1));
-  };
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === steps[at]?.key) after(350, () => go(at + 1));
+    if (!on || e.key !== "Escape" || at !== STEPS.length - 1) return;
+    ending = true;
+    after(350, finish);
   };
   const hook = () => {
     const d = doc();
     if (!d || hooked === d) return;
     contain(d);
-    hooked?.removeEventListener("click", onClick, true);
     hooked?.defaultView?.removeEventListener("keydown", onKey, true);
-    d.addEventListener("click", onClick, true);
     d.defaultView!.addEventListener("keydown", onKey, true);
     hooked = d;
   };
 
-  const go = (i: number) => {
-    if (i >= steps.length) return finish();
-    at = i;
-    target = null;
-    since = performance.now();
-    steps[i].find = STEPS[i].find;
-    hook();
-    text.innerHTML = steps[i].text;
-    count.textContent = `${i + 1} / ${steps.length}`;
+  const go = () => {
+    on = true;
+    ending = false;
+    at = -1;
+    shown = null;
     end.textContent = "Skip tour";
+    hook();
     if (!raf) place();
   };
-  const stop = () => {
+  const halt = () => {
     cancelAnimationFrame(raf);
     raf = 0;
-    at = -1;
+    on = false;
     target = null;
+  };
+  const stop = () => {
+    halt();
     ring.hidden = tip.hidden = true;
     replay.hidden = false;
   };
   const finish = () => {
-    cancelAnimationFrame(raf);
-    raf = 0;
-    at = steps.length;
-    target = null;
+    halt();
     ring.hidden = true;
     text.textContent = "That's the whole loop. Keep exploring, or pick another repository above.";
     count.textContent = "";
@@ -305,18 +312,21 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
     replay.hidden = false;
     const mine = ++finished;
     after(5000, () => {
-      if (at === steps.length && mine === finished) stop();
+      if (!on && mine === finished && !tip.hidden) stop();
     });
   };
   const begin = () => {
     replay.hidden = true;
     root.hidden = false;
+    finished++;
     const d = doc();
     // Deep in a map, the tour starts over from its top level.
-    if (d && !openable(d, 1)) {
-      frame.addEventListener("load", () => go(0), { once: true });
+    if (d && stepOf(d) > 0) {
+      halt();
+      ring.hidden = tip.hidden = true;
+      frame.addEventListener("load", go, { once: true });
       frame.contentWindow!.location.href = frame.src;
-    } else go(0);
+    } else go();
   };
 
   const onLoad = () => {
@@ -329,7 +339,7 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
     }
   };
   const onTab = (e: Event) => {
-    if ((e.target as Element).closest("[data-id]") && at >= 0) stop();
+    if ((e.target as Element).closest("[data-id]") && on) stop();
   };
   frame.addEventListener("load", onLoad);
   // Like the loaded state above: the first frame may have loaded before this ran.
@@ -344,7 +354,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
     end.removeEventListener("click", stop);
     replay.removeEventListener("click", begin);
     tabs.removeEventListener("click", onTab);
-    hooked?.removeEventListener("click", onClick, true);
     hooked?.defaultView?.removeEventListener("keydown", onKey, true);
   };
 }

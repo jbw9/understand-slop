@@ -1,7 +1,8 @@
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { listExamples } from "@/lib/maps";
-import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { auditOf, listExamples } from "@/lib/maps";
+import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
  * The reader's projects (lib/vault.ts): list them, start or import one, regenerate,
@@ -32,8 +33,12 @@ function turnOf(v: unknown): Turn | undefined {
 }
 
 export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  // How one map was made, for the audit view: a project's or an example's.
+  const audit = params.get("audit");
+  if (audit) return Response.json({ markdown: auditOf(audit) });
   // One project's state, polled by the open map to follow its updates.
-  const id = new URL(request.url).searchParams.get("id");
+  const id = params.get("id");
   if (id) {
     const p = listProjects().find((x) => x.id === id);
     return Response.json(p ? { id: p.id, update: p.update ?? null, progress: p.map.status === "generating" ? progressOf(p.id) : null } : null);
@@ -44,6 +49,7 @@ export async function GET(request: Request) {
       ...p,
       // A map from an earlier run still opens while a new one is being made.
       hasMap: Boolean(mapFileOf(p.id)),
+      hasAudit: existsSync(join(projectDir(p.id), "audit.md")),
       // The code moved on since the map was made.
       stale: Boolean(p.map.status === "ready" && p.map.commit && head && head !== p.map.commit),
       progress: p.map.status === "generating" ? progressOf(p.id) : undefined,

@@ -25,10 +25,15 @@ export interface RepoFile {
   outside?: boolean;
 }
 
+/** What a model summarises and a root must own: source, not tests. */
+export const isSource = (f: RepoFile) => f.code && !f.test;
+
 export interface Inventory {
   repo: string;
   name: string;
   commit: string;
+  /** Tracked files that differ from the commit: the map is read from disk, so it describes those edits, not the commit alone. */
+  dirty: string[];
   files: RepoFile[];
   readme: string;
   /** Dependency names from every manifest found, sorted. */
@@ -173,6 +178,7 @@ export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inv
     repo,
     name: repo.replace(/\/+$/, "").split("/").pop()!,
     commit: git(repo, "rev-parse", "--short", "HEAD"),
+    dirty: git(repo, "diff", "HEAD", "--name-only", "--relative").split("\n").filter(Boolean),
     files,
     readme: readmeFile ? readFileSync(join(repo, readmeFile), "utf8").slice(0, 8000) : "",
     deps,

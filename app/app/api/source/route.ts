@@ -1,5 +1,6 @@
 import { readSlice, writeSlice, Refused } from "@/lib/repo";
-import { loadMap, rootOf } from "@/lib/maps";
+import { bakedSource, loadMap, rootOf } from "@/lib/maps";
+import { sliceOf } from "@/lib/source";
 
 /** The checkout behind the map the reader has open (`?map=`). */
 const rootFor = (map: string | null | undefined) => rootOf(loadMap(map ?? undefined).file.RUN);
@@ -30,14 +31,16 @@ export async function GET(request: Request) {
     return bad("bad request");
   }
 
+  const fixture = q.get("fixture") ?? undefined;
   try {
     // `fixture` is the text the map claims is at these lines. Passing it is
     // what lets the answer say "this has drifted" instead of quietly showing
     // fresh code under a stale explanation.
-    return Response.json(
-      await readSlice({ file, start, end }, q.get("fixture") ?? undefined, rootFor(q.get("map"))),
-    );
+    return Response.json(await readSlice({ file, start, end }, fixture, rootFor(q.get("map"))));
   } catch (e) {
+    // No checkout here: an example still shows the code it was mapped from.
+    const text = bakedSource(q.get("map") ?? undefined)?.[file];
+    if (text !== undefined) return Response.json(sliceOf(text, { file, start, end, fixture }));
     return bad(e instanceof Refused ? e.message : "unreadable");
   }
 }

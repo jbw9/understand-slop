@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { STATIC_MAP } from "@/lib/source";
 import s from "./landing.module.css";
 
 export interface DemoMap {
@@ -11,13 +10,14 @@ export interface DemoMap {
   elapsed: string;
 }
 
-const src = (id: string) => (STATIC_MAP ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${id}/` : `/?map=${id}&embed`);
+// Built, each map's own export beside this page; in dev, the live app on this origin (next.config.ts).
+const src = (id: string) => (process.env.NODE_ENV === "production" ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${id}/` : `/?map=${id}&embed`);
 
 /**
  * The real canvas, framed. Each tab points the frame at another committed
- * map, so what a visitor explores is the product itself, not a recording. A
- * static export has no server to read maps, so each tab opens that map's own
- * export, published beside this page. A guided tour starts on the first map
+ * map, so what a visitor explores is the product itself, not a recording. The
+ * page is static and has no server to read maps, so each tab opens that map's
+ * own export, published beside it. A guided tour starts on the first map
  * and points at the real cards inside the frame.
  */
 export function LandingDemo({ maps }: { maps: DemoMap[] }) {

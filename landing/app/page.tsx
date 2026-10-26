@@ -56,16 +56,16 @@ const sentence = (sub: string) => `${sub.split(" — ")[0].replace(/\.$/, "")}.`
 
 export default function Landing() {
   const maps: DemoMap[] = DEMOS.map((d) => {
-    const { RUN } = loadMap(d.id).file;
+    const { RUN } = loadMap(d.id);
     return { ...d, files: RUN.files ?? 0, elapsed: RUN.elapsed ?? "" };
   });
 
-  const flask = loadMap("flask").file;
+  const flask = loadMap("flask");
   const first = flask.AUTHORED[0];
   const config = first.children!.find((c) => c.id === "ca-config")!;
 
   return (
-    // The root layout locks the body for the canvas; this page scrolls itself.
+    // The layout locks the body, as the app's does for its canvas; this page scrolls itself.
     <div className={s.page}>
       <main>
         <div className={s.top}>

@@ -65,11 +65,11 @@ The code drawer's edit/save path is still untested end to end.
 
 ## Contracts (frozen, no builder edits these)
 
-- `ui/lib/data.ts` — added `Edge.order`, `interface Group`, `Node.footprint`,
+- `app/lib/data.ts` — added `Edge.order`, `interface Group`, `Node.footprint`,
   `Node.summary`, `Node.group`. Additive only; nothing existing changed.
-- `ui/lib/view.ts` — new. Naming rule, `BLURB_LINES`, `ROW_LABEL_MAX_PCT`,
+- `app/lib/view.ts` — new. Naming rule, `BLURB_LINES`, `ROW_LABEL_MAX_PCT`,
   `ROW_VALUE_MIN_PX`, `CARD_ROWS_SOFT`, `STATE_MEANING`, `Ordering`.
-- `ui/lib/repo.ts` — new. `REPO_ROOT`, `Slice`, `ReadSlice`, `WriteSlice`.
+- `app/lib/repo.ts` — new. `REPO_ROOT`, `Slice`, `ReadSlice`, `WriteSlice`.
 
 ## What bit us
 

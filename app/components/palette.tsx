@@ -11,13 +11,15 @@ import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
 import { toggleWorkspace } from "@/components/workspace";
+import { DocIcon, openDoc, useDocList } from "@/components/docs";
 import { openSettings, readSettings, saveSettings } from "@/lib/settings";
 import type { Node } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 /**
  * The palette: one box that goes anywhere. Type part of a level's name and
- * Enter opens it however deep it is; start with `>` for the app's actions;
+ * Enter opens it however deep it is, and a doc of the project's opens the
+ * same way; start with `>` for the app's actions;
  * the map name in the title bar opens it on the maps, and the status bar's
  * counts open it on the levels that are not certain or the problems found.
  *
@@ -26,7 +28,7 @@ import { cn } from "@/lib/utils";
  */
 
 const OPEN = "slop:palette";
-export type PaletteMode = "all" | "actions" | "maps" | "unsure" | "problems";
+export type PaletteMode = "all" | "actions" | "maps" | "unsure" | "problems" | "docs";
 export const openPalette = (mode: PaletteMode = "all") =>
   window.dispatchEvent(new CustomEvent<PaletteMode>(OPEN, { detail: mode }));
 
@@ -37,7 +39,7 @@ interface Item {
   hint?: string;
   /** A second line: why a level is not certain, or what goes wrong. */
   detail?: string;
-  kind: "level" | "action" | "map" | "unsure" | "problem";
+  kind: "level" | "action" | "map" | "unsure" | "problem" | "doc";
   node?: Node;
   kbd?: string;
   run: () => void;
@@ -127,6 +129,20 @@ export function Palette() {
     return out;
   }, [map]);
 
+  const docList = useDocList();
+  const docs = useMemo<Item[]>(
+    () =>
+      (docList ?? []).map((d) => ({
+        key: `doc:${d.path}`,
+        // The file is what people call a doc; its heading says what is in it.
+        label: d.path,
+        hint: d.title || undefined,
+        kind: "doc" as const,
+        run: () => openDoc(d.path),
+      })),
+    [docList],
+  );
+
   const actions = useMemo<Item[]>(() => {
     const theme = (t: "light" | "dark" | "system") => () => saveSettings({ ...readSettings(), theme: t });
     return [
@@ -135,6 +151,7 @@ export function Palette() {
       { key: "a:diff", label: "What changed in the code", hint: "Diff two commits over the map", kind: "action", run: openDiff },
       { key: "a:audit", label: "How this map was made", hint: "What the agent read and decided", kind: "action", run: () => openAudit(map.name) },
       { key: "a:history", label: "What you added to this map", kind: "action", run: openHistory },
+      { key: "a:docs", label: "Read the docs…", hint: "The project's Markdown: design notes, decisions", kind: "action", run: () => setTimeout(() => openPalette("docs")) },
       { key: "a:projects", label: "Projects", hint: "Start a new map, or import one", kind: "action", run: () => openProjects() },
       { key: "a:maps", label: "Switch map…", kind: "action", run: () => setTimeout(() => openPalette("maps")) },
       { key: "a:settings", label: "Settings", kind: "action", run: openSettings },
@@ -191,8 +208,9 @@ export function Palette() {
       mode === "maps" ? maps
       : mode === "unsure" ? findings.unsure
       : mode === "problems" ? findings.problems
+      : mode === "docs" ? docs
       : actionsOnly ? actions
-      : q ? [...levels, ...actions]
+      : q ? [...levels, ...docs, ...actions]
       : levels;
     return pool
       // A hint counts only as a plain substring: scattered letters across a
@@ -202,7 +220,7 @@ export function Palette() {
       .sort((a, b) => b.s - a.s)
       .slice(0, 60)
       .map((x) => x.it);
-  }, [mode, query, levels, actions, maps, findings]);
+  }, [mode, query, levels, docs, actions, maps, findings]);
 
   useEffect(() => {
     list.current?.querySelector(`[data-i="${sel}"]`)?.scrollIntoView({ block: "nearest" });
@@ -253,6 +271,7 @@ export function Palette() {
             mode === "maps" ? "Switch to a map…"
             : mode === "unsure" ? `${findings.unsure.length} levels the map is not certain about — filter…`
             : mode === "problems" ? `${findings.problems.length} problems found in the code — filter…`
+            : mode === "docs" ? (docList === null ? "Finding the docs…" : `${docList.length} docs in this project — filter…`)
             : "Go to a level, or type > for actions"
           }
           className="h-11 w-full shrink-0 border-b border-border-gray bg-transparent px-4 text-[14px] text-ink placeholder:text-faint focus:outline-none"
@@ -293,7 +312,9 @@ export function Palette() {
                 ? "Every level is certain."
                 : mode === "problems" && !findings.problems.length
                   ? "The map found no problems."
-                  : "Nothing matches."}
+                  : mode === "docs" && docList && !docList.length
+                    ? "This project has no Markdown."
+                    : "Nothing matches."}
             </li>
           )}
         </ul>
@@ -338,6 +359,8 @@ function KindIcon({ kind }: { kind: Item["kind"] }) {
           <rect x="2" y="2.5" width="12" height="11" rx="2" />
           <path d="M5 6h6M5 9h4" />
         </>
+      ) : kind === "doc" ? (
+        <DocIcon />
       ) : kind === "map" ? (
         <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
       ) : (

@@ -54,6 +54,11 @@ export function shapeProblems(node: any, prefix: string, isRoot = true): string[
   else node.code.forEach((c: any, i: number) => {
     if (!isStr(c?.file) || !isInt(c?.start) || !isInt(c?.end) || !isStr(c?.label)) out.push(at(`code[${i}]`) + " needs file, start, end (integers), label");
   });
+  if (node.docs !== undefined && !Array.isArray(node.docs)) out.push(at("docs") + " must be an array of {file,start,end,label}");
+  else (node.docs ?? []).forEach((c: any, i: number) => {
+    if (!isStr(c?.file) || !isInt(c?.start) || !isInt(c?.end) || !isStr(c?.label)) out.push(at(`docs[${i}]`) + " needs file, start, end (integers), label");
+    else if (!/\.mdx?$/i.test(c.file)) out.push(at(`docs[${i}]`) + ` ${c.file} is not a doc; code goes in code`);
+  });
   for (const [i, iss] of (node.issues ?? []).entries())
     if (!isStr(iss?.title) || !isStr(iss?.detail)) out.push(at(`issues[${i}]`) + " needs title and detail");
   for (const [i, b] of (node.anatomy ?? []).entries()) {

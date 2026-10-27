@@ -10,7 +10,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
-import { apply, readOverlay } from "@/lib/overlay";
+import { apply, overlayFile, readOverlay } from "@/lib/overlay";
 import { listProjects, mapFileOf, markOpened, projectDir } from "@/lib/vault";
 
 /** One entry in the map picker. */
@@ -47,7 +47,7 @@ export function listMaps(): MapEntry[] {
  * a project, the reader's most recently opened project opens; null when they
  * have none yet.
  */
-export function loadMap(name: string | undefined): { name: string; file: MapFile } | null {
+export function loadMap(name: string | undefined): { name: string; version?: string; file: MapFile } | null {
   const projects = listProjects();
   const opened = (p: (typeof projects)[number]) => Date.parse(p.openedAt ?? p.addedAt);
   const project =
@@ -56,13 +56,46 @@ export function loadMap(name: string | undefined): { name: string; file: MapFile
   const file = project && mapFileOf(project.id);
   if (project && file) {
     markOpened(project.id);
-    const map: MapFile = JSON.parse(readFileSync(file, "utf8"));
-    map.RUN.root = project.root;
-    // What the reader added, composed in here so every consumer sees it.
-    const { file: composed } = apply(map, readOverlay(project.id));
-    return { name: project.id, file: composed };
+    const version = mapVersion(project.id);
+    return { name: project.id, version, file: readMap(project.id, project.root, file) };
   }
   return null;
+}
+
+function readMap(id: string, root: string, file: string): MapFile {
+  const map: MapFile = JSON.parse(readFileSync(file, "utf8"));
+  map.RUN.root = root;
+  // What the reader added, composed in here so every consumer sees it.
+  return apply(map, readOverlay(id)).file;
+}
+
+const mtime = (f: string) => (existsSync(f) ? statSync(f).mtimeMs : 0);
+
+/**
+ * Which state of a project's map is on disk: the times of the two files it is
+ * composed from. The generator and the updater rename a whole new file into
+ * place, so a new time is a new map, and the open page follows it
+ * (app/api/map/route.ts). Undefined for anything that is not a project with a map.
+ */
+export function mapVersion(id: string): string | undefined {
+  const file = listProjects().some((p) => p.id === id) && mapFileOf(id);
+  return file ? `${mtime(file)}:${mtime(overlayFile(id))}` : undefined;
+}
+
+/**
+ * A project's map as the open page shows it, read again because it changed.
+ * The version is taken before the read: a write landing between the two makes
+ * the file newer than its stamp, so the next poll reads it again rather than
+ * missing it.
+ */
+export function liveMap(id: string): { version: string; file: MapFile } | null {
+  const project = listProjects().find((p) => p.id === id);
+  const version = mapVersion(id);
+  const f = project && mapFileOf(id);
+  if (!project || !version || !f) return null;
+  const file = readMap(id, project.root, f);
+  file.RUN.url ??= remoteOf(file.RUN);
+  return { version, file };
 }
 
 /**
@@ -86,10 +119,13 @@ const baked = new Map<string, Record<string, string>>();
 /**
  * A demo's cited files as they were when its map was made (`source.json`
  * beside it), for a machine without its checkout. Keyed by repo-relative path,
- * so a caller's path never reaches the disk.
+ * so a caller's path never reaches the disk. Undefined when one of the
+ * reader's projects has the same name: a project mapped from this very
+ * checkout is called `understand-slop` too, and its code is on disk, as it is
+ * now, not as the demo froze it.
  */
 export function demoSource(name: string | undefined): Record<string, string> | undefined {
-  if (!isDemo(name)) return undefined;
+  if (!isDemo(name) || listProjects().some((p) => p.id === name && mapFileOf(p.id))) return undefined;
   const file = join(DEMOS, name, "source.json");
   if (!baked.has(name) && existsSync(file)) baked.set(name, JSON.parse(readFileSync(file, "utf8")));
   return baked.get(name);

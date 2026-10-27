@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { BOX_H, CUE_ROOM, layoutDiagram } from "@/lib/diagram";
+import { BOX_H, layoutDiagram } from "@/lib/diagram";
 import type { Anatomy } from "@/lib/data";
 import type { BlockDiff, MapDiff, PartDiff, RowDiff, Verdict } from "@/lib/diff";
 import { cn } from "@/lib/utils";
@@ -440,7 +440,7 @@ function DiagramDiff({
                   strokeDasharray={v === "removed" ? "5 4" : undefined}
                 />
                 <text
-                  x={x + (w - CUE_ROOM / 2) / 2}
+                  x={x + w / 2}
                   y={b.sub ? y + 25 : y + BOX_H / 2 + 5}
                   textAnchor="middle"
                   fontSize="14.5"

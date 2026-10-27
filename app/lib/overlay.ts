@@ -94,7 +94,7 @@ interface History {
 
 const EMPTY: Overlay = { version: 1, entries: [] };
 
-const overlayFile = (id: string) => join(projectDir(id), "overlay.json");
+export const overlayFile = (id: string) => join(projectDir(id), "overlay.json");
 const historyFile = (id: string) => join(projectDir(id), "history.json");
 
 /** Written whole and renamed into place, as the vault's index is: a crash never leaves half a file. */

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "@/components/button";
 import { useMap } from "@/components/map-context";
@@ -126,13 +125,13 @@ interface Update {
 
 /**
  * Follows the open map while an agent changes its code: an update redoing
- * the touched sections (lib/vault.ts) shows here while it runs, and the map
- * reloads the moment it is done. Only the user's own projects update; an
+ * the touched sections (lib/vault.ts) shows here while it runs. The map takes
+ * each section as it lands by itself (components/map-context.tsx); this only
+ * says what is happening. Only the user's own projects update; an
  * example describes some other copy of its code, so when an agent edits its
  * checkout this says so and offers to import it.
  */
 function MapUpdates({ id, root, local }: { id: string; root?: string; local: boolean }) {
-  const router = useRouter();
   const [u, setU] = useState<Update | null>(null);
   const [unfollowed, setUnfollowed] = useState(false);
 
@@ -155,10 +154,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
           const next = p?.update ?? null;
           setU(next);
           const done = next?.status !== "running" ? next?.finishedAt : undefined;
-          if (!first && done && done !== seen.current) {
-            router.refresh();
-            setFresh(true);
-          }
+          if (!first && done && done !== seen.current) setFresh(true);
           if (done) seen.current = done;
           first = false;
         })
@@ -166,7 +162,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
     void tick();
     const timer = setInterval(tick, 2000);
     return () => clearInterval(timer);
-  }, [id, local, router]);
+  }, [id, local]);
 
   useEffect(() => {
     if (!fresh) return;

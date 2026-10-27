@@ -8,8 +8,6 @@ import type { Anatomy, DiagramArrow, DiagramBox } from "@/lib/data";
  */
 
 export const BOX_H = 58;
-/** Width a corner badge needs beside the longest label on a live box. */
-export const CUE_ROOM = 26;
 const ROW_GAP = 40;
 const COL_GAP = 76;
 const PAD = 18;
@@ -43,15 +41,13 @@ export const overlaps = (a: Rect, b: Rect) =>
 export function layoutDiagram(block: Block) {
   const cols = Math.max(...block.boxes.map((b) => b.col)) + 1;
   const rows = Math.max(...block.boxes.map((b) => b.row)) + 1;
-  // Each column is as wide as its longest label. A box that opens a part also
-  // has to fit its badge in the top-right corner, so it reserves the room
-  // rather than letting the badge sit on the label.
+  // Each column is as wide as its longest label.
   const colW = Array.from({ length: cols }, (_, c) =>
     Math.max(
       150,
       ...block.boxes
         .filter((b) => b.col === c)
-        .map((b) => Math.max(b.label.length * 8.4 + (b.opens ? CUE_ROOM : 0), (b.sub?.length ?? 0) * LABEL_CHAR) + 32),
+        .map((b) => Math.max(b.label.length * 8.4, (b.sub?.length ?? 0) * LABEL_CHAR) + 32),
     ),
   );
   // The gap between columns is as wide as the longest straight-across label

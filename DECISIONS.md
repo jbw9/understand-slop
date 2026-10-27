@@ -1536,3 +1536,66 @@ and cutting the landing's demo, "removed claims" and flask sections.
 
 **Cost accepted:** a first launch has nothing to look at until a project is
 mapped. The eval and diagram-audit scripts list only what is in local `maps/`.
+
+
+## D64 — The map follows its file, one section at a time
+
+**Chose:** the open map polls `/api/map` every second with the version it has
+(the times of `map.json` and `overlay.json`), and gets a new file only when
+there is one. The new file is merged into the old (`lib/share.ts`): every part
+equal to what was there keeps its old object, so only the sections that
+changed re-render, and what is on screen keeps its scroll, open code and
+wires. The changed paths, ancestors included, light once
+(`components/flash.tsx`): a row or list entry by `data-path`, a box on the
+picture by `data-opens`, and the level's header only when nothing on it lit.
+The generator already wrote each root as it was accepted; the updater now
+writes each section as it is redone, not once at the end.
+**Beat:** `router.refresh()` when an update finished, which re-sent and
+rebuilt the whole map once, after every section was done; and pushing changes
+over a socket, which the app has no server for.
+
+**Cost accepted:** a poll a second while a map is open (two stats when nothing
+changed). A section redone while the reader is inside it changes under them,
+lit, rather than waiting for them to leave.
+
+
+## D65 — A repository's docs are evidence on the sections they explain
+
+**Chose:** a node may carry `docs`: passages of the repository's own Markdown
+(a design note, a recorded decision) that say why its code is the way it is,
+each labelled like a code ref and shown on its level as "From the docs", where
+each passage opens in place as text. The author is given the list of docs with
+their first headings, and the text of `AGENTS.md`/`CLAUDE.md` (any depth,
+capped) as the repository's own rules, where a departure is worth an issue.
+`check` holds doc refs to the same existence and range rules as code refs. An
+edit to a cited doc moves its passages' lines; only an edit inside a cited
+passage redoes the section citing it.
+**Beat:** a "Docs" section of its own, which is a file listing rather than a
+part of the product; and doc files as `code`, which would put prose in the
+code drawer and let a node stand on a note instead of the code.
+
+**Cost accepted:** docs only reach a map when it is generated again; a long
+doc is read 400 lines at a time, so a decision log is found by grep.
+
+
+## D66 — The project's docs are read in the app
+
+**Chose:** a docs reader (`components/docs.tsx`) that takes the open level's
+place while `?doc=<path>` is in the URL, so Back and Escape close it and the
+level it was opened over is still there. It renders GitHub Markdown
+(`react-markdown` + `remark-gfm`; raw HTML is shown as text, never run), with
+an outline of the headings beside it on a wide window, GitHub's heading
+anchors, links to other docs opened in place, and `&line=` landing on — and
+lighting — the passage a section cites. The docs are listed from git
+(`/api/docs`) and found from the palette (typed with the levels, or "Read the
+docs…"), a title-bar button, and "Open the whole doc" on a cited passage. Their
+text comes through `/api/source`, behind the code's containment check.
+**Fixed with it:** a project whose id matched a landing demo (`understand-slop`)
+read the demo's frozen `source.json` instead of its checkout; a project now
+wins over a demo of the same name.
+**Beat:** opening docs in a terminal tab or the system's editor, which leaves
+the app for what is part of understanding the code; and a dialog, which cannot
+be linked to or left open beside the map's own Back.
+
+**Cost accepted:** a dependency for Markdown. Links to code files inside a doc
+are named, not opened; images in a doc do not load.

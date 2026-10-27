@@ -2,7 +2,6 @@
  "RUN": {
   "command": "understand-slop map ky",
   "repo": "ky",
-  "about": "Cut by the caller's journey through the library — set up an instance, make a request, read the response — with retry logic and error handling as supporting roots reached from the request step.",
   "commit": "3541888",
   "files": 112,
   "elapsed": "8 min",
@@ -13,6 +12,114 @@
    "author": "global.anthropic.claude-opus-4-6-v1",
    "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   }
+ },
+ "OVERVIEW": {
+  "sub": "A small HTTP client built on fetch",
+  "detail": "You set up an instance, make a request, and read the response; retrying and typed errors hang off the request.",
+  "state": "inferred",
+  "unsure": "Drawn from the map's first top level, which ordered the roots without reading the code; its arrows cite no lines yet.",
+  "code": [
+   {
+    "file": "source/index.ts",
+    "start": 33,
+    "end": 56,
+    "label": "Setting Up Ky: createInstance builds a KyInstance with method shortcuts, create, extend"
+   },
+   {
+    "file": "source/core/Ky.ts",
+    "start": 348,
+    "end": 436,
+    "label": "Making A Request: Ky.create — static factory returning a ResponsePromise"
+   },
+   {
+    "file": "source/types/ResponsePromise.ts",
+    "start": 9,
+    "end": 71,
+    "label": "Reading The Response: ResponsePromise type with all body convenience methods"
+   },
+   {
+    "file": "source/core/Ky.ts",
+    "start": 688,
+    "end": 763,
+    "label": "Retrying On Failure: The full retry-decision logic (#calculateRetryDelay)"
+   },
+   {
+    "file": "source/index.ts",
+    "start": 96,
+    "end": 110,
+    "label": "Handling Errors: Public exports of all error classes and type guards"
+   }
+  ],
+  "anatomy": [
+   {
+    "kind": "diagram",
+    "caption": "The roots, in the order someone meets them",
+    "boxes": [
+     {
+      "id": "setting-up",
+      "label": "Setting Up Ky",
+      "col": 0,
+      "row": 0,
+      "opens": "setting-up"
+     },
+     {
+      "id": "making-request",
+      "label": "Making A Request",
+      "col": 1,
+      "row": 0,
+      "opens": "making-request"
+     },
+     {
+      "id": "reading-response",
+      "label": "Reading The Response",
+      "col": 2,
+      "row": 0,
+      "opens": "reading-response"
+     },
+     {
+      "id": "retrying",
+      "label": "Retrying On Failure",
+      "col": 1,
+      "row": 1,
+      "opens": "retrying"
+     },
+     {
+      "id": "handling-errors",
+      "label": "Handling Errors",
+      "col": 2,
+      "row": 1,
+      "opens": "handling-errors"
+     }
+    ],
+    "arrows": [
+     {
+      "from": "setting-up",
+      "to": "making-request",
+      "label": "creates instances"
+     },
+     {
+      "from": "making-request",
+      "to": "reading-response",
+      "label": "returns promise for"
+     },
+     {
+      "from": "making-request",
+      "to": "retrying",
+      "label": "retries using"
+     },
+     {
+      "from": "making-request",
+      "to": "handling-errors",
+      "label": "throws into"
+     },
+     {
+      "from": "reading-response",
+      "to": "handling-errors",
+      "label": "throws on invalid"
+     }
+    ]
+   }
+  ]
  },
  "AUTHORED": [
   {
@@ -4901,40 +5008,6 @@
      ]
     }
    ]
-  }
- ],
- "E0": [
-  {
-   "from": "setting-up",
-   "to": "making-request",
-   "label": "creates instances for",
-   "order": 1,
-   "state": "derived"
-  },
-  {
-   "from": "making-request",
-   "to": "reading-response",
-   "label": "returns promise for",
-   "order": 2,
-   "state": "derived"
-  },
-  {
-   "from": "making-request",
-   "to": "retrying",
-   "label": "retries using",
-   "state": "derived"
-  },
-  {
-   "from": "making-request",
-   "to": "handling-errors",
-   "label": "throws into",
-   "state": "derived"
-  },
-  {
-   "from": "reading-response",
-   "to": "handling-errors",
-   "label": "throws on invalid",
-   "state": "derived"
   }
  ],
  "LINKS": []

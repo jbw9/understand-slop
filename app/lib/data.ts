@@ -390,13 +390,6 @@ export interface Edge {
    * confident-looking one.
    */
   order?: number;
-  /**
-   * The branch this edge belongs to, where the path splits — e.g. students and
-   * organisations after launch routing. Edges sharing a lane form one ordered
-   * branch; its first edge leaves the fork node. An edge with no `order` is a
-   * hand-off between branches, not a step.
-   */
-  lane?: string;
 }
 
 /**
@@ -434,8 +427,6 @@ export interface Run {
   command: string;
   /** The checkout's directory name, looked for under the usual code folders (rootOf in lib/maps.ts) — also where the code level reads. */
   repo: string;
-  /** One sentence: what the top level is cut by, and why that order. */
-  about: string;
   commit: string;
   files: number;
   elapsed: string;

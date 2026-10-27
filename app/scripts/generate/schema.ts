@@ -105,6 +105,6 @@ export function submitProblems(
   const mine = idsOf(node);
   const clash = [...mine].filter((id) => opts.taken?.has(id));
   if (clash.length) return clash.map((id) => `${id}: already used elsewhere in the map`);
-  const problems = check({ AUTHORED: [opts.within ? opts.within(node) : node], E0: [], LINKS: [] }, repo, { generated: true }).problems;
+  const problems = check({ AUTHORED: [opts.within ? opts.within(node) : node], LINKS: [] }, repo, { generated: true }).problems;
   return opts.within ? problems.filter((p) => [...mine].some((id) => p.includes(id)) || p.startsWith("DUP")) : problems;
 }

@@ -2,7 +2,6 @@
  "RUN": {
   "command": "understand-slop map full-stack-fastapi-template",
   "repo": "full-stack-fastapi-template",
-  "about": "Cut by what a user does in order — signs in, then manages items — with settings and admin as hand-offs from sign-in, and three infrastructure roots (backend, API client, app shell) off the path.",
   "commit": "b1125d8",
   "files": 231,
   "elapsed": "12 min",
@@ -13,6 +12,129 @@
    "author": "us.anthropic.claude-opus-4-6-v1",
    "verify": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
   }
+ },
+ "OVERVIEW": {
+  "sub": "A full-stack app template with items and users",
+  "detail": "A user signs in, then manages items; settings and user admin open from sign-in. The backend's API spec generates the client the frontend calls.",
+  "state": "inferred",
+  "unsure": "Drawn from the map's first top level, which ordered the roots without reading the code; its arrows cite no lines yet.",
+  "code": [
+   {
+    "file": "backend/app/api/routes/login.py",
+    "start": 20,
+    "end": 42,
+    "label": "Signing In: Login router with OAuth2 token endpoint"
+   },
+   {
+    "file": "backend/app/api/routes/items.py",
+    "start": 10,
+    "end": 10,
+    "label": "Managing Items: FastAPI router mounted at /items"
+   },
+   {
+    "file": "frontend/src/routes/_layout/settings.tsx",
+    "start": 15,
+    "end": 24,
+    "label": "Changing Settings: Route definition at /_layout/settings"
+   },
+   {
+    "file": "frontend/src/routes/_layout/admin.tsx",
+    "start": 20,
+    "end": 37,
+    "label": "Managing Users: Route definition with superuser access guard and redirect"
+   },
+   {
+    "file": "frontend/src/main.tsx",
+    "start": 47,
+    "end": 56,
+    "label": "The App Shell: Root render: ThemeProvider → QueryClientProvider → Router → Toaster"
+   },
+   {
+    "file": "backend/app/main.py",
+    "start": 21,
+    "end": 36,
+    "label": "The Backend: FastAPI app creation, CORS, and route mounting"
+   }
+  ],
+  "anatomy": [
+   {
+    "kind": "diagram",
+    "caption": "The roots, in the order someone meets them",
+    "boxes": [
+     {
+      "id": "signing-in",
+      "label": "Signing In",
+      "col": 0,
+      "row": 0,
+      "opens": "signing-in"
+     },
+     {
+      "id": "managing-items",
+      "label": "Managing Items",
+      "col": 1,
+      "row": 0,
+      "opens": "managing-items"
+     },
+     {
+      "id": "changing-settings",
+      "label": "Changing Settings",
+      "col": 0,
+      "row": 1,
+      "opens": "changing-settings"
+     },
+     {
+      "id": "managing-users",
+      "label": "Managing Users",
+      "col": 1,
+      "row": 1,
+      "opens": "managing-users"
+     },
+     {
+      "id": "app-shell",
+      "label": "The App Shell",
+      "col": 2,
+      "row": 1,
+      "opens": "app-shell"
+     },
+     {
+      "id": "backend",
+      "label": "The Backend",
+      "col": 3,
+      "row": 1,
+      "opens": "backend"
+     },
+     {
+      "id": "api-client",
+      "label": "The API Client",
+      "col": 4,
+      "row": 1,
+      "opens": "api-client"
+     }
+    ],
+    "arrows": [
+     {
+      "from": "signing-in",
+      "to": "managing-items",
+      "label": "authenticates into"
+     },
+     {
+      "from": "signing-in",
+      "to": "changing-settings",
+      "label": "also unlocks"
+     },
+     {
+      "from": "signing-in",
+      "to": "managing-users",
+      "label": "unlocks for admins"
+     },
+     {
+      "from": "backend",
+      "to": "api-client",
+      "label": "generates spec for"
+     }
+    ]
+   }
+  ]
  },
  "AUTHORED": [
   {
@@ -7563,33 +7685,6 @@
      ]
     }
    ]
-  }
- ],
- "E0": [
-  {
-   "from": "signing-in",
-   "to": "managing-items",
-   "label": "authenticates into",
-   "order": 1,
-   "state": "derived"
-  },
-  {
-   "from": "signing-in",
-   "to": "changing-settings",
-   "label": "also unlocks",
-   "state": "derived"
-  },
-  {
-   "from": "signing-in",
-   "to": "managing-users",
-   "label": "unlocks for admins",
-   "state": "derived"
-  },
-  {
-   "from": "backend",
-   "to": "api-client",
-   "label": "generates spec for",
-   "state": "derived"
   }
  ],
  "LINKS": []

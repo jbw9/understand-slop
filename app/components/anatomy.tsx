@@ -188,7 +188,8 @@ function Block({
             {block.table}
           </span>
           <span className="ml-auto font-mono text-[10px] text-faint">
-            {block.rows.length} columns
+            {/* A schema named like a file (`map.json`) is a document's fields, not a table's columns. */}
+            {block.rows.length} {/\.\w+$/.test(block.table) ? "fields" : "columns"}
           </span>
         </div>
         <div>

@@ -1439,3 +1439,50 @@ resolved by `resolveRef`, so Claude never shells out to git to work one out.
 equally, moves nobody and says so. That is deliberate — `findSection` refuses an
 ambiguous match rather than opening an arbitrary one of them, because being
 taken to the wrong section mid-answer is worse than not moving.
+
+## D60 — The top of the map is a level
+
+**Chose:** the repository is a level like any other. `map.json` carries an
+`OVERVIEW` (sub, a two-sentence detail, one diagram whose boxes open the roots,
+code refs), and the canvas renders it with the same `Level` as every node, at
+the empty path. A root's eyebrow reads "Inside <repo>". The generator draws the
+overview after the roots are accepted (`scripts/generate/overview.ts`): one
+small agent, the authors' read tools, and the same checker, so every arrow
+between roots cites the line where one hands off to the other.
+**Beat:** `E0` with `order` / `lane` / hand-off edges, `RUN.about`, and the
+dedicated overview renderer that drew them: a numbered rail, a lane fork, "↗"
+hand-off lines and an "outside the path" grid. It was the one level that was
+not a picture (D40), and its edges came from the cut, which reads summaries,
+not code, yet were stamped `derived`. Supersedes D33 and the step numbers of
+D35's breadcrumb.
+
+The cut still partitions files into roots; it lists them in the order someone
+meets them and no longer draws edges. A map with no overview yet (mid-run,
+D57) lists its roots, which is what `Level` does for any node without a
+picture. `--overview` redraws only the top level of an existing map.
+
+The committed maps were migrated mechanically: each old path became the
+diagram, marked `inferred`, because none of those repositories were on the
+machine to cite against. Run `--overview` where they are to replace them.
+
+**Cost accepted:** no step numbers on roots; order is only the diagram's
+left-to-right layout.
+**At scale:** past ~10 roots the picture needs rows, as any diagram does, and
+past ~15 it stops being a picture; the cut's 4–10 roots keep it inside that.
+
+## D61 — The code is the last layer
+
+**Chose:** a level shows its code — "View the code" and the folded code pane —
+only when it has no parts below it. A level with parts points down at them
+instead. Every node still carries `code` refs: they are what the checker and
+the verifier hold its claims to, and what Claude is handed for a section
+(`describe` in `lib/map.ts`). They are just not drawn above the bottom.
+**Beat:** D34's drawer on every level, the overview's included. On a level with
+parts it competed with the picture as the way down, and offered the lines of a
+whole feature where the reader had not yet picked which part to read.
+
+**Cost accepted:** a reader who wants a root's entry point has to open a part
+to see any code. A row-built leaf still shows the nearest code above it
+(`codeAt`), as before.
+**At scale:** unchanged by size; a branch that stops early shows its code
+early.

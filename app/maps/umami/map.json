@@ -2,7 +2,6 @@
  "RUN": {
   "command": "understand-slop map umami",
   "repo": "umami",
-  "about": "Cut by the life of analytics data — an owner signs in, tracking collects visitor events, the owner views dashboards, runs specialized reports, then shares results — after which resource management, board building, and AI access branch off.",
   "commit": "e92fdab",
   "files": 1651,
   "elapsed": "1 min",
@@ -13,6 +12,156 @@
    "author": "global.anthropic.claude-opus-4-6-v1",
    "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   }
+ },
+ "OVERVIEW": {
+  "sub": "Self-hosted, privacy-focused web analytics",
+  "detail": "An owner signs in, the tracker collects visitor events, and the owner views dashboards and reports, then shares them. Boards, administration and AI access branch off the dashboards.",
+  "state": "inferred",
+  "unsure": "Drawn from the map's first top level, which ordered the roots without reading the code; its arrows cite no lines yet.",
+  "code": [
+   {
+    "file": "src/lib/auth.ts",
+    "start": 71,
+    "end": 147,
+    "label": "Signing In: checkAuth — main auth handler for every request"
+   },
+   {
+    "file": "src/app/api/send/route.ts",
+    "start": 75,
+    "end": 387,
+    "label": "Collecting Events: Main POST handler for all analytics events"
+   },
+   {
+    "file": "src/app/(main)/websites/[websiteId]/layout.tsx",
+    "start": 5,
+    "end": 27,
+    "label": "Viewing Analytics: Server layout validates website exists and wraps children in WebsiteLayout"
+   },
+   {
+    "file": "src/app/(main)/websites/[websiteId]/(reports)/funnels/page.tsx",
+    "start": 4,
+    "end": 8,
+    "label": "Running Reports: Typical page entry point (funnels)"
+   },
+   {
+    "file": "src/app/api/share/route.ts",
+    "start": 10,
+    "end": 42,
+    "label": "Sharing Results: POST creates a new share with generated slug"
+   },
+   {
+    "file": "src/lib/boards.ts",
+    "start": 4,
+    "end": 16,
+    "label": "Building Boards: Board and entity type constants"
+   }
+  ],
+  "anatomy": [
+   {
+    "kind": "diagram",
+    "caption": "The roots, in the order someone meets them",
+    "boxes": [
+     {
+      "id": "signing-in",
+      "label": "Signing In",
+      "col": 0,
+      "row": 0,
+      "opens": "signing-in"
+     },
+     {
+      "id": "collecting-events",
+      "label": "Collecting Events",
+      "col": 1,
+      "row": 0,
+      "opens": "collecting-events"
+     },
+     {
+      "id": "viewing-analytics",
+      "label": "Viewing Analytics",
+      "col": 2,
+      "row": 0,
+      "opens": "viewing-analytics"
+     },
+     {
+      "id": "running-reports",
+      "label": "Running Reports",
+      "col": 3,
+      "row": 0,
+      "opens": "running-reports"
+     },
+     {
+      "id": "sharing-results",
+      "label": "Sharing Results",
+      "col": 3,
+      "row": 1,
+      "opens": "sharing-results"
+     },
+     {
+      "id": "building-boards",
+      "label": "Building Boards",
+      "col": 0,
+      "row": 1,
+      "opens": "building-boards"
+     },
+     {
+      "id": "managing-resources",
+      "label": "Managing Resources",
+      "col": 1,
+      "row": 1,
+      "opens": "managing-resources"
+     },
+     {
+      "id": "ai-agent-access",
+      "label": "AI Agent Access",
+      "col": 2,
+      "row": 1,
+      "opens": "ai-agent-access"
+     }
+    ],
+    "arrows": [
+     {
+      "from": "signing-in",
+      "to": "collecting-events",
+      "label": "signs in the owner"
+     },
+     {
+      "from": "collecting-events",
+      "to": "viewing-analytics",
+      "label": "writes data for"
+     },
+     {
+      "from": "viewing-analytics",
+      "to": "running-reports",
+      "label": "links to deeper"
+     },
+     {
+      "from": "running-reports",
+      "to": "sharing-results",
+      "label": "publishes into"
+     },
+     {
+      "from": "viewing-analytics",
+      "to": "building-boards",
+      "label": "renders in"
+     },
+     {
+      "from": "viewing-analytics",
+      "to": "sharing-results",
+      "label": "exposes via"
+     },
+     {
+      "from": "viewing-analytics",
+      "to": "managing-resources",
+      "label": "configured by"
+     },
+     {
+      "from": "ai-agent-access",
+      "to": "viewing-analytics",
+      "label": "queries the same APIs"
+     }
+    ]
+   }
+  ]
  },
  "AUTHORED": [
   {
@@ -10577,60 +10726,6 @@
      ]
     }
    ]
-  }
- ],
- "E0": [
-  {
-   "from": "signing-in",
-   "to": "collecting-events",
-   "label": "authenticates owner who",
-   "order": 1,
-   "state": "derived"
-  },
-  {
-   "from": "collecting-events",
-   "to": "viewing-analytics",
-   "label": "writes data read by",
-   "order": 2,
-   "state": "derived"
-  },
-  {
-   "from": "viewing-analytics",
-   "to": "running-reports",
-   "label": "links to deeper",
-   "order": 3,
-   "state": "derived"
-  },
-  {
-   "from": "running-reports",
-   "to": "sharing-results",
-   "label": "publishes into",
-   "order": 4,
-   "state": "derived"
-  },
-  {
-   "from": "viewing-analytics",
-   "to": "building-boards",
-   "label": "components render in",
-   "state": "derived"
-  },
-  {
-   "from": "viewing-analytics",
-   "to": "sharing-results",
-   "label": "exposes via",
-   "state": "derived"
-  },
-  {
-   "from": "viewing-analytics",
-   "to": "managing-resources",
-   "label": "configured by",
-   "state": "derived"
-  },
-  {
-   "from": "ai-agent-access",
-   "to": "viewing-analytics",
-   "label": "queries same APIs as",
-   "state": "derived"
   }
  ],
  "LINKS": []

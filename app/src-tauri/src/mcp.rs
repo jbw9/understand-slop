@@ -114,9 +114,12 @@ fn handle(conn: TcpStream, app: &AppHandle) -> std::io::Result<()> {
 }
 
 const INSTRUCTIONS: &str = "These tools use the Preview tab in understand-slop: the user's project, \
-running as a web app beside you, exactly as the user sees it. Use them to check that what you \
-built works: take a screenshot, then click, type and read the page, as you would in a browser. \
-`device` does the same on an iOS Simulator or Android emulator running in the app.";
+running as a web app beside you, exactly as the user sees it, and any page on the web. Use them \
+to check that what you built works: take a screenshot, then click, type and read the page, as \
+you would in a browser. They are your browser here: to look something up or read a page on \
+the web, navigate the preview there (an address, or words to search for) instead of opening \
+another browser, so the user sees it beside you. `device` does the same on an iOS Simulator or \
+Android emulator running in the app.";
 
 /// One JSON-RPC message; nothing back for a notification.
 fn rpc(msg: &Value, tab: u32, app: &AppHandle) -> Option<Value> {
@@ -213,6 +216,8 @@ struct Frame {
     viewport_height: f64,
     dpr: f64,
     url: String,
+    /// A page from the web has a webview of its own (browser.rs).
+    view: Option<String>,
 }
 
 fn screenshot(tab: u32, app: &AppHandle) -> Result<Vec<Value>, String> {
@@ -244,15 +249,19 @@ fn snapshot(app: &AppHandle, frame: &Frame, points: f64) -> Result<Vec<u8>, Stri
     use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
     use tauri::Manager;
 
-    let window = app.get_webview_window("main").ok_or("The window is gone.")?;
+    let own = frame.view.is_some();
+    let view = app.get_webview(frame.view.as_deref().unwrap_or("main")).ok_or("The window is gone.")?;
     let (tx, rx) = mpsc::channel::<Option<Vec<u8>>>();
     let rect = NSRect::new(NSPoint::new(frame.x, frame.y), NSSize::new(frame.width, frame.height));
-    window
+    view
         .with_webview(move |webview| unsafe {
             let view = &*(webview.inner() as *const WKWebView);
             // This closure runs on the main thread: Tauri's promise.
             let config = WKSnapshotConfiguration::new(objc2::MainThreadMarker::new_unchecked());
-            config.setRect(rect);
+            // A page in its own webview is the whole of it.
+            if !own {
+                config.setRect(rect);
+            }
             config.setSnapshotWidth(Some(&NSNumber::new_f64(points)));
             let tx = tx.clone();
             let done = block2::RcBlock::new(move |image: *mut NSImage, _: *mut NSError| {
@@ -305,7 +314,7 @@ fn tools() -> Value {
     json!([
         {
             "name": "computer",
-            "description": "Use the project's running web app in the Preview tab with a mouse and keyboard, as a person would. Coordinates are CSS pixels in the preview's viewport, which are the screenshot's pixels (its reply says when they are not). Take a screenshot to see the page, and another after acting to see what changed. A ref from read_page or find can stand in for a coordinate. `type` types into whatever has focus, so click the field first; `key` presses keys, space-separated, like \"Enter\", \"Tab Tab\", \"ctrl+a\" or \"shift+Tab\".",
+            "description": "Use the page in the Preview tab with a mouse and keyboard, as a person would: on macOS these are real clicks and keystrokes, so anything a person can click works, and your pointer is drawn where you act for the user to follow. Coordinates are CSS pixels in the preview's viewport, which are the screenshot's pixels (its reply says when they are not). Take a screenshot to see the page, and another after acting to see what changed. A ref from read_page or find can stand in for a coordinate. `type` types into whatever has focus, so click the field first; `key` presses keys, space-separated, like \"Enter\", \"Tab Tab\", \"ctrl+a\" or \"shift+Tab\".",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -353,7 +362,7 @@ fn tools() -> Value {
         },
         {
             "name": "navigate",
-            "description": "Opens something in the preview: a path on the dev server (\"/settings\"), a full URL on this machine (another server, which the preview then follows), or \"back\", \"forward\" or \"reload\".",
+            "description": "Opens something in the preview: a path on the dev server (\"/settings\"), a full URL on this machine (another server, which the preview then follows), any page on the web (\"https://react.dev\", \"docs.rs/serde\"), words to search the web for (\"vite proxy websocket\"), or \"back\", \"forward\" or \"reload\".",
             "inputSchema": { "type": "object", "properties": { "url": { "type": "string" } }, "required": ["url"] }
         },
         {

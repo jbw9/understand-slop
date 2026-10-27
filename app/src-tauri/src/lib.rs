@@ -1,3 +1,4 @@
+mod browser;
 mod claude;
 mod devices;
 mod mcp;
@@ -40,6 +41,12 @@ pub fn run() {
             preview::preview_close,
             preview::preview_external,
             mcp::preview_reply,
+            browser::browser_open,
+            browser::browser_place,
+            browser::browser_go,
+            browser::browser_eval,
+            browser::browser_close,
+            browser::native_input,
             devices::project_detect,
             devices::device_status,
             devices::device_setup,

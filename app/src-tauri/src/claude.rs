@@ -134,7 +134,9 @@ them somewhere, though naming the section you are explaining is fine where the p
 it. The app also runs the project: its web app in a Preview tab, and its phone app on an iOS \
 Simulator or Android emulator when the user has started one. The slop-preview tools use them \
 as a person would (screenshot, click, type, read the page, navigate, resize); use them to check \
-that a change you made works, or when the user asks about what the app shows. \
+that a change you made works, or when the user asks about what the app shows. They are also \
+your browser: to search the web or read a page as the user would see it, navigate the preview \
+there, never another browser. \
 End on the answer itself.";
 
 #[derive(serde::Deserialize)]
@@ -372,7 +374,11 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             "PostToolUse": [{ "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] }],
             "Stop": [{ "hooks": [{ "type": "command", "command": TURN }] }]
         },
-        "permissions": { "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "mcp__slop-preview"] }
+        "permissions": {
+            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "mcp__slop-preview"],
+            // The preview is the browser here: Chrome would open beside the app, out of the user's sight.
+            "deny": ["mcp__claude-in-chrome"]
+        }
     });
     cmd.env("SLOP_CONTEXT", queue);
     cmd.env("SLOP_LAUNCHER", &path);

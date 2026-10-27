@@ -11,7 +11,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# unstable: the preview opens pages from the web in a webview of their own (src/browser.rs).
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,12 +23,13 @@ tauri-plugin-clipboard-manager = "2"
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 
-# The preview's screenshot for Claude: WebKit's own snapshot of the window
-# (src/mcp.rs). Already in the build through wry; named here to call them.
+# The preview's screenshot for Claude, WebKit's own snapshot of the window
+# (src/mcp.rs), and Claude's clicks and keys as AppKit events (src/browser.rs).
+# Already in the build through wry; named here to call them.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSGeometry", "NSValue"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSGeometry", "NSProcessInfo", "NSString", "NSValue"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSBitmapImageRep", "NSEvent", "NSGraphicsContext", "NSImage", "NSImageRep", "NSMenu", "NSResponder", "NSView", "NSWindow"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
 block2 = "0.6"
 

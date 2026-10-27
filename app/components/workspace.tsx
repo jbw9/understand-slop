@@ -2,7 +2,8 @@
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } from "@/components/agents";
 import { useMap } from "@/components/map-context";
@@ -45,6 +46,11 @@ import { cn } from "@/lib/utils";
  * one until the user asks. Claude reaches the preview through the app's MCP
  * server (src-tauri/src/mcp.rs), and this is where its calls find the right
  * project's preview.
+ *
+ * A tab can be dragged out of the window onto the map, into the main view:
+ * there it takes the map's place, with a strip of its own whose first tab is
+ * the map, and it is dragged back the same way. A tab is the same tab in
+ * either place: it is moved, never started again.
  */
 
 const TOGGLE = "slop:workspace";
@@ -85,6 +91,8 @@ interface Tab {
   label?: string;
   /** It runs the dev server: its output is watched for the server's address. */
   dev?: boolean;
+  /** Moved out of the window, into the main view in front of the map. */
+  main?: boolean;
 }
 
 /** How a project is run, from its files (src-tauri/src/devices.rs). */
@@ -147,8 +155,18 @@ export function Workspace() {
   // The tab last in view, per project.
   const [active, setActive] = useState<Record<string, number>>({});
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  // The tab in the main view, per project; none, or one moved away, is the map.
+  const [front, setFront] = useState<Record<string, number | null>>({});
   const mine = tabs.filter((t) => t.cwd === here);
-  const current = mine.find((t) => t.key === active[here]) ?? mine.at(-1);
+  const panel = mine.filter((t) => !t.main);
+  const docked = mine.filter((t) => t.main);
+  const current = panel.find((t) => t.key === active[here]) ?? panel.at(-1);
+  const upFront = docked.find((t) => t.key === front[here]);
+  // Where tab bodies are drawn: the window's and the main view's.
+  const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
+  const [mainSlot, setMainSlot] = useState<HTMLElement | null>(null);
+  const mainPane = useRef<HTMLElement>(null);
+  const [dragging, setDragging] = useState<{ key: number; x: number; y: number; to: "main" | "panel" } | null>(null);
   const { agents, others, main: mainAgent } = useAgents();
   const main = mainAgent.id;
   const aside = useRef<HTMLElement>(null);
@@ -191,8 +209,11 @@ export function Workspace() {
     (root: string) => {
       const open = tabsNow.current.find((x) => x.kind === "preview" && x.cwd === root);
       if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
-      setActive((a) => ({ ...a, [root]: open.key }));
-      if (root === here) show(true);
+      if (open.main) setFront((f) => ({ ...f, [root]: open.key }));
+      else {
+        setActive((a) => ({ ...a, [root]: open.key }));
+        if (root === here) show(true);
+      }
       return open.key;
     },
     [add, here, show],
@@ -202,7 +223,8 @@ export function Workspace() {
   const phone = (platform: Platform) => {
     const open = mine.find((x) => x.kind === platform);
     if (!open) return add(null, { kind: platform, title: PLATFORM[platform].label });
-    select(open.key);
+    if (open.main) return setFront((f) => ({ ...f, [here]: open.key }));
+    setActive((a) => ({ ...a, [here]: open.key }));
     show(true);
   };
 
@@ -242,7 +264,8 @@ export function Workspace() {
   };
 
   // Claude's calls on the preview (src-tauri/src/mcp.rs): the project is the
-  // one of the tab Claude runs in. A screenshot needs the preview on screen.
+  // one of the tab Claude runs in. A screenshot needs the preview on screen,
+  // and so does a click or a key, to be real input (components/preview.tsx).
   const latest = useRef({ here, shown: false });
   const answer = async ({ id, tab, cmd }: { id: number; tab: number; cmd: Call }) => {
     const reply = (ok: boolean, value: unknown) => void invoke("preview_reply", { id, ok, value });
@@ -251,7 +274,9 @@ export function Workspace() {
       let handle = previewOf(root);
       if (!handle) {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
-        if (!asked && !servers[root])
+        // Anything else to navigate to is a page from the web, which needs no server.
+        const web = cmd.op === "navigate" && !asked && !cmd.url.trim().startsWith("/");
+        if (!asked && !web && !servers[root])
           throw new Error(
             "No preview is open for this project, and no dev server has printed an address. Start the dev server in a terminal tab, or navigate to its address, like http://localhost:3000.",
           );
@@ -260,14 +285,16 @@ export function Workspace() {
         handle = await until(() => previewOf(root), 8000);
         if (asked) return reply(true, `Opened ${asked} in the preview.`);
       }
-      if (cmd.op === "frame") {
-        if (root !== latest.current.here) throw new Error("That preview belongs to a project that is not open in the window, so it cannot be seen.");
+      const seen = cmd.op === "frame" || (cmd.op === "agent" && cmd.name === "computer");
+      if (seen && root === latest.current.here) {
         const hidden = !latest.current.shown;
         preview(root);
         await sleep(hidden ? 520 : 80);
         // A window behind others draws no frames, so the slide in never runs:
         // it is put where it would have ended.
         if (document.visibilityState === "hidden" && aside.current) aside.current.style.transform = "none";
+      } else if (cmd.op === "frame") {
+        throw new Error("That preview belongs to a project that is not open in the window, so it cannot be seen.");
       }
       reply(true, await handle.run(cmd));
     } catch (e) {
@@ -278,7 +305,7 @@ export function Workspace() {
   const answering = useRef(answer);
   useEffect(() => {
     answering.current = answer;
-    latest.current = { here, shown: open && mine.length > 0 };
+    latest.current = { here, shown: open && panel.length > 0 };
   });
   useEffect(() => {
     if (!desktop) return;
@@ -286,7 +313,21 @@ export function Workspace() {
     return () => void off.then((f) => f());
   }, [desktop]);
 
-  const select = useCallback((key: number) => setActive((a) => ({ ...a, [here]: key })), [here]);
+  const select = useCallback(
+    (key: number) => {
+      if (tabsNow.current.find((x) => x.key === key)?.main) setFront((f) => ({ ...f, [here]: key }));
+      else setActive((a) => ({ ...a, [here]: key }));
+    },
+    [here],
+  );
+  /** A tab in view, wherever it is: the window is opened for one of its own. */
+  const bring = useCallback(
+    (key: number) => {
+      select(key);
+      if (!tabsNow.current.find((x) => x.key === key)?.main) show(true);
+    },
+    [select, show],
+  );
 
   // What is in front in each tab: Claude (the launcher keeps a marker), some
   // other program, or the shell at its prompt. Polled, since programs start
@@ -351,7 +392,10 @@ export function Workspace() {
   // Picks go to the tab in view if Claude runs there, else this project's
   // newest tab running it; with none, a pick opens a tab (lib/context.ts).
   const claudeHere =
-    (current?.live ? current.pty : undefined) ?? mine.findLast((t) => t.live && t.pty !== undefined)?.pty ?? null;
+    (current?.live ? current.pty : undefined) ??
+    (upFront?.live ? upFront.pty : undefined) ??
+    mine.findLast((t) => t.live && t.pty !== undefined)?.pty ??
+    null;
   useEffect(() => retarget(claudeHere), [claudeHere]);
 
   const close = useCallback(
@@ -361,27 +405,30 @@ export function Workspace() {
       const rest = tabs.filter((x) => x.key !== key);
       setTabs(rest);
       if (gone.pty !== undefined) tabEnded(gone.pty);
-      // The neighbour in the same project takes over; its last one closing
-      // hides the window.
-      const group = tabs.filter((x) => x.cwd === gone.cwd);
-      const left = rest.filter((x) => x.cwd === gone.cwd);
+      // The neighbour in the same place takes over: in the window, whose last
+      // one closing hides it; in the main view, where none left is the map.
+      const near = (x: Tab) => x.cwd === gone.cwd && !x.main === !gone.main;
+      const group = tabs.filter(near);
+      const left = rest.filter(near);
       const i = group.findIndex((x) => x.key === key);
-      if (active[gone.cwd] === key) {
-        setActive((a) => ({ ...a, [gone.cwd]: left[Math.min(i, left.length - 1)]?.key ?? -1 }));
+      const next = left[Math.min(i, left.length - 1)]?.key;
+      if (gone.main) {
+        if (front[gone.cwd] === key) setFront((f) => ({ ...f, [gone.cwd]: next ?? null }));
+      } else {
+        if (active[gone.cwd] === key) setActive((a) => ({ ...a, [gone.cwd]: next ?? -1 }));
+        if (!left.length && gone.cwd === here) show(false);
       }
-      if (!left.length && gone.cwd === here) show(false);
     },
-    [tabs, active, here, show],
+    [tabs, active, front, here, show],
   );
 
   useEffect(() => {
-    const toggle = () => (open && mine.length ? show(false) : mine.length ? show(true) : add(main));
+    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(main));
     // Asked for from the map: a tab running Claude, shown; or a new one.
     const toClaude = () => {
-      const last = (current?.live ? current : undefined) ?? mine.findLast((t) => t.live);
+      const last = (current?.live ? current : undefined) ?? (upFront?.live ? upFront : undefined) ?? mine.findLast((t) => t.live);
       if (!last) return add(CLAUDE.id);
-      select(last.key);
-      show(true);
+      bring(last.key);
     };
     // Capture phase, so the shortcut wins before xterm's own textarea sees
     // the key and sends it to the program.
@@ -404,10 +451,12 @@ export function Workspace() {
       // Ctrl+W closes the tab in view, as in a browser — only from inside the
       // window, so the map never loses a tab to a stray key.
       if (e.code === "KeyW" && !e.shiftKey) {
-        if (!current || !aside.current?.contains(e.target as globalThis.Node)) return;
+        const into = e.target as globalThis.Node;
+        const tab = aside.current?.contains(into) ? current : mainPane.current?.contains(into) ? upFront : undefined;
+        if (!tab) return;
         e.preventDefault();
         e.stopPropagation();
-        close(current.key);
+        close(tab.key);
         return;
       }
       if (e.code !== "Backquote" || e.shiftKey) return;
@@ -422,8 +471,7 @@ export function Workspace() {
       const running = mine.find((x) => x.pty !== undefined && inFront(x)?.id === agent);
       if (running) {
         (question ? prompt : paste)(running.pty!, text);
-        select(running.key);
-        show(true);
+        bring(running.key);
         return;
       }
       const key = add(agent);
@@ -439,7 +487,7 @@ export function Workspace() {
       off();
       offHand();
     };
-  }, [open, mine, current, main, add, close, select, show]);
+  }, [open, mine, panel, current, upFront, main, add, close, bring, show]);
 
   const drag = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -467,7 +515,94 @@ export function Workspace() {
     window.addEventListener("pointerup", up);
   };
 
-  const shown = open && mine.length > 0;
+  const shown = open && panel.length > 0;
+
+  /** Where the window is, or would be: dropped there, a tab goes back into it. */
+  const panelLeft = () => window.innerWidth - GAP - Math.min(width, window.innerWidth - 2 * GAP);
+
+  // A tab dragged from either strip: onto the window's side it goes there,
+  // anywhere else into the main view. A press that hardly moves is a click,
+  // so the button's own click only selects from the keyboard.
+  const grab = (t: Tab) => (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest("[data-close]")) return;
+    const handle = e.currentTarget;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let to: "main" | "panel" | null = null;
+    const move = (m: PointerEvent) => {
+      if (to === null && Math.hypot(m.clientX - x0, m.clientY - y0) < 6) return;
+      if (to === null) {
+        handle.setPointerCapture(e.pointerId);
+        // A preview's frame would take the pointer's moves for its own page.
+        document.body.dataset.dragging = "";
+      }
+      to = m.clientX >= panelLeft() ? "panel" : "main";
+      setDragging({ key: t.key, x: m.clientX, y: m.clientY, to });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      // Hardly moved: a click, which selects the tab.
+      if (to === null) return select(t.key);
+      delete document.body.dataset.dragging;
+      setDragging(null);
+      const main = to === "main";
+      if (main !== !!t.main) patch(t.key, { main });
+      if (main) setFront((f) => ({ ...f, [t.cwd]: t.key }));
+      else {
+        setActive((a) => ({ ...a, [t.cwd]: t.key }));
+        show(true);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const nameOf = (t: Tab) => {
+    const i = mine.indexOf(t);
+    const front = inFront(t);
+    return t.kind === "preview"
+      ? "Preview"
+      : t.kind !== "shell"
+        ? PLATFORM[t.kind].label
+        : front
+          ? `${front.command.replace(/^slop-/, "")} ${i + 1}`
+          : (t.label ?? `${t.title} ${i + 1}`);
+  };
+  const iconOf = (t: Tab) => {
+    const front = inFront(t);
+    return t.kind === "preview" ? <GlobeIcon /> : t.kind !== "shell" ? <PhoneIcon /> : front ? <AgentIcon id={front.id} /> : <TerminalIcon />;
+  };
+
+  /** A tab in either strip, drawn as an editor draws one. */
+  const tabView = (t: Tab, selected: boolean) => (
+    <div
+      key={t.key}
+      role="tab"
+      aria-selected={selected}
+      onPointerDown={grab(t)}
+      title="Drag onto the map to open it in the main view, or back onto the window"
+      className={cn(
+        "group flex shrink-0 cursor-default items-center gap-2 border-r border-border-gray pl-3 pr-2 text-[12px]",
+        selected ? "bg-surface-container-low text-ink" : "border-b text-muted-slate hover:text-ink",
+        dragging?.key === t.key && "opacity-40",
+      )}
+    >
+      <button type="button" onClick={(c) => c.detail === 0 && select(t.key)} className="flex cursor-pointer items-center gap-1.5">
+        {iconOf(t)}
+        {nameOf(t)}
+      </button>
+      <button
+        type="button"
+        data-close
+        onClick={() => close(t.key)}
+        aria-label={`Close ${nameOf(t)}`}
+        className="flex size-[18px] cursor-pointer items-center justify-center rounded-[4px] text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
+      >
+        ×
+      </button>
+    </div>
+  );
   const project = projects[here];
   const phones = (["ios", "android"] as const).filter((p) => project?.[p]);
   const offer =
@@ -522,43 +657,7 @@ export function Workspace() {
           the terminal rather than a pill above it. */}
       <header className="flex h-9 shrink-0 items-stretch bg-surface-container" role="tablist">
         <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
-          {mine.map((t, i) => {
-            const front = inFront(t);
-            const name =
-              t.kind === "preview"
-                ? "Preview"
-                : t.kind !== "shell"
-                  ? PLATFORM[t.kind].label
-                  : front
-                    ? `${front.command.replace(/^slop-/, "")} ${i + 1}`
-                    : (t.label ?? `${t.title} ${i + 1}`);
-            return (
-              <div
-                key={t.key}
-                role="tab"
-                aria-selected={t.key === current?.key}
-                className={cn(
-                  "group flex shrink-0 items-center gap-2 border-r border-border-gray pl-3 pr-2 text-[12px]",
-                  t.key === current?.key
-                    ? "bg-surface-container-low text-ink"
-                    : "border-b text-muted-slate hover:text-ink",
-                )}
-              >
-                <button type="button" onClick={() => select(t.key)} className="flex cursor-pointer items-center gap-1.5">
-                  {t.kind === "preview" ? <GlobeIcon /> : t.kind !== "shell" ? <PhoneIcon /> : front ? <AgentIcon id={front.id} /> : <TerminalIcon />}
-                  {name}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => close(t.key)}
-                  aria-label={`Close tab ${i + 1}`}
-                  className="flex size-[18px] cursor-pointer items-center justify-center rounded-[4px] text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
+          {panel.map((t) => tabView(t, t.key === current?.key))}
         </div>
         <button
           type="button"
@@ -600,36 +699,123 @@ export function Workspace() {
           ]}
         />
       ) : null}
-      <div className="relative min-h-0 flex-1 pt-1.5">
-        {tabs.map((t) => {
-          const visible = shown && t.key === current?.key;
+      <div ref={setPanelSlot} className="relative min-h-0 flex-1 pt-1.5" />
+      {/* Under the terminal, beside where a prompt is typed: Claude Code draws
+          its input at the foot of the tab, so what the next prompt will carry
+          sits next to it rather than across the top of the window. */}
+      {current?.pty !== undefined ? (
+        <Strip
+          tab={current}
+          pty={current.pty}
+          agents={current.found === false ? others : agents}
+          onRun={(id) => patch(current.key, { ran: id })}
+        />
+      ) : null}
+    </motion.aside>
+    <section
+      ref={mainPane}
+      aria-label="Main view"
+      hidden={!docked.length}
+      style={{ top: desktop ? TITLEBAR : 0, bottom: STATUSBAR }}
+      className="pointer-events-none fixed inset-x-0 z-30 flex flex-col"
+    >
+      <header role="tablist" className="pointer-events-auto flex h-9 shrink-0 items-stretch bg-surface-container">
+        <div
+          role="tab"
+          aria-selected={!upFront}
+          className={cn(
+            "flex shrink-0 items-center border-r border-border-gray px-3 text-[12px]",
+            upFront ? "border-b text-muted-slate hover:text-ink" : "bg-surface-container-low text-ink",
+          )}
+        >
+          <button type="button" onClick={() => setFront((f) => ({ ...f, [here]: null }))} className="flex cursor-pointer items-center gap-1.5">
+            <MapIcon />
+            Map
+          </button>
+        </div>
+        <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
+          {docked.map((t) => tabView(t, t.key === upFront?.key))}
+        </div>
+        <div className="flex-1 border-b border-border-gray" />
+      </header>
+      <div
+        ref={setMainSlot}
+        className={cn("relative min-h-0 flex-1 bg-surface-container-low", upFront ? "pointer-events-auto" : "invisible")}
+      />
+      {upFront?.pty !== undefined ? (
+        <div className="pointer-events-auto bg-surface-container-low">
+          <Strip
+            tab={upFront}
+            pty={upFront.pty}
+            agents={upFront.found === false ? others : agents}
+            onRun={(id) => patch(upFront.key, { ran: id })}
+          />
+        </div>
+      ) : null}
+    </section>
+    {dragging ? (
+      <>
+        {/* Where the tab will go, shown before it is let go. */}
+        <div
+          aria-hidden
+          style={
+            dragging.to === "panel"
+              ? { top: (desktop ? TITLEBAR : 0) + GAP, bottom: STATUSBAR + GAP, right: GAP, left: panelLeft() }
+              : { top: desktop ? TITLEBAR : 0, bottom: STATUSBAR, left: 0, right: shown ? window.innerWidth - panelLeft() + GAP : 0 }
+          }
+          className="pointer-events-none fixed z-50 rounded-[10px] border-2 border-dashed border-deep-green/60 bg-deep-green/8"
+        />
+        <div
+          aria-hidden
+          style={{ left: dragging.x + 12, top: dragging.y + 10 }}
+          className="pointer-events-none fixed z-50 flex items-center gap-1.5 rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
+        >
+          {(() => {
+            const t = tabs.find((x) => x.key === dragging.key);
+            return t ? (
+              <>
+                {iconOf(t)}
+                {nameOf(t)}
+                <span className="text-faint">→ {dragging.to === "panel" ? "window" : "main view"}</span>
+              </>
+            ) : null;
+          })()}
+        </div>
+      </>
+    ) : null}
+    {tabs.map((t) => {
+          const visible = t.main ? t.cwd === here && t.key === upFront?.key : shown && t.key === current?.key;
+          const slot = t.main ? mainSlot : panelSlot;
           if (t.kind === "preview") {
             const dev = tabs.find((x) => x.dev && x.cwd === t.cwd);
             return (
+              <Held key={t.key} slot={slot}>
               <Preview
-                key={t.key}
                 root={t.cwd}
                 target={servers[t.cwd]}
                 visible={visible}
                 waiting={servers[t.cwd] ? undefined : dev?.run}
                 onTarget={(url) => setServers((all) => ({ ...all, [t.cwd]: url }))}
-                onShowServer={dev ? () => select(dev.key) : undefined}
+                onShowServer={dev ? () => bring(dev.key) : undefined}
+                docked={!!t.main}
               />
+              </Held>
             );
           }
           if (t.kind !== "shell")
             return (
+              <Held key={t.key} slot={slot}>
               <Device
-                key={t.key}
                 platform={t.kind}
                 root={t.cwd}
                 visible={visible}
                 onCommand={(command, label) => add(null, { run: command, label, cwd: t.cwd })}
               />
+              </Held>
             );
           return (
+          <Held key={t.key} slot={slot}>
           <Shell
-            key={t.key}
             startClaude={t.start === CLAUDE.id}
             run={t.run ?? (t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined)}
             cwd={t.cwd || undefined}
@@ -643,22 +829,41 @@ export function Workspace() {
             }}
             onExit={() => close(t.key)}
           />
+          </Held>
           );
         })}
-      </div>
-      {/* Under the terminal, beside where a prompt is typed: Claude Code draws
-          its input at the foot of the tab, so what the next prompt will carry
-          sits next to it rather than across the top of the window. */}
-      {current?.pty !== undefined ? (
-        <Strip
-          tab={current}
-          pty={current.pty}
-          agents={current.found === false ? others : agents}
-          onRun={(id) => patch(current.key, { ran: id })}
-        />
-      ) : null}
-    </motion.aside>
     </>
+  );
+}
+
+/**
+ * A tab's body, drawn into one element for the tab's life and moved, never
+ * drawn again, between the window and the main view: a terminal drawn again
+ * would be a new shell.
+ */
+function Held({ slot, children }: { slot: HTMLElement | null; children: React.ReactNode }) {
+  const [box] = useState(() => {
+    if (typeof document === "undefined") return null;
+    // No box of its own: the body is laid out in the slot, and a hidden tab's
+    // holder never lies over the one in view.
+    const el = document.createElement("div");
+    el.style.display = "contents";
+    return el;
+  });
+  useLayoutEffect(() => {
+    if (box && slot && box.parentElement !== slot) slot.appendChild(box);
+  }, [box, slot]);
+  useEffect(() => () => box?.remove(), [box]);
+  return box ? createPortal(children, box) : null;
+}
+
+/** The map, as the main view's first tab. */
+function MapIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-3 shrink-0">
+      <path d="M1.5 3.5 5.5 2l5 1.5 4-1.5v10.5l-4 1.5-5-1.5-4 1.5Z" />
+      <path d="M5.5 2v10.5M10.5 3.5V14" />
+    </svg>
   );
 }
 

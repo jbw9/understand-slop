@@ -251,7 +251,7 @@ export function InlineMarks({ ids, note }: { ids: string[]; note?: string }) {
    pointer-to-a-pointer is the documented trap, a gate with a road around it
    because that hole is what the analysis actually found.
 
-   Colour follows the state families in STYLE.md: green/solid where the
+   Colour follows the state families in DESIGN.md: green/solid where the
    compiler resolved it, amber/dashed where it is `partial`.
    ──────────────────────────────────────────────────────────────────── */
 

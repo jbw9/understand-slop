@@ -50,9 +50,9 @@ No new dependencies without asking.
 
 Written as real files before any builder was dispatched:
 
-- `ui/lib/data.ts` - the node/anatomy/state types. `Edge` gains `order`.
-- `ui/lib/repo.ts` - the repo-reading contract (`readSlice`, `writeSlice`).
-- `ui/lib/view.ts` - naming, density and label rules every card obeys.
+- `app/lib/data.ts` - the node/anatomy/state types. `Edge` gains `order`.
+- `app/lib/repo.ts` - the repo-reading contract (`readSlice`, `writeSlice`).
+- `app/lib/view.ts` - naming, density and label rules every card obeys.
 
 ## Workstreams
 
@@ -82,13 +82,13 @@ commit `59a89b3`). Expo / React Native campus-events app: students
 (`app/individual`) and organisations (`app/org`), Supabase, two edge
 functions, a small Python API.
 
-Contracts (frozen this round): `ui/lib/data.ts` (now with `Run`),
-`ui/lib/view.ts`, `ui/lib/map.ts` (the one-line switch between fixtures —
+Contracts (frozen this round): `app/lib/data.ts` (now with `Run`),
+`app/lib/view.ts`, `app/lib/map.ts` (the one-line switch between fixtures —
 main thread flips it at fan-in).
 
 | ID | Owns | Agent |
 |---|---|---|
-| E - explorify fixture | `ui/lib/explorify.ts` (new); `ui/components/shapes.tsx` (append marks/figures only) | builder |
+| E - explorify fixture | `app/lib/explorify.ts` (new); `app/components/shapes.tsx` (append marks/figures only) | builder |
 
 Main thread owns `components/canvas.tsx`, `components/chrome.tsx`, `lib/map.ts`.
 Fan-in check: `check-map.mts` (every `source` block verbatim at its line,
@@ -107,17 +107,17 @@ the picture (`diagram`, or a `figure` shape drawn full width) → its own data
 (`table`, `sequence`, `screen`, `example`, `schema`, `flow`…) → parts to go
 deeper → Watch out (`issues`) → the code, folded (`code` refs, read live).
 Depth is whatever the explanation needs. Exemplar: `su-cats` in
-`ui/lib/explorify/signup.ts`.
+`app/lib/explorify/signup.ts`.
 
-Contracts (frozen this round, main thread only): `ui/lib/data.ts`,
-`ui/lib/view.ts`, `ui/lib/explorify/index.ts` (RUN, E0, LINKS — root ids are
-fixed), `ui/scripts/check-map.mts`, all of `ui/components/`.
+Contracts (frozen this round, main thread only): `app/lib/data.ts`,
+`app/lib/view.ts`, `app/lib/explorify/index.ts` (RUN, E0, LINKS — root ids are
+fixed), `app/scripts/check-map.mts`, all of `app/components/`.
 
 | ID | Owns | Agent |
 |---|---|---|
-| F1 - sign up, launch, account | `ui/lib/explorify/{signup,launch,account}.ts` | builder |
-| F2 - organisation side + server | `ui/lib/explorify/{create-event,check-in,server}.ts` | builder |
-| F3 - student side + backend | `ui/lib/explorify/{feed,rsvp,supabase}.ts` | builder |
+| F1 - sign up, launch, account | `app/lib/explorify/{signup,launch,account}.ts` | builder |
+| F2 - organisation side + server | `app/lib/explorify/{create-event,check-in,server}.ts` | builder |
+| F3 - student side + backend | `app/lib/explorify/{feed,rsvp,supabase}.ts` | builder |
 
 Fan-in: `npx -y tsx --tsconfig tsconfig.json scripts/check-map.mts @/lib/explorify
 ~/Desktop/Code/explorify` with 0 problems, tsc, eslint, every root driven in the
@@ -133,13 +133,13 @@ Every `screen` block that the web build can show gets a real `shot` (D37).
 Exemplars: `ce-home` (three shots) and `su-cats`.
 
 Contracts (frozen this round, main thread only): everything frozen in Round 3,
-plus `ui/scripts/capture/*`.
+plus `app/scripts/capture/*`.
 
 | ID | Owns | Agent |
 |---|---|---|
-| G1 - sign up, launch, account | `ui/lib/explorify/{signup,launch,account}.ts`, `ui/public/shots/explorify/{su,ln,ac,signup,launch,account}*.png` | builder |
-| G2 - organisation side + server | `ui/lib/explorify/{create-event,check-in,server}.ts`, `ui/public/shots/explorify/{ce,ci,sv,create-event,check-in,server}*.png` | builder |
-| G3 - student side + backend | `ui/lib/explorify/{feed,rsvp,supabase}.ts`, `ui/public/shots/explorify/{fd,rv,sb,feed,rsvp,supabase}*.png` | builder |
+| G1 - sign up, launch, account | `app/lib/explorify/{signup,launch,account}.ts`, `app/public/shots/explorify/{su,ln,ac,signup,launch,account}*.png` | builder |
+| G2 - organisation side + server | `app/lib/explorify/{create-event,check-in,server}.ts`, `app/public/shots/explorify/{ce,ci,sv,create-event,check-in,server}*.png` | builder |
+| G3 - student side + backend | `app/lib/explorify/{feed,rsvp,supabase}.ts`, `app/public/shots/explorify/{fd,rv,sb,feed,rsvp,supabase}*.png` | builder |
 
 Fan-in: check-map 0 problems, tsc, eslint, every level crawled, and the
 screenshots looked at.

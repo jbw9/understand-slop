@@ -1439,3 +1439,100 @@ resolved by `resolveRef`, so Claude never shells out to git to work one out.
 equally, moves nobody and says so. That is deliberate — `findSection` refuses an
 ambiguous match rather than opening an arbitrary one of them, because being
 taken to the wrong section mid-answer is worse than not moving.
+
+## D60 — The top of the map is a level
+
+**Chose:** the repository is a level like any other. `map.json` carries an
+`OVERVIEW` (sub, a two-sentence detail, one diagram whose boxes open the roots,
+code refs), and the canvas renders it with the same `Level` as every node, at
+the empty path. A root's eyebrow reads "Inside <repo>". The generator draws the
+overview after the roots are accepted (`scripts/generate/overview.ts`): one
+small agent, the authors' read tools, and the same checker, so every arrow
+between roots cites the line where one hands off to the other.
+**Beat:** `E0` with `order` / `lane` / hand-off edges, `RUN.about`, and the
+dedicated overview renderer that drew them: a numbered rail, a lane fork, "↗"
+hand-off lines and an "outside the path" grid. It was the one level that was
+not a picture (D40), and its edges came from the cut, which reads summaries,
+not code, yet were stamped `derived`. Supersedes D33 and the step numbers of
+D35's breadcrumb.
+
+The cut still partitions files into roots; it lists them in the order someone
+meets them and no longer draws edges. A map with no overview yet (mid-run,
+D57) lists its roots, which is what `Level` does for any node without a
+picture. `--overview` redraws only the top level of an existing map.
+
+The committed maps were migrated mechanically: each old path became the
+diagram, marked `inferred`, because none of those repositories were on the
+machine to cite against. Run `--overview` where they are to replace them.
+
+**Cost accepted:** no step numbers on roots; order is only the diagram's
+left-to-right layout.
+**At scale:** past ~10 roots the picture needs rows, as any diagram does, and
+past ~15 it stops being a picture; the cut's 4–10 roots keep it inside that.
+
+## D61 — The code is the last layer
+
+**Chose:** a level shows its code — "View the code" and the folded code pane —
+only when it has no parts below it. A level with parts points down at them
+instead. Every node still carries `code` refs: they are what the checker and
+the verifier hold its claims to, and what Claude is handed for a section
+(`describe` in `lib/map.ts`). They are just not drawn above the bottom.
+**Beat:** D34's drawer on every level, the overview's included. On a level with
+parts it competed with the picture as the way down, and offered the lines of a
+whole feature where the reader had not yet picked which part to read.
+
+**Cost accepted:** a reader who wants a root's entry point has to open a part
+to see any code. A row-built leaf still shows the nearest code above it
+(`codeAt`), as before.
+**At scale:** unchanged by size; a branch that stops early shows its code
+early.
+
+## D62 — The window is a frame: title bar, status bar, palette
+
+**Chose:** the window has fixed regions, separated by hairlines, the way an
+editor does: the title bar (where you are, and a box that opens the palette),
+the map, and a status bar under it. Chrome is one tone
+(`surface-container-low`); the map is the cream page. The workspace still
+floats over the map's right edge and stops above the status bar; its open tab
+is the colour of the terminal under it, as an editor draws tabs. Every action on a
+level is the same `Button` (`components/button.tsx`), and they sit in one row
+above the title instead of a rail beside the prose. Eyebrows and hints are set
+in sans; mono is left to identifiers (§11). Diagram boxes take a hairline
+instead of a 1.5px coloured edge. The dot field is no longer the default.
+**Beat:** docking the workspace as a side pane, which the user tried and
+turned down: they want it to float as it did. Also a sidebar tree of the map,
+which the user turned down again here for the reason in D35. The
+palette does the sidebar's job (reaching any level without walking down) and
+spends no column on it.
+**Why:** the user said the UI "looks like a bunch of components sticking
+together". Screenshots agreed: three surfaces each had their own idea of what
+a surface is, and a level's header mixed a mono button, a sans button and a
+pill.
+
+**Cost accepted:** the workspace still covers the right of the map while it
+is open. The status bar takes 24px of height on every screen.
+**At scale:** the palette lists every level, 71 in this repository's map;
+it caps at 60 results and ranks by match, so a big map is still one keystroke
+plus a few letters.
+
+
+## D63 — The app ships no example maps
+
+**Chose:** delete the six committed example maps (`app/maps/*`) and the
+explorify screenshots (`public/shots`). The app opens the reader's own projects
+only; with none, it shows Welcome, whose one button starts or imports a
+project. `maps/` is now git-ignored local output from the generator.
+**Kept:** the generator's worked example. The author prompt quoted one root of
+the explorify map, so that root, stripped exactly as before, is now
+`scripts/generate/prompts/exemplar.json`: generation is unchanged.
+**The landing keeps its demo.** Five of the maps (understand-slop, flask,
+fastapi, ky, umami: `map.json`, `report.json`, `source.json`) now live in
+`landing/demo/`, with the page that quotes them. The app reads them
+(`loadDemo` in `lib/maps.ts`) only for a page the landing frames (`?embed`)
+or a static export; an embed never falls back to one of the reader's
+projects. `scripts/export-static.mts` exports a demo or a project.
+**Beat:** hiding the examples from the app while keeping them in `app/maps`;
+and cutting the landing's demo, "removed claims" and flask sections.
+
+**Cost accepted:** a first launch has nothing to look at until a project is
+mapped. The eval and diagram-audit scripts list only what is in local `maps/`.

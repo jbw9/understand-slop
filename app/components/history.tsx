@@ -124,7 +124,7 @@ export function HistoryDialog() {
                 </ul>
               ) : (
                 <p className="mb-6 text-[13px] text-muted-slate">
-                  Nothing yet. Ask Claude about a level and keep the answer, or use “Fix this”.
+                  Nothing yet. Ask Claude about a level and keep the answer.
                 </p>
               )}
 

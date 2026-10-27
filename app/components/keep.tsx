@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/button";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AgentIcon, CLAUDE } from "@/components/agents";
@@ -358,26 +359,19 @@ export function CorrectSection({ path, onClose }: { path: string[]; onClose: () 
   );
 }
 
-/** The two buttons on a level's header. Desktop only, and only for a project. */
+/** The button on a level's header that keeps Claude's last answer. Desktop only, and only for a project. */
 export function FixAndKeep({ path, answer }: { path: string[]; answer: Exchange | null }) {
   const desktop = useDesktop();
-  const [open, setOpen] = useState<"keep" | "fix" | null>(null);
+  const [open, setOpen] = useState<"keep" | null>(null);
   if (!desktop) return null;
-  const quiet =
-    "flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 font-mono text-[11px] text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-ink";
   return (
     <>
       {answer ? (
-        <button type="button" className={quiet} onClick={() => setOpen("keep")} title="Turn Claude's last answer into a block on this level">
-          <AgentIcon id={CLAUDE.id} />
+        <Button onClick={() => setOpen("keep")} icon={<AgentIcon id={CLAUDE.id} />} title="Turn Claude's last answer into a block on this level">
           Keep the answer
-        </button>
+        </Button>
       ) : null}
-      <button type="button" className={quiet} onClick={() => setOpen("fix")} title="Tell Claude what this gets wrong, or write it yourself">
-        Fix this
-      </button>
       {open === "keep" && answer ? <KeepAnswer exchange={answer} path={path} onClose={() => setOpen(null)} /> : null}
-      {open === "fix" ? <CorrectSection path={path} onClose={() => setOpen(null)} /> : null}
     </>
   );
 }

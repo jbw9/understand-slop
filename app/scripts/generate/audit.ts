@@ -7,8 +7,11 @@
  */
 import type { Node } from "@/lib/data";
 import type { Authored } from "./author";
+import { OVERVIEW_ID } from "./check";
+import type { Overview } from "@/lib/map";
 import type { Cut } from "./cut";
 import type { Inventory } from "./inventory";
+import type { Overviewed } from "./overview";
 import type { Verdict } from "./verify";
 
 export interface AuditInput {
@@ -21,6 +24,9 @@ export interface AuditInput {
   /** True when the cut was reused from an earlier run (a --roots repair). */
   cutReused: boolean;
   authored: Record<string, Authored>;
+  /** The overview as this run drew it; null when it kept the one it had. */
+  drawn: Overviewed | null;
+  overview?: Overview;
   verdicts: Record<string, Verdict[]>;
   /** The roots this run redid, when it was a repair; the rest were kept as they were. */
   only?: string[];
@@ -62,10 +68,6 @@ export function auditMarkdown(a: AuditInput): string {
   else out.push("- The first cut passed its checks.");
   if (cut.roots.length) out.push("", "| Root | Why it is a root | Owns |", "|---|---|---|");
   for (const r of cut.roots) out.push(`| ${r.title} | ${r.why.replace(/\|/g, "\\|")} | ${r.files.length} path${r.files.length === 1 ? "" : "s"} |`);
-  if (cut.edges.length) out.push("", `The path through them: ${cut.edges.map((e) => `${title.get(e.from) ?? e.from} → ${title.get(e.to) ?? e.to}${e.label ? ` (${e.label})` : ""}`).join(", ")}.`);
-  const roots = new Set(cut.edges.flatMap((e) => [e.from, e.to]));
-  const off = cut.roots.filter((r) => !roots.has(r.id));
-  if (off.length && cut.edges.length) out.push(`Off the path: ${off.map((r) => r.title).join(", ")}.`);
   if (cut.excluded.length) {
     out.push("", "Left out of the map:");
     for (const e of cut.excluded) out.push(`- \`${e.path}\` — ${e.reason}`);
@@ -95,9 +97,24 @@ export function auditMarkdown(a: AuditInput): string {
     if (w.root) out.push("What it settled on:", "", ...outline(w.root));
   }
 
-  // 3. Verification.
-  out.push("", "## 3. What verification changed", "", "A second model read each node against the lines it cites and the code around them. Questioned claims went to a reviewer that could read the repo, which dismissed them, added the missing citation, corrected the wording, or marked the node unsure.");
-  for (const r of cut.roots) {
+  // 3. The overview.
+  out.push("", "## 3. How the top level was drawn", "");
+  const pic = a.overview?.anatomy?.find((b) => b.kind === "diagram");
+  if (!a.overview) out.push(a.drawn ? `The overview was not accepted after ${a.drawn.submits} submits; the top level lists the roots instead. Its last problems: ${a.drawn.problems.slice(0, 10).join("; ")}` : "No overview: no root was accepted.");
+  else {
+    if (!a.drawn) out.push("_The overview was kept from the previous run: the same roots stand._", "");
+    else out.push(`Drawn after the roots, in ${a.drawn.turns + 1} turns and ${a.drawn.submits} submit${a.drawn.submits === 1 ? "" : "s"}.`, "");
+    out.push(`_${a.overview.sub}_ — ${a.overview.detail ?? ""}`);
+    if (pic?.kind === "diagram") {
+      const label = (id: string) => pic.boxes.find((x) => x.id === id)?.label ?? id;
+      if (pic.arrows.length) out.push("", "Between the roots:", "", ...pic.arrows.map((x) => `- ${label(x.from)} → ${label(x.to)}${x.label ? ` (${x.label})` : ""} — \`${x.at ?? "uncited"}\``));
+      else out.push("", "No arrows: the code shows no path from one root to another.");
+    }
+  }
+
+  // 4. Verification.
+  out.push("", "## 4. What verification changed", "", "A second model read each node against the lines it cites and the code around them. Questioned claims went to a reviewer that could read the repo, which dismissed them, added the missing citation, corrected the wording, or marked the node unsure.");
+  for (const r of [{ id: OVERVIEW_ID, title: "Overview" }, ...cut.roots]) {
     const v = a.verdicts[r.id];
     if (!v) continue;
     const flagged = v.filter((x) => x.flagged);
@@ -113,8 +130,8 @@ export function auditMarkdown(a: AuditInput): string {
     }
   }
 
-  // 4. The final check.
-  out.push("", "## 4. The final check", "");
+  // 5. The final check.
+  out.push("", "## 5. The final check", "");
   if (a.checkProblems.length) {
     out.push(`${a.checkProblems.length} problems remain in the finished map:`, "");
     for (const p of a.checkProblems.slice(0, 50)) out.push(`- ${p}`);

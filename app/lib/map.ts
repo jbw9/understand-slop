@@ -1,21 +1,32 @@
 /**
  * The map on screen, whichever repository it describes.
  *
- * A map file states facts — `RUN`, the authored tree, the root chain `E0`, and
- * row-to-row `LINKS` — as `maps/<name>/map.json`, hand-exported or generated.
+ * A map file states facts — `RUN`, the `OVERVIEW` of the repository, the
+ * authored tree, and row-to-row `LINKS` — as `maps/<name>/map.json`,
+ * hand-exported or generated.
  * Everything derived from those lives here, so a second repository is a second
  * file, not a copy of the tree plumbing.
  */
 
-import type { Anatomy, CodeRef, Edge, Link, Node, Run } from "@/lib/data";
+import type { Anatomy, CodeRef, Link, Node, Run } from "@/lib/data";
 import { rowId } from "@/lib/data";
+
+/**
+ * The repository as a level of its own: what it is, and one picture whose
+ * boxes open the roots. Absent on a map still being made, whose top level is
+ * then its roots listed (D60).
+ */
+export type Overview = Pick<Node, "sub" | "detail" | "anatomy" | "issues" | "code" | "state" | "unsure">;
 
 export interface MapFile {
   RUN: Run;
+  OVERVIEW?: Overview;
   AUTHORED: Node[];
-  E0: Edge[];
   LINKS: Link[];
 }
+
+/** The top level's id: the empty path, which is the repository itself. */
+export const TOP_ID = "";
 
 /* ── rows that go deeper ──────────────────────────────────────
    A row carrying `under` becomes a REAL child node, spliced in beside whatever
@@ -98,11 +109,9 @@ function withRowChildren(nodes: Node[]): Node[] {
   });
 }
 
-const byOrder = (a: Edge, b: Edge) => (a.order ?? 0) - (b.order ?? 0);
-
 /** Everything the screen reads, derived once from one map file. */
 export function buildMap(file: MapFile, name: string) {
-  const { RUN, E0, LINKS } = file;
+  const { RUN, OVERVIEW, LINKS } = file;
   /**
    * The tree everything else reads: authored nodes, plus one node for every
    * row that carries `under`. Built once, so no consumer knows a row was
@@ -110,59 +119,25 @@ export function buildMap(file: MapFile, name: string) {
    */
   const L0: Node[] = withRowChildren(file.AUTHORED);
 
-  /** Resolve a path of ids to the node it names. */
+  /** The repository as a node: the level the empty path opens, its parts the roots. */
+  const TOP: Node = { state: "derived", ...OVERVIEW, id: TOP_ID, title: RUN.repo, sub: OVERVIEW?.sub ?? "", col: 0, row: 0, children: L0 };
+
+  /** Resolve a path of ids to the node it names; the empty path is the repository. */
   function nodeAt(path: string[]): Node | null {
-    let level: Node[] = L0;
-    let found: Node | null = null;
+    let found: Node | null = TOP;
     for (const id of path) {
-      found = level.find((n) => n.id === id) ?? null;
+      found = found?.children?.find((n) => n.id === id) ?? null;
       if (!found) return null;
-      level = found.children ?? [];
     }
     return found;
   }
 
   /** The nodes shown at a given path's level — roots when the path is empty. */
   function levelAt(path: string[]): Node[] {
-    if (path.length === 0) return L0;
     return nodeAt(path)?.children ?? [];
   }
 
-  /**
-   * The path everyone walks, in the order E0 chains it: the ordered edges with
-   * no lane. Walking them from the first `from` IS the sequence.
-   */
-  const SPINE = (() => {
-    const sorted = E0.filter((e) => e.order !== undefined && !e.lane).sort(byOrder);
-    return sorted.length ? [sorted[0].from, ...sorted.map((e) => e.to)] : [];
-  })();
-
-  /** Where the path splits, one ordered branch per lane. Empty if it never does. */
-  const LANES = [...new Set(E0.flatMap((e) => (e.lane ? [e.lane] : [])))].map((lane) => {
-    const sorted = E0.filter((e) => e.lane === lane).sort(byOrder);
-    return { name: lane, from: sorted[0].from, ids: sorted.map((e) => e.to) };
-  });
-
-  /** Edges with no order: one branch handing something to another. */
-  const HANDOFFS = E0.filter((e) => e.order === undefined);
-
-  const ON_PATH = new Set([...SPINE, ...LANES.flatMap((l) => l.ids)]);
-
-  function roots(ids: string[]) {
-    return ids.map((id) => L0.find((n) => n.id === id)).filter((n): n is Node => n !== undefined);
-  }
-
-  /** 1-indexed position on the path, counting the shared steps into a lane. */
-  function stepOf(id: string): { n: number; of: number; lane?: string } | undefined {
-    const i = SPINE.indexOf(id);
-    if (i !== -1) return { n: i + 1, of: SPINE.length };
-    for (const l of LANES) {
-      const j = l.ids.indexOf(id);
-      if (j !== -1) return { n: SPINE.length + j + 1, of: SPINE.length + l.ids.length, lane: l.name };
-    }
-  }
-
-  return { name, RUN, E0, LINKS, L0, nodeAt, levelAt, SPINE, LANES, HANDOFFS, ON_PATH, roots, stepOf };
+  return { name, RUN, OVERVIEW, LINKS, L0, TOP, nodeAt, levelAt };
 }
 
 export type BuiltMap = ReturnType<typeof buildMap>;
@@ -170,10 +145,11 @@ export type BuiltMap = ReturnType<typeof buildMap>;
 
 /**
  * The code behind a level. A row-built level has no refs of its own; the code
- * of the nearest level above it is still the code behind it.
+ * of the nearest level above it is still the code behind it, up to the
+ * repository's own.
  */
 export function codeAt({ nodeAt }: BuiltMap, path: string[]): CodeRef[] {
-  for (let i = path.length; i > 0; i--) {
+  for (let i = path.length; i >= 0; i--) {
     const code = nodeAt(path.slice(0, i))?.code;
     if (code?.length) return code;
   }
@@ -205,7 +181,7 @@ export function outline(m: BuiltMap): string {
       `${"  ".repeat(depth)}- ${n.title}${n.sub ? ` — ${n.sub}` : ""}`,
       ...lines(n.children ?? [], depth + 1),
     ]);
-  return [`${m.RUN.repo}: ${m.RUN.about}`, "", ...lines(m.L0)].join("\n");
+  return [`${m.RUN.repo}${m.OVERVIEW?.sub ? `: ${m.OVERVIEW.sub}` : ""}`, "", ...lines(m.L0)].join("\n");
 }
 
 /**
@@ -214,12 +190,12 @@ export function outline(m: BuiltMap): string {
  * map's account of it. `[]` is the repository as a whole.
  */
 export function describe(m: BuiltMap, path: string[]): string {
-  const { RUN, L0, nodeAt } = m;
+  const { RUN, OVERVIEW, L0, nodeAt } = m;
   const node = path.length ? nodeAt(path) : null;
   if (!node) {
     return [
       `[Map section: the whole repository (${RUN.repo})`,
-      RUN.about,
+      ...[OVERVIEW?.sub, OVERVIEW?.detail].filter(Boolean),
       `Its top-level sections: ${L0.map((n) => n.title).join(", ")}]`,
     ].join("\n");
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow, OriginMark, Prose } from "@/components/state";
 import { SourceView, type RowCtx } from "@/components/anatomy";
@@ -142,7 +142,7 @@ function Diagram({
       <figcaption className="mb-3 max-w-[1000px]">
         <span className="text-[14px] font-medium text-on-surface">{block.caption}</span>
         {navigable ? (
-          <span className="ml-2.5 whitespace-nowrap font-mono text-[10.5px] text-faint">
+          <span className="ml-2.5 whitespace-nowrap text-[12px] text-faint">
             colours match the parts below
           </span>
         ) : null}
@@ -230,10 +230,14 @@ function Diagram({
                   y={y}
                   width={w}
                   height={BOX_H}
-                  rx="6"
+                  rx="7"
                   fill={fill}
                   stroke={stroke}
-                  strokeWidth="1.5"
+                  // A hairline, like every other container on the page: the
+                  // tint already says which section it is, and a heavy edge
+                  // made the picture louder than the tables beside it.
+                  strokeWidth="1"
+                  strokeOpacity={sec >= 0 ? 0.55 : 1}
                   strokeDasharray={b.tone === "warn" ? "5 4" : undefined}
                 />
                 {/* The label centres in the space left of the badge, so a
@@ -509,16 +513,21 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
 
 /**
  * What the user sees, top to bottom, in the frame of what it runs on — a
- * phone, or a browser window for a web page — with what each numbered thing
- * does written beside it rather than on top of it.
+ * phone, or a browser window for a web page — with what each thing does
+ * written beside it rather than on top of it, a line running from the thing
+ * to its note. A real capture has no coordinates for where each item landed,
+ * and a narrow page puts the notes under the screen; both fall back to numbers.
  */
 function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
   const noted = block.items.map((it, i) => ({ ...it, i })).filter((it) => it.note);
   const num = new Map(noted.map((it, k) => [it.i, k + 1]));
+  const [box, paths] = useCallouts(!block.shot && noted.length > 0);
+  // Numbers until the lines are measured, and wherever they cannot be drawn.
+  const n = (i: number) => (paths ? undefined : num.get(i));
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="flex flex-wrap items-start gap-6">
+      <div ref={box} className="relative flex flex-wrap items-start gap-6">
         {block.shot ? (
           // The real screen, captured from the app's own web build with
           // sample data (D37). Numbered callouts sit beside it, not on it:
@@ -560,8 +569,8 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             <div className="flex flex-col gap-2 px-5 pb-5 pt-4">
               <p className="mb-1 text-[13px] font-semibold text-ink">{block.title}</p>
               {block.items.map((it, i) => (
-                <div key={i} data-pick={it.label}>
-                  <ScreenThing type={it.type} label={it.label} n={num.get(i)} />
+                <div key={i} data-pick={it.label} data-thing={num.get(i)}>
+                  <ScreenThing type={it.type} label={it.label} n={n(i)} />
                 </div>
               ))}
             </div>
@@ -572,8 +581,8 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             <p className="mb-3 px-2 text-center text-[13px] font-semibold text-ink">{block.title}</p>
             <div className="flex flex-col gap-2 px-2 pb-3">
               {block.items.map((it, i) => (
-                <div key={i} data-pick={it.label}>
-                  <ScreenThing type={it.type} label={it.label} n={num.get(i)} />
+                <div key={i} data-pick={it.label} data-thing={num.get(i)}>
+                  <ScreenThing type={it.type} label={it.label} n={n(i)} />
                 </div>
               ))}
             </div>
@@ -586,8 +595,8 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
           // screen — the main text of the block — and is typeset as such.
           <ol className="flex min-w-[280px] max-w-[760px] flex-1 flex-col gap-4 pt-10">
             {noted.map((it, k) => (
-              <li key={it.i} data-pick={it.label} className="flex gap-3 text-[15.5px] leading-relaxed">
-                <Badge n={k + 1} />
+              <li key={it.i} data-pick={it.label} data-note={k + 1} className="flex gap-3 text-[15.5px] leading-relaxed">
+                {paths ? null : <Badge n={k + 1} />}
                 <span>
                   <span className="font-semibold text-ink">{it.label}</span>
                   <span className="text-on-surface-variant">
@@ -599,9 +608,72 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             ))}
           </ol>
         ) : null}
+        {paths ? (
+          <svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible text-faint">
+            {paths.map((l) => (
+              <g key={l.n}>
+                <path d={l.d} fill="none" stroke="currentColor" strokeWidth={1.25} />
+                <circle cx={l.from.x} cy={l.from.y} r={3} fill="currentColor" />
+                <circle cx={l.to.x} cy={l.to.y} r={3} fill="currentColor" />
+              </g>
+            ))}
+          </svg>
+        ) : null}
       </div>
     </div>
   );
+}
+
+type Pt = { x: number; y: number };
+
+/** Where `el` sits inside `box`, in the layout's own pixels — the same space an SVG inside `box` draws in, whatever zoom or scale is applied above. */
+function offsetIn(el: HTMLElement, box: HTMLElement) {
+  let x = 0, y = 0;
+  for (let at: HTMLElement | null = el; at && at !== box; at = at.offsetParent as HTMLElement | null) {
+    x += at.offsetLeft;
+    y += at.offsetTop;
+  }
+  return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+}
+
+/**
+ * Lines from each noted thing on a drawn screen (`data-thing`) to its note
+ * (`data-note`), measured after layout and again on every resize. The paths
+ * are null when there is nothing to join or the notes have wrapped under the
+ * screen, which is the cue to number them instead.
+ */
+function useCallouts(on: boolean) {
+  const box = useRef<HTMLDivElement>(null);
+  const [paths, setPaths] = useState<{ n: string; d: string; from: Pt; to: Pt }[] | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!on || !el) return;
+    const measure = () => {
+      const out: { n: string; d: string; from: Pt; to: Pt }[] = [];
+      for (const note of el.querySelectorAll<HTMLElement>("[data-note]")) {
+        const item = el.querySelector<HTMLElement>(`[data-thing="${note.dataset.note}"]`);
+        if (!item) continue;
+        // A heading or a line of text spans the screen's width but its words
+        // do not: the line leaves from the end of the words, not empty space.
+        const thing = item.querySelector<HTMLElement>("[data-anchor]") ?? item;
+        const a = offsetIn(thing, el), b = offsetIn(note, el);
+        // Wrapped: the note is not to the right of the screen, so a line would cut across it.
+        const row = offsetIn(item, el);
+        if (b.x < row.x + row.w) { setPaths(null); return; }
+        const from = { x: a.x + a.w + 6, y: a.y + a.h / 2 };
+        // The first line of the note, not the middle of a note that wraps.
+        const to = { x: b.x - 8, y: b.y + 13 };
+        const bend = (to.x - from.x) / 2;
+        out.push({ n: note.dataset.note!, from, to, d: `M${from.x},${from.y} C${from.x + bend},${from.y} ${to.x - bend},${to.y} ${to.x},${to.y}` });
+      }
+      setPaths(out.length ? out : null);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [on]);
+  return [box, on ? paths : null] as const;
 }
 
 function Badge({ n }: { n: number }) {
@@ -621,9 +693,9 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
   const base = "relative text-[12.5px]";
   switch (type) {
     case "heading":
-      return <p className={cn(base, "text-[15px] font-semibold text-ink")}>{label}{badge}</p>;
+      return <p className={cn(base, "text-[15px] font-semibold text-ink")}><span data-anchor>{label}</span>{badge}</p>;
     case "text":
-      return <p className={cn(base, "text-muted-slate")}>{label}{badge}</p>;
+      return <p className={cn(base, "text-muted-slate")}><span data-anchor>{label}</span>{badge}</p>;
     case "field":
       return (
         <div className={cn(base, "rounded-[5px] border border-border-strong px-2.5 py-2 text-faint")}>
@@ -666,10 +738,11 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
 
 /* ── example ─────────────────────────────────────────────────── */
 
-function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
+/** `bare` drops the label and caption, for a row that already shows them. */
+export function Example({ block, bare }: { block: Extract<Anatomy, { kind: "example" }>; bare?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="mb-2.5 flex items-center gap-2">
+      <div className={cn("mb-2.5 flex items-center gap-2", bare && "hidden")}>
         <span className="rounded-[6px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
           example
         </span>

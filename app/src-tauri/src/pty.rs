@@ -257,6 +257,12 @@ pub fn context_set(id: u32, text: String, ptys: tauri::State<Ptys>) -> Result<()
     claude::replace(&queue_of(&ptys, id)?, &text).map_err(|e| e.to_string())
 }
 
+/// Where the user is on the map, for every prompt to say (claude::place).
+#[tauri::command]
+pub fn context_where(id: u32, text: String, ptys: tauri::State<Ptys>) -> Result<(), String> {
+    claude::place(&queue_of(&ptys, id)?, &text).map_err(|e| e.to_string())
+}
+
 /// True while something queued has not gone out with a prompt yet.
 #[tauri::command]
 pub fn context_pending(id: u32, ptys: tauri::State<Ptys>) -> Result<bool, String> {

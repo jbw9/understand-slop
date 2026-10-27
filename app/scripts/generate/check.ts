@@ -24,6 +24,9 @@ export const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 export const SUB_WORDS = 8;
 export const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
 
+/** How the overview is named in a problem: no node can have this id, so it never clashes with one. */
+export const OVERVIEW_ID = "(overview)";
+
 /** Lines of repo files, read once per run. */
 export function fileReader(repo: string) {
   const cache = new Map<string, string[] | null>();
@@ -43,7 +46,7 @@ export function fileReader(repo: string) {
  * three levels under every root.
  */
 export function check(
-  map: Pick<MapFile, "AUTHORED" | "E0" | "LINKS">,
+  map: Pick<MapFile, "AUTHORED" | "OVERVIEW" | "LINKS">,
   repo: string,
   opts: { generated?: boolean; only?: Set<string> } = {},
 ): CheckResult {
@@ -61,7 +64,10 @@ export function check(
   // screen actually reads, not the authored one.
   const built = new Map<string, Set<string>>();
   const index = (ns: any[]) => ns.forEach((n) => { built.set(n.id, new Set((n.children ?? []).map((c: any) => c.id))); index(n.children ?? []); });
-  index(buildMap({ RUN: {} as any, AUTHORED: map.AUTHORED, E0: [], LINKS: [] }, "").L0);
+  const L0 = buildMap({ RUN: {} as any, AUTHORED: map.AUTHORED, LINKS: [] }, "").L0;
+  index(L0);
+  // The overview's boxes open the roots, as a node's open its children.
+  built.set(OVERVIEW_ID, new Set(L0.map((n) => n.id)));
 
   const walkBlocks = (owner: string, blocks: any[] = [], d: number): number => {
     let deepest = d;
@@ -165,8 +171,8 @@ export function check(
   });
   for (const [id, c] of ids) if (c > 1) problems.push(`DUP id ${id}`);
   if (!opts.only) {
-    for (const e of map.E0 ?? []) for (const k of [e.from, e.to])
-      if (!map.AUTHORED.some((r) => r.id === k)) problems.push(`E0 endpoint ${k} not a root`);
+    // The repository's own level (D60) is held to what any level is.
+    if (map.OVERVIEW) walk({ ...map.OVERVIEW, id: OVERVIEW_ID, title: "Overview", sub: map.OVERVIEW.sub ?? "", children: [] }, 0);
     for (const l of map.LINKS ?? []) for (const k of [l.from, l.to]) {
       const owner = k.slice(0, k.indexOf(":"));
       if (!ids.has(owner)) problems.push(`LINK owner ${owner} unknown`);

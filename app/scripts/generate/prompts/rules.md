@@ -20,11 +20,12 @@ The reader is a developer who has to *explain* this system under questioning: wh
 ## Shape of the tree
 
 - **Roots are what someone does with the product**, cut by features and journeys, not by architecture layers. A library's "someone" is the caller ("Making A Request", "Retrying On Failure"). Layers like "API", "Database" or "Utils" say nothing specific about this product.
+- **The top level is a level too.** Above the roots sits the repository itself: a short detail and one diagram whose boxes open the roots, drawn after the roots are written, with an arrow only where the code goes from one root to another.
 - **Each level names its parts and never shows their contents.** Children are chapters: each one answers one question about its parent.
 - **Depth belongs to the branch.**
   - Most roots go 2–3 levels: root → parts → the mechanism or data one part turns on.
   - Stop when there is nothing more to explain.
-  - Don't pad a branch to reach code (the code is always one click away in the drawer). Don't stop short of the interesting part either.
+  - The reader sees code only on the last level of a branch, a node with no children; above it, `code` refs back the claims but are not shown. So a leaf is where the lines are worth reading: don't pad a branch to reach code, and don't stop short of the interesting part either.
 - **Breadth:** 3–6 children per node is typical, never more than about 8.
 
 ## What a level shows
@@ -39,13 +40,15 @@ The level itself, `node` open:
      - Boxes sit on a grid (`col` left to right, `row` top to bottom, from 0). Never put two boxes in one cell. Keep it to about 5 columns and about 10 boxes.
      - A box is a thing at runtime ("users table", "Login screen", "Stripe webhook"). Its `sub` is a few words (about 25 characters at most): "row with this id", not a sentence — a long sub widens its whole column.
      - The checker lays the picture out as the page will and rejects one that is too wide to read, has a label drawn on another label or a box, or a line through a box it does not connect. Fix those by rearranging: put boxes an arrow joins next to each other, use more rows and fewer columns, and do not run an arrow across a box in between.
-     - A box that a child explains carries `opens: "<child id>"`, which makes the picture the way down. Link every child that has a box. Boxes with nothing to open are scenery.
+     - A box that a child explains carries `opens: "<child id>"`, which makes the picture the way down. Give every child a box when you can: a level whose picture opens all its parts shows no separate list of them. Boxes with nothing to open are scenery.
    - `sequence`: who talks to whom, in order. Every `from`/`to` must be one of `actors`.
    - `table`: real values, such as the categories, the env vars, the fields a form sends, the routes. Every row must have exactly as many cells as `columns`.
    - `screen`: what a user sees on one screen, as `items` top to bottom, read from the JSX or template. No `shot`.
      - `device` is what it runs on: `phone` for a mobile app's screen, `web` for a page in a browser. The brief says which this repo has; never default to `phone`.
      - A `web` screen gives `route`, the URL path it is at (`/settings/billing`, `/invite/[token]`), when the code shows it — a URL, never a file path.
+     - An item's `note` is drawn beside the screen with a line to the item: what it does or holds, in a few words ("opens the wizard", "must be 8+ characters"). Give a note only to the items worth pointing at, about 3–6; an item that explains itself gets none.
    - `example`: what a stored value or payload looks like. It is labelled as an example, synthesized from the code.
+   - **A file or record is shown by what is in it, never by its name alone.** When a level names files it writes or reads (`map.json`, `.env`, a log), or stored records, give each one that matters a `schema` (its fields, for structured data: JSON, a table, a typed config) or an `example` (for text: markdown, logs, CSV). A list of names with a line each tells the reader only that the files exist.
    - `flow` (numbered steps), `facts` (label/value pairs), `chips` (a closed set), `map` (in → out rules), `schema` (table columns), `routes` (HTTP routes).
 5. `issues`: real problems a developer should know before touching this, shown as "Watch out".
    - Each is a few-word title, then 1–3 sentences on what goes wrong, for whom, and when, with `where` as `file:line`.

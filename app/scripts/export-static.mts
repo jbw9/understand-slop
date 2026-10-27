@@ -6,13 +6,16 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Node } from "@/lib/data";
-import { loadMap, rootOf } from "@/lib/maps";
+import { demoSource, loadDemo, loadMap, rootOf } from "@/lib/maps";
 
 const args = process.argv.slice(2);
 const opt = (k: string) => { const i = args.indexOf(k); return i === -1 ? undefined : args[i + 1]; };
 const name = args[0];
-const { name: found, file } = loadMap(name);
-if (found !== name) throw new Error(`no map named ${name}`);
+// One of the landing's demos (landing/demo, D63), or one of this machine's projects.
+const open = loadDemo(name) ?? loadMap(name);
+if (!open || open.name !== name) throw new Error(`no demo or project named ${name}`);
+const { file } = open;
+const baked = demoSource(name);
 
 // --root: the checkout to read, when it is not where the map was made.
 const root = opt("--root") ?? rootOf(file.RUN);
@@ -22,7 +25,8 @@ const walk = (n: Node) => {
   (n.children ?? []).forEach(walk);
 };
 file.AUTHORED.forEach(walk);
-const source = Object.fromEntries([...cited].sort().map((f) => [f, readFileSync(join(root, f), "utf8")]));
+// A demo carries its cited files; a project's are read from its checkout.
+const source = Object.fromEntries([...cited].sort().map((f) => [f, baked?.[f] ?? readFileSync(join(root, f), "utf8")]));
 
 const out = resolve("out", name);
 rmSync(out, { recursive: true, force: true });

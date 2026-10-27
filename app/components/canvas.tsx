@@ -4,18 +4,20 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { AnatomyView, type RowCtx } from "@/components/anatomy";
-import { CodeDrawer, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
+import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
+import { CodeDrawer, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, OriginMark, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Zoom, useZoomScale } from "@/components/zoom";
 import { Crumbs, goTo, useLocation } from "@/components/chrome";
+import { Button, CodeIcon } from "@/components/button";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { FixAndKeep, onAnswer } from "@/components/keep";
+import { SectionTabs, openInTab } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
 import type { Exchange } from "@/lib/keep";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
@@ -225,7 +227,7 @@ export function Canvas() {
   // keeps its own menu, and there is no Claude tab to hand anything to.
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   const { ground } = useSettings();
-  const [menu, setMenu] = useState<{ x: number; y: number; target: Target } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; target: Target; opens: string[] | null } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const onContextMenu = (e: React.MouseEvent) => {
     // Anything else on the level — a caption, the space between blocks — is
@@ -234,16 +236,30 @@ export function Canvas() {
     const target = el ? targetOf(map, el, path) : section(map, path);
     if (!target) return;
     e.preventDefault();
-    setMenu({ x: e.clientX, y: e.clientY, target });
+    setMenu({ x: e.clientX, y: e.clientY, target, opens: opensAt(e.target as Element, path) });
+  };
+
+  // A part opens in a new tab the way a link does: a middle click, or a click
+  // with ⌘/Ctrl. Taken in the capture phase, before the part's own click opens
+  // it in place.
+  const toTab = (e: React.MouseEvent) => {
+    const opens = opensAt(e.target as Element, path);
+    if (!opens) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openInTab(name, opens);
   };
 
   return (
     <div
-      className="flex h-full w-full overflow-hidden bg-warm-cream"
+      className="flex h-full w-full flex-col overflow-hidden bg-warm-cream"
       onContextMenu={desktop ? onContextMenu : undefined}
+      onClickCapture={(e) => (e.metaKey || e.ctrlKey ? toTab(e) : undefined)}
+      onAuxClickCapture={(e) => (e.button === 1 ? toTab(e) : undefined)}
     >
       {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
-      <main ref={scrollRef} className={cn(GROUND[ground], "relative min-w-0 flex-1 overflow-auto")}>
+      <SectionTabs path={path} />
+      <main ref={scrollRef} className={cn(GROUND[ground], "relative min-h-0 min-w-0 flex-1 overflow-auto")}>
         {/* In the desktop app the title bar carries where you are. */}
         {desktop ? null : (
           <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => goTo(path.slice(0, d))} />
@@ -271,11 +287,7 @@ export function Canvas() {
               exit="gone"
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              {focus ? (
-                <Level node={focus} path={path} ctx={ctx} onOpen={goTo} />
-              ) : (
-                <Overview onOpen={goTo} />
-              )}
+              <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -309,6 +321,22 @@ function useLatestAnswer(): Exchange | null {
 const PICKABLE = "[data-path], [data-row], [data-pick]";
 
 /**
+ * The level a clicked element leads to, if it leads anywhere but here: a part's
+ * card (`data-path`) or a diagram box, whose href is that part's own URL.
+ */
+function opensAt(el: Element, here: string[]): string[] | null {
+  const link = el.closest("a[href]");
+  const href = link?.getAttribute("href");
+  const at = href?.startsWith("?")
+    ? new URLSearchParams(href).getAll("at")
+    : (() => {
+        const card = el.closest<HTMLElement | SVGElement>("[data-path]");
+        return card?.dataset.path ? (JSON.parse(card.dataset.path) as string[]) : null;
+      })();
+  return at && at.join("/") !== here.join("/") ? at : null;
+}
+
+/**
  * What a right-clicked element hands to Claude. An element's words are what
  * is on screen — `data-pick-text` where the screen leaves something out, like
  * a table row's column names — and its code is the nearest `data-pick-code`.
@@ -330,7 +358,21 @@ function targetOf(map: BuiltMap, el: HTMLElement | SVGElement, level: string[]):
   };
 }
 
-function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
+function PickMenu({
+  x,
+  y,
+  target,
+  opens,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  target: Target;
+  /** The level the thing under the pointer opens, offered in a new tab. */
+  opens: string[] | null;
+  onClose: () => void;
+}) {
+  const { name } = useMap();
   const status = usePicked(target.key);
   return (
     <Menu
@@ -339,6 +381,7 @@ function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Tar
       title={target.title}
       onClose={onClose}
       items={[
+        ...(opens ? [{ label: "Open in new tab", onClick: () => openInTab(name, opens) }] : []),
         status === "queued"
           ? { label: "Waiting for your next prompt", disabled: true }
           : { label: status === "sent" ? "Send to Claude again" : "Add to Claude context", onClick: () => pick(target) },
@@ -384,8 +427,10 @@ function HandProblems({ node, path }: { node: Node; path: string[] }) {
       ? `Sent to ${main.label}`
       : `Ask ${main.label}`;
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      tone="alarm"
+      icon={<AgentIcon id={main.id} />}
       disabled={claude && status === "queued"}
       onClick={async () => {
         // The code goes along, so the agent answers from it instead of
@@ -411,11 +456,9 @@ function HandProblems({ node, path }: { node: Node; path: string[] }) {
           ? "Asks Claude about every problem here, with its section and code"
           : `Asks ${main.label} about every problem here, with its section and code`
       }
-      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-clay-line bg-pure-white px-2.5 py-1 font-mono text-[11px] text-clay-ink transition-colors hover:bg-clay-surface disabled:cursor-default disabled:opacity-70"
     >
-      <AgentIcon id={main.id} />
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -429,71 +472,6 @@ function blockLabel(b: Anatomy): string {
 }
 
 /* ── levels ──────────────────────────────────────────────────── */
-
-/**
- * The repo itself, drawn as a level like any other: the shared path as a
- * numbered line, then — where it splits — one numbered line per lane side by
- * side, and the roots E0 never touches grouped under their own heading.
- */
-function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
-  const { RUN, E0, L0, SPINE, LANES, HANDOFFS, ON_PATH, roots } = useMap();
-  const chain = roots(SPINE);
-  const outside = L0.filter((n) => !ON_PATH.has(n.id));
-  const fork = LANES.length ? L0.find((n) => n.id === LANES[0].from) : undefined;
-  const answer = useLatestAnswer();
-
-  return (
-    <>
-      <Header
-        path={[]}
-        eyebrow="Repository"
-        title={RUN.repo}
-        sub={RUN.about}
-        meta={`${RUN.files} files · commit ${RUN.commit}`}
-        link={RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
-        actions={<FixAndKeep path={[]} answer={answer} />}
-      />
-      <Caption
-        count={chain.length}
-        what="steps"
-        how={LANES.length ? "in order, for everyone" : "in order"}
-      />
-      <Steps nodes={chain} edges={E0} at={[]} onOpen={onOpen} />
-
-      {fork ? (
-        <section className="mt-10">
-          <Caption count={LANES.length} what="paths" how={`after ${fork.title}`} />
-          <Note>{fork.title} sends each account down one of these. They meet where noted.</Note>
-          <div className="grid max-w-[1180px] grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-2">
-            {LANES.map((l) => (
-              <div key={l.name} className="min-w-0">
-                <h3 className="mb-3 border-b border-border-strong pb-2 text-[15px] font-semibold text-ink">
-                  {l.name}
-                </h3>
-                <Steps
-                  nodes={roots(l.ids)}
-                  edges={E0}
-                  start={SPINE.length + 1}
-                  handoffs={HANDOFFS}
-                  at={[]}
-                  onOpen={onOpen}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {outside.length ? (
-        <section className="mt-12">
-          <Caption count={outside.length} what="more" how="outside the path" />
-          <Note>No step leads to these.</Note>
-          <Grid nodes={outside} at={[]} onOpen={onOpen} />
-        </section>
-      ) : null}
-    </>
-  );
-}
 
 /**
  * One open node, explained. Top to bottom: what it is (header), the picture of
@@ -517,10 +495,11 @@ function Level({
   onOpen: (p: string[]) => void;
 }) {
   const map = useMap();
-  const { RUN, nodeAt, stepOf } = map;
+  const { RUN, nodeAt } = map;
   const kids = authored(node);
   const parent = path.length > 1 ? nodeAt(path.slice(0, -1)) : null;
-  const step = path.length === 1 ? stepOf(node.id) : undefined;
+  // The empty path is the repository itself (D60): nothing above it to go back to.
+  const top = path.length === 0;
   const note = setNote(node);
   const sequence = node.group?.ordering === "sequence";
   const figure = node.shape?.kind === "figure" ? node.shape : undefined;
@@ -546,27 +525,34 @@ function Level({
     ) ?? { kind: "diagram", caption: "", boxes: [], arrows: [] },
     owns,
   );
-  const code = codeAt(map, path);
-  const [codeOpen, setCodeOpen] = useState(false);
+  // The code is the last layer: a level with parts below it points down at
+  // them, and only a level with nothing below it shows its lines.
+  const code = node.children?.length ? [] : codeAt(map, path);
+  // A leaf with nothing else on it opens on its code, so the bottom of a
+  // branch is never a title over an empty page.
+  const [codeOpen, setCodeOpen] = useState(blocks.length === 0 && !figure);
   const answer = useLatestAnswer();
   // Empty outside diff mode, so the block render below is unchanged then.
   const blockDiffs = useBlockDiffs(path);
+  // Two or more data shapes (a table, a file's fields, a stored value) are one
+  // section of names, each opening its own body, instead of a stack of full
+  // cards. Not in a diff that touches one: the red and green must be on screen.
+  const shapes = blocks.flatMap((b, i) => (b.kind === "schema" || b.kind === "example" ? [i] : []));
+  const grouped = shapes.length > 1 && !shapes.some((i) => blockDiffs.has(i));
 
   return (
     <>
       <Header
         path={path}
-        back={{
-          label: parent?.title ?? RUN.repo,
-          onClick: () => onOpen(path.slice(0, -1)),
-        }}
-        eyebrow={
-          parent
-            ? `Inside ${parent.title}`
-            : step
-              ? `${step.lane ? `${step.lane} · ` : ""}Step ${step.n} of ${step.of}`
-              : "Outside the path"
+        back={
+          top
+            ? undefined
+            : {
+                label: parent?.title ?? RUN.repo,
+                onClick: () => onOpen(path.slice(0, -1)),
+              }
         }
+        eyebrow={top ? "Repository" : `Inside ${parent?.title ?? RUN.repo}`}
         title={node.title}
         state={node.state}
         origin={node.origin}
@@ -577,12 +563,15 @@ function Level({
         detail={node.detail}
         unsure={node.state === "derived" ? undefined : node.unsure}
         meta={
-          !nearBottom(node)
+          top
+            ? `${RUN.files} files · commit ${RUN.commit}`
+            : !nearBottom(node)
             ? undefined
             : node.footprint
               ? `${node.footprint.dirs.join("  ")}  ·  ${node.footprint.files} files`
               : node.evidence
         }
+        link={top && RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
         shape={figure ? undefined : node.shape}
         onCode={
           code.length
@@ -613,7 +602,11 @@ function Level({
         ) : null}
 
         {blocks.map((b, i) =>
-          blockDiffs.has(i) ? (
+          grouped && shapes.includes(i) ? (
+            i === shapes[0] ? (
+              <DataShapes key={i} owner={node.id} blocks={shapes.map((j) => blocks[j] as DataBlock)} ctx={ctx} />
+            ) : null
+          ) : blockDiffs.has(i) ? (
             <div key={i} data-pick={blockLabel(b)}>
               <div className={b.kind === "diagram" ? "" : "max-w-[1100px]"}>
                 <BlockDiffView block={b} diff={blockDiffs.get(i)!} />
@@ -644,16 +637,15 @@ function Level({
           ),
         )}
 
-        {kids.length ? (
+        {/* When every part is a box on the picture, the picture is the list. */}
+        {kids.length && onDiagram.size < kids.length ? (
           <section>
             <Caption
               count={kids.length}
               what={kids.length === 1 ? "part" : "parts"}
               how={
                 onDiagram.size
-                  ? onDiagram.size === kids.length
-                    ? "all of them on the picture above"
-                    : `${onDiagram.size} of them on the picture above`
+                  ? `${onDiagram.size} of them on the picture above`
                   : sequence
                     ? "in order — open one to go deeper"
                     : "open one to go deeper"
@@ -705,6 +697,90 @@ function Level({
   );
 }
 
+/* ── data shapes ─────────────────────────────────────────────── */
+
+type DataBlock = Extract<Anatomy, { kind: "schema" | "example" }>;
+
+/** A shape's name, what it is in a few words, and how much is inside. */
+function shapeLabel(b: DataBlock): { name: string; gloss?: string; size: string } {
+  if (b.kind === "schema") {
+    const file = /\.\w+$/.test(b.table);
+    return { name: b.table, size: `${b.rows.length} ${file ? "fields" : "columns"}` };
+  }
+  const [name, ...rest] = b.caption.split(" — ");
+  return { name, gloss: rest.join(" — ") || undefined, size: "example" };
+}
+
+/**
+ * The level's data shapes, listed by name; each opens in place to its fields
+ * or its example, the way the code drawer's places do.
+ */
+function DataShapes({ owner, blocks, ctx }: { owner: string; blocks: DataBlock[]; ctx: RowCtx }) {
+  const [open, setOpen] = useState<Set<number>>(() => new Set());
+  const labels = blocks.map(shapeLabel);
+  const what = labels.every((l) => /\.\w+$/.test(l.name))
+    ? "files"
+    : blocks.every((b) => b.kind === "schema")
+      ? "tables"
+      : "shapes of data";
+  const toggle = (i: number) =>
+    setOpen((was) => {
+      const next = new Set(was);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
+  return (
+    <section>
+      <Caption count={blocks.length} what={what} how="open one to see what is in it" />
+      <ul className="flex max-w-[1100px] flex-col gap-2">
+        {blocks.map((b, i) => {
+          const { name, gloss, size } = labels[i];
+          const shown = open.has(i);
+          return (
+            <li key={i} data-pick={blockLabel(b)} className="overflow-hidden rounded-[8px] border border-border-gray bg-pure-white">
+              <button
+                onClick={() => toggle(i)}
+                aria-expanded={shown}
+                className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-container-low"
+              >
+                <span className="self-center">{b.kind === "schema" ? <TableGlyph /> : <ExampleGlyph />}</span>
+                <span className="shrink-0 font-mono text-[13px] font-semibold text-ink">{name}</span>
+                {gloss ? <span className="min-w-0 truncate text-[13px] text-on-surface-variant">{gloss}</span> : null}
+                <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">{size}</span>
+                <span aria-hidden className="text-[11px] text-faint">{shown ? "▾" : "▸"}</span>
+              </button>
+              {shown ? (
+                <div className="border-t border-border-gray">
+                  {b.kind === "schema" ? (
+                    // The schema rows are typeset for a 340px card; zoom lifts them as elsewhere on a level.
+                    <div className="[zoom:1.18]">
+                      <AnatomyView owner={owner} blocks={[b]} ctx={ctx} headless />
+                    </div>
+                  ) : (
+                    <div className="p-3">
+                      <Example block={b} bare />
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** A page with lines: a stored value, as the table glyph is a table. */
+function ExampleGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M2.5 1.5h5l2 2v7h-7z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" className="text-muted-slate" />
+      <path d="M4 6h4M4 8h3" stroke="currentColor" strokeWidth="1" className="text-muted-slate" />
+    </svg>
+  );
+}
+
 /* ── layout ──────────────────────────────────────────────────── */
 
 /**
@@ -717,21 +793,14 @@ function Level({
 function Steps({
   nodes,
   edges,
-  start = 1,
-  handoffs = [],
   at,
   onOpen,
 }: {
   nodes: Node[];
   edges: Edge[];
-  /** The first dot's number — a lane continues the shared path's count. */
-  start?: number;
-  /** Hand-offs into another lane, written under the step they leave. */
-  handoffs?: Edge[];
   at: string[];
   onOpen: (p: string[]) => void;
 }) {
-  const { L0, stepOf } = useMap();
   return (
     <ol className="flex max-w-[880px] flex-col">
       {nodes.map((n, i) => {
@@ -743,7 +812,7 @@ function Steps({
         return (
           <li key={n.id} className="flex gap-4">
             <div className="flex w-[22px] shrink-0 flex-col items-center pt-[15px]">
-              <StepDot n={start + i} state={n.state} />
+              <StepDot n={i + 1} state={n.state} />
               {last ? null : (
                 <span
                   className={cn(
@@ -765,17 +834,6 @@ function Steps({
                   {edge.label} {nodes[i + 1].title}
                 </p>
               ) : null}
-              {handoffs
-                .filter((h) => h.from === n.id)
-                .map((h) => (
-                  <p key={h.to} className="mt-1.5 pl-1 text-[11.5px] italic text-faint">
-                    ↗ {h.label}{" "}
-                    <span className="font-medium not-italic text-muted-slate">
-                      {L0.find((r) => r.id === h.to)?.title}
-                    </span>
-                    {stepOf(h.to)?.lane ? ` · ${stepOf(h.to)?.lane}` : ""}
-                  </p>
-                ))}
             </div>
           </li>
         );
@@ -783,6 +841,7 @@ function Steps({
     </ol>
   );
 }
+
 
 /** A set has no order, so it gets no numbers and no line — a grid. */
 function Grid({
@@ -881,7 +940,7 @@ function Caption({ count, what, how }: { count: number; what: string; how: strin
       <Eyebrow className="text-muted-slate">
         {count} {what}
       </Eyebrow>
-      <span className="font-mono text-[10.5px] text-faint">· {how}</span>
+      <span className="text-[12px] text-faint">· {how}</span>
     </div>
   );
 }
@@ -933,25 +992,28 @@ function Header({
 }) {
   return (
     <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
-      {/* Two columns on a wide level: the prose keeps a reading measure on the
-          left, and what used to sit under it as a monospace afterthought —
-          where the code lives, how to open it, what is not certain — moves
-          into a rail on the right. Below 1100px it is one column again, in
-          the old order. The level's pictures still span the full width; the
-          header no longer leaves that width empty. */}
-      <div className="flex flex-col gap-x-14 gap-y-6 xl:flex-row xl:items-start xl:justify-between">
-      <div className="min-w-0 max-w-[660px] xl:flex-1">
+      {/* One toolbar row: the way back on the left, what you can do to this
+          level on the right. They used to be a back link here and a column of
+          mismatched buttons in a rail beside the prose, which read as parts
+          from different apps (D62). */}
+      <div className="mb-5 flex min-h-7 flex-wrap items-center gap-2">
         {back ? (
-          <button
-            onClick={back.onClick}
-            className="-ml-2 mb-4 flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] text-muted-slate transition-colors hover:bg-surface-container-low hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
-          >
+          <Button variant="ghost" onClick={back.onClick} className="-ml-2.5 text-muted-slate" title="Back (Esc)">
             <span aria-hidden>←</span>
             {back.label}
-          </button>
+          </Button>
         ) : null}
+        <span className="flex-1" />
+        {onCode ? (
+          <Button onClick={onCode} icon={<CodeIcon />}>
+            View the code
+          </Button>
+        ) : null}
+        {actions}
+      </div>
+      <div className="max-w-[720px]">
         <Eyebrow>{eyebrow}</Eyebrow>
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
             {title}
           </h1>
@@ -969,6 +1031,17 @@ function Header({
         {sub ? (
           <p className="mt-1.5 text-[15px] leading-snug text-on-surface-variant">{sub}</p>
         ) : null}
+        {/* Where this lives: one quiet line under the title, not a rail. */}
+        {meta || link ? (
+          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-faint">
+            {meta ? <span className="whitespace-pre-wrap font-mono text-[11.5px]">{meta}</span> : null}
+            {link ? (
+              <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11.5px] text-deep-green hover:underline">
+                {link.label}
+              </a>
+            ) : null}
+          </p>
+        ) : null}
         {detail
           ? detail.split(/\n\s*\n/).map((para, i) => (
               <p key={i} className="mt-4 text-[14.5px] leading-relaxed text-on-surface">
@@ -977,39 +1050,11 @@ function Header({
             ))
           : null}
         {unsure ? (
-          <p className="mt-4 rounded-[6px] border border-dashed border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] leading-snug text-amber-ink">
+          <p className="mt-4 border-l-2 border-amber-line bg-amber-surface/60 py-2 pl-3 pr-3 text-[13px] leading-snug text-amber-ink">
             <span className="font-semibold">Not certain: </span>
             <Prose text={unsure} />
           </p>
         ) : null}
-      </div>
-
-      {/* The rail: where this lives and how to get at it. */}
-      {meta || link || onCode || actions ? (
-        <div className="flex shrink-0 flex-col items-start gap-2.5 xl:w-[320px] xl:items-end xl:text-right">
-          {onCode ? (
-            // A real button, not a faint mono link among the file paths: it
-            // is the one action in the header, and it was reading as part of
-            // the metadata beside it.
-            <button
-              onClick={onCode}
-              className="flex items-center gap-2 rounded-[7px] border border-border-gray bg-pure-white px-3 py-1.5 text-[12.5px] text-on-surface-variant transition-colors hover:border-border-strong hover:bg-surface-container-low hover:text-ink"
-            >
-              <span className="font-mono text-[11.5px]">{"</>"}</span>
-              View the code
-            </button>
-          ) : null}
-          {actions ? <div className="flex flex-wrap gap-1.5 xl:justify-end">{actions}</div> : null}
-          {meta ? (
-            <p className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-faint">{meta}</p>
-          ) : null}
-          {link ? (
-            <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-deep-green hover:underline">
-              {link.label}
-            </a>
-          ) : null}
-        </div>
-      ) : null}
       </div>
     </header>
   );

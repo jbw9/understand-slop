@@ -81,7 +81,7 @@ export function SettingsDialog() {
       >
         <PanelHead
           title="Settings"
-          note="How the app looks, which agent tabs open into, and how Claude Code runs. Changes apply as you make them."
+          note="How the app looks, which agent tabs open into, whether a project's dev server starts by itself, and how Claude Code runs. Changes apply as you make them."
           right={
             <button
               type="submit"
@@ -153,6 +153,28 @@ export function SettingsDialog() {
                 >
                   <AgentIcon id={a.id} />
                   {a.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Dev server" hint="Start a project's dev server when it opens, and show the running app in a Preview tab.">
+            <div role="radiogroup" aria-label="Dev server" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+              {[
+                { value: true, label: "Start it" },
+                { value: false, label: "Leave it" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.devServer === o.value}
+                  onClick={() => set({ devServer: o.value })}
+                  className={cn(
+                    "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.devServer === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {o.label}
                 </button>
               ))}
             </div>

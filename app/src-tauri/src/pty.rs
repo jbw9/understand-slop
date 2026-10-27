@@ -90,7 +90,7 @@ pub fn pty_spawn(
     // With Claude found, the launcher works in this tab; asked to, Claude runs
     // first and the user's ordinary interactive shell takes over when it exits.
     if let Some(launch) = &launch {
-        claude::prepare(&mut cmd, launch, &context, outline.as_deref()).map_err(|e| e.to_string())?;
+        claude::prepare(&mut cmd, launch, &context, outline.as_deref(), id).map_err(|e| e.to_string())?;
         if start_claude && cfg!(unix) {
             cmd.args(["-c", r#""$SLOP_LAUNCHER"; exec "$SHELL""#]);
             cmd.env("SHELL", &program);

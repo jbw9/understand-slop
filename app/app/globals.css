@@ -239,6 +239,10 @@
     background: var(--color-warm-cream);
     color: var(--color-ink);
   }
+  /* While an edge is dragged, a framed page would take the pointer's moves for its own. */
+  body[data-dragging] iframe {
+    pointer-events: none;
+  }
   /* Numbers in chips and counts must not jitter as they change. */
   .tnum {
     font-variant-numeric: tabular-nums;

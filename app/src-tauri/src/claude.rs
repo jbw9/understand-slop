@@ -131,7 +131,11 @@ whether you edited files, whether the map is accurate, or that there is nothing 
 and mention a correction only in passing when you ran slop-map-fix. What you show is \
 likewise not worth narrating — the user can see it, so never announce that you are taking \
 them somewhere, though naming the section you are explaining is fine where the prose wants \
-it. End on the answer itself.";
+it. The app also runs the project: its web app in a Preview tab, and its phone app on an iOS \
+Simulator or Android emulator when the user has started one. The slop-preview tools use them \
+as a person would (screenshot, click, type, read the page, navigate, resize); use them to check \
+that a change you made works, or when the user asks about what the app shows. \
+End on the answer itself.";
 
 #[derive(serde::Deserialize)]
 pub struct Launch {
@@ -146,7 +150,7 @@ const LAUNCHER: &str = r#"#!/bin/sh
 # Claude Code with understand-slop's map-context hook (src-tauri/src/claude.rs).
 trap 'rm -f "$SLOP_CONTEXT.live"' EXIT INT TERM HUP
 : > "$SLOP_CONTEXT.live"
-"$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} "$@"
+"$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} ${SLOP_CLAUDE_MCP:+--mcp-config "$SLOP_CLAUDE_MCP"} "$@"
 "#;
 
 #[derive(serde::Serialize)]
@@ -348,9 +352,10 @@ fn install(path: &Path, script: &str) -> std::io::Result<()> {
 }
 
 /// What a tab's shell needs so that the launcher works in it: the user's
-/// `claude`, the hook, the system prompt, and the launcher on PATH. Returns
-/// the launcher's own path, for starting Claude without relying on PATH.
-pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline: Option<&str>) -> std::io::Result<PathBuf> {
+/// `claude`, the hook, the system prompt, the preview's tools (mcp.rs), and
+/// the launcher on PATH. Returns the launcher's own path, for starting Claude
+/// without relying on PATH.
+pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline: Option<&str>, tab: u32) -> std::io::Result<PathBuf> {
     let path = launcher()?;
     // The page has the map; this only keeps it where slop-map-list can read it.
     // Written per tab and cleared with the tab, so it never outlives the map it
@@ -367,13 +372,16 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             "PostToolUse": [{ "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] }],
             "Stop": [{ "hooks": [{ "type": "command", "command": TURN }] }]
         },
-        "permissions": { "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)"] }
+        "permissions": { "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "mcp__slop-preview"] }
     });
     cmd.env("SLOP_CONTEXT", queue);
     cmd.env("SLOP_LAUNCHER", &path);
     cmd.env("SLOP_CLAUDE_BIN", &launch.path);
     cmd.env("SLOP_CLAUDE_SETTINGS", settings.to_string());
     cmd.env("SLOP_CLAUDE_SYSTEM", SYSTEM);
+    if let Some(mcp) = crate::mcp::config(tab) {
+        cmd.env("SLOP_CLAUDE_MCP", mcp);
+    }
     if let Some(m) = launch.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
         cmd.env("SLOP_CLAUDE_MODEL", m);
     }

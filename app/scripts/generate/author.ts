@@ -17,7 +17,7 @@ import type { Cut, Root } from "./cut";
 import { owners } from "./cut";
 import { isSource, numbered, type Inventory } from "./inventory";
 import { submitProblems, typeReference } from "./schema";
-import { full, oneLine, type FileSummary } from "./summarize";
+import { fit, full, oneLine, type FileSummary } from "./summarize";
 
 export interface Authored {
   root: Node | null;
@@ -99,6 +99,14 @@ export function system(): Block[] {
   return systemCache;
 }
 
+/**
+ * How much of the brief a root's own files may take, in characters (about 30k
+ * tokens). The brief is re-sent on every turn of the author's conversation, so
+ * a root owning hundreds of files is folded by directory (fit): the author
+ * still sees all of it, and lists or reads a folded directory to go further.
+ */
+const OWNED_BUDGET = 110_000;
+
 function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
   const mine = inv.files.filter((f) => isSource(f) && owners(cut, f.path).includes(root.id));
   const mineSet = new Set(mine.map((f) => f.path));
@@ -112,6 +120,8 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
   return [
     `# Repository: ${inv.name} @ ${inv.commit}${inv.dirty.length ? ` (with uncommitted edits to ${inv.dirty.length} files, which you read as they are on disk)` : ""}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
+    ...(inv.instructions ? [`## What the repository tells coding agents\nIts own conventions and rules (AGENTS.md, CLAUDE.md). They say what its parts are meant to be; where the code departs from them, that is worth an issue.\n\n${inv.instructions}`] : []),
+    ...(inv.docs.length ? [`## Its docs (${inv.docs.length}): path, lines, first heading\n${inv.docs.slice(0, 80).map((d) => `${d.path} (${d.lines})${d.title ? ` — ${d.title}` : ""}`).join("\n")}`] : []),
     ...(inv.scope ? [`## Scope\nThis map covers only part of the repository. Its reader: ${inv.scope.focus} Files outside it can still be read and cited.`] : []),
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
     `## Your root\nid: ${root.id}\ntitle: ${root.title}\nsub: ${root.sub}\nscope: ${root.why}\nEvery node id under it starts with "${root.prefix}-".`,
@@ -123,11 +133,15 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
           ? "no mobile framework is in its dependencies, so every screen block is device \"web\", with the route it is at."
           : "it has both a mobile app and a web one — give each screen block the device of the code it is read from."
     }`,
-    `## Files this root owns (${mine.length}), with what each does\n${mine.map((f) => (sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`)).join("\n")}`,
+    ((owned) =>
+      `## Files this root owns (${mine.length}), with what each does${owned.folded ? "\nToo many to list one by one, so the deepest directories are folded into a line each (`dir/ (N files …)`); list or grep a folded directory to see its files." : ""}\n${owned.text}`)(
+      fit(mine, sums, (f) => (sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`), OWNED_BUDGET),
+    ),
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
     `## Task
 Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
 Aim for 2-3 levels, 3-6 children per node, a diagram on most levels whose boxes open the children they show, and real issues where the code has them.
+${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
 Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");
 }

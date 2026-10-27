@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { ask, type Message } from "./bedrock";
 import { SUB_WORDS, words } from "./check";
 import { isSource, type Inventory } from "./inventory";
-import { oneLine, type FileSummary } from "./summarize";
+import { fit, oneLine, type FileSummary } from "./summarize";
 
 export interface Root {
   id: string;
@@ -75,6 +75,16 @@ const INSTRUCTIONS = `Choose the top level of the map: 4 to 10 roots.
 - Ids are kebab-case; prefixes are 2-3 letters and unique.
 Call the cut tool once.`;
 
+/**
+ * How much of the prompt the file listing may take, in characters (about 60k
+ * tokens): the rest of the window holds the rules, the README, the reply,
+ * every rejected round sent back, and through Claude Code its own system
+ * prompt. One line per file overflows it past roughly 2,000 files; a larger
+ * repository is folded by directory (fit). Kafka's 4,021 files were ~300k
+ * tokens one per line.
+ */
+const LISTING_BUDGET = 220_000;
+
 /** The roots that claim a path: an exact listing, else the longest directory claim. */
 export function owners(cut: Cut, path: string): string[] {
   const exact = cut.roots.filter((r) => r.files.includes(path)).map((r) => r.id);
@@ -112,20 +122,24 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   // each change would otherwise re-cut every repository and rename its roots.
   const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
   const rules = all.slice(0, all.indexOf("## What a level shows"));
-  const listing = inv.files
-    .filter(isSource)
-    .map((f) => (sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`))
-    .join("\n");
+  const listing = fit(
+    inv.files.filter(isSource),
+    sums,
+    (f) => (sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`),
+    LISTING_BUDGET,
+  );
   const other = inv.files.filter((f) => (!f.code || f.test) && !f.outside).map((f) => f.path);
   const messages: Message[] = [
     {
       role: "user",
       content: [
         `# Repository: ${inv.name} @ ${inv.commit}`,
-        `## README\n${inv.readme || "(none)"}`,
+        `## README\n${inv.readme.slice(0, 12000) || "(none)"}`,
         ...(inv.scope ? [`## Scope\nThis map covers only part of the repository: ${inv.scope.paths.join(", ")}. Its reader: ${inv.scope.focus} Cut the roots by what that reader does with this part. Code outside the scope is not listed and needs no root.`] : []),
         `## Dependencies\n${inv.deps.join(", ") || "(none)"}`,
-        `## Source files (${inv.files.filter(isSource).length}), one line each\n${listing}`,
+        listing.folded
+          ? `## Source files (${inv.files.filter(isSource).length}), one line each where there was room\nThe repository is too large to list file by file, so its deepest directories are folded: a line ending in \`/ (N files …)\` stands for every file under that directory, with its largest few named. Claim a folded directory whole, by that \`/\`-terminated path or a parent's; a root of a repository this size will own far more than 60 files.\n${listing.text}`
+          : `## Source files (${inv.files.filter(isSource).length}), one line each\n${listing.text}`,
         `## Other files (tests, config, docs, assets) — need no root\n${other.slice(0, 400).join("\n")}${other.length > 400 ? `\n… and ${other.length - 400} more` : ""}`,
         INSTRUCTIONS,
       ].join("\n\n"),

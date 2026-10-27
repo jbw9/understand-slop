@@ -12,6 +12,7 @@ import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
 import { toggleWorkspace } from "@/components/workspace";
+import { DocIcon } from "@/components/docs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -185,6 +186,9 @@ function MapTools() {
         {/* A page with a check: the run's record, read back. */}
         <path d="M4 1.5h5.5L12 4v10.5H4z" />
         <path d="m6 9 1.5 1.5L10 8" />
+      </Control>
+      <Control label="Docs — read the project's Markdown" onClick={() => openPalette("docs")}>
+        <DocIcon />
       </Control>
       <Control label="What you added to this map — and a way back" onClick={openHistory}>
         {/* A clock turned back: the history of the reader's own additions. */}

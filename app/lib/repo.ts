@@ -132,6 +132,29 @@ async function contain(repoRoot: RepoRoot, file: string): Promise<string | null>
 /** Thrown to the route handler, which turns it into a 400 with this message. */
 export class Refused extends Error {}
 
+/** What a doc may show from the repository: images, by extension, and their types. */
+export const IMAGE_TYPES: Record<string, string> = {
+  svg: "image/svg+xml",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  ico: "image/x-icon",
+};
+
+/** An image a doc in the repository shows (components/docs.tsx), behind the same containment as the code. */
+export async function readImage(root: RepoRoot, file: string): Promise<{ body: Buffer; type: string }> {
+  const type = IMAGE_TYPES[file.split(".").pop()?.toLowerCase() ?? ""];
+  if (!type) throw new Refused("not an image");
+  const real = await contain(root, file);
+  if (!real) throw new Refused("outside repo");
+  const s = await stat(real);
+  if (!s.isFile() || s.size > 20 << 20) throw new Refused("not a file");
+  return { body: await readFile(real), type };
+}
+
 /**
  * `fixture` is what the MAP claims sits at these lines, which the repository
  * itself has no opinion about; undefined when the caller made no claim.

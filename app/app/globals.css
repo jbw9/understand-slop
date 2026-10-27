@@ -245,6 +245,123 @@
   }
 }
 
+@layer components {
+  /* A doc in the reader (components/docs.tsx): set for reading at length,
+     in the page's own type, not a second design. */
+  .doc-prose {
+    color: var(--color-on-surface-variant);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .doc-prose > * + * {
+    margin-top: 1em;
+  }
+  .doc-prose :is(h1, h2, h3, h4, h5, h6) {
+    color: var(--color-ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    scroll-margin-top: 1rem;
+  }
+  .doc-prose h1 {
+    font-size: 26px;
+    margin-top: 1.6em;
+  }
+  .doc-prose h2 {
+    font-size: 20px;
+    margin-top: 2em;
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid var(--color-border-gray);
+  }
+  .doc-prose h3 {
+    font-size: 16.5px;
+    margin-top: 1.6em;
+  }
+  .doc-prose :is(h4, h5, h6) {
+    font-size: 15px;
+    margin-top: 1.4em;
+  }
+  .doc-prose > :first-child {
+    margin-top: 0;
+  }
+  .doc-prose strong {
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+  .doc-prose a {
+    color: var(--color-deep-green);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .doc-prose :is(ul, ol) {
+    padding-left: 1.4em;
+  }
+  .doc-prose ul {
+    list-style: disc;
+  }
+  .doc-prose ol {
+    list-style: decimal;
+  }
+  .doc-prose li + li,
+  .doc-prose li > :is(ul, ol) {
+    margin-top: 0.3em;
+  }
+  .doc-prose li::marker {
+    color: var(--color-faint);
+  }
+  .doc-prose blockquote {
+    border-left: 3px solid var(--color-border-strong);
+    padding-left: 1em;
+    color: var(--color-muted-slate);
+  }
+  .doc-prose :not(pre) > code {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--color-surface-container);
+    color: var(--color-on-surface-variant);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  .doc-prose pre {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    background: var(--color-pure-white);
+    border: 1px solid var(--color-border-gray);
+    border-radius: 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+  }
+  .doc-prose table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .doc-prose :is(th, td) {
+    border: 1px solid var(--color-border-gray);
+    padding: 6px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .doc-prose th {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+  .doc-prose hr {
+    border: 0;
+    border-top: 1px solid var(--color-border-gray);
+    margin: 2em 0;
+  }
+  .doc-prose img {
+    max-width: 100%;
+  }
+  .doc-prose input[type="checkbox"] {
+    margin-right: 0.4em;
+  }
+}
+
 @layer utilities {
   /* Dot grid for the canvas ground — paper texture, not a grid
      you are meant to align to. */
@@ -267,9 +384,8 @@
 }
 
 @layer utilities {
-  /* A diagram box that opens a part (D40). The cue sits at 0.45 so the box
-     reads as scenery first and as a door on approach; the whole group lifts
-     on hover so the target is the box, not the chevron. */
+  /* A diagram box that opens a part (D40). The whole group lifts on hover,
+     so the target is the box. */
   .dg-live {
     cursor: pointer;
   }
@@ -285,11 +401,6 @@
   .dg-nav > g:not(.dg-live) text {
     opacity: 0.82;
   }
-  .dg-cue {
-    transition: transform 150ms ease;
-    transform-origin: center;
-    transform-box: fill-box;
-  }
   .dg-live rect {
     transition:
       filter 150ms ease,
@@ -301,9 +412,6 @@
     stroke-width: 1.5;
     stroke-opacity: 1;
     filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.1));
-  }
-  .dg-live:hover .dg-cue {
-    transform: scale(1.18);
   }
   /* SVG ignores `outline`, so the focus ring is the box's own stroke,
      thickened and recoloured — visible against every tone. */

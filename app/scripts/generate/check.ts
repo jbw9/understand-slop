@@ -149,13 +149,14 @@ export function check(
         for (const m of n.shape.ids) if (!MARK_IDS.includes(m)) problems.push(`SHAPE ${n.id} mark "${m}" has no drawing (have: ${MARK_IDS.join(", ")})`);
       if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);
     }
-    for (const c of n.code ?? []) {
-      refs++;
-      const lines = linesOf(c.file);
-      if (!lines) problems.push(`CODE ${n.id} ${c.file} does not exist`);
-      else if (!inRange(c.file, c.start, c.end))
-        problems.push(`CODE ${n.id} ${c.file}:${c.start}-${c.end} out of range (file has ${lines.length})`);
-    }
+    for (const [kind, list] of [["CODE", n.code], ["DOCS", n.docs]] as const)
+      for (const c of list ?? []) {
+        refs++;
+        const lines = linesOf(c.file);
+        if (!lines) problems.push(`${kind} ${n.id} ${c.file} does not exist`);
+        else if (!inRange(c.file, c.start, c.end))
+          problems.push(`${kind} ${n.id} ${c.file}:${c.start}-${c.end} out of range (file has ${lines.length})`);
+      }
     for (const e of n.edges ?? []) for (const k of [e.from, e.to])
       if (!built.get(n.id)?.has(k)) problems.push(`EDGE ${n.id} ${e.from}→${e.to}: "${k}" is not a child`);
     let deepest = walkBlocks(n.id, n.anatomy, d);

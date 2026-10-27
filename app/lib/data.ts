@@ -342,6 +342,14 @@ export interface Node {
   detail?: string;
   /** Where this lives in the code. Every authored node has at least one. */
   code?: CodeRef[];
+  /**
+   * What the repository's own docs say about this: passages of its Markdown
+   * (a design note, a recorded decision, a plan) that explain WHY the code is
+   * the way it is, or what it is meant to become. Only passages that bear on
+   * this node, each labelled with what it says, never the code's stand-in:
+   * `code` is still where it lives. Most nodes have none.
+   */
+  docs?: CodeRef[];
   /** Known problems, shown as "Watch out" on this level. */
   issues?: Issue[];
   /**

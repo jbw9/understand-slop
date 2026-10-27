@@ -10,6 +10,7 @@
 
 import type { Anatomy, CodeRef, Link, Node, Run } from "@/lib/data";
 import { rowId } from "@/lib/data";
+import { share } from "@/lib/share";
 
 /**
  * The repository as a level of its own: what it is, and one picture whose
@@ -109,18 +110,32 @@ function withRowChildren(nodes: Node[]): Node[] {
   });
 }
 
-/** Everything the screen reads, derived once from one map file. */
-export function buildMap(file: MapFile, name: string) {
-  const { RUN, OVERVIEW, LINKS } = file;
-  /**
-   * The tree everything else reads: authored nodes, plus one node for every
-   * row that carries `under`. Built once, so no consumer knows a row was
-   * involved.
-   */
-  const L0: Node[] = withRowChildren(file.AUTHORED);
+/**
+ * Everything the screen reads, derived once from one map file. Given the map
+ * it replaces, every part the new file left alone keeps its old identity
+ * (lib/share.ts), so a rewrite re-renders only what it changed.
+ */
+export function buildMap(file: MapFile, name: string, prev?: { RUN: Run; OVERVIEW?: Overview; LINKS: Link[]; TOP: Node }) {
+  const RUN = prev ? share(prev.RUN, file.RUN) : file.RUN;
+  const OVERVIEW = prev ? share(prev.OVERVIEW, file.OVERVIEW) : file.OVERVIEW;
+  const LINKS = prev ? share(prev.LINKS, file.LINKS) : file.LINKS;
 
   /** The repository as a node: the level the empty path opens, its parts the roots. */
-  const TOP: Node = { state: "derived", ...OVERVIEW, id: TOP_ID, title: RUN.repo, sub: OVERVIEW?.sub ?? "", col: 0, row: 0, children: L0 };
+  const built: Node = {
+    state: "derived",
+    ...OVERVIEW,
+    id: TOP_ID,
+    title: RUN.repo,
+    sub: OVERVIEW?.sub ?? "",
+    col: 0,
+    row: 0,
+    // The tree everything else reads: authored nodes, plus one node for every
+    // row that carries `under`. Built once, so no consumer knows a row was
+    // involved.
+    children: withRowChildren(file.AUTHORED),
+  };
+  const TOP = prev ? share(prev.TOP, built) : built;
+  const L0: Node[] = TOP.children!;
 
   /** Resolve a path of ids to the node it names; the empty path is the repository. */
   function nodeAt(path: string[]): Node | null {
@@ -209,6 +224,7 @@ export function describe(m: BuiltMap, path: string[]): string {
     node.unsure ? `Not certain: ${node.unsure}` : "",
     node.issues?.length ? `Problems: ${node.issues.map((i) => i.title).join("; ")}` : "",
     code.length ? `Code:\n${code.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
+    node.docs?.length ? `What its docs say (read for why):\n${node.docs.map((c) => `- ${c.file}:${c.start}-${c.end} — ${c.label}`).join("\n")}` : "",
   ]
     .filter(Boolean)
     .join("\n")

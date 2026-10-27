@@ -5,7 +5,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
-import { CodeDrawer, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
+import { CodeDrawer, DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, OriginMark, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
@@ -14,6 +14,8 @@ import { Crumbs, goTo, useLocation } from "@/components/chrome";
 import { Button, CodeIcon } from "@/components/button";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
+import { useFlash } from "@/components/flash";
+import { DocView, closeDoc, useOpenDoc } from "@/components/docs";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { FixAndKeep, onAnswer } from "@/components/keep";
@@ -98,6 +100,8 @@ export function Canvas() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { nodes, anchor, version } = useWireAnchors();
+  // A rewrite of the map lights what it changed (components/flash.tsx).
+  useFlash(contentRef);
 
   /**
    * The open path, root-first, read from the URL (useLocation in
@@ -106,7 +110,9 @@ export function Canvas() {
    * were.
    */
   const { path, crumbs } = useLocation();
-  const key = path.join("/");
+  // A doc opened over the level (components/docs.tsx) takes its place until closed.
+  const doc = useOpenDoc();
+  const key = doc ? `doc:${doc.file}` : path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
   // Which way the level slides: deeper or back. Derived when the depth
@@ -207,8 +213,9 @@ export function Canvas() {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && e.target.closest("textarea, input")) return;
       if (e.key === "Escape") {
-        // Unwind one layer at a time: the trace first, then one level.
-        if (traced) setTraced(null);
+        // Unwind one layer at a time: an open doc, the trace, then one level.
+        if (doc) closeDoc();
+        else if (traced) setTraced(null);
         else if (path.length) goTo(path.slice(0, -1));
       } else if (e.key === "0" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         // ⌘0 belongs to the zoom reset, which listens on window too.
@@ -217,7 +224,7 @@ export function Canvas() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [traced, setTraced, path]);
+  }, [traced, setTraced, path, doc]);
 
   /* ── handing a section to Claude ──────────────────────────── */
 
@@ -287,7 +294,11 @@ export function Canvas() {
               exit="gone"
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
+              {doc ? (
+                <DocView file={doc.file} line={doc.line} />
+              ) : (
+                <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -675,6 +686,14 @@ function Level({
           <div>
             <div className="max-w-[820px]">
               <WatchOut issues={node.issues} action={<HandProblems node={node} path={path} />} />
+            </div>
+          </div>
+        ) : null}
+
+        {node.docs?.length ? (
+          <div>
+            <div className="max-w-[820px]">
+              <DocsList refs={node.docs} />
             </div>
           </div>
         ) : null}

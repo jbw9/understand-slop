@@ -36,6 +36,14 @@ export interface Inventory {
   dirty: string[];
   files: RepoFile[];
   readme: string;
+  /**
+   * What the repository tells coding agents (AGENTS.md, CLAUDE.md, at any
+   * depth): its conventions and rules, which say what its parts are meant to
+   * be. Capped; empty when it has none.
+   */
+  instructions: string;
+  /** Its other Markdown, with each file's first heading: the docs a section may cite for why (`Node.docs`). */
+  docs: { path: string; lines: number; title: string }[];
   /** Dependency names from every manifest found, sorted. */
   deps: string[];
   /** Brand marks this repo has a real dependency for (D25). */
@@ -62,6 +70,9 @@ const SKIP = [
 const TEST = /(^|\/)(tests?|__tests__|__mocks__|specs?|e2e|cypress|playwright|fixtures|stories)\/|\.(test|spec|stories|e2e)\.[a-z]+$|(^|\/)(test_[^/]+|[^/]+_test)\.(py|go)$|(^|\/)conftest\.py$/;
 /** Bigger than this is generated, vendored, or a fixture — listed, never summarised. */
 const MAX_BYTES = 150_000;
+/** The files a repository writes for coding agents rather than for people. */
+const AGENT_FILES = /(^|\/)(AGENTS|CLAUDE|GEMINI)\.md$/i;
+const INSTRUCTIONS_CHARS = 6000;
 
 /** Which dependency names stand for which brand mark. */
 const MARK_DEPS: Record<string, RegExp> = {
@@ -173,6 +184,18 @@ export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inv
   }
 
   const readmeFile = listed.find((f) => /^readme(\.md|\.rst|\.txt)?$/i.test(f));
+  const markdown = files.filter((f) => !f.test && /\.mdx?$/i.test(f.path) && f.path !== readmeFile);
+  const forAgents = markdown.filter((f) => AGENT_FILES.test(f.path));
+  const instructions = forAgents
+    .map((f) => `### ${f.path}\n${readFileSync(join(repo, f.path), "utf8").trim()}`)
+    .join("\n\n")
+    .slice(0, INSTRUCTIONS_CHARS);
+  const docs = markdown
+    .filter((f) => !AGENT_FILES.test(f.path))
+    .map((f) => {
+      const heading = readFileSync(join(repo, f.path), "utf8").match(/^#{1,3}\s+(.+)$/m);
+      return { path: f.path, lines: f.lines, title: heading ? heading[1].trim() : "" };
+    });
   const deps = manifests(repo, listed);
   return {
     repo,
@@ -181,6 +204,8 @@ export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inv
     dirty: git(repo, "diff", "HEAD", "--name-only", "--relative").split("\n").filter(Boolean),
     files,
     readme: readmeFile ? readFileSync(join(repo, readmeFile), "utf8").slice(0, 8000) : "",
+    instructions,
+    docs,
     deps,
     marks: MARK_IDS.filter((m) => MARK_DEPS[m] && deps.some((d) => MARK_DEPS[m].test(d))),
     device: deviceOf(deps, listed),

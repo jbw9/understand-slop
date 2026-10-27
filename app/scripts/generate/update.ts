@@ -47,6 +47,13 @@ import { idsOf, submitProblems } from "./schema";
 import { full, oneLine, summarize, type FileSummary } from "./summarize";
 import { verifyTree } from "./verify";
 
+/** Written whole and renamed into place, so the open map never reads half a file. */
+function atomic(path: string, body: string) {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, body);
+  renameSync(tmp, path);
+}
+
 /* ── 3. which sections ───────────────────────────────────────── */
 
 interface Placed {
@@ -74,7 +81,7 @@ const shared = (a: string, b: string) => {
 };
 
 /** The sections to redo — the ones the code changes touch, and `also` — and the changed files no section could take. */
-function targets(map: MapFile, cut: Cut, byPath: Map<string, Change>, also: Placed[]): { picked: Placed[]; homeless: string[] } {
+function targets(map: MapFile, cut: Cut, byPath: Map<string, Change>, also: Placed[], isCode: (path: string) => boolean): { picked: Placed[]; homeless: string[] } {
   const all = walk(map.AUTHORED);
   const picked = new Set<Placed>(also.map((a) => all.find((p) => p.node === a.node)!).filter(Boolean));
   const covered = new Set<string>();
@@ -88,7 +95,9 @@ function targets(map: MapFile, cut: Cut, byPath: Map<string, Change>, also: Plac
     }
   const homeless: string[] = [];
   for (const c of byPath.values()) {
-    if (covered.has(c.path) || c.after === null) continue;
+    // A doc edited away from every passage cited from it only moves those
+    // passages' lines: adding a decision to a long log redoes nothing.
+    if (covered.has(c.path) || c.after === null || !isCode(c.path)) continue;
     // The section citing this file nearest the first change; deeper wins a tie.
     const at = c.hunks[0]?.os ?? 1;
     let best: { p: Placed; d: number } | null = null;
@@ -332,8 +341,8 @@ export async function update(args: string[]) {
   const inv = inventory(repo, { untracked: true });
   const isCode = new Map(inv.files.map((f) => [f.path, isSource(f)]));
   const citedAnywhere = new Set(walk(map.AUTHORED).flatMap((p) => refs(p.node).map((r) => r.file)));
-  // Only code the map covers or could: a lockfile or a test changing moves nothing.
-  const found = changes(repo, map.RUN.commit, base).filter((c) => (c.after === null ? citedAnywhere.has(c.path) : isCode.get(c.path)));
+  // Only code the map covers or could, and docs it cites: a lockfile or a test changing moves nothing.
+  const found = changes(repo, map.RUN.commit, base).filter((c) => (c.after === null ? citedAnywhere.has(c.path) : isCode.get(c.path) || citedAnywhere.has(c.path)));
   console.log(`${found.length} changed code files${found.length ? `: ${found.map((c) => c.path).join(", ")}` : ""}`);
   if (!found.length && !wrong.size) {
     result({ ok: true, changed: [], sections: [], unmatched });
@@ -343,7 +352,7 @@ export async function update(args: string[]) {
 
   // Which sections, read off the references as they were; then every
   // reference moves to where its code is now.
-  const { picked, homeless } = targets(map, cut, byPath, [...wrong.keys()]);
+  const { picked, homeless } = targets(map, cut, byPath, [...wrong.keys()], (p) => Boolean(isCode.get(p)));
   for (const p of walk(map.AUTHORED)) refs(p.node, (f, line) => (byPath.has(f) ? moved(byPath.get(f)!, line) : line));
   console.log(`${picked.length} sections to redo: ${picked.map((p) => p.node.id).join(", ")}`);
   // A section redone takes the notes on it and on anything inside it.
@@ -360,10 +369,16 @@ export async function update(args: string[]) {
 
   const sums = await summarize(inv, () => {});
   const say = (s: string) => console.log(`  ${s}`);
-  const done = await Promise.all(picked.map(async (t) => ({ t, node: await redo(t, map, cut, inv, sums, byPath, { account: said, notes: notesFor(t) }, model, say) })));
   const failed: string[] = [];
   const removed: string[] = [];
-  for (const { t, node } of done) {
+  // Each section goes into the map the moment it is redone, and the map is
+  // written then, so the open page shows it while the others are still being
+  // worked on (components/map-context.tsx). The sections are redone
+  // concurrently, but each one is spliced in without an await in between, so
+  // no write ever sees half of one.
+  const done: { t: Placed; node: Awaited<ReturnType<typeof redo>> }[] = new Array(picked.length);
+  const land = (t: Placed, node: Awaited<ReturnType<typeof redo>>) => {
+    done[picked.indexOf(t)] = { t, node };
     const at = t.path.length === 1 ? null : t.path[t.path.length - 2];
     const siblings = at ? at.children! : map.AUTHORED;
     const i = siblings.findIndex((c) => c.id === t.node.id);
@@ -382,7 +397,6 @@ export async function update(args: string[]) {
       }
       say(`${t.node.id}: removed`);
     } else if (node) {
-      await verifyTree(node, inv, model);
       siblings[i] = { ...node, col: t.node.col, row: t.node.row };
       say(`${t.node.id}: updated`);
     } else {
@@ -390,10 +404,18 @@ export async function update(args: string[]) {
       siblings[i] = { ...t.node, state: "partial", unsure: "This section was due an update — its code changed, or it was found wrong — and the update failed; parts of it may be out of date." };
       say(`${t.node.id}: FAILED, kept as it was`);
     }
-  }
+    atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+  };
+  await Promise.all(
+    picked.map(async (t) => {
+      const node = await redo(t, map, cut, inv, sums, byPath, { account: said, notes: notesFor(t) }, model, say);
+      if (node && !isRemoved(node)) await verifyTree(node, inv, model);
+      land(t, node);
+    }),
+  );
 
   const final = check(map, repo, { generated: true });
-  writeFileSync(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+  atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
   // The map now describes these files as they are: the next update starts here.
   for (const c of found) base[c.path] = c.after;
   writeFileSync(`${out}/base.json`, JSON.stringify(base) + "\n");

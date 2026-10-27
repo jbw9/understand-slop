@@ -8,7 +8,8 @@ import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
 import { readSource } from "@/lib/source";
-import { BOX_H, CUE_ROOM, layoutDiagram } from "@/lib/diagram";
+import { openDoc } from "@/components/docs";
+import { BOX_H, layoutDiagram } from "@/lib/diagram";
 
 /**
  * The blocks a reader learns from without opening code (round 3, D34): the
@@ -221,6 +222,7 @@ function Diagram({
               <Box
                 key={b.id}
                 live={Boolean(go)}
+                opens={b.opens}
                 href={b.opens ? hrefFor?.(b.opens) : undefined}
                 onActivate={go}
                 label={b.label}
@@ -240,10 +242,8 @@ function Diagram({
                   strokeOpacity={sec >= 0 ? 0.55 : 1}
                   strokeDasharray={b.tone === "warn" ? "5 4" : undefined}
                 />
-                {/* The label centres in the space left of the badge, so a
-                    long one never runs under it. */}
                 <text
-                  x={x + (w - (b.opens ? CUE_ROOM : 0)) / 2}
+                  x={x + w / 2}
                   y={b.sub ? y + 25 : y + BOX_H / 2 + 5}
                   textAnchor="middle"
                   fontSize="14.5"
@@ -256,30 +256,6 @@ function Diagram({
                   <text x={x + w / 2} y={y + 43} textAnchor="middle" fontSize="12" fill="var(--color-faint)">
                     {b.sub}
                   </text>
-                ) : null}
-                {/* The cue that this box goes somewhere. A filled disc in the
-                    corner rather than a bare character: at rest a lone "›"
-                    read as decoration, so the click was only discoverable by
-                    hovering (D43). */}
-                {go ? (
-                  <g className="dg-cue" aria-hidden>
-                    {/* Green, the accent that means "this does something"
-                        everywhere else on the page. It is deliberately NOT
-                        the section hue: the badge answers "can I open this",
-                        the tint answers "what does it belong to", and those
-                        are different questions. */}
-                    <circle cx={x + w - 15} cy={y + 15} r="8.5" fill="var(--color-deep-green)" />
-                    <text
-                      x={x + w - 15}
-                      y={y + 19}
-                      textAnchor="middle"
-                      fontSize="11"
-                      fontWeight="700"
-                      fill="var(--color-pure-white)"
-                    >
-                      ›
-                    </text>
-                  </g>
                 ) : null}
               </Box>
             );
@@ -298,22 +274,26 @@ function Diagram({
  */
 function Box({
   live,
+  opens,
   href,
   onActivate,
   label,
   children,
 }: {
   live: boolean;
+  /** The part it opens, so a rewrite of that part can light the box (components/flash.tsx). */
+  opens?: string;
   /** A real destination, so the link focuses and Enter fires natively. */
   href?: string;
   onActivate?: () => void;
   label: string;
   children: React.ReactNode;
 }) {
-  if (!live) return <g data-pick={label}>{children}</g>;
+  if (!live) return <g data-pick={label} data-opens={opens}>{children}</g>;
   return (
     <a
       data-pick={label}
+      data-opens={opens}
       className="dg-live"
       href={href}
       aria-label={`${label} — open this part`}
@@ -909,3 +889,75 @@ function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: Ro
   );
 }
 
+
+/* ── docs ────────────────────────────────────────────────────── */
+
+/**
+ * What the repository's own docs say about this level (`Node.docs`): the
+ * design notes and decisions behind the code, each a passage that opens in
+ * place. Read as the doc is now, like the code; shown as text, not code,
+ * since it is written to be read.
+ */
+export function DocsList({ refs }: { refs: CodeRef[] }) {
+  return (
+    <section data-pick="From the docs" data-pick-text={refs.map((r) => `${r.file}:${r.start}-${r.end} — ${r.label}`).join("\n")}>
+      <Eyebrow>From the docs</Eyebrow>
+      <ul className="mt-3 flex flex-col gap-2">
+        {refs.map((r) => (
+          <DocPassage key={`${r.file}:${r.start}`} doc={r} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DocPassage({ doc }: { doc: CodeRef }) {
+  const [slice, setSlice] = useState<RepoSlice | null | "failed">(null);
+  const [shown, setShown] = useState(false);
+  const { name: map } = useMap();
+
+  const toggle = async () => {
+    setShown((v) => !v);
+    if (slice) return;
+    try {
+      const r = await readSource({ map, file: doc.file, start: doc.start, end: doc.end });
+      setSlice("slice" in r ? r.slice : "failed");
+    } catch {
+      setSlice("failed");
+    }
+  };
+
+  return (
+    <li data-pick={doc.label} data-pick-code={`${doc.file}:${doc.start}-${doc.end}`} className="rounded-[8px] border border-border-gray bg-pure-white">
+      <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
+        <span className="text-[13.5px] text-ink">{doc.label}</span>
+        <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">
+          {doc.file}:{doc.start}–{doc.end}
+        </span>
+        <span aria-hidden className="text-[11px] text-faint">{shown ? "▾" : "▸"}</span>
+      </button>
+      {shown ? (
+        <div className="border-t border-border-gray px-4 py-3">
+          {slice === "failed" ? (
+            <p className="text-[12.5px] text-clay-ink">Could not read this doc from the repository.</p>
+          ) : slice ? (
+            <>
+              <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-on-surface-variant">
+                <Prose text={slice.code.trim()} />
+              </p>
+              <button
+                type="button"
+                onClick={() => openDoc(doc.file, { line: doc.start })}
+                className="mt-2 cursor-pointer text-[12.5px] text-deep-green hover:underline"
+              >
+                Open the whole doc
+              </button>
+            </>
+          ) : (
+            <p className="text-[12.5px] text-faint">Reading…</p>
+          )}
+        </div>
+      ) : null}
+    </li>
+  );
+}

@@ -152,3 +152,60 @@ export function full(s: FileSummary): string {
   const syms = s.symbols.map((x) => `    ${x.start}-${x.end} ${x.name}: ${x.does}`).join("\n");
   return `${oneLine(s)}${s.user_sees ? `\n    user sees: ${s.user_sees}` : ""}${syms ? `\n${syms}` : ""}`;
 }
+
+/** A directory folded into one line: its size, what kinds of file it holds, and its largest files' purposes. */
+function folded(dir: string, files: RepoFile[], sums: Record<string, FileSummary>): string {
+  const kinds = new Map<string, number>();
+  for (const f of files) {
+    const k = sums[f.path]?.kind ?? "other";
+    kinds.set(k, (kinds.get(k) ?? 0) + 1);
+  }
+  const mix = [...kinds].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${n} ${k}`).join(", ");
+  const lines = files.reduce((a, f) => a + f.lines, 0);
+  const largest = [...files]
+    .sort((a, b) => b.lines - a.lines)
+    .slice(0, 3)
+    .map((f) => `${f.path.slice(dir.length + 1)}: ${(sums[f.path]?.purpose ?? "").slice(0, 90)}`)
+    .join("; ");
+  return `${dir}/ (${files.length} files, ${lines} lines: ${mix}) — largest: ${largest}`;
+}
+
+const parentOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
+
+/**
+ * The files one line each (`line`), unless that is more than `budget`
+ * characters: then whole directories are folded into one line apiece
+ * (`dir/ (N files …)`), deepest and largest first, until it fits. A large
+ * repository is still seen whole, with detail where the tree is shallow,
+ * rather than failing a prompt that cannot hold one line per file. Says
+ * whether anything was folded, so a prompt can tell its reader how to read it.
+ */
+export function fit(
+  files: RepoFile[],
+  sums: Record<string, FileSummary>,
+  line: (f: RepoFile) => string,
+  budget: number,
+): { text: string; folded: boolean } {
+  type Entry = { key: string; dir: string; text: string; files: RepoFile[] };
+  let entries: Entry[] = files.map((f) => ({ key: f.path, dir: parentOf(f.path), text: line(f), files: [f] }));
+  let size = entries.reduce((a, e) => a + e.text.length + 1, 0);
+  let any = false;
+  while (size > budget) {
+    const groups = new Map<string, Entry[]>();
+    for (const e of entries) if (e.dir) groups.set(e.dir, [...(groups.get(e.dir) ?? []), e]);
+    // The deepest directory first, and of those the one costing most: the top
+    // of the tree is what a reader cuts by, so it keeps its detail longest.
+    const depth = (d: string) => d.split("/").length;
+    const cost = (es: Entry[]) => es.reduce((a, e) => a + e.text.length, 0);
+    const pick = [...groups].sort(([a, x], [b, y]) => depth(b) - depth(a) || cost(y) - cost(x))[0];
+    if (!pick) break;
+    const [dir, inside] = pick;
+    const all = inside.flatMap((e) => e.files);
+    const one: Entry = { key: `${dir}/`, dir: parentOf(dir), text: folded(dir, all, sums), files: all };
+    entries = [...entries.filter((e) => !inside.includes(e)), one];
+    size += one.text.length - cost(inside);
+    any = true;
+  }
+  return { text: entries.sort((a, b) => a.key.localeCompare(b.key)).map((e) => e.text).join("\n"), folded: any };
+}
+

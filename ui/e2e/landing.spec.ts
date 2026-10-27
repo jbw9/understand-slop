@@ -124,8 +124,8 @@ test("going off script shows the step for where the visitor is", async ({ page }
   await page.goto("/landing");
   await expect(page.getByRole("status")).toContainText("1 / 5");
   const frame = page.frameLocator("iframe");
-  // Not the card the tour rings: the second one.
-  await frame.locator("button[data-path]:not([disabled])").nth(1).click();
+  // Not the card the tour rings: the second one, opened from the keyboard, since a phone's tip can cover it.
+  await frame.locator("button[data-path]:not([disabled])").nth(1).press("Enter");
   await expect(page.getByRole("status")).toContainText("2 / 5");
   await frame.locator("body").press("Escape");
   await expect(page.getByRole("status")).toContainText("1 / 5");
@@ -137,6 +137,84 @@ test("switching repository ends the tour", async ({ page }) => {
   await page.getByRole("tab", { name: "Flask" }).click();
   await expect(page.getByRole("status")).toBeHidden();
   await expect(page.getByRole("button", { name: "Take the tour" })).toBeVisible();
+});
+
+test("switching repository by arrow key ends the tour", async ({ page }) => {
+  await page.goto("/landing");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
+  await page.getByRole("tab", { name: "TBD itself" }).press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Flask" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("status")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Take the tour" })).toBeVisible();
+});
+
+test("switching repository while the tour restarts keeps it ended", async ({ page }) => {
+  await page.goto("/landing");
+  const tip = page.getByRole("status");
+  await clickRing(page);
+  await expect(tip).toContainText("2 / 5");
+  await tip.getByRole("button", { name: "Skip tour" }).click();
+  await page.getByRole("button", { name: "Take the tour" }).click();
+  await page.getByRole("tab", { name: "Flask" }).click();
+  await expect(page.frameLocator("iframe").getByRole("heading", { name: "flask" })).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(tip).toBeHidden();
+});
+
+test("switching repository hides the tour's last word", async ({ page }) => {
+  await page.goto("/landing");
+  const tip = page.getByRole("status");
+  for (const n of [2, 3, 4, 5]) {
+    await clickRing(page);
+    await expect(tip).toContainText(`${n} / 5`);
+  }
+  await tip.getByRole("button", { name: "Done" }).click();
+  await expect(tip).toContainText("That's the whole loop");
+  await page.getByRole("tab", { name: "Flask" }).click();
+  await expect(tip).toBeHidden();
+});
+
+test("the ring stays on its card while the demo scrolls", async ({ page }) => {
+  await page.goto("/landing");
+  await expect(page.getByRole("status")).toContainText("1 / 5");
+  await page.locator("iframe").scrollIntoViewIfNeeded();
+  const gaps = await page.evaluate(
+    () =>
+      new Promise<number[]>((done) => {
+        const frame = document.querySelector("iframe")!;
+        const ring = document.querySelector<HTMLElement>("[data-ring]")!;
+        const card = frame.contentDocument!.querySelector("button[data-path]:not([disabled])")!;
+        const scroller = frame.contentDocument!.querySelector("main")!;
+        const gaps: number[] = [];
+        let n = 0;
+        const tick = () => {
+          if (n > 2) {
+            const r = ring.getBoundingClientRect();
+            const c = card.getBoundingClientRect();
+            const f = frame.getBoundingClientRect();
+            gaps.push(Math.abs(r.top + 5 - (f.top + c.top)));
+          }
+          if (++n > 20) return done(gaps);
+          scroller.scrollBy(0, 6);
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  expect(Math.max(...gaps)).toBeLessThanOrEqual(7);
+});
+
+test("the tip never covers the card it points at", async ({ page }) => {
+  await page.goto("/landing");
+  const tip = page.getByRole("status");
+  for (const n of [1, 2, 3, 4]) {
+    if (n > 1) await clickRing(page);
+    await expect(tip).toContainText(`${n} / 5`);
+    await page.waitForTimeout(600);
+    const [t, r] = [(await tip.boundingBox())!, (await page.locator("[data-ring]").boundingBox())!];
+    const overlap = t.x < r.x + r.width && r.x < t.x + t.width && t.y < r.y + r.height && r.y < t.y + t.height;
+    expect(overlap, `step ${n}`).toBe(false);
+  }
 });
 
 test("opening the code inside the demo never scrolls the page", async ({ page }) => {
@@ -154,15 +232,45 @@ test("opening the code inside the demo never scrolls the page", async ({ page })
   expect(await scrollTop(page)).toBe(before);
 });
 
-test("Esc on the lines ends the tour", async ({ page }) => {
+test("Esc goes back a level even when the page around the demo has focus", async ({ page }) => {
+  await page.goto("/landing");
+  const tip = page.getByRole("status");
+  for (const n of [2, 3]) {
+    await clickRing(page);
+    await expect(tip).toContainText(`${n} / 5`);
+  }
+  const at = () => page.locator("iframe").evaluate((f: HTMLIFrameElement) => f.contentWindow!.location.search);
+  expect(await at()).toContain("at=gn-scan");
+  await page.getByText("This is the app").click();
+  await page.keyboard.press("Escape");
+  await expect(tip).toContainText("2 / 5");
+  await expect.poll(at).not.toContain("gn-scan");
+});
+
+test("Esc steps back one layer at a time: the lines, the code, then the level", async ({ page }) => {
   await page.goto("/landing");
   const tip = page.getByRole("status");
   for (const n of [2, 3, 4, 5]) {
     await clickRing(page);
     await expect(tip).toContainText(`${n} / 5`);
   }
-  await page.keyboard.press("Escape");
+  for (const n of [4, 3, 2]) {
+    await page.keyboard.press("Escape");
+    await expect(tip).toContainText(`${n} / 5`);
+  }
+});
+
+test("Done on the last step ends the tour", async ({ page }) => {
+  await page.goto("/landing");
+  const tip = page.getByRole("status");
+  for (const n of [2, 3, 4, 5]) {
+    await clickRing(page);
+    await expect(tip).toContainText(`${n} / 5`);
+  }
+  await expect(tip.getByRole("button", { name: "Skip tour" })).toHaveCount(0);
+  await tip.getByRole("button", { name: "Done" }).click();
   await expect(tip).toContainText("That's the whole loop");
+  await expect(page.getByRole("button", { name: "Take the tour" })).toBeVisible();
 });
 
 test("each How it works tab shows its own window", async ({ page }) => {

@@ -1,1 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,68078,e=>{"use strict";var o=e.i(86682);async function t(e={}){return"object"==typeof e&&Object.freeze(e),await (0,o.invoke)("plugin:dialog|open",{options:e})}e.s(["open",0,t])}]);

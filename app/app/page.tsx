@@ -76,7 +76,9 @@ export default async function Home({
             </DiffMode>
           </Suspense>
         </div>
-        <Workspace />
+        <Suspense>
+          <Workspace />
+        </Suspense>
         {embed ? null : <StatusBar />}
         <Suspense>
           <Palette />

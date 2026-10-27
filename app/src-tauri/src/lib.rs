@@ -1,4 +1,7 @@
 mod claude;
+mod devices;
+mod mcp;
+mod preview;
 mod pty;
 
 use tauri::Manager;
@@ -10,13 +13,14 @@ pub fn run() {
         // The terminal's copy and paste (Ctrl+Shift+C / V): plain text only.
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(pty::Ptys::default())
+        .manage(preview::Previews::default())
         .setup(|app| {
+            // Claude's way into the preview, for every Claude tab (mcp.rs).
+            mcp::start(app.handle().clone());
             #[cfg(target_os = "linux")]
             if let Some(window) = app.get_webview_window("main") {
                 pinch_to_page(&window);
             }
-            #[cfg(not(target_os = "linux"))]
-            let _ = app;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,12 +35,26 @@ pub fn run() {
             pty::context_pending,
             pty::context_where,
             claude::claude_detect,
+            preview::preview_open,
+            preview::preview_target,
+            preview::preview_close,
+            preview::preview_external,
+            mcp::preview_reply,
+            devices::project_detect,
+            devices::device_status,
+            devices::device_setup,
+            devices::device_start,
+            devices::device_frame,
+            devices::device_input,
+            devices::device_run,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 app.state::<pty::Ptys>().kill_all();
+                app.state::<preview::Previews>().close_all();
+                devices::stop_all();
             }
         });
 }

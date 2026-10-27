@@ -22,5 +22,14 @@ tauri-plugin-clipboard-manager = "2"
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 
+# The preview's screenshot for Claude: WebKit's own snapshot of the window
+# (src/mcp.rs). Already in the build through wry; named here to call them.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSGeometry", "NSValue"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
+block2 = "0.6"
+
 [dev-dependencies]
 tempfile = "3"

@@ -1,16 +1,20 @@
 "use client";
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion } from "motion/react";
 import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } from "@/components/agents";
 import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
+import { Preview } from "@/components/preview";
+import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
+import { findAddress, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
 import type { Exchange } from "@/lib/keep";
 import { cn } from "@/lib/utils";
@@ -31,6 +35,16 @@ import { cn } from "@/lib/utils";
  * the map, and its width gives way to the window's. Hiding it, or switching
  * tabs, never ends a program; a tab ends when it is closed or its shell exits.
  * Tabs belong to the project they were opened in.
+ *
+ * Besides terminals, a tab can be the project running: a Preview of its web
+ * app (components/preview.tsx), or its phone app on the Android emulator or
+ * the iOS Simulator (components/device.tsx). When a project with a web dev
+ * server opens, its server starts in a tab of its own and the Preview opens
+ * beside it, showing the page once the server prints its address. A project
+ * with a phone app is offered its simulator, once; nothing is installed for
+ * one until the user asks. Claude reaches the preview through the app's MCP
+ * server (src-tauri/src/mcp.rs), and this is where its calls find the right
+ * project's preview.
  */
 
 const TOGGLE = "slop:workspace";
@@ -47,6 +61,8 @@ const STATUSBAR = 24;
 
 interface Tab {
   key: number;
+  /** A terminal, or the project running: its web app, or a phone. */
+  kind: "shell" | "preview" | Platform;
   /** The agent it opened into, or null for a plain shell. */
   start: string | null;
   /** The agent last started in it, from the menu or the strip: what a busy shell is running. */
@@ -63,6 +79,41 @@ interface Tab {
   busy: boolean;
   /** Whether Claude Code was found for it; unknown while it starts. */
   found?: boolean;
+  /** A command the app typed into it when it opened: the dev server, a setup, a build. */
+  run?: string;
+  /** What it is called instead of its shell's name, when the app opened it for something. */
+  label?: string;
+  /** It runs the dev server: its output is watched for the server's address. */
+  dev?: boolean;
+}
+
+/** How a project is run, from its files (src-tauri/src/devices.rs). */
+interface Project {
+  web: string | null;
+  android: boolean;
+  ios: boolean;
+}
+
+const OFFER_KEY = "slop.offer:";
+
+function offered(root: string) {
+  try {
+    return localStorage.getItem(OFFER_KEY + root) !== null;
+  } catch {
+    return false;
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Polls for something to exist, giving up after `ms`. */
+async function until<T>(get: () => T | undefined, ms: number): Promise<T> {
+  for (let waited = 0; waited < ms; waited += 100) {
+    const v = get();
+    if (v) return v;
+    await sleep(100);
+  }
+  throw new Error("The preview did not open in time.");
 }
 
 function storedWidth() {
@@ -114,15 +165,126 @@ export function Workspace() {
   }, []);
 
   const add = useCallback(
-    (start: string | null) => {
+    (start: string | null, extra?: Partial<Tab>) => {
       const key = nextKey++;
-      setTabs((t) => [...t, { key, start, ran: start, title: "terminal", cwd: here, live: false, busy: false }]);
-      setActive((a) => ({ ...a, [here]: key }));
-      show(true);
+      const cwd = extra?.cwd ?? here;
+      setTabs((t) => [...t, { key, kind: "shell", start, ran: start, title: "terminal", cwd, live: false, busy: false, ...extra }]);
+      setActive((a) => ({ ...a, [cwd]: key }));
+      if (cwd === here) show(true);
       return key;
     },
     [here, show],
   );
+
+  // Each project's dev server address, once it has printed one; and how each
+  // project is run, read when it is first opened.
+  const [servers, setServers] = useState<Record<string, string>>({});
+  const [projects, setProjects] = useState<Record<string, Project>>({});
+  const [offers, setOffers] = useState<Record<string, boolean>>({});
+  const tabsNow = useRef(tabs);
+  useEffect(() => {
+    tabsNow.current = tabs;
+  });
+
+  /** A project's one Preview tab: brought to the front, or opened. */
+  const preview = useCallback(
+    (root: string) => {
+      const open = tabsNow.current.find((x) => x.kind === "preview" && x.cwd === root);
+      if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
+      setActive((a) => ({ ...a, [root]: open.key }));
+      if (root === here) show(true);
+      return open.key;
+    },
+    [add, here, show],
+  );
+
+  /** This project's phone of a kind: brought to the front, or opened. */
+  const phone = (platform: Platform) => {
+    const open = mine.find((x) => x.kind === platform);
+    if (!open) return add(null, { kind: platform, title: PLATFORM[platform].label });
+    select(open.key);
+    show(true);
+  };
+
+  // A project opening for the first time this session: how it runs is read,
+  // its dev server started with a Preview in front, and a phone app offered
+  // its simulator.
+  const launched = useRef(new Set<string>());
+  useEffect(() => {
+    if (!desktop || !here || launched.current.has(here)) return;
+    launched.current.add(here);
+    const root = here;
+    invoke<Project>("project_detect", { root })
+      .then((p) => {
+        setProjects((all) => ({ ...all, [root]: p }));
+        if (p.web && readSettings().devServer) {
+          add(null, { run: p.web, dev: true, label: "dev server", cwd: root });
+          add(null, { kind: "preview", title: "Preview", cwd: root });
+        }
+      })
+      .catch(() => {});
+  }, [desktop, here, add]);
+
+  // The dev server's tab, read as it prints until it gives its address. Only
+  // whole lines, so an address split across two reads is never taken short.
+  const tails = useRef<Record<number, string>>({});
+  const heard = (t: Tab, text: string) => {
+    if (tails.current[t.key] === null) return;
+    const tail = ((tails.current[t.key] ?? "") + text).slice(-4000);
+    const url = findAddress(tail.slice(0, tail.lastIndexOf("\n") + 1));
+    if (!url) {
+      tails.current[t.key] = tail;
+      return;
+    }
+    (tails.current as Record<number, string | null>)[t.key] = null;
+    setServers((all) => ({ ...all, [t.cwd]: url }));
+    preview(t.cwd);
+  };
+
+  // Claude's calls on the preview (src-tauri/src/mcp.rs): the project is the
+  // one of the tab Claude runs in. A screenshot needs the preview on screen.
+  const latest = useRef({ here, shown: false });
+  const answer = async ({ id, tab, cmd }: { id: number; tab: number; cmd: Call }) => {
+    const reply = (ok: boolean, value: unknown) => void invoke("preview_reply", { id, ok, value });
+    try {
+      const root = tabsNow.current.find((x) => x.pty === tab)?.cwd ?? latest.current.here;
+      let handle = previewOf(root);
+      if (!handle) {
+        const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
+        if (!asked && !servers[root])
+          throw new Error(
+            "No preview is open for this project, and no dev server has printed an address. Start the dev server in a terminal tab, or navigate to its address, like http://localhost:3000.",
+          );
+        if (asked) setServers((all) => ({ ...all, [root]: asked }));
+        preview(root);
+        handle = await until(() => previewOf(root), 8000);
+        if (asked) return reply(true, `Opened ${asked} in the preview.`);
+      }
+      if (cmd.op === "frame") {
+        if (root !== latest.current.here) throw new Error("That preview belongs to a project that is not open in the window, so it cannot be seen.");
+        const hidden = !latest.current.shown;
+        preview(root);
+        await sleep(hidden ? 520 : 80);
+        // A window behind others draws no frames, so the slide in never runs:
+        // it is put where it would have ended.
+        if (document.visibilityState === "hidden" && aside.current) aside.current.style.transform = "none";
+      }
+      reply(true, await handle.run(cmd));
+    } catch (e) {
+      reply(false, e instanceof Error ? e.message : String(e));
+    }
+  };
+  // The latest of everything above, for a call that arrives between renders.
+  const answering = useRef(answer);
+  useEffect(() => {
+    answering.current = answer;
+    latest.current = { here, shown: open && mine.length > 0 };
+  });
+  useEffect(() => {
+    if (!desktop) return;
+    const off = listen<{ id: number; tab: number; cmd: Call }>("slop:preview", (e) => void answering.current(e.payload));
+    return () => void off.then((f) => f());
+  }, [desktop]);
 
   const select = useCallback((key: number) => setActive((a) => ({ ...a, [here]: key })), [here]);
 
@@ -281,6 +443,8 @@ export function Workspace() {
 
   const drag = (e: React.PointerEvent) => {
     e.preventDefault();
+    // A preview's frame would take the pointer's moves for its own page.
+    document.body.dataset.dragging = "";
     const from = e.clientX;
     // What is on screen, which a narrow window may have clamped.
     const start = (e.currentTarget.parentElement as HTMLElement).offsetWidth;
@@ -292,6 +456,7 @@ export function Workspace() {
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      delete document.body.dataset.dragging;
       try {
         localStorage.setItem(WIDTH_KEY, String(last));
       } catch {
@@ -302,9 +467,31 @@ export function Workspace() {
     window.addEventListener("pointerup", up);
   };
 
-  if (!tabs.length) return null;
   const shown = open && mine.length > 0;
+  const project = projects[here];
+  const phones = (["ios", "android"] as const).filter((p) => project?.[p]);
+  const offer =
+    phones.length && !offers[here] && !offered(here) && !mine.some((t) => t.kind === "ios" || t.kind === "android") ? (
+      <Offer
+        phones={phones}
+        onPick={(p) => {
+          phone(p);
+          setOffers((all) => ({ ...all, [here]: true }));
+        }}
+        onDismiss={() => {
+          try {
+            localStorage.setItem(OFFER_KEY + here, "1");
+          } catch {
+            /* asked again next time */
+          }
+          setOffers((all) => ({ ...all, [here]: true }));
+        }}
+      />
+    ) : null;
+  if (!tabs.length) return offer;
   return (
+    <>
+    {offer}
     <motion.aside
       ref={aside}
       aria-label="Workspace"
@@ -337,6 +524,14 @@ export function Workspace() {
         <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
           {mine.map((t, i) => {
             const front = inFront(t);
+            const name =
+              t.kind === "preview"
+                ? "Preview"
+                : t.kind !== "shell"
+                  ? PLATFORM[t.kind].label
+                  : front
+                    ? `${front.command.replace(/^slop-/, "")} ${i + 1}`
+                    : (t.label ?? `${t.title} ${i + 1}`);
             return (
               <div
                 key={t.key}
@@ -350,8 +545,8 @@ export function Workspace() {
                 )}
               >
                 <button type="button" onClick={() => select(t.key)} className="flex cursor-pointer items-center gap-1.5">
-                  {front ? <AgentIcon id={front.id} /> : <TerminalIcon />}
-                  {front ? front.command.replace(/^slop-/, "") : t.title} {i + 1}
+                  {t.kind === "preview" ? <GlobeIcon /> : t.kind !== "shell" ? <PhoneIcon /> : front ? <AgentIcon id={front.id} /> : <TerminalIcon />}
+                  {name}
                 </button>
                 <button
                   type="button"
@@ -400,17 +595,46 @@ export function Workspace() {
               .sort((a, b) => Number(b.id === main) - Number(a.id === main))
               .map((a) => ({ label: a.label, icon: <AgentIcon id={a.id} />, onClick: () => add(a.id) })),
             { label: "Terminal", icon: <TerminalIcon />, onClick: () => add(null) },
+            { label: "Preview", icon: <GlobeIcon />, onClick: () => preview(here) },
+            ...phones.map((p) => ({ label: PLATFORM[p].label === "iOS" ? "iOS Simulator" : "Android emulator", icon: <PhoneIcon />, onClick: () => phone(p) })),
           ]}
         />
       ) : null}
       <div className="relative min-h-0 flex-1 pt-1.5">
-        {tabs.map((t) => (
+        {tabs.map((t) => {
+          const visible = shown && t.key === current?.key;
+          if (t.kind === "preview") {
+            const dev = tabs.find((x) => x.dev && x.cwd === t.cwd);
+            return (
+              <Preview
+                key={t.key}
+                root={t.cwd}
+                target={servers[t.cwd]}
+                visible={visible}
+                waiting={servers[t.cwd] ? undefined : dev?.run}
+                onTarget={(url) => setServers((all) => ({ ...all, [t.cwd]: url }))}
+                onShowServer={dev ? () => select(dev.key) : undefined}
+              />
+            );
+          }
+          if (t.kind !== "shell")
+            return (
+              <Device
+                key={t.key}
+                platform={t.kind}
+                root={t.cwd}
+                visible={visible}
+                onCommand={(command, label) => add(null, { run: command, label, cwd: t.cwd })}
+              />
+            );
+          return (
           <Shell
             key={t.key}
             startClaude={t.start === CLAUDE.id}
-            run={t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined}
+            run={t.run ?? (t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined)}
             cwd={t.cwd || undefined}
-            visible={shown && t.key === current?.key}
+            visible={visible}
+            onOutput={t.dev ? (text) => heard(t, text) : undefined}
             onTitle={(title) => patch(t.key, { title })}
             onClaude={(found) => patch(t.key, { found })}
             onSpawn={(pty) => {
@@ -419,7 +643,8 @@ export function Workspace() {
             }}
             onExit={() => close(t.key)}
           />
-        ))}
+          );
+        })}
       </div>
       {/* Under the terminal, beside where a prompt is typed: Claude Code draws
           its input at the foot of the tab, so what the next prompt will carry
@@ -433,6 +658,66 @@ export function Workspace() {
         />
       ) : null}
     </motion.aside>
+    </>
+  );
+}
+
+/**
+ * A project with a phone app is asked, once, whether to run it here. Picking
+ * one opens its tab, which says what it needs before anything is installed.
+ */
+function Offer({ phones, onPick, onDismiss }: { phones: Platform[]; onPick: (p: Platform) => void; onDismiss: () => void }) {
+  const what = phones.length > 1 ? "iOS and Android apps" : phones[0] === "ios" ? "an iOS app" : "an Android app";
+  return (
+    <motion.div
+      role="dialog"
+      aria-label="Run the phone app here"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
+      style={{ bottom: STATUSBAR + GAP }}
+      className="fixed left-3 z-40 flex max-w-[340px] flex-col gap-2.5 rounded-[10px] border border-border-gray bg-pure-white p-3.5 shadow-lift"
+    >
+      <p className="text-[13px] leading-snug text-ink">
+        This project has {what}. Run {phones.length > 1 ? "them" : "it"} here, in the app?
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {phones.map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onPick(p)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-border-strong px-2.5 py-1 text-[12px] text-ink hover:bg-surface-container"
+          >
+            <PhoneIcon />
+            {p === "ios" ? "iOS Simulator" : "Android emulator"}
+          </button>
+        ))}
+        <button type="button" onClick={onDismiss} className="ml-auto cursor-pointer px-1 text-[12px] text-faint hover:text-ink">
+          Not now
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/** A page: the Preview tab. Drawn like the terminal glyph. */
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden className="size-3 shrink-0">
+      <circle cx="8" cy="8" r="6" />
+      <path d="M2 8h12M8 2c1.7 1.8 2.5 3.8 2.5 6S9.7 12.2 8 14C6.3 12.2 5.5 10.2 5.5 8S6.3 3.8 8 2Z" />
+    </svg>
+  );
+}
+
+/** A phone: the iOS and Android tabs. */
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden className="size-3 shrink-0">
+      <rect x="4" y="1.5" width="8" height="13" rx="2" />
+      <path d="M7 12h2" />
+    </svg>
   );
 }
 

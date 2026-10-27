@@ -18,12 +18,14 @@ export interface Settings {
   agent: string;
   /** What the map is drawn on. */
   ground: Ground;
+  /** Start a project's dev server when it opens, and show it in a Preview tab. */
+  devServer: boolean;
 }
 
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "plain" };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "plain", devServer: true };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));

@@ -155,6 +155,7 @@ export function Shell({
   onTitle,
   onSpawn,
   onClaude,
+  onOutput,
   onExit,
 }: {
   startClaude?: boolean;
@@ -167,6 +168,8 @@ export function Shell({
   onSpawn?: (pty: number) => void;
   /** Whether Claude Code was found, so this tab can run it. */
   onClaude?: (found: boolean) => void;
+  /** What the program prints, as text: how the dev server's tab hears its address. */
+  onOutput?: (text: string) => void;
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -174,9 +177,9 @@ export function Shell({
   const show = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest callbacks, so the effect below runs once per shell, not per render.
-  const handlers = useRef({ onTitle, onSpawn, onClaude, onExit });
+  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onExit });
   useEffect(() => {
-    handlers.current = { onTitle, onSpawn, onClaude, onExit };
+    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onExit };
   });
   // The map's sections, for `slop-map-list`. Through a ref for the same
   // reason: a map that updates must not restart the shell.
@@ -275,10 +278,14 @@ export function Shell({
       refit();
 
       const out = new Channel<ArrayBuffer | { exit: number }>();
+      // Streaming, so a character split across two reads still decodes.
+      const text = new TextDecoder();
       out.onmessage = (m) => {
         if (gone) return;
-        if (m instanceof ArrayBuffer) term.write(new Uint8Array(m));
-        else handlers.current.onExit();
+        if (m instanceof ArrayBuffer) {
+          term.write(new Uint8Array(m));
+          handlers.current.onOutput?.(text.decode(m, { stream: true }));
+        } else handlers.current.onExit();
       };
       try {
         const spawned = await invoke<{ id: number; shell: string }>("pty_spawn", {

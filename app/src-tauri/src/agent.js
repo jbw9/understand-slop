@@ -1,12 +1,24 @@
 // understand-slop's preview agent (src-tauri/src/preview.rs puts it in every
 // page the preview frames). It answers the window around the frame
 // (components/preview.tsx): reads the page, and clicks, types and scrolls in it
-// the way a person would, for the user's tools and for Claude's. It does
-// nothing in a page that is not framed.
+// the way a person would, for the user's tools and for Claude's, and draws
+// Claude's pointer where it acts. It does nothing in a page that is not framed.
+//
+// A page from the web is not framed but has a webview of its own
+// (src-tauri/src/browser.rs), where this runs wrapped with SLOP_NATIVE set: it
+// keeps what it has to say until the tab collects it, through window.__slop.
 (() => {
-  if (window.__slopAgent || window.parent === window) return;
+  const native = typeof SLOP_NATIVE !== "undefined";
+  if (window.__slopAgent || (!native && window.parent === window)) return;
   window.__slopAgent = true;
+  let outbox = [];
   const post = (m) => {
+    if (native) {
+      outbox.push(m);
+      // Nobody collecting (the tab closed): the oldest give way.
+      if (outbox.length > 2000) outbox = outbox.slice(-1000);
+      return;
+    }
     try {
       window.parent.postMessage({ __slop: true, ...m }, "*");
     } catch {}
@@ -196,10 +208,75 @@
     if (!found.length) return `Nothing on the page matches "${query}".`;
     return found
       .map((el) => {
-        const r = el.getBoundingClientRect();
-        return `- ${roleOf(el) || el.tagName.toLowerCase()} "${nameOf(el)}" [${refOf(el)}] at (${Math.round(r.x + r.width / 2)}, ${Math.round(r.y + r.height / 2)})`;
+        const { x, y } = spot(el);
+        return `- ${roleOf(el) || el.tagName.toLowerCase()} "${nameOf(el)}" [${refOf(el)}] at (${Math.round(x)}, ${Math.round(y)})`;
       })
       .join("\n");
+  };
+
+  /* ── Claude's pointer ────────────────────────────────────────── */
+
+  // Made the first time Claude acts, so a page that renders itself into the
+  // whole document has finished before anything is added to it. In the top
+  // layer, over the page's own dialogs, and never in the way of a click.
+  let pointer = null;
+  let fade = 0;
+  const ARROW =
+    '<svg width="22" height="24" viewBox="0 0 22 24"><path d="M2 1.5 2 19.5 7 15 10.5 22.5 13.6 21 10.2 13.8 17 13.8Z" fill="#d97757" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  const draw = () => {
+    if (pointer?.host.isConnected) return pointer;
+    const host = document.createElement("slop-pointer");
+    host.setAttribute("popover", "manual");
+    host.style.cssText =
+      "all:initial;position:fixed;inset:0;width:100vw;height:100vh;margin:0;padding:0;border:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483647";
+    const root = host.attachShadow({ mode: "closed" });
+    root.innerHTML = `<style>
+      .p{position:fixed;left:-2px;top:-1px;opacity:0;transition:transform .35s cubic-bezier(.3,.7,.25,1),opacity .25s;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+      .t{position:absolute;left:18px;top:20px;padding:2px 6px;border-radius:5px;background:#d97757;color:#fff;font:600 11px/1.3 -apple-system,system-ui,sans-serif;white-space:nowrap}
+      .r{position:fixed;left:-14px;top:-14px;width:24px;height:24px;border:2px solid #d97757;border-radius:50%;opacity:0}
+      .r.on{animation:r .55s ease-out}
+      @keyframes r{from{opacity:.95;scale:.3}to{opacity:0;scale:1.7}}
+    </style><div class="p">${ARROW}<span class="t">Claude</span></div><div class="r"></div>`;
+    (document.body || document.documentElement).appendChild(host);
+    const p = root.querySelector(".p");
+    const ring = root.querySelector(".r");
+    // From the middle the first time, so the first move is seen.
+    p.style.transform = `translate(${innerWidth / 2}px, ${innerHeight / 2}px)`;
+    pointer = { host, p, ring };
+    return pointer;
+  };
+  /** Moves the pointer to (x, y), and resolves once it is there. */
+  const glide = (x, y) => {
+    const { host, p } = draw();
+    try {
+      // Shown again, so it is on top of whatever the page put in the top layer since.
+      if (host.matches(":popover-open")) host.hidePopover();
+      host.showPopover();
+    } catch {
+      /* no popover in this engine: fixed and z-indexed is near enough */
+    }
+    void p.offsetWidth;
+    p.style.opacity = "1";
+    p.style.transform = `translate(${x}px, ${y}px)`;
+    clearTimeout(fade);
+    fade = setTimeout(() => (p.style.opacity = "0"), 5000);
+    return new Promise((r) => setTimeout(r, 380));
+  };
+  const press = (x, y) => {
+    if (!pointer) return;
+    const { ring } = pointer;
+    ring.style.translate = `${x}px ${y}px`;
+    ring.classList.remove("on");
+    void ring.offsetWidth;
+    ring.classList.add("on");
+  };
+  /** Out of the picture, for a screenshot. */
+  const veil = () => {
+    if (!pointer) return;
+    pointer.p.style.transition = "none";
+    pointer.p.style.opacity = "0";
+    void pointer.p.offsetWidth;
+    pointer.p.style.transition = "";
   };
 
   /* ── acting on the page ──────────────────────────────────────── */
@@ -211,13 +288,29 @@
       new Promise((r) => setTimeout(r, 200)),
     ]);
 
+  /**
+   * A point that lands on the element: its middle, unless that is a gap (a
+   * link wrapped onto two lines) or something lies over it, then the middle
+   * of one of its boxes that is clear.
+   */
+  const spot = (el) => {
+    const r = el.getBoundingClientRect();
+    const boxes = [r, ...el.getClientRects()];
+    for (const b of boxes) {
+      const x = b.x + b.width / 2;
+      const y = b.y + b.height / 2;
+      const top = document.elementFromPoint(x, y);
+      if (top && (el.contains(top) || top.contains(el))) return { x, y };
+    }
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  };
+
   /** The element and the point to act at: a ref's middle, or a coordinate. */
   const target = ({ ref, coordinate }) => {
     if (ref) {
       const el = byRef(ref);
       el.scrollIntoView({ block: "center", inline: "center" });
-      const r = el.getBoundingClientRect();
-      return { el, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      return { el, ...spot(el) };
     }
     if (!coordinate) throw new Error("Give a coordinate [x, y] or a ref.");
     const [x, y] = coordinate;
@@ -300,7 +393,7 @@
   const KEYS = { enter: "Enter", return: "Enter", tab: "Tab", escape: "Escape", esc: "Escape", backspace: "Backspace", delete: "Delete", space: " ", up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", home: "Home", end: "End", pageup: "PageUp", pagedown: "PageDown" };
 
   /** `Enter`, `Tab Tab`, `ctrl+a`, `shift+Tab`: each, in turn, with what it does by default. */
-  const press = (text) => {
+  const pressKeys = (text) => {
     for (const combo of text.trim().split(/\s+/)) {
       const parts = combo.split("+");
       const raw = parts.pop();
@@ -402,19 +495,20 @@
         case "double_click":
         case "triple_click": {
           const t = target(a);
+          await glide(t.x, t.y);
           click(t, { button: a.action === "right_click" ? 2 : 0, count: a.action === "double_click" ? 2 : a.action === "triple_click" ? 3 : 1 });
-          post({ type: "pointer", x: t.x, y: t.y });
+          press(t.x, t.y);
           await frames();
           return `Clicked ${describe(t.el)} at (${Math.round(t.x)}, ${Math.round(t.y)}).`;
         }
         case "hover": {
           const t = target(a);
+          await glide(t.x, t.y);
           mouse(t.el, "pointerover", t.x, t.y);
           mouse(t.el, "mouseover", t.x, t.y);
           mouse(t.el, "pointerenter", t.x, t.y);
           mouse(t.el, "mouseenter", t.x, t.y);
           mouse(t.el, "mousemove", t.x, t.y);
-          post({ type: "pointer", x: t.x, y: t.y });
           await frames();
           return `Hovering ${describe(t.el)}.`;
         }
@@ -424,7 +518,7 @@
           return r;
         }
         case "key": {
-          const r = press(a.text ?? "");
+          const r = pressKeys(a.text ?? "");
           await frames();
           return r;
         }
@@ -466,6 +560,30 @@
           throw new Error(`Unknown action: ${a.action}`);
       }
     },
+    /** Where to act, for input given from outside the page: the pointer goes there first. */
+    async locate(a) {
+      const t = target(a);
+      await glide(t.x, t.y);
+      return { x: t.x, y: t.y, what: describe(t.el) };
+    },
+    async glide({ x, y }) {
+      await glide(x, y);
+      return "";
+    },
+    press({ x, y }) {
+      press(x, y);
+      return "";
+    },
+    async veil() {
+      veil();
+      await frames();
+      return "";
+    },
+    /** What typing would go into, if anything. */
+    focused() {
+      const el = document.activeElement;
+      return !el || el === document.body ? null : describe(el);
+    },
     read_page: readPage,
     find,
     form_input: formInput,
@@ -473,9 +591,7 @@
     javascript: evaluate,
   };
 
-  addEventListener("message", async (e) => {
-    if (e.source !== window.parent || !e.data || !e.data.__slopCmd) return;
-    const { id, name, args } = e.data;
+  const answer = async (id, name, args) => {
     try {
       const run = COMMANDS[name];
       if (!run) throw new Error(`Unknown command: ${name}`);
@@ -483,5 +599,51 @@
     } catch (err) {
       post({ type: "reply", id, ok: false, value: String((err && err.message) || err) });
     }
+  };
+
+  if (native) {
+    // Fixed in place before the page's own scripts run, so a page cannot answer for it.
+    Object.defineProperty(window, "__slop", {
+      value: Object.freeze({
+        run: (id, name, args) => void answer(id, name, args),
+        drain: () => {
+          const all = outbox;
+          outbox = [];
+          return all;
+        },
+      }),
+    });
+    return;
+  }
+
+  addEventListener("message", (e) => {
+    if (e.source !== window.parent || !e.data || !e.data.__slopCmd) return;
+    void answer(e.data.id, e.data.name, e.data.args);
   });
+
+  // A link off this machine cannot be framed: the preview opens it as a page
+  // from the web instead. Left to the page first, which may route it itself.
+  const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/;
+  const outside = (href) => {
+    try {
+      const u = new URL(href, location.href);
+      return /^https?:$/.test(u.protocol) && !LOCAL.test(u.hostname) ? u.href : null;
+    } catch {
+      return null;
+    }
+  };
+  addEventListener("click", (e) => {
+    const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+    const url = a && !e.defaultPrevented && e.button === 0 && outside(a.href);
+    if (!url) return;
+    e.preventDefault();
+    post({ type: "open", url });
+  });
+  const open = window.open;
+  window.open = function (url, ...rest) {
+    const away = url && outside(String(url));
+    if (!away) return open.call(this, url, ...rest);
+    post({ type: "open", url: away });
+    return null;
+  };
 })();

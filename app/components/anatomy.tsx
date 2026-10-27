@@ -45,15 +45,18 @@ export function AnatomyView({
   owner,
   blocks,
   ctx,
+  headless,
 }: {
   owner: string;
   blocks: Anatomy[];
   ctx: RowCtx;
+  /** Drawn inside a row that already names the block, so its own header and frame would say it twice. */
+  headless?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3">
       {blocks.map((block, i) => (
-        <Block key={i} owner={owner} block={block} ctx={ctx} />
+        <Block key={i} owner={owner} block={block} ctx={ctx} headless={headless} />
       ))}
     </div>
   );
@@ -174,15 +177,17 @@ function Block({
   owner,
   block,
   ctx,
+  headless,
 }: {
   owner: string;
   block: Anatomy;
   ctx: RowCtx;
+  headless?: boolean;
 }) {
   if (block.kind === "schema") {
     return (
-      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
-        <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
+      <div className={headless ? "bg-pure-white" : "overflow-hidden rounded-[6px] border border-border-gray bg-pure-white"}>
+        <div className={cn("flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5", headless && "hidden")}>
           <TableGlyph />
           <span className="font-mono text-[11px] font-semibold text-ink">
             {block.table}
@@ -1137,7 +1142,7 @@ function FileGlyph() {
   );
 }
 
-function TableGlyph() {
+export function TableGlyph() {
   return (
     <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <rect x="1" y="1.5" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1" className="text-muted-slate" />

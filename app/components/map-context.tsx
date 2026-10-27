@@ -27,3 +27,8 @@ export function useMap() {
   if (!m) throw new Error("useMap outside MapProvider");
   return m;
 }
+
+/** The map on screen, or null before the reader has any project to open. */
+export function useMaybeMap() {
+  return useContext(MapContext);
+}

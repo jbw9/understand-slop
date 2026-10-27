@@ -33,7 +33,7 @@ Two readers, one screen:
 
 | Thing | What it is | Where it lives |
 |---|---|---|
-| **Map** | One repository's explanation, written by the generator | `maps/<name>/map.json`, or the vault for imported projects |
+| **Map** | One repository's explanation, written by the generator | the project's folder in the vault (`lib/vault.ts`); the app ships no example maps |
 | **Level** | One node of the map, open. The repository itself is the top level (D60) | `Level` in `components/canvas.tsx` |
 | **Part** | A child of the open level. Named and peeked at, never opened in place (D31) | `Steps` / `Grid` / `List` in `canvas.tsx` |
 | **Block** | One piece of explanation on a level: diagram, table, sequence, screen, example (D34) | `components/blocks.tsx`, `components/anatomy.tsx` |
@@ -100,8 +100,23 @@ The rest of the window, scrolling. It shows exactly one `Level`, top to bottom:
 A window floating over the map's right edge, holding tabs. Each tab is a real
 terminal in the map's checkout (`components/shell.tsx`), started as Claude
 Code, another installed agent (`components/agents.tsx`), or a plain shell. It
-floats, so opening it never takes space from the map. Hiding it never ends a
-program. Desktop only.
+floats, so opening it never takes space from the map, and it stops above the
+status bar. Hiding it never ends a program. Desktop only.
+
+### Status bar — `components/statusbar.tsx`
+
+One 24px line under the map and the workspace: the commit, file count, how
+many levels there are, how many are not certain, how many problems the map
+found, a running or finished map update, and the two keys that reach
+everything (Ctrl+K, Ctrl+`). Whatever level is open, this does not change.
+
+### Palette — `components/palette.tsx`
+
+Ctrl+K (or Ctrl+P, or the box in the title bar) opens one input over the
+window. Typing matches every level in the map by name, with its trail beside
+it, and Enter opens it, however deep it is. A leading `>` (or Ctrl+Shift+P)
+lists the app's actions; clicking the map's name in the title bar lists the
+maps. This is how you jump around the map without a sidebar (D35, D62).
 
 ### Dialogs
 
@@ -111,18 +126,18 @@ of also leaving the level.
 
 | Dialog | Opens from | Shows |
 |---|---|---|
-| Projects — `projects.tsx` | title bar, "Import to keep it updated" | your imported projects, shipped examples, a wizard to start or import one |
+| Projects — `projects.tsx` | title bar, "Import to keep it updated" | your imported projects, and a wizard to start or import one |
 | Diff panel — `diff-panel.tsx` | title bar, or Claude setting a range | every section a commit range touched; a click opens that level (D58) |
 | Audit — `audit.tsx` | title bar | how the map was made: the run's `audit.md` |
 | History — `history.tsx` | title bar | what you added to this map, every earlier version, revert |
-| Settings — `settings.tsx` | title bar | theme, background (dots / squares / plain), default agent, Claude Code path, model |
+| Settings — `settings.tsx` | title bar | theme, background (plain by default / dots / squares), default agent, Claude Code path, model |
 
 ---
 
 ## 4. Main flows
 
 **Read a repository.** Open the app → the most recently opened project's top
-level (or the default example) → read the overview picture → click a box →
+level (or Welcome, with no project yet) → read the overview picture → click a box →
 that part's level slides in → repeat until a level has no parts → open the
 code. Back is the browser's back, the swipe, Esc, the "←" link, or a crumb.
 
@@ -133,10 +148,10 @@ for your next prompt → ask. Claude can run `slop-map-show section "<title>"`,
 which moves your view while the answer is still arriving (D59).
 
 **Keep or correct what the map says.** After Claude answers, a level offers to
-keep the answer as a block marked as yours (`KeepAnswer`). "Fix this" either
-sends a correction through the updater, which re-reads the code so the section
-stays `derived`, or saves your own words in the overlay (D55). History lists all
-of it and can revert.
+keep the answer as a block marked as yours (`KeepAnswer`). History lists all of
+it and can revert. The "Fix this" button is gone from the level header (D62);
+its dialog (`CorrectSection`, D55) is still in `components/keep.tsx` but has no
+way in.
 
 **Review a change.** Diff button → the panel lists changed sections → click
 one → the same level, decorated: tinted sections, removed things in red beside
@@ -156,8 +171,8 @@ before the run ends (D57).
 |---|---|
 | **No overview yet** (mid-run) | The top level lists its roots as parts, the same as any node without a picture (D60) |
 | **Half-made map** | Finished sections can be explored. Only the project list shows that the run is still going (D57, known gap) |
-| **Unknown map or level** | A `?map=` that isn't found falls back to the default example; a path whose id was renamed falls back to the repo level (D29) |
-| **Example map** | Read-only: no overlay, no corrections. Code comes from the committed `source.json` when the checkout is missing |
+| **Unknown map or level** | A `?map=` that isn't found falls back to your most recently opened project; a path whose id was renamed falls back to the repo level (D29) |
+| **No projects yet** | The window shows Welcome (`components/welcome.tsx`): a title bar with Projects and Settings, and one button to start or import a project |
 | **Map from another copy** | Title bar: "This map doesn't follow edits", with an import link |
 | **Updating** | Title bar: "◷ Updating the map…" → "✓ Map updated: <sections>" for 6 s, or "✗ Map update failed" with the error on hover |
 | **Not certain** | `partial`: solid amber edge; `inferred`: dashed. Each carries its `unsure` reason. `derived` carries no mark (D3) |

@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Anatomy, Node } from "@/lib/data";
 import { layoutProblems } from "./check";
 
-const names = process.argv.slice(2).length ? process.argv.slice(2) : readdirSync("maps").filter((d) => existsSync(`maps/${d}/map.json`)).sort();
+const names = process.argv.slice(2).length ? process.argv.slice(2) : (existsSync("maps") ? readdirSync("maps") : []).filter((d) => existsSync(`maps/${d}/map.json`)).sort();
 
 let total = 0;
 for (const name of names) {

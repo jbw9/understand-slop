@@ -24,7 +24,6 @@ const noSubscribe = () => () => {};
 export interface Crumb {
   id: string;
   title: string;
-  step?: number;
 }
 
 /**
@@ -37,7 +36,7 @@ export interface Crumb {
  * The map and the title bar both read it, so they always agree.
  */
 export function useLocation(): { path: string[]; crumbs: Crumb[] } {
-  const { nodeAt, stepOf } = useMap();
+  const { nodeAt } = useMap();
   const params = useSearchParams();
   // The deepest level asked for that the map still has: an update can take
   // a section away while it is open.
@@ -52,8 +51,8 @@ export function useLocation(): { path: string[]; crumbs: Crumb[] } {
       path
         .map((_, i) => nodeAt(path.slice(0, i + 1)))
         .filter((n): n is Node => n !== null)
-        .map((n) => ({ id: n.id, title: n.title, step: stepOf(n.id)?.n })),
-    [path, nodeAt, stepOf],
+        .map((n) => ({ id: n.id, title: n.title })),
+    [path, nodeAt],
   );
   return { path, crumbs };
 }
@@ -73,71 +72,21 @@ export function goTo(next: string[]) {
   window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
 }
 
-/**
- * The levels below the repo, each a way back up — the title bar's trail in
- * the desktop app. Clicking one opens it; the last is where you are.
- */
-export function Trail({ crumbs, onJump }: { crumbs: Crumb[]; onJump: (depth: number) => void }) {
-  return (
-    <ol className="flex min-w-0 items-center">
-      {crumbs.map((c, i) => {
-        const here = i === crumbs.length - 1;
-        return (
-          <Fragment key={c.id}>
-            <li aria-hidden className="shrink-0 px-0.5 text-[12px] text-faint">
-              ›
-            </li>
-            <li className={cn("min-w-0", here ? "shrink-0" : "shrink")}>
-              <button
-                type="button"
-                onClick={() => onJump(i + 1)}
-                disabled={here}
-                aria-current={here ? "page" : undefined}
-                title={c.title}
-                className={cn(
-                  "block max-w-full truncate rounded-[5px] px-1.5 py-0.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
-                  here ? "font-semibold text-ink" : "cursor-pointer text-muted-slate hover:bg-surface-container hover:text-ink",
-                )}
-              >
-                {c.step ? <span className="mr-1 font-mono text-[10.5px] text-faint">{c.step}</span> : null}
-                {c.title}
-              </button>
-            </li>
-          </Fragment>
-        );
-      })}
-    </ol>
-  );
-}
-
-/**
- * Which map is open, and every other one to switch to: the reader's own
- * projects first, then the examples that ship with the app.
- */
+/** Which map is open, and every other one of the reader's projects to switch to. */
 export function MapSwitcher({ map, maps, className }: { map: string; maps: MapEntry[]; className?: string }) {
   const router = useRouter();
   return (
     <select
       value={map}
       aria-label="Map"
-      // The router, not pushState: the map is read on the server.
       onChange={(e) => router.push(`?map=${encodeURIComponent(e.target.value)}`)}
       className={className}
     >
-      {[
-        { label: "Your projects", entries: maps.filter((m) => m.local) },
-        { label: "Examples", entries: maps.filter((m) => !m.local) },
-      ].map((g) =>
-        g.entries.length ? (
-          <optgroup key={g.label} label={g.label}>
-            {g.entries.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </optgroup>
-        ) : null,
-      )}
+      {maps.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.label}
+        </option>
+      ))}
     </select>
   );
 }
@@ -154,12 +103,12 @@ export function Crumbs({
   map: string;
   maps: MapEntry[];
   /** One entry per level below the repo, outermost first. */
-  crumbs: { id: string; title: string; step?: number }[];
+  crumbs: { id: string; title: string }[];
   /** Jump to depth `n` — 0 is the repo. */
   onJump: (depth: number) => void;
 }) {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
-  const stops = [{ id: "", title: repo, step: undefined as number | undefined }, ...crumbs];
+  const stops = [{ id: "", title: repo }, ...crumbs];
   return (
     <nav
       aria-label="Location"
@@ -198,7 +147,6 @@ export function Crumbs({
                       here ? "font-semibold text-ink" : "text-muted-slate hover:bg-surface-container-low hover:text-ink",
                     )}
                   >
-                    {c.step ? <span className="mr-1 font-mono text-[11px] text-faint">{c.step}</span> : null}
                     {c.title}
                   </button>
                 </li>
@@ -206,22 +154,7 @@ export function Crumbs({
             );
           })}
         </ol>
-        <div className="hidden shrink-0 items-center gap-3 pt-0.5 font-mono text-[10.5px] text-faint sm:flex">
-          <Hint k="esc">back</Hint>
-          <Hint k="0">top</Hint>
-        </div>
       </div>
     </nav>
-  );
-}
-
-function Hint({ k, children }: { k: string; children: React.ReactNode }) {
-  return (
-    <span className="flex items-center gap-1">
-      <kbd className="rounded-[3px] border border-border-gray bg-surface px-1.5 py-0.5 text-[10px] text-muted-slate">
-        {k}
-      </kbd>
-      {children}
-    </span>
   );
 }

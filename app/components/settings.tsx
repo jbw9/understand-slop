@@ -22,9 +22,9 @@ const THEMES: { value: Theme; label: string }[] = [
 ];
 
 const GROUNDS: { value: Ground; label: string }[] = [
+  { value: "plain", label: "Plain" },
   { value: "dots", label: "Dots" },
   { value: "squares", label: "Squares" },
-  { value: "plain", label: "Plain" },
 ];
 
 type Found = { path: string; version: string | null } | null;

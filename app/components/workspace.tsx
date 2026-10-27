@@ -1,15 +1,16 @@
 "use client";
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { motion } from "motion/react";
 import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } from "@/components/agents";
 import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
-import { clearPicks, onHand, onOpenClaude, prompt, retarget, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
+import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
+import { useLocation } from "@/components/chrome";
 import { openSettings, readSettings } from "@/lib/settings";
 import type { Exchange } from "@/lib/keep";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
  * of tabs. Every tab is a terminal — the user's shell on a pty in the open
  * map's checkout (components/shell.tsx) — opened straight into a coding agent
  * (components/agents.tsx) or as a plain shell, from the `+` menu. Quitting the
- * agent leaves the shell, in the same folder, and the strip under the tabs
+ * agent leaves the shell, in the same folder, and the strip under the terminal
  * starts one again. A tab's label says what is in front: Claude, another
  * agent, or the shell.
  *
@@ -41,6 +42,8 @@ const MIN_WIDTH = 380;
 const GAP = 12;
 /** The custom title bar's height, in the desktop app. */
 const TITLEBAR = 36;
+/** The status bar's height (components/statusbar.tsx), which it floats above. */
+const STATUSBAR = 24;
 
 interface Tab {
   key: number;
@@ -72,17 +75,21 @@ function storedWidth() {
   return 640;
 }
 
-const noSubscribe = () => () => {};
-
 /** Tab keys, unique for the app's life. */
 let nextKey = 1;
 
+const noSubscribe = () => () => {};
+
 export function Workspace() {
-  const here = useMap().RUN.root ?? "";
+  const map = useMap();
+  const here = map.RUN.root ?? "";
+  // The section in front (components/tabs.tsx), which every prompt to Claude
+  // here is told about without being shown (src-tauri/src/claude.rs, place).
+  const { path, crumbs } = useLocation();
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
-  const [open, setOpen] = useState(false);
   // Hidden once it has slid away, so it takes no clicks and no focus.
   const [settled, setSettled] = useState(true);
+  const [open, setOpen] = useState(false);
   // Safe to read during render: nothing is drawn until a tab is opened.
   const [width, setWidth] = useState(storedWidth);
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -170,6 +177,14 @@ export function Workspace() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [tabs, toPaste]);
+
+  // Where the reader is, kept beside every tab of this project, so whatever
+  // runs Claude there can say "you are reading X" without a pick in the strip.
+  const reading = `[Reading now: ${[map.RUN.repo, ...crumbs.map((c) => c.title)].join(" › ")}]\n${section(map, path).text}`;
+  const terminals = JSON.stringify(tabs.filter((t) => t.cwd === here && t.pty !== undefined).map((t) => t.pty));
+  useEffect(() => {
+    for (const id of JSON.parse(terminals) as number[]) void invoke("context_where", { id, text: reading }).catch(() => {});
+  }, [terminals, reading]);
 
   // Picks go to the tab in view if Claude runs there, else this project's
   // newest tab running it; with none, a pick opens a tab (lib/context.ts).
@@ -300,7 +315,7 @@ export function Workspace() {
       onAnimationComplete={() => setSettled(true)}
       style={{
         top: (desktop ? TITLEBAR : 0) + GAP,
-        bottom: GAP,
+        bottom: STATUSBAR + GAP,
         right: GAP,
         // Never wider than the window allows, whatever was dragged out before.
         width: `min(${width}px, calc(100vw - ${2 * GAP}px))`,
@@ -315,8 +330,11 @@ export function Workspace() {
         aria-label="Resize workspace"
         className="absolute inset-y-6 left-0 z-10 w-1.5 cursor-col-resize hover:bg-deep-green/20"
       />
-      <header className="flex h-10 shrink-0 items-center gap-1 border-b border-border-gray px-2.5" role="tablist">
-        <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none]">
+      {/* Tabs as an editor draws them: the open one is the colour of the
+          pane below it and has no line under it, so it reads as the front of
+          the terminal rather than a pill above it. */}
+      <header className="flex h-9 shrink-0 items-stretch bg-surface-container" role="tablist">
+        <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
           {mine.map((t, i) => {
             const front = inFront(t);
             return (
@@ -325,8 +343,10 @@ export function Workspace() {
                 role="tab"
                 aria-selected={t.key === current?.key}
                 className={cn(
-                  "group flex shrink-0 items-center gap-1.5 rounded-[5px] px-2 py-0.5 font-mono text-[11.5px]",
-                  t.key === current?.key ? "bg-surface-container text-ink" : "text-faint hover:text-on-surface-variant",
+                  "group flex shrink-0 items-center gap-2 border-r border-border-gray pl-3 pr-2 text-[12px]",
+                  t.key === current?.key
+                    ? "bg-surface-container-low text-ink"
+                    : "border-b text-muted-slate hover:text-ink",
                 )}
               >
                 <button type="button" onClick={() => select(t.key)} className="flex cursor-pointer items-center gap-1.5">
@@ -337,7 +357,7 @@ export function Workspace() {
                   type="button"
                   onClick={() => close(t.key)}
                   aria-label={`Close tab ${i + 1}`}
-                  className="cursor-pointer text-faint opacity-0 hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
+                  className="flex size-[18px] cursor-pointer items-center justify-center rounded-[4px] text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
                 >
                   ×
                 </button>
@@ -354,16 +374,17 @@ export function Workspace() {
           aria-label="New tab"
           aria-haspopup="menu"
           title="New tab (Ctrl+T for a terminal, Ctrl+Shift+T for the default agent)"
-          className="shrink-0 cursor-pointer rounded-[5px] px-2 text-[14px] text-faint hover:text-ink"
+          className="flex w-9 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           +
         </button>
+        <div className="flex-1 border-b border-border-gray" />
         <button
           type="button"
           onClick={() => show(false)}
           aria-label="Hide workspace"
           title="Hide (Ctrl+`) — everything keeps running. Ctrl+W closes a tab."
-          className="ml-auto shrink-0 cursor-pointer rounded-[5px] px-2 text-[13px] text-faint hover:text-ink"
+          className="flex w-9 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           ✕
         </button>
@@ -380,14 +401,6 @@ export function Workspace() {
               .map((a) => ({ label: a.label, icon: <AgentIcon id={a.id} />, onClick: () => add(a.id) })),
             { label: "Terminal", icon: <TerminalIcon />, onClick: () => add(null) },
           ]}
-        />
-      ) : null}
-      {current?.pty !== undefined ? (
-        <Strip
-          tab={current}
-          pty={current.pty}
-          agents={current.found === false ? others : agents}
-          onRun={(id) => patch(current.key, { ran: id })}
         />
       ) : null}
       <div className="relative min-h-0 flex-1 pt-1.5">
@@ -408,6 +421,17 @@ export function Workspace() {
           />
         ))}
       </div>
+      {/* Under the terminal, beside where a prompt is typed: Claude Code draws
+          its input at the foot of the tab, so what the next prompt will carry
+          sits next to it rather than across the top of the window. */}
+      {current?.pty !== undefined ? (
+        <Strip
+          tab={current}
+          pty={current.pty}
+          agents={current.found === false ? others : agents}
+          onRun={(id) => patch(current.key, { ran: id })}
+        />
+      ) : null}
     </motion.aside>
   );
 }
@@ -480,7 +504,7 @@ function inFront(t: Tab): Agent | undefined {
 }
 
 /**
- * The line under the tabs. With Claude running: the map context handed to
+ * The line under the terminal. With Claude running: the map context handed to
  * it, waiting (◷) until the next prompt takes it, then sent (✓); only a
  * waiting one can still be taken back. With the shell at its prompt: the
  * agents to start here. With anything else in front, only waiting picks.
@@ -504,7 +528,7 @@ function Strip({
     void invoke("pty_write", { id: pty, data: `${a.command}\r` });
   };
   return (
-    <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border-gray px-3 py-1.5 font-mono text-[11px] [scrollbar-width:none]">
+    <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-t border-torder-gray px-3 py-1.5 font-mono text-[11px] [scrollbar-width:none]">
       {tab.live ? <span className="shrink-0 text-faint">context</span> : null}
       {idle
         ? agents.map((a) => (

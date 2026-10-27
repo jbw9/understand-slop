@@ -4,12 +4,11 @@
  *
  * The one call whose mistakes every later stage inherits, so it runs on the
  * strongest model available and its output is checked mechanically: every
- * source file must land in a root or be excluded with a reason, and every
- * edge must join two roots.
+ * source file must land in a root or be excluded with a reason. How the roots
+ * connect is drawn later, from the code, by the overview (overview.ts).
  */
 
 import { readFileSync } from "node:fs";
-import type { Edge } from "@/lib/data";
 import { ask, type Message } from "./bedrock";
 import { SUB_WORDS, words } from "./check";
 import { isSource, type Inventory } from "./inventory";
@@ -29,7 +28,6 @@ export interface Cut {
   about: string;
   roots: Root[];
   excluded: { path: string; reason: string }[];
-  edges: Edge[];
 }
 
 const TOOL = {
@@ -38,9 +36,9 @@ const TOOL = {
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["about", "roots", "excluded", "edges"],
+    required: ["about", "roots", "excluded"],
     properties: {
-      about: { type: "string", description: "One sentence: what the top level is cut by and why that order. E.g. 'Cut by the life of one event — an organisation creates it, a student finds and joins it — after the two steps every account passes first.'" },
+      about: { type: "string", description: "One sentence for the authors: what the top level is cut by and why that order. E.g. 'Cut by the life of one event — an organisation creates it, a student finds and joins it — after the two steps every account passes first.'" },
       roots: {
         type: "array",
         items: {
@@ -62,22 +60,6 @@ const TOOL = {
         description: "Source files or directories ('/'-terminated) deliberately left out of every root, each with a reason: generated, vendored, dead, pure tooling.",
         items: { type: "object", additionalProperties: false, required: ["path", "reason"], properties: { path: { type: "string" }, reason: { type: "string" } } },
       },
-      edges: {
-        type: "array",
-        description: "Real precedence between roots. Ordered edges with no lane form the shared path; edges sharing a lane form one branch after a fork; an edge with no order is a hand-off between branches.",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["from", "to", "label"],
-          properties: {
-            from: { type: "string" },
-            to: { type: "string" },
-            label: { type: "string", description: "One or two words, read as '<label> <to title>': 'then', 'produces', 'feeds'. Never restate the next root's title." },
-            order: { type: "integer", description: "1-indexed position in the path or lane. Omit for a hand-off." },
-            lane: { type: "string", description: "Only where the path genuinely forks (e.g. by account type): the branch name." },
-          },
-        },
-      },
     },
   },
 };
@@ -85,9 +67,9 @@ const TOOL = {
 const INSTRUCTIONS = `Choose the top level of the map: 4 to 10 roots.
 
 - Roots are what someone DOES with the product, in the order they do it — a journey, not a stack of layers. For a library, the someone is the caller.
-- Title a journey root as the action, the way a user would say it: "Signing Up", "Writing A Post", "Making A Request" — not a layer or module name like "Authentication" or "Post Dashboard". Roots off the path may be nouns ("The Database").
-- Put the roots that are steps of one journey on the path with ordered edges. Fork into lanes only where the code really routes different users down different paths.
-- Things that are not steps (the database, background jobs, shared infrastructure, admin tooling) are roots off the path with no edge. Use them sparingly; prefer folding infrastructure into the feature that uses it.
+- Title a journey root as the action, the way a user would say it: "Signing Up", "Writing A Post", "Making A Request" — not a layer or module name like "Authentication" or "Post Dashboard". Roots that are not steps may be nouns ("The Database").
+- List the roots in the order someone meets them.
+- Things that are not steps (the database, background jobs, shared infrastructure, admin tooling) may be roots of their own. Use them sparingly; prefer folding infrastructure into the feature that uses it.
 - Every source file listed must be in at least one root's files or in excluded. Use '/'-terminated directory paths to keep the list short when a whole directory belongs to one root.
 - A root should own enough to explain in 2-3 levels and not so much that it can't: roughly 3-60 files.
 - Ids are kebab-case; prefixes are 2-3 letters and unique.
@@ -112,7 +94,6 @@ const excludedBy = (cut: Cut, path: string) => cut.excluded.some((e) => e.path =
 
 function problems(cut: Cut, inv: Inventory): string[] {
   const out: string[] = [];
-  const ids = new Set(cut.roots.map((r) => r.id));
   const prefixes = new Set<string>();
   for (const r of cut.roots) {
     if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(r.id)) out.push(`root id "${r.id}" is not kebab-case`);
@@ -120,10 +101,6 @@ function problems(cut: Cut, inv: Inventory): string[] {
     prefixes.add(r.prefix);
     if (r.title.split(/\s+/).length > 4) out.push(`root ${r.id}: title "${r.title}" has more than 4 words`);
     if (words(r.sub) > SUB_WORDS) out.push(`root ${r.id}: sub "${r.sub}" has more than ${SUB_WORDS} words`);
-  }
-  for (const e of cut.edges) {
-    for (const k of [e.from, e.to]) if (!ids.has(k)) out.push(`edge ${e.from}→${e.to}: "${k}" is not a root id`);
-    if (words(e.label ?? "") > 2) out.push(`edge ${e.from}→${e.to}: label "${e.label}" has more than 2 words`);
   }
   const missing = inv.files.filter((f) => isSource(f) && !owners(cut, f.path).length && !excludedBy(cut, f.path)).map((f) => f.path);
   if (missing.length) out.push(`${missing.length} source files are in no root and not excluded:\n${missing.slice(0, 300).join("\n")}`);

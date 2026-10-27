@@ -1,9 +1,12 @@
 import { readSlice, writeSlice, Refused } from "@/lib/repo";
-import { bakedSource, loadMap, rootOf } from "@/lib/maps";
+import { demoSource, loadMap, rootOf } from "@/lib/maps";
 import { sliceOf } from "@/lib/source";
 
-/** The checkout behind the map the reader has open (`?map=`). */
-const rootFor = (map: string | null | undefined) => rootOf(loadMap(map ?? undefined).file.RUN);
+/** The checkout behind the map the reader has open (`?map=`); null with no project yet. */
+const rootFor = (map: string | null | undefined) => {
+  const open = loadMap(map ?? undefined);
+  return open ? rootOf(open.file.RUN) : null;
+};
 
 /**
  * The only door to the real repository.
@@ -32,15 +35,20 @@ export async function GET(request: Request) {
   }
 
   const fixture = q.get("fixture") ?? undefined;
+  // A landing demo reads the code it was mapped from, committed beside it (D63).
+  const demo = demoSource(q.get("map") ?? undefined);
+  if (demo) {
+    const text = demo[file];
+    return text === undefined ? bad("unreadable") : Response.json(sliceOf(text, { file, start, end, fixture }));
+  }
+  const root = rootFor(q.get("map"));
+  if (!root) return bad("unreadable");
   try {
     // `fixture` is the text the map claims is at these lines. Passing it is
     // what lets the answer say "this has drifted" instead of quietly showing
     // fresh code under a stale explanation.
-    return Response.json(await readSlice({ file, start, end }, fixture, rootFor(q.get("map"))));
+    return Response.json(await readSlice({ file, start, end }, fixture, root));
   } catch (e) {
-    // No checkout here: an example still shows the code it was mapped from.
-    const text = bakedSource(q.get("map") ?? undefined)?.[file];
-    if (text !== undefined) return Response.json(sliceOf(text, { file, start, end, fixture }));
     return bad(e instanceof Refused ? e.message : "unreadable");
   }
 }
@@ -60,6 +68,8 @@ export async function POST(request: Request) {
     return bad("bad request");
   }
 
-  const result = await writeSlice({ file, start, end, code, expected }, rootFor(typeof map === "string" ? map : null));
+  const root = rootFor(typeof map === "string" ? map : null);
+  if (!root) return bad("unreadable");
+  const result = await writeSlice({ file, start, end, code, expected }, root);
   return Response.json(result, { status: result.ok ? 200 : 409 });
 }

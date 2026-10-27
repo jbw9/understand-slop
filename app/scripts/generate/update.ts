@@ -372,7 +372,12 @@ export async function update(args: string[]) {
       removed.push(t.node.id);
       // A root goes with the lines drawn to it.
       if (!at) {
-        map.E0 = map.E0.filter((e) => e.from !== t.node.id && e.to !== t.node.id);
+        const pic = map.OVERVIEW?.anatomy?.find((b) => b.kind === "diagram");
+        if (pic?.kind === "diagram") {
+          const gone = new Set(pic.boxes.filter((x) => x.opens === t.node.id).map((x) => x.id));
+          pic.boxes = pic.boxes.filter((x) => !gone.has(x.id));
+          pic.arrows = pic.arrows.filter((x) => !gone.has(x.from) && !gone.has(x.to));
+        }
         map.LINKS = map.LINKS.filter((l) => !l.from.startsWith(`${t.node.id}:`) && !l.to.startsWith(`${t.node.id}:`));
       }
       say(`${t.node.id}: removed`);

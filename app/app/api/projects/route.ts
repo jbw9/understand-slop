@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { auditOf, listExamples } from "@/lib/maps";
+import { auditOf } from "@/lib/maps";
 import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       progress: p.map.status === "generating" ? progressOf(p.id) : undefined,
     };
   });
-  return Response.json({ vault: VAULT, examples: listExamples(), projects });
+  return Response.json({ vault: VAULT, projects });
 }
 
 export async function POST(request: Request) {
@@ -69,10 +69,10 @@ export async function POST(request: Request) {
     switch (action) {
       case "import":
         if (!str(root)) return bad("Choose a directory.");
-        return Response.json(importProject(root as string, str(name), listExamples(), str(claude)));
+        return Response.json(importProject(root as string, str(name), str(claude)));
       case "create":
         if (!str(root) || !str(name)) return bad("Choose where it goes and what it is called.");
-        return Response.json(createProject(root as string, name as string, listExamples()));
+        return Response.json(createProject(root as string, name as string));
       case "regenerate":
         if (!str(id)) return bad("bad request");
         return Response.json(generate(id as string, str(claude)) ?? null);

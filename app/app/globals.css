@@ -293,12 +293,14 @@
   .dg-live rect {
     transition:
       filter 150ms ease,
-      stroke-width 150ms ease;
+      stroke-width 150ms ease,
+      stroke-opacity 150ms ease;
   }
   .dg-live:hover rect,
   .dg-live:focus-visible rect {
-    stroke-width: 2.5;
-    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.14));
+    stroke-width: 1.5;
+    stroke-opacity: 1;
+    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.1));
   }
   .dg-live:hover .dg-cue {
     transform: scale(1.18);

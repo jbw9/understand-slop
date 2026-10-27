@@ -23,6 +23,9 @@ const Scale = createContext(1);
 /** The magnification the level is drawn at, for anything that measures it. */
 export const useZoomScale = () => useContext(Scale);
 
+/** A pinch the desktop shell took from WebKitGTK (src-tauri/src/lib.rs). */
+const PINCH = "slop:pinch";
+
 export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement | null>; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const now = useRef(1);
@@ -92,6 +95,16 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
       e.preventDefault();
       pinching = false;
     };
+    // WebKitGTK (the desktop app on Linux) sends neither, and would magnify
+    // the whole window instead; the shell takes the pinch and passes on its
+    // scale since the pinch began (src-tauri/src/lib.rs). A new one starts at 1.
+    let last = 1;
+    const onPinch = (e: Event) => {
+      const { scale, x, y } = (e as CustomEvent<{ scale: number; x: number; y: number }>).detail;
+      if (scale === 1) last = 1;
+      zoomTo(now.current * (scale / last), local({ clientX: x, clientY: y }));
+      last = scale;
+    };
 
     const onKey = (e: KeyboardEvent) => {
       const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? e.metaKey : e.ctrlKey;
@@ -113,6 +126,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
     pane.addEventListener("gesturestart", onStart);
     pane.addEventListener("gesturechange", onChange);
     pane.addEventListener("gestureend", onEnd);
+    window.addEventListener(PINCH, onPinch);
     window.addEventListener("keydown", onKey);
     return () => {
       ro.disconnect();
@@ -120,6 +134,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
       pane.removeEventListener("gesturestart", onStart);
       pane.removeEventListener("gesturechange", onChange);
       pane.removeEventListener("gestureend", onEnd);
+      window.removeEventListener(PINCH, onPinch);
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

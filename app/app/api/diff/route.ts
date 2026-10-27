@@ -27,8 +27,9 @@ export async function GET(request: Request) {
   try {
     open = loadMap(q.get("map") ?? undefined);
   } catch {
-    return bad("No such map.", 404);
+    open = null;
   }
+  if (!open) return bad("No such map.", 404);
   const root = rootOf(open.file.RUN);
 
   if (q.get("commits")) return Response.json({ commits: commitList(root), at: open.file.RUN.commit });

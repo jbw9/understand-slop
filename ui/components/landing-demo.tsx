@@ -29,6 +29,8 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const stage = useRef<HTMLDivElement>(null);
   const tabs = useRef<HTMLDivElement>(null);
   const replay = useRef<HTMLButtonElement>(null);
+  const guide = useRef<Tour>(null);
+  const shownMap = useRef(open);
 
   // The first frame is server-rendered and can finish loading before React
   // hydrates, so its load event is missed. Read the document instead.
@@ -37,7 +39,35 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
     if (doc?.readyState === "complete" && doc.URL !== "about:blank") setLoaded(open);
   }, [open]);
 
-  useEffect(() => tour(frame.current!, stage.current!, tabs.current!, replay.current!), []);
+  // Another repository ends the tour, whether picked by click or by arrow key.
+  useEffect(() => {
+    if (shownMap.current === open) return;
+    shownMap.current = open;
+    guide.current?.away();
+  }, [open]);
+
+  // Keys go only to the focused document, so Esc pressed on the page around
+  // the demo never reached the map. Hand it on while the demo is on screen.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (e.target instanceof Element && e.target.closest("input, textarea, [contenteditable]")) return;
+      const r = stage.current!.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= window.innerHeight) return;
+      try {
+        const win = frame.current!.contentWindow as typeof window;
+        win.document.body.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      } catch {}
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const t = tour(frame.current!, stage.current!, replay.current!);
+    guide.current = t;
+    return t.dispose;
+  }, []);
 
   const onKey = (e: React.KeyboardEvent) => {
     const i = maps.findIndex((m) => m.id === open);
@@ -118,7 +148,7 @@ const STEPS: Step[] = [
   { text: "A part cites the code it describes. Click to see where.", find: (d) => drawers(d)[0] },
   { text: "Each row is a place in the code. Click one to read its lines.", find: (d) => refs(d)[0] },
   {
-    text: "These are the exact lines. Press <kbd>Esc</kbd> to go back up a level.",
+    text: "These are the exact lines. Press <kbd>Esc</kbd> to close them.",
     find: (d) => refs(d).find(isOpen)?.parentElement ?? undefined,
   },
 ];
@@ -143,7 +173,11 @@ function stepOf(d: Document) {
   return Math.min(new URLSearchParams(d.defaultView!.location.search).getAll("at").length, 2);
 }
 
-/** Scrolls `el` inside its own scroller in the frame, never the page around it. */
+/**
+ * Scrolls `el` inside its own scroller in the frame, never the page around it,
+ * and returns that scroller. Centering never pushes the top of a tall element
+ * out of view.
+ */
 function within(el: Element, align: "start" | "center", behavior: ScrollBehavior) {
   const view = el.ownerDocument.defaultView!;
   const r = el.getBoundingClientRect();
@@ -154,7 +188,10 @@ function within(el: Element, align: "start" | "center", behavior: ScrollBehavior
   const top = box ? box.getBoundingClientRect().top : 0;
   const h = box ? box.clientHeight : view.innerHeight;
   const margin = parseFloat(view.getComputedStyle(el).scrollMarginTop) || 0;
-  (box ?? view).scrollBy({ top: align === "start" ? r.top - top - margin : r.top - top - h / 2 + r.height / 2, behavior });
+  const head = r.top - top - margin;
+  const by = align === "start" ? head : Math.min(r.top - top - h / 2 + r.height / 2, head - 24);
+  (box ?? view).scrollBy({ top: by, behavior });
+  return box ?? view;
 }
 
 /**
@@ -172,13 +209,81 @@ function contain(d: Document) {
   proto.scrollIntoView = Object.assign(patched, { contained: true as const });
 }
 
+type Box = { x: number; y: number; w: number; h: number };
+type Tour = { away: () => void; dispose: () => void };
+
+const GLIDE = 320;
+const ease = (p: number) => 1 - (1 - p) ** 4;
+
+/**
+ * Puts an element on a box that may itself be moving. A glide eases from
+ * where the element was toward the box's live position, so it lands exactly
+ * on a target that scrolls while it travels. Otherwise it follows the box
+ * every frame, with no lag.
+ */
+function mover(el: HTMLElement, sized: boolean) {
+  let last: Box | null = null;
+  let from: Box | null = null;
+  let start = 0;
+  let written = "";
+  return {
+    glide(now: number) {
+      from = last;
+      start = now;
+    },
+    forget() {
+      last = from = null;
+    },
+    to(goal: Box, now: number) {
+      let b = goal;
+      if (from) {
+        const p = Math.min(1, (now - start) / GLIDE);
+        const e = ease(p);
+        const f = from;
+        b = { x: f.x + (goal.x - f.x) * e, y: f.y + (goal.y - f.y) * e, w: f.w + (goal.w - f.w) * e, h: f.h + (goal.h - f.h) * e };
+        if (p === 1) from = null;
+      }
+      last = b;
+      const x = Math.round(b.x);
+      const y = Math.round(b.y);
+      const w = Math.round(b.w);
+      const h = Math.round(b.h);
+      const key = sized ? `${x} ${y} ${w} ${h}` : `${x} ${y}`;
+      if (key === written) return;
+      written = key;
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      if (sized) {
+        el.style.width = `${w}px`;
+        el.style.height = `${h}px`;
+      }
+    },
+  };
+}
+
+/**
+ * Where the tip goes: beside the target, then above it, then below it. When
+ * none of those fit, it docks to the edge of the stage away from the target.
+ */
+function spot(r: DOMRect | undefined, W: number, H: number, tw: number, th: number) {
+  const m = 12;
+  const clampX = (x: number) => Math.max(m, Math.min(x, W - tw - m));
+  const clampY = (y: number) => Math.max(m, Math.min(y, H - th - m));
+  if (!r) return { side: "none", x: (W - tw) / 2, y: H - th - 28 };
+  if (r.right + 18 + tw <= W - m) return { side: "right", x: r.right + 18, y: clampY(r.top + r.height / 2 - th / 2) };
+  if (r.top - th - 16 >= m) return { side: "above", x: clampX(r.left), y: r.top - th - 16 };
+  if (r.bottom + 16 + th <= H - m) return { side: "below", x: clampX(r.left), y: r.bottom + 16 };
+  const low = r.top + r.height / 2 < H / 2;
+  return { side: low ? "dock-bottom" : "dock-top", x: clampX((W - tw) / 2), y: low ? H - th - m : m };
+}
+
 /**
  * Points at one real element in the frame per step. Runs on the DOM
- * directly: every animation frame it reads where the visitor is, picks the
- * step for it, and follows that step's element, which the canvas moves and
- * replaces as the visitor explores.
+ * directly. Each frame it follows that step's element, which the canvas moves
+ * and replaces as the visitor explores. It reads where the visitor is, and so
+ * which step to show, only when the frame's DOM changes, and it sleeps while
+ * the demo is off screen.
  */
-function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, replay: HTMLButtonElement) {
+function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonElement): Tour {
   const root = stage.querySelector<HTMLElement>("[data-tour]")!;
   const ring = root.querySelector<HTMLElement>("[data-ring]")!;
   const tip = root.querySelector<HTMLElement>("[data-tip]")!;
@@ -192,127 +297,187 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
       return null;
     }
   };
-  let on = false;
+  let mode: "off" | "on" | "done" = "off";
   let at = -1;
   let since = 0;
   let target: Element | null = null;
   // The element last scrolled into view, so a visitor scrolling away is left alone.
   let shown: Element | null = null;
+  let side = "";
+  let stale = true;
+  let read = 0;
   let raf = 0;
+  let near = true;
   let seen = false;
-  let ending = false;
+  let reloading = false;
   let hooked: Document | null = null;
+  let watch: MutationObserver | null = null;
+  // The tour's own scroll, which any input from the visitor cancels.
+  let scrolling: { box: Element | Window; until: number } | null = null;
   let finished = 0;
   const timers: number[] = [];
   const after = (ms: number, f: () => void) => timers.push(window.setTimeout(f, ms));
-
-  // Placed where it is measured, without sliding there from the last spot.
-  const jump = (el: HTMLElement) => {
-    el.style.transition = "none";
-    requestAnimationFrame(() => requestAnimationFrame(() => (el.style.transition = "")));
+  const ringAt = mover(ring, true);
+  const tipAt = mover(tip, false);
+  const show = (el: HTMLElement, on: boolean) => {
+    if (el.hidden === on) el.hidden = !on;
+  };
+  const hide = () => {
+    show(ring, false);
+    show(tip, false);
+    ringAt.forget();
+    tipAt.forget();
+    side = "";
   };
 
-  const place = () => {
-    raf = requestAnimationFrame(place);
+  const step = (now: number) => {
     const d = doc();
-    if (!d || ending) return;
-    const now = stepOf(d);
-    if (now !== at) {
-      at = now;
-      since = performance.now();
-      text.innerHTML = STEPS[at].text;
-      count.textContent = `${at + 1} / ${STEPS.length}`;
-    }
-    target = STEPS[at].find(d) ?? null;
-    // A new level takes a moment to draw its cards: wait for them before falling back to the middle.
-    if (!target && performance.now() - since < 700) {
-      ring.hidden = tip.hidden = true;
-      return;
-    }
+    if (!d) return;
     const W = stage.clientWidth;
     const H = stage.clientHeight;
-    if (tip.hidden) {
-      jump(tip);
-      tip.hidden = false;
+    if (mode === "done") {
+      tipAt.to({ ...spot(undefined, W, H, tip.offsetWidth, tip.offsetHeight), w: 0, h: 0 }, now);
+      return;
     }
-    const tw = tip.offsetWidth;
-    const th = tip.offsetHeight;
+    // The DOM changing marks the step stale; a slow re-read catches what no mutation shows, like a resize.
+    if (stale || now - read > 250 || (target && !target.isConnected)) {
+      stale = false;
+      read = now;
+      const next = stepOf(d);
+      if (next !== at) {
+        at = next;
+        since = now;
+        text.innerHTML = STEPS[at].text;
+        count.textContent = `${at + 1} / ${STEPS.length}`;
+        end.textContent = at === STEPS.length - 1 ? "Done" : "Skip tour";
+      }
+      const found = STEPS[at].find(d) ?? null;
+      if (found !== target) {
+        target = found;
+        ringAt.glide(now);
+        tipAt.glide(now);
+      }
+    }
+    // A new level takes a moment to draw its cards: wait for them before falling back to the middle.
+    if (!target && now - since < 700) {
+      hide();
+      return;
+    }
     if (target && target !== shown) {
       shown = target;
       const r = target.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > H) within(target, "center", "smooth");
-    }
-    let x = (W - tw) / 2;
-    let y = H - th - 28;
-    const r = target?.getBoundingClientRect();
-    const off = !r || r.bottom < 0 || r.top > H;
-    if (ring.hidden && !off) jump(ring);
-    ring.hidden = off;
-    if (r && !off) {
-      ring.style.width = `${r.width + 10}px`;
-      ring.style.height = `${r.height + 10}px`;
-      ring.style.transform = `translate(${r.left - 5}px, ${r.top - 5}px)`;
-      x = r.right + 18;
-      y = r.top + r.height / 2 - th / 2;
-      if (x + tw > W - 12) {
-        x = r.left;
-        y = r.top - th - 16;
-        if (y < 12) y = r.bottom + 16;
+      if (r.top < 0 || r.top + Math.min(r.height, H / 3) > H) {
+        scrolling = { box: within(target, "center", "smooth"), until: now + 1000 };
       }
     }
-    x = Math.max(12, Math.min(x, W - tw - 12));
-    y = Math.max(12, Math.min(y, H - th - 12));
-    tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    const r = target?.getBoundingClientRect();
+    const off = !r || r.bottom < 0 || r.top > H;
+    // Appear on the target once the tour's own scroll brings it in, not in the middle first.
+    if (off && target && scrolling && now < scrolling.until) {
+      hide();
+      return;
+    }
+    show(tip, true);
+    if (off) {
+      show(ring, false);
+      ringAt.forget();
+    } else {
+      show(ring, true);
+      ringAt.to({ x: r.left - 5, y: r.top - 5, w: r.width + 10, h: r.height + 10 }, now);
+    }
+    const s = spot(off ? undefined : r, W, H, tip.offsetWidth, tip.offsetHeight);
+    if (s.side !== side) {
+      if (side) tipAt.glide(now);
+      side = s.side;
+    }
+    tipAt.to({ x: s.x, y: s.y, w: 0, h: 0 }, now);
   };
 
-  const onKey = (e: KeyboardEvent) => {
-    if (!on || e.key !== "Escape" || at !== STEPS.length - 1) return;
-    ending = true;
-    after(350, finish);
+  const loop = (now: number) => {
+    raf = requestAnimationFrame(loop);
+    step(now);
+  };
+  const run = () => {
+    const want = (mode === "on" || mode === "done") && near;
+    if (want && !raf) raf = requestAnimationFrame(loop);
+    if (!want && raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  };
+
+  // In the demo, Esc closes the open lines, then the open code, before the canvas leaves the level.
+  // It listens on the document, under the window's own listeners, so an open dialog or menu closes first.
+  const onEsc = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || e.defaultPrevented || (e.target as Element).closest?.("input, textarea, [contenteditable]")) return;
+    const d = doc();
+    const open = d && (refs(d).find(isOpen) ?? drawers(d).find(isOpen));
+    if (!open) return;
+    e.stopPropagation();
+    open.click();
+  };
+  const onInput = () => {
+    if (scrolling && performance.now() < scrolling.until) {
+      const b = scrolling.box;
+      b.scrollTo({ top: "scrollY" in b ? b.scrollY : b.scrollTop, behavior: "instant" });
+    }
+    scrolling = null;
+  };
+  const inputs = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+  const unhook = () => {
+    watch?.disconnect();
+    hooked?.removeEventListener("keydown", onEsc);
+    for (const t of inputs) hooked?.removeEventListener(t, onInput, true);
   };
   const hook = () => {
     const d = doc();
     if (!d || hooked === d) return;
+    unhook();
     contain(d);
-    hooked?.defaultView?.removeEventListener("keydown", onKey, true);
-    d.defaultView!.addEventListener("keydown", onKey, true);
+    d.addEventListener("keydown", onEsc);
+    for (const t of inputs) d.addEventListener(t, onInput, { capture: true, passive: true });
+    watch = new MutationObserver(() => (stale = true));
+    watch.observe(d.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-expanded", "disabled", "hidden", "data-path"],
+    });
     hooked = d;
   };
 
   const go = () => {
-    on = true;
-    ending = false;
+    mode = "on";
     at = -1;
-    shown = null;
+    target = shown = null;
+    stale = true;
     end.textContent = "Skip tour";
+    hide();
     hook();
-    if (!raf) place();
-  };
-  const halt = () => {
-    cancelAnimationFrame(raf);
-    raf = 0;
-    on = false;
-    target = null;
+    run();
   };
   const stop = () => {
-    halt();
-    ring.hidden = tip.hidden = true;
+    mode = "off";
+    reloading = false;
+    target = null;
+    hide();
     replay.hidden = false;
+    run();
   };
+  const onEnd = () => (mode === "on" && at === STEPS.length - 1 ? finish() : stop());
   const finish = () => {
-    halt();
-    ring.hidden = true;
+    mode = "done";
+    show(ring, false);
+    ringAt.forget();
     text.textContent = "That's the whole loop. Keep exploring, or pick another repository above.";
     count.textContent = "";
     end.textContent = "Done";
-    tip.hidden = false;
-    const x = Math.round((stage.clientWidth - tip.offsetWidth) / 2);
-    const y = Math.round(stage.clientHeight - tip.offsetHeight - 28);
-    tip.style.transform = `translate(${x}px, ${y}px)`;
+    tipAt.glide(performance.now());
     replay.hidden = false;
+    run();
     const mine = ++finished;
     after(5000, () => {
-      if (!on && mine === finished && !tip.hidden) stop();
+      if (mode === "done" && mine === finished) stop();
     });
   };
   const begin = () => {
@@ -322,9 +487,10 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
     const d = doc();
     // Deep in a map, the tour starts over from its top level.
     if (d && stepOf(d) > 0) {
-      halt();
-      ring.hidden = tip.hidden = true;
-      frame.addEventListener("load", go, { once: true });
+      mode = "off";
+      hide();
+      run();
+      reloading = true;
       frame.contentWindow!.location.href = frame.src;
     } else go();
   };
@@ -333,28 +499,38 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, tabs: HTMLElement, r
     if (!doc()) return;
     root.hidden = false;
     hook();
-    if (!seen) {
+    if (reloading) {
+      reloading = false;
+      go();
+    } else if (!seen) {
       seen = true;
       begin();
     }
   };
-  const onTab = (e: Event) => {
-    if ((e.target as Element).closest("[data-id]") && on) stop();
-  };
+  const io = new IntersectionObserver(([e]) => {
+    near = e.isIntersecting;
+    run();
+  });
+  io.observe(stage);
   frame.addEventListener("load", onLoad);
   // Like the loaded state above: the first frame may have loaded before this ran.
   if (frame.contentDocument?.readyState === "complete" && frame.contentDocument.URL !== "about:blank") onLoad();
-  end.addEventListener("click", stop);
+  end.addEventListener("click", onEnd);
   replay.addEventListener("click", begin);
-  tabs.addEventListener("click", onTab);
-  return () => {
-    cancelAnimationFrame(raf);
-    timers.forEach(clearTimeout);
-    frame.removeEventListener("load", onLoad);
-    end.removeEventListener("click", stop);
-    replay.removeEventListener("click", begin);
-    tabs.removeEventListener("click", onTab);
-    hooked?.defaultView?.removeEventListener("keydown", onKey, true);
+  return {
+    away: () => {
+      if (mode !== "off" || reloading) stop();
+    },
+    dispose: () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      timers.forEach(clearTimeout);
+      io.disconnect();
+      unhook();
+      frame.removeEventListener("load", onLoad);
+      end.removeEventListener("click", onEnd);
+      replay.removeEventListener("click", begin);
+    },
   };
 }
 

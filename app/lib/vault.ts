@@ -1,8 +1,7 @@
 /**
  * Server-side: the project vault — the reader's own projects, imported from
  * their machine. It lives in the app's data directory, never in this repo, so
- * an imported project and its map stay local: the only maps ever committed are
- * the examples under `app/maps/`.
+ * an imported project and its map stay local: no map is ever committed.
  *
  *   <vault>/projects.json             the list below
  *   <vault>/projects/<id>/map.json    the map, as the generator writes it
@@ -42,7 +41,7 @@ export const projectDir = (id: string) => join(VAULT, "projects", id);
 export type MapStatus = "generating" | "ready" | "failed" | "cancelled" | "empty";
 
 export interface Project {
-  /** The `?map=` key: unique across examples and projects, safe as a directory name. */
+  /** The `?map=` key: unique across projects, safe as a directory name. */
   id: string;
   /** What the reader called it. */
   name: string;
@@ -215,14 +214,14 @@ function freeId(name: string, taken: Set<string>) {
 export class ImportError extends Error {}
 
 /** Register a checkout and start mapping it. */
-export function importProject(rootIn: string, nameIn: string | undefined, examples: string[], claude?: string): Project {
+export function importProject(rootIn: string, nameIn: string | undefined, claude?: string): Project {
   const root = resolve(rootIn.replace(/^~(?=$|\/)/, homedir()));
   if (!existsSync(root) || !statSync(root).isDirectory()) throw new ImportError("That is not a directory.");
   const v = readVault();
   const same = v.projects.find((p) => p.root === root);
   if (same) throw new ImportError(`Already imported as "${same.name}".`);
   const name = nameIn?.trim() || basename(root);
-  const id = freeId(name, new Set([...examples, ...v.projects.map((p) => p.id)]));
+  const id = freeId(name, new Set(v.projects.map((p) => p.id)));
   const now = new Date().toISOString();
   const project: Project = {
     id,
@@ -242,7 +241,7 @@ export function importProject(rootIn: string, nameIn: string | undefined, exampl
  * checkout and register it. There is no code to map yet, so nothing runs;
  * the reader maps it from the list once there is.
  */
-export function createProject(parentIn: string, nameIn: string, examples: string[]): Project {
+export function createProject(parentIn: string, nameIn: string): Project {
   const name = nameIn.trim();
   if (!name || /[\\/]/.test(name) || name === "." || name === "..") throw new ImportError("Give it a folder name, without slashes.");
   const parent = resolve(parentIn.replace(/^~(?=$|\/)/, homedir()));
@@ -256,7 +255,7 @@ export function createProject(parentIn: string, nameIn: string, examples: string
   git(root, "init");
   const now = new Date().toISOString();
   const project: Project = {
-    id: freeId(name, new Set([...examples, ...v.projects.map((p) => p.id)])),
+    id: freeId(name, new Set(v.projects.map((p) => p.id))),
     name,
     root,
     addedAt: now,

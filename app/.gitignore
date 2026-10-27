@@ -47,3 +47,6 @@ next-env.d.ts
 /src-tauri/gen
 # generator response cache
 /maps/*/.cache/
+
+# maps the generator writes by default (scripts/generate/run.mts); the app ships none
+maps/

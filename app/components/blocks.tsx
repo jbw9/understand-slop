@@ -142,7 +142,7 @@ function Diagram({
       <figcaption className="mb-3 max-w-[1000px]">
         <span className="text-[14px] font-medium text-on-surface">{block.caption}</span>
         {navigable ? (
-          <span className="ml-2.5 whitespace-nowrap font-mono text-[10.5px] text-faint">
+          <span className="ml-2.5 whitespace-nowrap text-[12px] text-faint">
             colours match the parts below
           </span>
         ) : null}
@@ -230,10 +230,14 @@ function Diagram({
                   y={y}
                   width={w}
                   height={BOX_H}
-                  rx="6"
+                  rx="7"
                   fill={fill}
                   stroke={stroke}
-                  strokeWidth="1.5"
+                  // A hairline, like every other container on the page: the
+                  // tint already says which section it is, and a heavy edge
+                  // made the picture louder than the tables beside it.
+                  strokeWidth="1"
+                  strokeOpacity={sec >= 0 ? 0.55 : 1}
                   strokeDasharray={b.tone === "warn" ? "5 4" : undefined}
                 />
                 {/* The label centres in the space left of the badge, so a
@@ -734,10 +738,11 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
 
 /* ── example ─────────────────────────────────────────────────── */
 
-function Example({ block }: { block: Extract<Anatomy, { kind: "example" }> }) {
+/** `bare` drops the label and caption, for a row that already shows them. */
+export function Example({ block, bare }: { block: Extract<Anatomy, { kind: "example" }>; bare?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="mb-2.5 flex items-center gap-2">
+      <div className={cn("mb-2.5 flex items-center gap-2", bare && "hidden")}>
         <span className="rounded-[6px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
           example
         </span>

@@ -23,9 +23,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Drains the queue: the `mv` is atomic, so a pick appended while Claude reads
-/// lands in a fresh file for the next prompt rather than being lost.
-const HOOK: &str = r#"f="$SLOP_CONTEXT"; [ -s "$f" ] || exit 0; mv "$f" "$f.sent" && cat "$f.sent""#;
+/// Every prompt first says where the user is on the map (`.where`, kept by the
+/// app as they move; see `place`): its first line always, so "what am I
+/// reading?" has an answer, and the section itself only when it has changed
+/// since the last prompt, so one page read for a while is not sent each turn.
+/// Then it drains the queue: the `mv` is atomic, so a pick appended while
+/// Claude reads lands in a fresh file for the next prompt rather than being lost.
+const HOOK: &str = r#"f="$SLOP_CONTEXT"; w="$f.where"; if [ -s "$w" ]; then head -n 1 "$w"; cmp -s "$w" "$w.sent" || { tail -n +2 "$w"; cp "$w" "$w.sent"; }; fi; [ -s "$f" ] || exit 0; mv "$f" "$f.sent" && cat "$f.sent""#;
 
 /// After a tool that can change files: this turn may have edited code.
 const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
@@ -103,7 +107,11 @@ can attach things they picked on the map: a whole section arrives as a block sta
 `[Map section:`, one element of a section (a row, a diagram box, a step, a line of code) as \
 one starting with `[Map element:`. Each names where it sits on the map, what it says, and \
 the code behind it. Treat what is attached as what the user is asking about, and read the \
-listed code when it is relevant. Do not edit files unless asked. The map can be wrong: when \
+listed code when it is relevant. Each prompt also opens with a `[Reading now:` line naming \
+the section the user has open, followed by that section when it has changed since the last \
+prompt. When they ask what they are reading, or say \"this\" or \"here\" with nothing \
+attached, they mean that section: summarize or answer from it and the code it lists. It is \
+told to you, not shown to them, so never mention having been told where they are. Do not edit files unless asked. The map can be wrong: when \
 you find that it is (a listed problem that is not real, a description or a line reference \
 that does not match the code), run `slop-map-fix \"<section title>\" \"<what it gets wrong, \
 and what is true>\"` once per section, and the map is corrected after your turn. Code you \
@@ -216,6 +224,8 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue.with_extension("md.fix"));
     let _ = std::fs::remove_file(queue.with_extension("md.act"));
     let _ = std::fs::remove_file(queue.with_extension("md.map"));
+    let _ = std::fs::remove_file(queue.with_extension("md.where"));
+    let _ = std::fs::remove_file(queue.with_extension("md.where.sent"));
 }
 
 /// Something Claude asked the app to show. Serializes tagged on `verb`, for a
@@ -385,6 +395,18 @@ pub fn append(queue: &Path, text: &str) -> std::io::Result<()> {
     writeln!(f, "{}\n", text.trim_end())
 }
 
+/// Where the user is on the map, rewritten whenever they move. Written whole
+/// and renamed into place, so a prompt never reads half of it.
+pub fn place(queue: &Path, text: &str) -> std::io::Result<()> {
+    if let Some(dir) = queue.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let to = queue.with_extension("md.where");
+    let part = queue.with_extension("md.where.part");
+    std::fs::write(&part, format!("{}\n", text.trim_end()))?;
+    std::fs::rename(part, to)
+}
+
 /// Replaces what is still waiting. Empty clears it.
 pub fn replace(queue: &Path, text: &str) -> std::io::Result<()> {
     if text.trim().is_empty() {
@@ -449,6 +471,27 @@ mod tests {
         assert!(!pending(&q));
         // The next prompt goes without it.
         assert_eq!(run(HOOK, &q), "");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_hook_says_where_and_the_page_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        place(&q, "[Reading now: explorify › Signing Up]\n[Map section: Signing Up\nFive stages.]").unwrap();
+        // The first prompt gets where, and the page.
+        let first = run(HOOK, &q);
+        assert!(first.starts_with("[Reading now: explorify › Signing Up]"));
+        assert!(first.contains("Five stages."));
+        // Still there: where again, the page not.
+        let second = run(HOOK, &q);
+        assert!(second.contains("[Reading now:"));
+        assert!(!second.contains("Five stages."));
+        // Moved: the new page goes out, and a pick still follows it.
+        place(&q, "[Reading now: explorify › Tax Engine]\n[Map section: Tax Engine\nFormulas.]").unwrap();
+        append(&q, "[Map element: a row]").unwrap();
+        let third = run(HOOK, &q);
+        assert!(third.contains("Formulas.") && third.contains("[Map element: a row]"));
     }
 
     /// The stop hook as Claude Code runs it: what it is told arrives on stdin.

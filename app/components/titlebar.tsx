@@ -2,23 +2,23 @@
 
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { openSettings } from "@/lib/settings";
-import { MapSwitcher, Trail, goTo, useLocation } from "@/components/chrome";
+import { Kbd } from "@/components/button";
+import { openPalette } from "@/components/palette";
 import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
-import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
+import { toggleWorkspace } from "@/components/workspace";
 import { cn } from "@/lib/utils";
 
 /**
  * The window's own title bar. The native one is off (`decorations: false` in
- * tauri.conf.json), so this draws where you are — the map switcher and the
- * trail of levels below it — the drag area and the window buttons, in the
- * page's palette rather than the desktop's. The map below has no header of its
+ * tauri.conf.json), so this draws the map's name, which switches maps, a box
+ * that opens the palette (components/palette.tsx), the tools, and the window
+ * buttons, in the page's palette rather than the desktop's. The map below has no header of its
  * own in the desktop app.
  *
  * Everything marked `data-tauri-drag-region` moves the window, and a double
@@ -34,10 +34,13 @@ import { cn } from "@/lib/utils";
 
 const noSubscribe = () => () => {};
 
-export function Titlebar() {
+/**
+ * `bare` is the window with no map open (components/welcome.tsx): the frame,
+ * the projects and settings buttons, and the window buttons, so it can still
+ * be moved and closed.
+ */
+export function Titlebar({ bare }: { bare?: boolean }) {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
-  const { name, maps, RUN } = useMap();
-  const { path, crumbs } = useLocation();
   const [maximized, setMaximized] = useState(false);
   // Only read once `desktop` is true, which is never on the server.
   const mac = desktop && /Mac/.test(navigator.userAgent);
@@ -58,47 +61,121 @@ export function Titlebar() {
   if (!desktop) return null;
   const win = getCurrentWindow();
   return (
+    // Three columns, the outer two equal, so the command centre sits at the
+    // middle of the window rather than of whatever room the trail leaves. The
+    // right one never gives up its buttons; when the window is too narrow for
+    // both, the trail truncates first and the centre drifts left.
     <header
       data-tauri-drag-region
-      className={cn(
-        "flex h-9 shrink-0 select-none items-center border-b border-border-gray bg-surface-container-low",
-        mac ? "pl-[78px]" : "pl-1.5",
-      )}
+      className="grid h-9 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,372px)_minmax(max-content,1fr)] items-center border-b border-border-gray bg-surface-container-low"
     >
+      {/* The Mac's traffic lights take the left edge, inside this column so the centre stays the window's. */}
+      <div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center", mac ? "pl-[78px]" : "pl-1.5")}>
+        {bare ? (
+          <span data-tauri-drag-region className="px-2 font-mono text-[11.5px] font-semibold text-ink">
+            understand-slop
+          </span>
+        ) : (
+          <Where />
+        )}
+      </div>
+      <div data-tauri-drag-region className="flex h-full min-w-0 items-center justify-center px-4">
+          {bare ? null : <Centre />}
+      </div>
+      <div data-tauri-drag-region className="flex h-full items-center justify-end">
+        <Control label="Projects — start a new one, or switch maps" onClick={() => openProjects()}>
+          <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
+        </Control>
+        {bare ? null : <MapTools />}
+        <span aria-hidden className="mx-1 h-4 w-px bg-border-strong" />
+        {bare ? null : (
+          <Control label="Claude Code & terminal (Ctrl+`)" onClick={toggleWorkspace}>
+            <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
+            <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
+          </Control>
+        )}
+        <Control label="Settings" onClick={openSettings}>
+          {/* Lucide's gear, drawn on 24 and scaled to the 16 grid; the stroke
+              is scaled up to match so it reads as heavy as its neighbours. */}
+          <g transform="scale(0.6667)" strokeWidth="1.875">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+          </g>
+        </Control>
+        {mac ? null : (
+          <>
+            <span aria-hidden className="mx-1 h-4 w-px bg-border-strong" />
+            <Control win label="Minimize" onClick={() => win.minimize()}>
+              <path d="M4 8h8" />
+            </Control>
+            <Control win label={maximized ? "Restore" : "Maximize"} onClick={() => win.toggleMaximize()}>
+              {maximized ? (
+                <>
+                  <rect x="3.5" y="5.5" width="7" height="7" rx="1" />
+                  <path d="M6 5.5V4.5a1 1 0 0 1 1-1h4.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1h-1" />
+            </>
+          ) : (
+            <rect x="4" y="4" width="8" height="8" rx="1" />
+          )}
+        </Control>
+        <Control win label="Close" onClick={() => win.close()} danger>
+          <path d="m4.5 4.5 7 7m0-7-7 7" />
+        </Control>
+          </>
+        )}
+      </div>
+    </header>
+  );
+}
+
+/** The map's name, which switches maps. Where you are inside it is the tabs' to say (components/tabs.tsx). */
+function Where() {
+  const { name } = useMap();
+  return (
+    <>
       {/* Outside the drag region, so a click opens it rather than moving the window. */}
-      <label className="relative flex items-center">
-        {/* Only the reader's own projects; an example is opened from Projects,
-            and listed here just while it is the one open. */}
-        <MapSwitcher
-          map={name}
-          maps={maps.filter((m) => m.local || m.id === name)}
-          className="cursor-pointer appearance-none rounded-[5px] bg-transparent py-1 pl-2 pr-6 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
-        />
-        <svg
-          aria-hidden
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          className="pointer-events-none absolute right-2 text-faint"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+      <button
+        type="button"
+        onClick={() => openPalette("maps")}
+        title="Switch map"
+        className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-[5px] px-2 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
+      >
+        {name}
+        <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-faint">
           <path d="m2.5 4 2.5 2.5L7.5 4" />
         </svg>
-      </label>
-      <Trail crumbs={crumbs} onJump={(d) => goTo(path.slice(0, d))} />
-      <span data-tauri-drag-region className="ml-3 flex shrink-0 items-center gap-2 font-mono text-[10.5px] text-faint">
-        <Hint k="esc">back</Hint>
-        <Hint k="0">top</Hint>
-      </span>
-      <div data-tauri-drag-region className="h-full flex-1" />
-      <MapUpdates key={name} id={name} root={RUN.root} local={maps.some((m) => m.id === name && m.local)} />
-      <Control label="Projects — start a new one, or switch maps" onClick={() => openProjects()}>
-        <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
-      </Control>
+      </button>
+    </>
+  );
+}
+
+function Centre() {
+  const { name } = useMap();
+  return (
+    <>
+      {/* The command centre, as in VS Code: where you go to get anywhere. */}
+      <button
+        type="button"
+        onClick={() => openPalette()}
+        className="flex h-[22px] w-full max-w-[340px] cursor-pointer items-center gap-2 rounded-[6px] border border-border-gray bg-warm-cream px-2.5 text-[12px] text-faint transition-colors hover:border-border-strong hover:text-muted-slate"
+      >
+        <svg aria-hidden width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="m10.5 10.5 3.5 3.5" />
+        </svg>
+        <span className="truncate">Go to a level in {name}</span>
+        <span className="flex-1" />
+        <Kbd className="h-4 text-[10px]">Ctrl K</Kbd>
+      </button>
+    </>
+  );
+}
+
+/** The tools that act on the open map. */
+function MapTools() {
+  const { name } = useMap();
+  return (
+    <>
       <Control label="What changed in the code — red is gone, green is new" onClick={openDiff}>
         {/* Two states side by side: the old and the new. */}
         <path d="M5.5 13V5.5a2 2 0 0 1 2-2h3M10.5 3l2 2.5-2 2.5" />
@@ -114,39 +191,7 @@ export function Titlebar() {
         <circle cx="8" cy="8" r="6" />
         <path d="M8 4.5V8l2.5 1.5" />
       </Control>
-      <Control label="Claude Code & terminal (Ctrl+`)" onClick={toggleWorkspace}>
-        <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
-        <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
-      </Control>
-      <Control label="Settings" onClick={openSettings} className="mr-1.5">
-        {/* Lucide's gear, drawn on 24 and scaled to the 16 grid; the stroke
-            is scaled up to match so it reads as heavy as its neighbours. */}
-        <g transform="scale(0.6667)" strokeWidth="1.875">
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-          <circle cx="12" cy="12" r="3" />
-        </g>
-      </Control>
-      {mac ? null : (
-        <>
-          <Control label="Minimize" onClick={() => win.minimize()}>
-            <path d="M4 8h8" />
-          </Control>
-          <Control label={maximized ? "Restore" : "Maximize"} onClick={() => win.toggleMaximize()}>
-            {maximized ? (
-              <>
-                <rect x="3.5" y="5.5" width="7" height="7" rx="1" />
-                <path d="M6 5.5V4.5a1 1 0 0 1 1-1h4.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1h-1" />
-          </>
-        ) : (
-          <rect x="4" y="4" width="8" height="8" rx="1" />
-        )}
-      </Control>
-      <Control label="Close" onClick={() => win.close()} danger>
-        <path d="m4.5 4.5 7 7m0-7-7 7" />
-      </Control>
-        </>
-      )}
-    </header>
+    </>
   );
 }
 
@@ -154,12 +199,15 @@ function Control({
   label,
   onClick,
   danger,
+  win,
   className,
   children,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** One of the window's own buttons: minimize, maximize, close. */
+  win?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -170,7 +218,10 @@ function Control({
       aria-label={label}
       title={label}
       className={cn(
-        "flex h-full w-11 cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+        "flex cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+        // Window buttons fill the bar's height, as native ones do; the tools
+        // are small square targets, as in an editor's title bar.
+        win ? "h-full w-11" : "mx-px h-7 w-7 rounded-[5px]",
         danger ? "hover:bg-clay-ink hover:text-white" : "hover:bg-surface-container hover:text-ink",
         className,
       )}
@@ -179,114 +230,5 @@ function Control({
         {children}
       </svg>
     </button>
-  );
-}
-
-function Hint({ k, children }: { k: string; children: React.ReactNode }) {
-  return (
-    <span data-tauri-drag-region className="flex items-center gap-1">
-      <kbd className="rounded-[3px] border border-border-gray bg-surface px-1 text-[10px] text-muted-slate">{k}</kbd>
-      {children}
-    </span>
-  );
-}
-
-interface Update {
-  status: "running" | "done" | "failed";
-  finishedAt?: string;
-  changed?: string[];
-  sections?: string[];
-  error?: string;
-}
-
-/**
- * Follows the open map while an agent changes its code: an update redoing
- * the touched sections (lib/vault.ts) shows here while it runs, and the map
- * reloads the moment it is done. Only the user's own projects update; an
- * example describes some other copy of its code, so when an agent edits its
- * checkout this says so and offers to import it.
- */
-function MapUpdates({ id, root, local }: { id: string; root?: string; local: boolean }) {
-  const router = useRouter();
-  const [u, setU] = useState<Update | null>(null);
-  const [unfollowed, setUnfollowed] = useState(false);
-
-  useEffect(() => {
-    const on = (e: Event) => (e as CustomEvent<string>).detail === root && setUnfollowed(true);
-    window.addEventListener(UNFOLLOWED, on);
-    return () => window.removeEventListener(UNFOLLOWED, on);
-  }, [root]);
-  // The last finished update already on screen, so only a new one reloads.
-  const seen = useRef<string | undefined>(undefined);
-  const [fresh, setFresh] = useState(false);
-
-  useEffect(() => {
-    if (!local) return;
-    let first = true;
-    const tick = () =>
-      fetch(`/api/projects?id=${encodeURIComponent(id)}`)
-        .then((r) => r.json())
-        .then((p: { update: Update | null } | null) => {
-          const next = p?.update ?? null;
-          setU(next);
-          const done = next?.status !== "running" ? next?.finishedAt : undefined;
-          if (!first && done && done !== seen.current) {
-            router.refresh();
-            setFresh(true);
-          }
-          if (done) seen.current = done;
-          first = false;
-        })
-        .catch(() => {});
-    void tick();
-    const timer = setInterval(tick, 2000);
-    return () => clearInterval(timer);
-  }, [id, local, router]);
-
-  useEffect(() => {
-    if (!fresh) return;
-    const t = setTimeout(() => setFresh(false), 6000);
-    return () => clearTimeout(t);
-  }, [fresh]);
-
-  if (unfollowed && root)
-    return (
-      <span data-tauri-drag-region className="mr-2 flex min-w-0 items-center gap-2 font-mono text-[10.5px] text-amber-ink">
-        <span className="truncate" title="This map was made from another copy of the code, so it cannot follow edits here.">
-          This map doesn&apos;t follow edits
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            setUnfollowed(false);
-            openProjects(root);
-          }}
-          className="shrink-0 cursor-pointer text-deep-green underline"
-        >
-          Import to keep it updated
-        </button>
-        <button type="button" onClick={() => setUnfollowed(false)} aria-label="Dismiss" className="shrink-0 cursor-pointer text-faint hover:text-ink">
-          ×
-        </button>
-      </span>
-    );
-  // A turn that changed nothing the map covers passes silently.
-  if (!u || (u.status === "done" && (!fresh || !u.sections?.length))) return null;
-  const what = u.sections?.length ? u.sections.join(", ") : u.changed?.join(", ");
-  return (
-    <span
-      data-tauri-drag-region
-      title={u.status === "failed" ? u.error : what}
-      className={cn(
-        "mr-2 max-w-[320px] truncate font-mono text-[10.5px]",
-        u.status === "failed" ? "text-clay-ink" : u.status === "running" ? "text-amber-ink" : "text-deep-green",
-      )}
-    >
-      {u.status === "running"
-        ? "◷ Updating the map to what the agent changed or found…"
-        : u.status === "failed"
-          ? "✗ Map update failed"
-          : `✓ Map updated: ${u.sections!.join(", ")}`}
-    </span>
   );
 }

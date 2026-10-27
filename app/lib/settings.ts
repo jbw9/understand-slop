@@ -23,7 +23,7 @@ export interface Settings {
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "dots" };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "plain" };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));

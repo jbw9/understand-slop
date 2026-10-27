@@ -77,17 +77,13 @@ export const TOOLS: Tool[] = [
   },
 ];
 
-/** The explorify root used as the worked example, minus what generated maps may not use. */
+/**
+ * The worked example: one root of the hand-authored explorify map, kept as a
+ * prompt file now that the example maps are gone. It was cut from that map
+ * with figures and screenshots stripped, which generated maps may not use.
+ */
 function exemplar(): string {
-  const map = JSON.parse(readFileSync("maps/explorify/map.json", "utf8"));
-  const root = structuredClone(map.AUTHORED.find((r: any) => r.id === "check-in"));
-  const strip = (n: any) => {
-    if (n.shape?.kind === "figure") delete n.shape;
-    for (const b of n.anatomy ?? []) if (b.kind === "screen") delete b.shot;
-    (n.children ?? []).forEach(strip);
-  };
-  strip(root);
-  return JSON.stringify(root, null, 1);
+  return readFileSync("scripts/generate/prompts/exemplar.json", "utf8").trimEnd();
 }
 
 let systemCache: Block[] | null = null;

@@ -72,70 +72,21 @@ export function goTo(next: string[]) {
   window.history.pushState(null, "", q.size ? `?${q}` : window.location.pathname);
 }
 
-/**
- * The levels below the repo, each a way back up — the title bar's trail in
- * the desktop app. Clicking one opens it; the last is where you are.
- */
-export function Trail({ crumbs, onJump }: { crumbs: Crumb[]; onJump: (depth: number) => void }) {
-  return (
-    <ol className="flex min-w-0 items-center">
-      {crumbs.map((c, i) => {
-        const here = i === crumbs.length - 1;
-        return (
-          <Fragment key={c.id}>
-            <li aria-hidden className="shrink-0 px-0.5 text-[12px] text-faint">
-              ›
-            </li>
-            <li className={cn("min-w-0", here ? "shrink-0" : "shrink")}>
-              <button
-                type="button"
-                onClick={() => onJump(i + 1)}
-                disabled={here}
-                aria-current={here ? "page" : undefined}
-                title={c.title}
-                className={cn(
-                  "block max-w-full truncate rounded-[5px] px-1.5 py-0.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
-                  here ? "font-semibold text-ink" : "cursor-pointer text-muted-slate hover:bg-surface-container hover:text-ink",
-                )}
-              >
-                {c.title}
-              </button>
-            </li>
-          </Fragment>
-        );
-      })}
-    </ol>
-  );
-}
-
-/**
- * Which map is open, and every other one to switch to: the reader's own
- * projects first, then the examples that ship with the app.
- */
+/** Which map is open, and every other one of the reader's projects to switch to. */
 export function MapSwitcher({ map, maps, className }: { map: string; maps: MapEntry[]; className?: string }) {
   const router = useRouter();
   return (
     <select
       value={map}
       aria-label="Map"
-      // The router, not pushState: the map is read on the server.
       onChange={(e) => router.push(`?map=${encodeURIComponent(e.target.value)}`)}
       className={className}
     >
-      {[
-        { label: "Your projects", entries: maps.filter((m) => m.local) },
-        { label: "Examples", entries: maps.filter((m) => !m.local) },
-      ].map((g) =>
-        g.entries.length ? (
-          <optgroup key={g.label} label={g.label}>
-            {g.entries.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </optgroup>
-        ) : null,
-      )}
+      {maps.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.label}
+        </option>
+      ))}
     </select>
   );
 }
@@ -203,22 +154,7 @@ export function Crumbs({
             );
           })}
         </ol>
-        <div className="hidden shrink-0 items-center gap-3 pt-0.5 font-mono text-[10.5px] text-faint sm:flex">
-          <Hint k="esc">back</Hint>
-          <Hint k="0">top</Hint>
-        </div>
       </div>
     </nav>
-  );
-}
-
-function Hint({ k, children }: { k: string; children: React.ReactNode }) {
-  return (
-    <span className="flex items-center gap-1">
-      <kbd className="rounded-[3px] border border-border-gray bg-surface px-1.5 py-0.5 text-[10px] text-muted-slate">
-        {k}
-      </kbd>
-      {children}
-    </span>
   );
 }

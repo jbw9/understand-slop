@@ -1486,3 +1486,53 @@ to see any code. A row-built leaf still shows the nearest code above it
 (`codeAt`), as before.
 **At scale:** unchanged by size; a branch that stops early shows its code
 early.
+
+## D62 — The window is a frame: title bar, status bar, palette
+
+**Chose:** the window has fixed regions, separated by hairlines, the way an
+editor does: the title bar (where you are, and a box that opens the palette),
+the map, and a status bar under it. Chrome is one tone
+(`surface-container-low`); the map is the cream page. The workspace still
+floats over the map's right edge and stops above the status bar; its open tab
+is the colour of the terminal under it, as an editor draws tabs. Every action on a
+level is the same `Button` (`components/button.tsx`), and they sit in one row
+above the title instead of a rail beside the prose. Eyebrows and hints are set
+in sans; mono is left to identifiers (§11). Diagram boxes take a hairline
+instead of a 1.5px coloured edge. The dot field is no longer the default.
+**Beat:** docking the workspace as a side pane, which the user tried and
+turned down: they want it to float as it did. Also a sidebar tree of the map,
+which the user turned down again here for the reason in D35. The
+palette does the sidebar's job (reaching any level without walking down) and
+spends no column on it.
+**Why:** the user said the UI "looks like a bunch of components sticking
+together". Screenshots agreed: three surfaces each had their own idea of what
+a surface is, and a level's header mixed a mono button, a sans button and a
+pill.
+
+**Cost accepted:** the workspace still covers the right of the map while it
+is open. The status bar takes 24px of height on every screen.
+**At scale:** the palette lists every level, 71 in this repository's map;
+it caps at 60 results and ranks by match, so a big map is still one keystroke
+plus a few letters.
+
+
+## D63 — The app ships no example maps
+
+**Chose:** delete the six committed example maps (`app/maps/*`) and the
+explorify screenshots (`public/shots`). The app opens the reader's own projects
+only; with none, it shows Welcome, whose one button starts or imports a
+project. `maps/` is now git-ignored local output from the generator.
+**Kept:** the generator's worked example. The author prompt quoted one root of
+the explorify map, so that root, stripped exactly as before, is now
+`scripts/generate/prompts/exemplar.json`: generation is unchanged.
+**The landing keeps its demo.** Five of the maps (understand-slop, flask,
+fastapi, ky, umami: `map.json`, `report.json`, `source.json`) now live in
+`landing/demo/`, with the page that quotes them. The app reads them
+(`loadDemo` in `lib/maps.ts`) only for a page the landing frames (`?embed`)
+or a static export; an embed never falls back to one of the reader's
+projects. `scripts/export-static.mts` exports a demo or a project.
+**Beat:** hiding the examples from the app while keeping them in `app/maps`;
+and cutting the landing's demo, "removed claims" and flask sections.
+
+**Cost accepted:** a first launch has nothing to look at until a project is
+mapped. The eval and diagram-audit scripts list only what is in local `maps/`.

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { openAudit } from "@/components/audit";
 import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
-import { useMap } from "@/components/map-context";
+import { useMaybeMap } from "@/components/map-context";
 import { PanelHead } from "@/components/panel";
 import { readSettings } from "@/lib/settings";
 import type { Progress, Project } from "@/lib/vault";
@@ -13,8 +13,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The project list: the reader's own projects, imported from this machine and
- * kept in the app's vault (lib/vault.ts), and the examples that ship with the
- * app. Starting one (a short wizard) either makes a new empty folder, or maps
+ * kept in the app's vault (lib/vault.ts). Starting one (a short wizard) either makes a new empty folder, or maps
  * an existing one straight away through the reader's Claude Code;
  * the list follows the run, and the map opens from here or the picker once
  * it is made.
@@ -27,7 +26,6 @@ export const openProjects = (root?: string) => window.dispatchEvent(new CustomEv
 type Listed = Project & { hasMap: boolean; hasAudit: boolean; stale: boolean; progress?: Progress };
 interface List {
   vault: string;
-  examples: string[];
   projects: Listed[];
 }
 
@@ -54,7 +52,7 @@ async function claudePath(): Promise<string | undefined> {
 
 export function ProjectsDialog() {
   const router = useRouter();
-  const { name: current } = useMap();
+  const current = useMaybeMap()?.name;
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<List | null>(null);
   const [root, setRoot] = useState("");
@@ -144,6 +142,14 @@ export function ProjectsDialog() {
     }
   };
 
+  // Deleting the open project goes to the blank page (components/welcome.tsx)
+  // rather than quietly opening some other project.
+  const remove = async (id: string) => {
+    if (!(await act({ action: "remove", id }))) return;
+    if (id === current) router.push("/?none");
+    else router.refresh();
+  };
+
   // `at` is the level to open at, as chrome.tsx's goTo spells it: a finished
   // root is explorable from the list while the rest are still being made.
   const openMap = (id: string, at?: string) => {
@@ -203,7 +209,7 @@ export function ProjectsDialog() {
                       openAudit(p.id);
                     }}
                     onCancel={() => void act({ action: "cancel", id: p.id })}
-                    onRemove={() => void act({ action: "remove", id: p.id })}
+                    onRemove={() => void remove(p.id)}
                   />
                 ))}
               </ul>
@@ -212,26 +218,6 @@ export function ProjectsDialog() {
             )}
           </section>
 
-          <section>
-            <h3 className="mb-2 text-[13px] font-semibold text-ink">Examples</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {list?.examples.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => openMap(id)}
-                  className={cn(
-                    "cursor-pointer rounded-[6px] border px-2.5 py-1 font-mono text-[11.5px]",
-                    id === current
-                      ? "border-mint-line bg-mint-success text-deep-green"
-                      : "border-border-gray text-on-surface-variant hover:border-border-strong hover:text-ink",
-                  )}
-                >
-                  {id}
-                </button>
-              ))}
-            </div>
-          </section>
         </div>
         <div className="flex justify-end border-t border-border-gray bg-surface px-5 py-3">
           <button type="button" onClick={close} className={QUIET}>

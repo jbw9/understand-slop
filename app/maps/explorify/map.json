@@ -2,10 +2,161 @@
  "RUN": {
   "command": "understand-slop map .",
   "repo": "explorify",
-  "about": "Cut by the life of one event — an organisation creates it, a student finds and joins it, the organisation checks them in — after the two steps every account passes first.",
   "commit": "304a512",
   "files": 181,
   "elapsed": "—"
+ },
+ "OVERVIEW": {
+  "sub": "A campus events app for students and organisations",
+  "detail": "Every account signs up and opens the app, which routes students and organisations apart. An organisation creates an event; a student finds and joins it; the organisation checks them in.",
+  "state": "inferred",
+  "unsure": "Drawn from the map's first top level, which ordered the roots without reading the code; its arrows cite no lines yet.",
+  "code": [
+   {
+    "file": "app/(auth)/login.tsx",
+    "start": 134,
+    "end": 150,
+    "label": "Signing Up: Login asks: organisation or individual?"
+   },
+   {
+    "file": "app/_layout.tsx",
+    "start": 46,
+    "end": 90,
+    "label": "Opening The App: The launch check in the root layout"
+   },
+   {
+    "file": "app/org/index/addEvent.tsx",
+    "start": 193,
+    "end": 251,
+    "label": "Creating An Event: Tapping Preview checks the form, uploads the picture and saves a draft"
+   },
+   {
+    "file": "app/individual/index/index.tsx",
+    "start": 104,
+    "end": 128,
+    "label": "Finding Events: What Home does on its first visit"
+   },
+   {
+    "file": "app/individual/index/components/eventContext.tsx",
+    "start": 17,
+    "end": 67,
+    "label": "Joining And Saving: The shared state and the one drawer"
+   },
+   {
+    "file": "app/org/index/eventdetails.tsx",
+    "start": 145,
+    "end": 187,
+    "label": "Checking People In: Event details re-reads the guest list"
+   }
+  ],
+  "anatomy": [
+   {
+    "kind": "diagram",
+    "caption": "The roots, in the order someone meets them",
+    "boxes": [
+     {
+      "id": "signup",
+      "label": "Signing Up",
+      "col": 0,
+      "row": 0,
+      "opens": "signup"
+     },
+     {
+      "id": "launch",
+      "label": "Opening The App",
+      "col": 1,
+      "row": 0,
+      "opens": "launch"
+     },
+     {
+      "id": "create-event",
+      "label": "Creating An Event",
+      "col": 2,
+      "row": 1,
+      "opens": "create-event"
+     },
+     {
+      "id": "feed",
+      "label": "Finding Events",
+      "col": 2,
+      "row": 0,
+      "opens": "feed"
+     },
+     {
+      "id": "rsvp",
+      "label": "Joining And Saving",
+      "col": 3,
+      "row": 0,
+      "opens": "rsvp"
+     },
+     {
+      "id": "check-in",
+      "label": "Checking People In",
+      "col": 3,
+      "row": 1,
+      "opens": "check-in"
+     },
+     {
+      "id": "account",
+      "label": "Your Account",
+      "col": 0,
+      "row": 2,
+      "opens": "account"
+     },
+     {
+      "id": "supabase",
+      "label": "Supabase Backend",
+      "col": 1,
+      "row": 2,
+      "opens": "supabase"
+     },
+     {
+      "id": "server",
+      "label": "Server Code",
+      "col": 2,
+      "row": 2,
+      "opens": "server"
+     }
+    ],
+    "arrows": [
+     {
+      "from": "signup",
+      "to": "launch",
+      "label": "then opens"
+     },
+     {
+      "from": "launch",
+      "to": "feed",
+      "label": "routes students to"
+     },
+     {
+      "from": "feed",
+      "to": "rsvp",
+      "label": "opens"
+     },
+     {
+      "from": "launch",
+      "to": "create-event",
+      "label": "routes organisations to"
+     },
+     {
+      "from": "create-event",
+      "to": "check-in",
+      "label": "checks in at"
+     },
+     {
+      "from": "create-event",
+      "to": "feed",
+      "label": "publishes into"
+     },
+     {
+      "from": "rsvp",
+      "to": "check-in",
+      "label": "fills the list for"
+     }
+    ]
+   }
+  ]
  },
  "AUTHORED": [
   {
@@ -305,7 +456,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Stage 1 of 5",
        "caption": "Stage 1, with a name typed",
        "shot": "/shots/explorify/su-student.png",
@@ -455,7 +607,8 @@
        ],
        "anatomy": [
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Stage 2 of 5",
          "caption": "Stage 2, with an email typed",
          "shot": "/shots/explorify/su-email.png",
@@ -590,7 +743,8 @@
        ],
        "anatomy": [
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Stage 3 of 5",
          "caption": "Stage 3, with a code typed",
          "shot": "/shots/explorify/su-code.png",
@@ -731,7 +885,8 @@
          ]
         },
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Stage 4 of 5",
          "caption": "Stage 4, with a valid password typed",
          "shot": "/shots/explorify/su-password.png",
@@ -798,7 +953,8 @@
        ],
        "anatomy": [
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Stage 5 of 5",
          "caption": "Stage 5, with two categories picked",
          "shot": "/shots/explorify/su-finish.png",
@@ -932,7 +1088,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Stage 1 of 5 (organisation)",
        "caption": "Stage 1, with a name typed",
        "shot": "/shots/explorify/su-org.png",
@@ -950,7 +1107,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Stage 5 of 5 (organisation)",
        "caption": "Stage 5, with two categories picked",
        "shot": "/shots/explorify/su-org-categories.png",
@@ -1150,7 +1308,8 @@
        ],
        "anatomy": [
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Choose your campus",
          "caption": "Opened directly at /campusSelection — nothing in the app links here",
          "shot": "/shots/explorify/su-campus.png",
@@ -1173,7 +1332,8 @@
          ]
         },
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "No match",
          "caption": "A search that matches nothing",
          "shot": "/shots/explorify/su-campus-none.png",
@@ -2073,7 +2233,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Login",
        "caption": "The login screen, as someone signed out first sees it",
        "shot": "/shots/explorify/ln-login.png",
@@ -3049,7 +3210,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Home",
        "caption": "Home, as an organisation first sees it",
        "shot": "/shots/explorify/ce-home.png",
@@ -3082,7 +3244,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Ongoing",
        "caption": "After tapping Ongoing",
        "shot": "/shots/explorify/ce-home-ongoing.png",
@@ -3110,7 +3273,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Draft",
        "caption": "After tapping Draft",
        "shot": "/shots/explorify/ce-home-draft.png",
@@ -3240,7 +3404,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Add Event",
        "caption": "The top of the form, as it opens",
        "shot": "/shots/explorify/ce-form.png",
@@ -3283,7 +3448,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Add Event, scrolled down",
        "caption": "The rest of the form",
        "shot": "/shots/explorify/ce-form-lower.png",
@@ -3654,7 +3820,8 @@
          ]
         },
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Select University",
          "caption": "The Campus drawer, opened from the form",
          "shot": "/shots/explorify/ce-campus.png",
@@ -3982,7 +4149,8 @@
          ]
         },
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Draft list",
          "caption": "One draft whose saved date is \"2026-10-23\"",
          "shot": "/shots/explorify/ce-dates-list.png",
@@ -3995,7 +4163,8 @@
          ]
         },
         {
-         "kind": "screen", "device": "phone",
+         "kind": "screen",
+         "device": "phone",
          "title": "Preview",
          "caption": "The same draft, opened (phone set to Illinois time)",
          "shot": "/shots/explorify/ce-dates-preview.png",
@@ -4311,7 +4480,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Preview",
        "caption": "A draft as a student would see it",
        "shot": "/shots/explorify/ce-draft.png",
@@ -4679,7 +4849,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Edit Event",
        "caption": "Opened from the Edit button on the Draft list",
        "shot": "/shots/explorify/ce-edit.png",
@@ -4707,7 +4878,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Edit Event, scrolled down",
        "caption": "The same event, further down",
        "shot": "/shots/explorify/ce-edit-lower.png",
@@ -4980,7 +5152,8 @@
      ]
     },
     {
-     "kind": "screen", "device": "phone",
+     "kind": "screen",
+     "device": "phone",
      "title": "Home",
      "caption": "Home for Maya, a sample student interested in STEM and social events",
      "shot": "/shots/explorify/feed.png",
@@ -5320,7 +5493,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Campus picker",
        "caption": "After tapping \"Exploring events at UIUC\"",
        "shot": "/shots/explorify/fd-campus.png",
@@ -6373,7 +6547,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Search",
        "caption": "Search, opened from Home — the organisation side has a near-identical copy in app/org/index/search.tsx",
        "shot": "/shots/explorify/fd-search.png",
@@ -6401,7 +6576,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "STEM selected",
        "shot": "/shots/explorify/fd-search-stem.png",
        "items": [
@@ -6418,7 +6594,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Typing \"terms\"",
        "shot": "/shots/explorify/fd-search-terms.png",
        "items": [
@@ -6622,7 +6799,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Event page",
        "caption": "Tapping Robotics Demo Night on Home",
        "shot": "/shots/explorify/fd-details.png",
@@ -6665,7 +6843,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Event page, scrolled",
        "shot": "/shots/explorify/fd-details-bottom.png",
        "items": [
@@ -6692,7 +6871,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "View all",
        "shot": "/shots/explorify/fd-details-attendees.png",
        "items": [
@@ -7108,7 +7288,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "RSVP drawer",
        "caption": "Join on the event page, for Maya — who already joined this event with a party of 2",
        "shot": "/shots/explorify/rv-swipe.png",
@@ -7146,7 +7327,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Confirming",
        "caption": "Just after the swipe",
        "shot": "/shots/explorify/rv-swipe-confirmed.png",
@@ -7164,7 +7346,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Done",
        "caption": "Two seconds after a successful write",
        "shot": "/shots/explorify/rv-swipe-done.png",
@@ -7680,7 +7863,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Where the working Cancel shows",
        "caption": "Home, right after Maya joins in this session",
        "shot": "/shots/explorify/rv-state-joined.png",
@@ -7977,7 +8161,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "After a fresh launch",
        "caption": "Maya joined Robotics Demo Night in an earlier session",
        "shot": "/shots/explorify/rv-state.png",
@@ -7990,7 +8175,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "After joining again",
        "caption": "Same screen, once the drawer's Done is tapped",
        "shot": "/shots/explorify/rv-state-joined.png",
@@ -8064,7 +8250,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "RSVPd Events",
        "caption": "Maya's Saved tab: she joined Robotics Demo Night",
        "shot": "/shots/explorify/rv-saved.png",
@@ -8092,7 +8279,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Saved Events",
        "caption": "She bookmarked Lantern Festival",
        "shot": "/shots/explorify/rv-saved-bookmarks.png",
@@ -8619,7 +8807,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Event details (organisation)",
        "caption": "Robotics Demo Night, opened from Ongoing",
        "shot": "/shots/explorify/ci-details.png",
@@ -8664,7 +8853,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Attendees section",
        "caption": "The same page, scrolled to the bottom",
        "shot": "/shots/explorify/ci-details-attendees.png",
@@ -8771,7 +8961,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Attendees (6)",
        "caption": "Robotics Demo Night: three bookings, Maya already checked in",
        "shot": "/shots/explorify/ci-list.png",
@@ -8897,7 +9088,8 @@
      ],
      "anatomy": [
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "After one tap",
        "caption": "Leo Park tapped once",
        "shot": "/shots/explorify/ci-tap.png",
@@ -9082,7 +9274,8 @@
    ],
    "anatomy": [
     {
-     "kind": "screen", "device": "phone",
+     "kind": "screen",
+     "device": "phone",
      "title": "Account tab (student)",
      "caption": "A student's Account tab, before any photo is chosen",
      "shot": "/shots/explorify/account.png",
@@ -9125,7 +9318,8 @@
      ]
     },
     {
-     "kind": "screen", "device": "phone",
+     "kind": "screen",
+     "device": "phone",
      "title": "Account tab (organisation)",
      "caption": "An organisation's Account tab: the same rows",
      "shot": "/shots/explorify/account-org.png",
@@ -9421,7 +9615,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Edit Profile (student)",
        "caption": "A student's drawer with five interests picked",
        "shot": "/shots/explorify/ac-profile.png",
@@ -9449,7 +9644,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Edit Profile (organisation)",
        "caption": "An organisation's drawer, filled from its profile",
        "shot": "/shots/explorify/ac-profile-org.png",
@@ -9837,7 +10033,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Step 1 of 2",
        "caption": "Step 1, with an email typed",
        "shot": "/shots/explorify/ac-reset.png",
@@ -9864,7 +10061,8 @@
        ]
       },
       {
-       "kind": "screen", "device": "phone",
+       "kind": "screen",
+       "device": "phone",
        "title": "Step 2 of 2",
        "caption": "Step 2, with a code and a new password typed",
        "shot": "/shots/explorify/ac-reset-code.png",
@@ -12453,59 +12651,6 @@
      ]
     }
    ]
-  }
- ],
- "E0": [
-  {
-   "from": "signup",
-   "to": "launch",
-   "state": "derived",
-   "label": "every later open goes through",
-   "order": 1
-  },
-  {
-   "from": "launch",
-   "to": "feed",
-   "state": "derived",
-   "label": "routes students to",
-   "order": 2,
-   "lane": "Students"
-  },
-  {
-   "from": "feed",
-   "to": "rsvp",
-   "state": "derived",
-   "label": "opens",
-   "order": 3,
-   "lane": "Students"
-  },
-  {
-   "from": "launch",
-   "to": "create-event",
-   "state": "derived",
-   "label": "routes organisations to",
-   "order": 2,
-   "lane": "Organisations"
-  },
-  {
-   "from": "create-event",
-   "to": "check-in",
-   "state": "derived",
-   "label": "lists the event, whose details open",
-   "order": 3,
-   "lane": "Organisations"
-  },
-  {
-   "from": "create-event",
-   "to": "feed",
-   "state": "derived",
-   "label": "publishes into"
-  },
-  {
-   "from": "rsvp",
-   "to": "check-in",
-   "state": "derived",
-   "label": "fills the list for"
   }
  ],
  "LINKS": [

@@ -24,7 +24,6 @@ const noSubscribe = () => () => {};
 export interface Crumb {
   id: string;
   title: string;
-  step?: number;
 }
 
 /**
@@ -37,7 +36,7 @@ export interface Crumb {
  * The map and the title bar both read it, so they always agree.
  */
 export function useLocation(): { path: string[]; crumbs: Crumb[] } {
-  const { nodeAt, stepOf } = useMap();
+  const { nodeAt } = useMap();
   const params = useSearchParams();
   // The deepest level asked for that the map still has: an update can take
   // a section away while it is open.
@@ -52,8 +51,8 @@ export function useLocation(): { path: string[]; crumbs: Crumb[] } {
       path
         .map((_, i) => nodeAt(path.slice(0, i + 1)))
         .filter((n): n is Node => n !== null)
-        .map((n) => ({ id: n.id, title: n.title, step: stepOf(n.id)?.n })),
-    [path, nodeAt, stepOf],
+        .map((n) => ({ id: n.id, title: n.title })),
+    [path, nodeAt],
   );
   return { path, crumbs };
 }
@@ -99,7 +98,6 @@ export function Trail({ crumbs, onJump }: { crumbs: Crumb[]; onJump: (depth: num
                   here ? "font-semibold text-ink" : "cursor-pointer text-muted-slate hover:bg-surface-container hover:text-ink",
                 )}
               >
-                {c.step ? <span className="mr-1 font-mono text-[10.5px] text-faint">{c.step}</span> : null}
                 {c.title}
               </button>
             </li>
@@ -154,12 +152,12 @@ export function Crumbs({
   map: string;
   maps: MapEntry[];
   /** One entry per level below the repo, outermost first. */
-  crumbs: { id: string; title: string; step?: number }[];
+  crumbs: { id: string; title: string }[];
   /** Jump to depth `n` — 0 is the repo. */
   onJump: (depth: number) => void;
 }) {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
-  const stops = [{ id: "", title: repo, step: undefined as number | undefined }, ...crumbs];
+  const stops = [{ id: "", title: repo }, ...crumbs];
   return (
     <nav
       aria-label="Location"
@@ -198,7 +196,6 @@ export function Crumbs({
                       here ? "font-semibold text-ink" : "text-muted-slate hover:bg-surface-container-low hover:text-ink",
                     )}
                   >
-                    {c.step ? <span className="mr-1 font-mono text-[11px] text-faint">{c.step}</span> : null}
                     {c.title}
                   </button>
                 </li>

@@ -2,7 +2,6 @@
  "RUN": {
   "command": "understand-slop map flask",
   "repo": "flask",
-  "about": "Cut by the developer journey of building a Flask web app — you create and configure the application, wire up routes and blueprints, handle incoming requests at runtime, render templates and JSON, then run and test it — the order every Flask project follows.",
   "commit": "d086db8",
   "files": 227,
   "elapsed": "15 min",
@@ -13,6 +12,122 @@
    "author": "global.anthropic.claude-opus-4-6-v1",
    "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   }
+ },
+ "OVERVIEW": {
+  "sub": "A Python web framework and its examples",
+  "detail": "You create and configure an app, register routes, handle requests, render responses, then run and test it.",
+  "state": "inferred",
+  "unsure": "Drawn from the map's first top level, which ordered the roots without reading the code; its arrows cite no lines yet.",
+  "code": [
+   {
+    "file": "src/flask/app.py",
+    "start": 109,
+    "end": 112,
+    "label": "Creating the App: Flask class definition, inherits from App"
+   },
+   {
+    "file": "src/flask/sansio/scaffold.py",
+    "start": 344,
+    "end": 373,
+    "label": "Defining Routes: @route decorator: the main way to register a URL rule"
+   },
+   {
+    "file": "src/flask/app.py",
+    "start": 1566,
+    "end": 1616,
+    "label": "Handling Requests: wsgi_app: entry point that pushes context and dispatches"
+   },
+   {
+    "file": "src/flask/templating.py",
+    "start": 136,
+    "end": 148,
+    "label": "Rendering Responses: render_template the main public entry point"
+   },
+   {
+    "file": "src/flask/cli.py",
+    "start": 1109,
+    "end": 1118,
+    "label": "Running & Testing: The `cli` FlaskGroup instance — the flask entry point"
+   },
+   {
+    "file": "examples/tutorial/flaskr/__init__.py",
+    "start": 6,
+    "end": 48,
+    "label": "Example Applications: Flaskr app factory"
+   }
+  ],
+  "anatomy": [
+   {
+    "kind": "diagram",
+    "caption": "The roots, in the order someone meets them",
+    "boxes": [
+     {
+      "id": "creating-app",
+      "label": "Creating the App",
+      "col": 0,
+      "row": 0,
+      "opens": "creating-app"
+     },
+     {
+      "id": "defining-routes",
+      "label": "Defining Routes",
+      "col": 1,
+      "row": 0,
+      "opens": "defining-routes"
+     },
+     {
+      "id": "handling-requests",
+      "label": "Handling Requests",
+      "col": 2,
+      "row": 0,
+      "opens": "handling-requests"
+     },
+     {
+      "id": "rendering-responses",
+      "label": "Rendering Responses",
+      "col": 3,
+      "row": 0,
+      "opens": "rendering-responses"
+     },
+     {
+      "id": "running-testing",
+      "label": "Running & Testing",
+      "col": 3,
+      "row": 1,
+      "opens": "running-testing"
+     },
+     {
+      "id": "example-apps",
+      "label": "Example Applications",
+      "col": 0,
+      "row": 1,
+      "opens": "example-apps"
+     }
+    ],
+    "arrows": [
+     {
+      "from": "creating-app",
+      "to": "defining-routes",
+      "label": "registers routes"
+     },
+     {
+      "from": "defining-routes",
+      "to": "handling-requests",
+      "label": "dispatches into"
+     },
+     {
+      "from": "handling-requests",
+      "to": "rendering-responses",
+      "label": "renders output"
+     },
+     {
+      "from": "rendering-responses",
+      "to": "running-testing",
+      "label": "served and tested"
+     }
+    ]
+   }
+  ]
  },
  "AUTHORED": [
   {
@@ -7150,36 +7265,6 @@
      ]
     }
    ]
-  }
- ],
- "E0": [
-  {
-   "from": "creating-app",
-   "to": "defining-routes",
-   "label": "registers endpoints via",
-   "order": 1,
-   "state": "derived"
-  },
-  {
-   "from": "defining-routes",
-   "to": "handling-requests",
-   "label": "dispatches into",
-   "order": 2,
-   "state": "derived"
-  },
-  {
-   "from": "handling-requests",
-   "to": "rendering-responses",
-   "label": "produces output with",
-   "order": 3,
-   "state": "derived"
-  },
-  {
-   "from": "rendering-responses",
-   "to": "running-testing",
-   "label": "is served and tested by",
-   "order": 4,
-   "state": "derived"
   }
  ],
  "LINKS": []

@@ -271,11 +271,7 @@ export function Canvas() {
               exit="gone"
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              {focus ? (
-                <Level node={focus} path={path} ctx={ctx} onOpen={goTo} />
-              ) : (
-                <Overview onOpen={goTo} />
-              )}
+              <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -431,71 +427,6 @@ function blockLabel(b: Anatomy): string {
 /* ── levels ──────────────────────────────────────────────────── */
 
 /**
- * The repo itself, drawn as a level like any other: the shared path as a
- * numbered line, then — where it splits — one numbered line per lane side by
- * side, and the roots E0 never touches grouped under their own heading.
- */
-function Overview({ onOpen }: { onOpen: (p: string[]) => void }) {
-  const { RUN, E0, L0, SPINE, LANES, HANDOFFS, ON_PATH, roots } = useMap();
-  const chain = roots(SPINE);
-  const outside = L0.filter((n) => !ON_PATH.has(n.id));
-  const fork = LANES.length ? L0.find((n) => n.id === LANES[0].from) : undefined;
-  const answer = useLatestAnswer();
-
-  return (
-    <>
-      <Header
-        path={[]}
-        eyebrow="Repository"
-        title={RUN.repo}
-        sub={RUN.about}
-        meta={`${RUN.files} files · commit ${RUN.commit}`}
-        link={RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
-        actions={<FixAndKeep path={[]} answer={answer} />}
-      />
-      <Caption
-        count={chain.length}
-        what="steps"
-        how={LANES.length ? "in order, for everyone" : "in order"}
-      />
-      <Steps nodes={chain} edges={E0} at={[]} onOpen={onOpen} />
-
-      {fork ? (
-        <section className="mt-10">
-          <Caption count={LANES.length} what="paths" how={`after ${fork.title}`} />
-          <Note>{fork.title} sends each account down one of these. They meet where noted.</Note>
-          <div className="grid max-w-[1180px] grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-2">
-            {LANES.map((l) => (
-              <div key={l.name} className="min-w-0">
-                <h3 className="mb-3 border-b border-border-strong pb-2 text-[15px] font-semibold text-ink">
-                  {l.name}
-                </h3>
-                <Steps
-                  nodes={roots(l.ids)}
-                  edges={E0}
-                  start={SPINE.length + 1}
-                  handoffs={HANDOFFS}
-                  at={[]}
-                  onOpen={onOpen}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {outside.length ? (
-        <section className="mt-12">
-          <Caption count={outside.length} what="more" how="outside the path" />
-          <Note>No step leads to these.</Note>
-          <Grid nodes={outside} at={[]} onOpen={onOpen} />
-        </section>
-      ) : null}
-    </>
-  );
-}
-
-/**
  * One open node, explained. Top to bottom: what it is (header), the picture of
  * how it fits together, its own data — tables, screens, who talks to whom —
  * then its parts to go deeper, what to watch out for, and last, folded, the
@@ -517,10 +448,11 @@ function Level({
   onOpen: (p: string[]) => void;
 }) {
   const map = useMap();
-  const { RUN, nodeAt, stepOf } = map;
+  const { RUN, nodeAt } = map;
   const kids = authored(node);
   const parent = path.length > 1 ? nodeAt(path.slice(0, -1)) : null;
-  const step = path.length === 1 ? stepOf(node.id) : undefined;
+  // The empty path is the repository itself (D60): nothing above it to go back to.
+  const top = path.length === 0;
   const note = setNote(node);
   const sequence = node.group?.ordering === "sequence";
   const figure = node.shape?.kind === "figure" ? node.shape : undefined;
@@ -546,7 +478,9 @@ function Level({
     ) ?? { kind: "diagram", caption: "", boxes: [], arrows: [] },
     owns,
   );
-  const code = codeAt(map, path);
+  // The code is the last layer: a level with parts below it points down at
+  // them, and only a level with nothing below it shows its lines.
+  const code = node.children?.length ? [] : codeAt(map, path);
   const [codeOpen, setCodeOpen] = useState(false);
   const answer = useLatestAnswer();
   // Empty outside diff mode, so the block render below is unchanged then.
@@ -556,17 +490,15 @@ function Level({
     <>
       <Header
         path={path}
-        back={{
-          label: parent?.title ?? RUN.repo,
-          onClick: () => onOpen(path.slice(0, -1)),
-        }}
-        eyebrow={
-          parent
-            ? `Inside ${parent.title}`
-            : step
-              ? `${step.lane ? `${step.lane} · ` : ""}Step ${step.n} of ${step.of}`
-              : "Outside the path"
+        back={
+          top
+            ? undefined
+            : {
+                label: parent?.title ?? RUN.repo,
+                onClick: () => onOpen(path.slice(0, -1)),
+              }
         }
+        eyebrow={top ? "Repository" : `Inside ${parent?.title ?? RUN.repo}`}
         title={node.title}
         state={node.state}
         origin={node.origin}
@@ -577,12 +509,15 @@ function Level({
         detail={node.detail}
         unsure={node.state === "derived" ? undefined : node.unsure}
         meta={
-          !nearBottom(node)
+          top
+            ? `${RUN.files} files · commit ${RUN.commit}`
+            : !nearBottom(node)
             ? undefined
             : node.footprint
               ? `${node.footprint.dirs.join("  ")}  ·  ${node.footprint.files} files`
               : node.evidence
         }
+        link={top && RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
         shape={figure ? undefined : node.shape}
         onCode={
           code.length
@@ -644,16 +579,15 @@ function Level({
           ),
         )}
 
-        {kids.length ? (
+        {/* When every part is a box on the picture, the picture is the list. */}
+        {kids.length && onDiagram.size < kids.length ? (
           <section>
             <Caption
               count={kids.length}
               what={kids.length === 1 ? "part" : "parts"}
               how={
                 onDiagram.size
-                  ? onDiagram.size === kids.length
-                    ? "all of them on the picture above"
-                    : `${onDiagram.size} of them on the picture above`
+                  ? `${onDiagram.size} of them on the picture above`
                   : sequence
                     ? "in order — open one to go deeper"
                     : "open one to go deeper"
@@ -717,21 +651,14 @@ function Level({
 function Steps({
   nodes,
   edges,
-  start = 1,
-  handoffs = [],
   at,
   onOpen,
 }: {
   nodes: Node[];
   edges: Edge[];
-  /** The first dot's number — a lane continues the shared path's count. */
-  start?: number;
-  /** Hand-offs into another lane, written under the step they leave. */
-  handoffs?: Edge[];
   at: string[];
   onOpen: (p: string[]) => void;
 }) {
-  const { L0, stepOf } = useMap();
   return (
     <ol className="flex max-w-[880px] flex-col">
       {nodes.map((n, i) => {
@@ -743,7 +670,7 @@ function Steps({
         return (
           <li key={n.id} className="flex gap-4">
             <div className="flex w-[22px] shrink-0 flex-col items-center pt-[15px]">
-              <StepDot n={start + i} state={n.state} />
+              <StepDot n={i + 1} state={n.state} />
               {last ? null : (
                 <span
                   className={cn(
@@ -765,17 +692,6 @@ function Steps({
                   {edge.label} {nodes[i + 1].title}
                 </p>
               ) : null}
-              {handoffs
-                .filter((h) => h.from === n.id)
-                .map((h) => (
-                  <p key={h.to} className="mt-1.5 pl-1 text-[11.5px] italic text-faint">
-                    ↗ {h.label}{" "}
-                    <span className="font-medium not-italic text-muted-slate">
-                      {L0.find((r) => r.id === h.to)?.title}
-                    </span>
-                    {stepOf(h.to)?.lane ? ` · ${stepOf(h.to)?.lane}` : ""}
-                  </p>
-                ))}
             </div>
           </li>
         );
@@ -783,6 +699,7 @@ function Steps({
     </ol>
   );
 }
+
 
 /** A set has no order, so it gets no numbers and no line — a grid. */
 function Grid({

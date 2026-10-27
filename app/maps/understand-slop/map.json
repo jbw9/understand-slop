@@ -2,7 +2,6 @@
  "RUN": {
   "command": "understand-slop map understand-slop",
   "repo": "understand-slop",
-  "about": "Cut by the life of a map — a pipeline generates it from a repo, a canvas lets someone navigate its tree, a detail panel lets them inspect each node — after the three steps every map passes through, with one hand-authored example alongside.",
   "commit": "c0c5eac",
   "files": 109,
   "elapsed": "28 min",
@@ -13,6 +12,91 @@
    "author": "global.anthropic.claude-opus-4-6-v1",
    "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   }
+ },
+ "OVERVIEW": {
+  "sub": "Explore a codebase as a map, level by level",
+  "detail": "A pipeline generates a map from a repository; the canvas navigates its tree and the detail views inspect each part.",
+  "state": "inferred",
+  "unsure": "Drawn from the map's first top level, which ordered the roots without reading the code; its arrows cite no lines yet.",
+  "code": [
+   {
+    "file": "app/scripts/generate/pipeline.ts",
+    "start": 20,
+    "end": 69,
+    "label": "Generating a Map: main() runs stages: inventory, summarize, cut, author, verify"
+   },
+   {
+    "file": "app/components/canvas.tsx",
+    "start": 83,
+    "end": 270,
+    "label": "Navigating the Map: Canvas: reads path from URL, manages navigation, renders level with animation"
+   },
+   {
+    "file": "app/components/anatomy.tsx",
+    "start": 44,
+    "end": 80,
+    "label": "Inspecting a Node: AnatomyView iterates blocks for a card"
+   },
+   {
+    "file": "app/lib/explorify/index.ts",
+    "start": 63,
+    "end": 65,
+    "label": "The Explorify Example: The nine root nodes assembled into one array"
+   }
+  ],
+  "anatomy": [
+   {
+    "kind": "diagram",
+    "caption": "The roots, in the order someone meets them",
+    "boxes": [
+     {
+      "id": "generating",
+      "label": "Generating a Map",
+      "col": 0,
+      "row": 0,
+      "opens": "generating"
+     },
+     {
+      "id": "navigating",
+      "label": "Navigating the Map",
+      "col": 1,
+      "row": 0,
+      "opens": "navigating"
+     },
+     {
+      "id": "inspecting",
+      "label": "Inspecting a Node",
+      "col": 2,
+      "row": 0,
+      "opens": "inspecting"
+     },
+     {
+      "id": "explorify-example",
+      "label": "The Explorify Example",
+      "col": 0,
+      "row": 1,
+      "opens": "explorify-example"
+     }
+    ],
+    "arrows": [
+     {
+      "from": "generating",
+      "to": "navigating",
+      "label": "produces maps for"
+     },
+     {
+      "from": "navigating",
+      "to": "inspecting",
+      "label": "drills into"
+     },
+     {
+      "from": "explorify-example",
+      "to": "navigating",
+      "label": "example data for"
+     }
+    ]
+   }
+  ]
  },
  "AUTHORED": [
   {
@@ -5955,28 +6039,6 @@
      ]
     }
    ]
-  }
- ],
- "E0": [
-  {
-   "from": "generating",
-   "to": "navigating",
-   "label": "produces maps for",
-   "order": 1,
-   "state": "derived"
-  },
-  {
-   "from": "navigating",
-   "to": "inspecting",
-   "label": "drills into",
-   "order": 2,
-   "state": "derived"
-  },
-  {
-   "from": "explorify-example",
-   "to": "navigating",
-   "label": "provides example data to",
-   "state": "derived"
   }
  ],
  "LINKS": []

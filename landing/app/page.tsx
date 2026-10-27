@@ -23,6 +23,7 @@ const DEMOS = [
   { id: "fastapi", label: "FastAPI" },
   { id: "ky", label: "ky" },
   { id: "umami", label: "Umami" },
+  { id: "kafka", label: "Kafka" },
 ];
 
 // Placeholders, not real people. Replace with real, attributable quotes before publishing.

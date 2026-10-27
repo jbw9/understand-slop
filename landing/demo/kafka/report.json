@@ -1,0 +1,360 @@
+{
+ "repo": "kafka",
+ "commit": "d18f93f",
+ "backend": "claude-code",
+ "models": {
+  "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "cut": "global.anthropic.claude-opus-4-6-v1",
+  "author": "global.anthropic.claude-opus-4-6-v1",
+  "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+ },
+ "elapsed": {
+  "summarize": 0,
+  "cut": 220,
+  "author": 313,
+  "overview": 64,
+  "verify": 351,
+  "total": 948
+ },
+ "usd": 23.78,
+ "fullUsd": 45.21,
+ "bill": {
+  "summarize": {
+   "calls": 519,
+   "cached": 519,
+   "input": 10584533,
+   "output": 1631131,
+   "cacheRead": 426590,
+   "usd": 0,
+   "fullUsd": 21.428014750000003
+  },
+  "cut": {
+   "calls": 2,
+   "cached": 0,
+   "input": 142568,
+   "output": 14070,
+   "cacheRead": 0,
+   "usd": 1.2427925,
+   "fullUsd": 1.2427925
+  },
+  "author": {
+   "calls": 8,
+   "cached": 0,
+   "input": 943856,
+   "output": 140430,
+   "cacheRead": 7653032,
+   "usd": 13.2362235,
+   "fullUsd": 13.2362235
+  },
+  "overview": {
+   "calls": 1,
+   "cached": 0,
+   "input": 18871,
+   "output": 3509,
+   "cacheRead": 283630,
+   "usd": 0.3474675,
+   "fullUsd": 0.3474675
+  },
+  "verify": {
+   "calls": 41,
+   "cached": 0,
+   "input": 569689,
+   "output": 72012,
+   "cacheRead": 17857,
+   "usd": 1.07392445,
+   "fullUsd": 1.07392445
+  },
+  "verify-review": {
+   "calls": 69,
+   "cached": 0,
+   "input": 733838,
+   "output": 83919,
+   "cacheRead": 2405051,
+   "usd": 7.881291750000001,
+   "fullUsd": 7.881291750000001
+  }
+ },
+ "throttled": {
+  "waits": 0,
+  "seconds": 0
+ },
+ "files": {
+  "listed": 7557,
+  "summarised": 4021,
+  "unassigned": []
+ },
+ "excluded": [
+  {
+   "path": "generator/",
+   "reason": "Build-time code generator that produces Java message classes from JSON schemas; pure tooling."
+  },
+  {
+   "path": "api-checker/",
+   "reason": "Gradle/Maven plugins that verify API surface compatibility; build-time tooling only."
+  },
+  {
+   "path": "jmh-benchmarks/",
+   "reason": "JMH performance benchmarks for internal subsystems; testing tooling, not product code."
+  },
+  {
+   "path": "trogdor/",
+   "reason": "Fault injection and workload testing framework with its own REST server; testing tooling."
+  },
+  {
+   "path": "release/",
+   "reason": "Python scripts automating the Apache release process (SVN, Maven, Docker); pure release tooling."
+  },
+  {
+   "path": "committer-tools/",
+   "reason": "Helper scripts for committers to merge PRs, verify licenses, and manage collaborators; pure tooling."
+  },
+  {
+   "path": ".github/scripts/",
+   "reason": "CI helper scripts for checkstyle annotations, JUnit reporting, PR linting, and flaky test reports; pure CI tooling."
+  }
+ ],
+ "overview": {
+  "accepted": true,
+  "turns": 18,
+  "submits": 1,
+  "lastProblems": []
+ },
+ "roots": [
+  {
+   "id": "produce-consume",
+   "title": "Producing and Consuming",
+   "accepted": true,
+   "turns": 34,
+   "reads": 28,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 10,
+    "rewritten": [
+     {
+      "id": "pc-send-batch",
+      "claims": [
+       "RecordAccumulator maintains a ConcurrentMap of topic to partition queues — contradicted: Line 92 shows: `protected final ConcurrentMap<String /*topic*/, TopicInfo> topicInfoMap = new CopyOnWriteMap<>();` This is a ConcurrentMap from topic to TopicInfo, not directly to partition queues. The partition queues are inside TopicInfo (accessed via `topicInfo.batches` at line 324)."
+      ]
+     },
+     {
+      "id": "pc-receive",
+      "claims": [
+       "Both use FetchRequestManager to issue FetchRequest RPCs — not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "broker",
+   "title": "Running the Broker",
+   "accepted": true,
+   "turns": 25,
+   "reads": 21,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 4,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "store",
+   "title": "Storing Records",
+   "accepted": true,
+   "turns": 31,
+   "reads": 25,
+   "submits": 4,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 15,
+    "ok": 15,
+    "flagged": 12,
+    "rewritten": [
+     {
+      "id": "st-producer",
+      "claims": [
+       "detects duplicates — not_shown"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "raft",
+   "title": "Reaching Consensus",
+   "accepted": true,
+   "turns": 32,
+   "reads": 28,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 10,
+    "ok": 10,
+    "flagged": 8,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "coordinate",
+   "title": "Coordinating Groups",
+   "accepted": true,
+   "turns": 29,
+   "reads": 25,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 20,
+    "ok": 19,
+    "flagged": 12,
+    "rewritten": [
+     {
+      "id": "coordinate",
+      "claims": [
+       "Three separate coordinators share a generic replicated state machine framework (`CoordinatorRuntime`) — not_shown: The detail mentions three coordinators but the cited code for label [0] describes CoordinatorRuntime as a generic framework (lines 76-77: 'provides a framework to implement coordinators such as the group coordinator or the transaction coordinator'). Label [1] shows GroupCoordinatorService building a CoordinatorRuntime instance at line 278. Label [2] shows ShareCoordinatorService building a CoordinatorRuntime instance at line 229. The transaction coordinator is not shown building its own instance in the cited code.",
+       "The transaction coordinator tracks transaction lifecycles via `__transaction_state` — not_shown: The transaction coordinator is not shown in the cited code samples. No evidence of transaction coordinator building a CoordinatorRuntime or using `__transaction_state` is presented."
+      ]
+     },
+     {
+      "id": "co-assign-streams",
+      "claims": [
+       "Standby tasks use `RackAwareStandbyPicker` — not_shown"
+      ]
+     },
+     {
+      "id": "co-txn-log",
+      "claims": [
+       "Tombstone records (null value) expire dead transactions — not_shown: Lines 127-128 show that when `valueBuffer == null`, a `TxnTombstone` is returned. The comment at lines 113 describes this. However, the code does not explicitly show that tombstones 'expire' transactions—they represent null values in the log."
+      ]
+     },
+     {
+      "id": "co-share",
+      "claims": [
+       "writeState: generates snapshot or update records"
+      ]
+     }
+    ],
+    "downgraded": [
+     "co-assign-streams"
+    ]
+   }
+  },
+  {
+   "id": "streams",
+   "title": "Processing Streams",
+   "accepted": true,
+   "turns": 28,
+   "reads": 22,
+   "submits": 4,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 7,
+    "ok": 7,
+    "flagged": 5,
+    "rewritten": [],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "connect",
+   "title": "Connecting Systems",
+   "accepted": true,
+   "turns": 27,
+   "reads": 23,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 17,
+    "ok": 17,
+    "flagged": 10,
+    "rewritten": [
+     {
+      "id": "cn-mm-heartbeat",
+      "claims": [
+       "Clients use heartbeats to detect replication lag and cluster connectivity — not_shown: The code shown does not contain any explanation or implementation of how clients consume or use the heartbeat records. This is application-level usage not shown in the connector/task code."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "manage",
+   "title": "Managing the Cluster",
+   "accepted": true,
+   "turns": 23,
+   "reads": 20,
+   "submits": 1,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 11,
+    "ok": 11,
+    "flagged": 7,
+    "rewritten": [
+     {
+      "id": "mg-topics",
+      "claims": [
+       "any error during close is swallowed and the original exit code is overridden"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  }
+ ],
+ "check": {
+  "problems": [],
+  "depth": [
+   {
+    "id": "produce-consume",
+    "depth": 3,
+    "nodes": 11
+   },
+   {
+    "id": "broker",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "store",
+    "depth": 3,
+    "nodes": 15
+   },
+   {
+    "id": "raft",
+    "depth": 3,
+    "nodes": 10
+   },
+   {
+    "id": "coordinate",
+    "depth": 3,
+    "nodes": 20
+   },
+   {
+    "id": "streams",
+    "depth": 2,
+    "nodes": 7
+   },
+   {
+    "id": "connect",
+    "depth": 3,
+    "nodes": 17
+   },
+   {
+    "id": "manage",
+    "depth": 3,
+    "nodes": 11
+   }
+  ]
+ },
+ "verifyPassRate": 99
+}

@@ -371,93 +371,7 @@ function Block({
     );
   }
 
-  if (block.kind === "map") {
-    return (
-      <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
-        {block.caption ? (
-          <div className="border-b border-border-gray bg-surface px-3 py-1.5">
-            <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
-              {block.caption}
-            </span>
-          </div>
-        ) : null}
-        {block.rows.map((m) => {
-          const id = rowId(owner, m.from);
-          const isLit = ctx.lit.has(id);
-          const isOpen = ctx.open === id;
-          return (
-            <div key={m.from} className="border-b border-border-gray last:border-b-0">
-              <button
-                ref={ctx.anchor(id)}
-                data-row={id}
-                // A row that has somewhere to go opens it; one that does not
-                // keeps tracing. The same click does the thing the row can
-                // actually do, so there is no dead affordance either way.
-                // Stop the click here when the row owns a level.
-                //
-                // The card wrapping these rows is itself clickable, and a real
-                // pointer click bubbles: row opens the level, card handler then
-                // fires on the SAME click and collapses it again. Measured
-                // order was ROW click → CARD click, which is why calling the
-                // handler directly worked and every genuine click did nothing.
-                onClick={(e) => {
-                  if (!m.under) return ctx.onTrace(id);
-                  e.stopPropagation();
-                  ctx.onOpenRow(id);
-                }}
-                className={rowClass(id, ctx, cn(PAIR_SCOPE, "px-3 py-1.5"))}
-              >
-                <span className={PAIR_ROW}>
-                  <span className={cn(PAIR_LABEL, "flex items-start gap-2")}>
-                    <span
-                      className={cn(
-                        "min-w-0 rounded-[3px] px-1.5 py-0.5 font-mono text-[10px]",
-                        isLit || isOpen
-                          ? "bg-deep-green text-white"
-                          : "bg-surface-container text-on-surface",
-                      )}
-                    >
-                      {m.from}
-                    </span>
-                    {/* The arrow carries the relationship, so the text doesn't
-                        have to say "becomes". Stacked, it would point down a
-                        column at nothing, so it is hidden there — the vertical
-                        order already says which is which. */}
-                    <span className="ml-auto hidden shrink-0 font-mono text-[11px] leading-[1.5] text-faint @min-[267px]:block">
-                      →
-                    </span>
-                  </span>
-                  {/* Chip sits INSIDE the flowing column, not beside it. As a
-                      sibling of the text it was `shrink-0` against a `flex-1`
-                      that could shrink to nothing, so a long `to` string was
-                      squeezed into a five-line ribbon while the chip kept its
-                      full width. Inline, the chip wraps with the words. */}
-                  <span className={cn(PAIR_VALUE, "flex items-start gap-2")}>
-                    <span
-                      className={cn(
-                        "min-w-0 flex-1 font-mono text-[9.5px] leading-snug",
-                        m.state === "derived" ? "text-muted-slate" : "text-amber-ink",
-                      )}
-                    >
-                      {m.to}
-                      {m.state !== "derived" ? (
-                        <StateChip state={m.state} className="ml-1.5 align-[1px]" />
-                      ) : null}
-                    </span>
-                    {m.under ? (
-                      <span className="mt-[3px]">
-                        <Caret open={isOpen} />
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
+  if (block.kind === "map") return <MapRows owner={owner} block={block} ctx={ctx} />;
 
   if (block.kind === "parts") {
     // The ratio IS the finding. Segments are sized by real weight, so a 149KB
@@ -1148,5 +1062,84 @@ export function TableGlyph() {
       <rect x="1" y="1.5" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1" className="text-muted-slate" />
       <path d="M1 4.5h10M4.5 4.5v6" stroke="currentColor" strokeWidth="1" className="text-muted-slate" />
     </svg>
+  );
+}
+
+/**
+ * A `map` block as a list of names. Each row's `to` stays folded until the
+ * reader asks for it, so the block reads as the set of cases first and the
+ * detail of one case second, instead of a wall of arrows.
+ */
+function MapRows({ owner, block, ctx }: { owner: string; block: Extract<Anatomy, { kind: "map" }>; ctx: RowCtx }) {
+  const [shown, setShown] = useState<Set<string>>(() => new Set());
+  const toggle = (from: string) =>
+    setShown((s) => {
+      const next = new Set(s);
+      if (!next.delete(from)) next.add(from);
+      return next;
+    });
+  return (
+    <div className="overflow-hidden rounded-[6px] border border-border-gray bg-pure-white">
+      {block.caption ? (
+        <div className="border-b border-border-gray bg-surface px-3 py-1.5">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
+            {block.caption}
+          </span>
+        </div>
+      ) : null}
+      {block.rows.map((m) => {
+        const id = rowId(owner, m.from);
+        const isLit = ctx.lit.has(id);
+        const isOpen = ctx.open === id;
+        // A row with a level of its own shows its detail while that level is open.
+        const expanded = shown.has(m.from) || isOpen;
+        return (
+          <div key={m.from} className="border-b border-border-gray last:border-b-0">
+            <button
+              ref={ctx.anchor(id)}
+              data-row={id}
+              aria-expanded={expanded}
+              // The card wrapping these rows is itself clickable, and a real
+              // pointer click bubbles: without stopping it here, the card's
+              // handler fires on the SAME click and undoes the row's.
+              onClick={(e) => {
+                e.stopPropagation();
+                if (m.under) return ctx.onOpenRow(id);
+                toggle(m.from);
+                ctx.onTrace(id);
+              }}
+              className={rowClass(id, ctx, "flex w-full items-start gap-2 px-3 py-1.5 text-left")}
+            >
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    "inline-block rounded-[3px] px-1.5 py-0.5 font-mono text-[10px]",
+                    isLit || isOpen ? "bg-deep-green text-white" : "bg-surface-container text-on-surface",
+                  )}
+                >
+                  {m.from}
+                </span>
+                {m.state !== "derived" ? <StateChip state={m.state} className="ml-1.5 align-[1px]" /> : null}
+                {expanded ? (
+                  <span
+                    className={cn(
+                      "mt-1.5 mb-0.5 block border-l-2 pl-2 font-mono text-[9.5px] leading-snug",
+                      m.state === "derived" ? "border-border-strong text-muted-slate" : "border-amber-line text-amber-ink",
+                    )}
+                  >
+                    {m.to}
+                  </span>
+                ) : null}
+              </span>
+              {/* Turns down when the row unfolds in place; a row that opens a
+                  level points right like every other way down. */}
+              <span className={cn("mt-[3px] shrink-0 transition-transform duration-200", expanded && !m.under && "rotate-90")}>
+                <Caret open={expanded} />
+              </span>
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }

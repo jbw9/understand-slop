@@ -106,17 +106,38 @@
 .navBar nav a:hover {
   color: var(--ink);
 }
+/* One centred column: a line to the agent section, the claim, then the buttons. */
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  align-items: end;
-  gap: 28px 72px;
-  padding: 56px 0 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 0 64px;
+  text-align: center;
+}
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 26px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 13.5px;
+  color: var(--variant);
+  transition: border-color 0.2s ease-out, color 0.2s ease-out;
+}
+.kicker:hover {
+  border-color: var(--strong);
+  color: var(--ink);
+}
+.kicker span {
+  color: var(--green);
 }
 /* Two lines at every width: the size follows the line that has to fit. */
 .hero h1 {
   margin: 0;
-  font-size: min(80px, 4.6vw);
+  font-size: min(92px, (100vw - 2 * var(--gutter)) / 9.8);
   line-height: 1;
   letter-spacing: -0.045em;
   font-weight: 500;
@@ -128,8 +149,8 @@
   color: var(--green);
 }
 .pitch p {
-  max-width: 28em;
-  margin: 0 0 28px;
+  max-width: 30em;
+  margin: 28px auto 32px;
   font-size: clamp(17px, 1.4vw, 20px);
   line-height: 1.5;
   color: var(--variant);
@@ -138,6 +159,7 @@
 .ctas {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 12px;
 }
@@ -228,6 +250,7 @@
 /* ── the demo ─────────────────────────────────────────── */
 .switcher {
   display: flex;
+  justify-content: center;
   margin-bottom: 16px;
 }
 .tabs {
@@ -1300,9 +1323,6 @@
   font-style: normal;
   color: var(--green);
 }
-.close .ctas {
-  justify-content: center;
-}
 
 .end {
   display: flex;
@@ -1327,8 +1347,7 @@
 
 @media (max-width: 900px) {
   .hero {
-    grid-template-columns: minmax(0, 1fr);
-    padding-top: 48px;
+    padding-top: 40px;
   }
   .navBar nav a:not(:last-child) {
     display: none;
@@ -1339,9 +1358,6 @@
   }
   .steps::before {
     display: none;
-  }
-  .hero h1 {
-    font-size: min(80px, (100vw - 2 * var(--gutter)) / 9.8);
   }
   .errata li {
     grid-template-columns: minmax(0, 1fr);

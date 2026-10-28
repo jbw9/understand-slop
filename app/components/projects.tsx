@@ -184,7 +184,7 @@ export function ProjectsDialog() {
               }}
             />
           ) : (
-            <div className="flex items-center justify-between gap-4 rounded-[8px] border border-border-gray bg-surface px-4 py-3">
+            <div className="flex items-center justify-between gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-3">
               <p className="text-[12.5px] text-muted-slate">Start a project from scratch, or map a folder on this machine.</p>
               <button type="button" onClick={() => setWizard(true)} className={cn(PRIMARY, "shrink-0")}>
                 New project…
@@ -195,7 +195,7 @@ export function ProjectsDialog() {
           <section>
             <h3 className="mb-2 text-[13px] font-semibold text-ink">Your projects</h3>
             {list?.projects.length ? (
-              <ul className="flex flex-col divide-y divide-border-gray rounded-[8px] border border-border-gray">
+              <ul className="flex flex-col divide-y divide-border-gray rounded-[3px] border border-border-gray">
                 {list.projects.map((p) => (
                   <ProjectRow
                     key={p.id}
@@ -282,7 +282,7 @@ function NewProject({
         if (last) onStart();
         else if (canNext) setStep(step + 1);
       }}
-      className="flex flex-col gap-4 rounded-[8px] border border-border-gray bg-surface px-4 py-4"
+      className="flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4"
     >
       <ol className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.09em]">
         {STEPS.map((s, i) => (
@@ -303,7 +303,7 @@ function NewProject({
               type="button"
               onClick={() => choose(o.v)}
               className={cn(
-                "flex cursor-pointer flex-col gap-1 rounded-[6px] border bg-pure-white px-3 py-3 text-left transition-colors hover:border-deep-green",
+                "flex cursor-pointer flex-col gap-1 rounded-[2px] border bg-pure-white px-3 py-3 text-left transition-colors hover:border-deep-green",
                 fresh === o.v ? "border-deep-green" : "border-border-gray",
               )}
             >
@@ -494,7 +494,7 @@ function ProjectRow({
       </p>
       {status === "generating" && p.progress?.roots.length ? <Roots roots={p.progress.roots} onOpen={onOpen} /> : null}
       {status === "failed" && p.map.error ? (
-        <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-[5px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
+        <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-[2px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
           {p.map.error}
         </pre>
       ) : null}

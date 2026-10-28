@@ -68,6 +68,7 @@ export function Titlebar({ bare }: { bare?: boolean }) {
     // both, the trail truncates first and the centre drifts left.
     <header
       data-tauri-drag-region
+      data-chrome
       className="grid h-9 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,372px)_minmax(max-content,1fr)] items-center border-b border-border-gray bg-surface-container-low"
     >
       {/* The Mac's traffic lights take the left edge, inside this column so the centre stays the window's. */}
@@ -139,7 +140,7 @@ function Where() {
         type="button"
         onClick={() => openPalette("maps")}
         title="Switch map"
-        className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-[5px] px-2 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
+        className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] px-2 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
       >
         {name}
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-faint">
@@ -158,7 +159,7 @@ function Centre() {
       <button
         type="button"
         onClick={() => openPalette()}
-        className="flex h-[22px] w-full max-w-[340px] cursor-pointer items-center gap-2 rounded-[6px] border border-border-gray bg-warm-cream px-2.5 text-[12px] text-faint transition-colors hover:border-border-strong hover:text-muted-slate"
+        className="flex h-[22px] w-full max-w-[340px] cursor-pointer items-center gap-2 rounded-[2px] border border-border-gray bg-warm-cream px-2.5 text-[12px] text-faint transition-colors hover:border-border-strong hover:text-muted-slate"
       >
         <svg aria-hidden width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <circle cx="7" cy="7" r="4.5" />
@@ -225,7 +226,7 @@ function Control({
         "flex cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
         // Window buttons fill the bar's height, as native ones do; the tools
         // are small square targets, as in an editor's title bar.
-        win ? "h-full w-11" : "mx-px h-7 w-7 rounded-[5px]",
+        win ? "h-full w-11" : "mx-px h-7 w-7 rounded-[2px]",
         danger ? "hover:bg-clay-ink hover:text-white" : "hover:bg-surface-container hover:text-ink",
         className,
       )}

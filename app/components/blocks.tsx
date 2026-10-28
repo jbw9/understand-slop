@@ -232,7 +232,7 @@ function Diagram({
                   y={y}
                   width={w}
                   height={BOX_H}
-                  rx="7"
+                  rx="3"
                   fill={fill}
                   stroke={stroke}
                   // A hairline, like every other container on the page: the
@@ -326,7 +326,7 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white">
+      <div className="overflow-x-auto rounded-[3px] border border-border-gray bg-pure-white">
         <table className="w-full border-collapse text-left text-[13.5px]">
           <thead>
             <tr className="border-b border-border-gray bg-surface">
@@ -397,7 +397,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
+      <div className="overflow-x-auto rounded-[3px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
         <div className="relative" style={{ minWidth: n * 150 }}>
           {/* lifelines */}
           {block.actors.map((a) => (
@@ -414,7 +414,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
               return (
                 <div key={a} className="flex flex-1 justify-center">
                   <span
-                    className="rounded-[5px] border px-3 py-1.5 text-[13px] font-semibold"
+                    className="rounded-[2px] border px-3 py-1.5 text-[13px] font-semibold"
                     style={{ borderColor: t.ink, background: t.surface, color: t.ink }}
                   >
                     {a}
@@ -441,7 +441,7 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
                   <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">{i + 1}</span>
                   {self ? (
                     <div
-                      className="absolute top-[8px] -translate-x-1/2 rounded-[5px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
+                      className="absolute top-[8px] -translate-x-1/2 rounded-[2px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
                       style={{ left: `${a}%`, maxWidth: `${100 / n}%` }}
                     >
                       {m.label}
@@ -534,7 +534,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
           </figure>
         ) : block.device !== "phone" ? (
           // A web page: a browser window, its address bar showing the route.
-          <div className="w-[440px] max-w-full shrink-0 overflow-hidden rounded-[10px] border-[1.5px] border-border-strong bg-pure-white shadow-panel">
+          <div className="w-[440px] max-w-full shrink-0 overflow-hidden rounded-[4px] border-[1.5px] border-border-strong bg-pure-white shadow-panel">
             <div className="flex items-center gap-3 border-b border-border-gray bg-surface-container px-3 py-2">
               <div className="flex shrink-0 gap-1.5">
                 {[0, 1, 2].map((i) => (
@@ -542,7 +542,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
                 ))}
               </div>
               {/* Empty without a route: the title is just below, and an older map has none. */}
-              <p className="h-[22px] min-w-0 flex-1 truncate rounded-[5px] bg-pure-white px-2.5 py-1 font-mono text-[11px] leading-[14px] text-muted-slate">
+              <p className="h-[22px] min-w-0 flex-1 truncate rounded-[2px] bg-pure-white px-2.5 py-1 font-mono text-[11px] leading-[14px] text-muted-slate">
                 {block.route}
               </p>
             </div>
@@ -678,38 +678,38 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
       return <p className={cn(base, "text-muted-slate")}><span data-anchor>{label}</span>{badge}</p>;
     case "field":
       return (
-        <div className={cn(base, "rounded-[5px] border border-border-strong px-2.5 py-2 text-faint")}>
+        <div className={cn(base, "rounded-[2px] border border-border-strong px-2.5 py-2 text-faint")}>
           {label}
           {badge}
         </div>
       );
     case "choice":
       return (
-        <div className={cn(base, "rounded-[6px] border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
+        <div className={cn(base, "rounded-[2px] border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
           {label}
           {badge}
         </div>
       );
     case "button":
       return (
-        <div className={cn(base, "rounded-[6px] bg-deep-green px-3 py-2 text-center font-medium text-white")}>
+        <div className={cn(base, "rounded-[2px] bg-deep-green px-3 py-2 text-center font-medium text-white")}>
           {label}
           {badge}
         </div>
       );
     case "image":
       return (
-        <div className={cn(base, "flex h-20 items-center justify-center rounded-[5px] bg-surface-container text-faint")}>
+        <div className={cn(base, "flex h-20 items-center justify-center rounded-[2px] bg-surface-container text-faint")}>
           {label}
           {badge}
         </div>
       );
     default:
       return (
-        <div className={cn(base, "flex flex-col gap-1 rounded-[5px] border border-border-gray p-2 text-on-surface-variant")}>
+        <div className={cn(base, "flex flex-col gap-1 rounded-[2px] border border-border-gray p-2 text-on-surface-variant")}>
           {label}
-          <span className="h-2 w-4/5 rounded-[3px] bg-surface-container" />
-          <span className="h-2 w-3/5 rounded-[3px] bg-surface-container" />
+          <span className="h-2 w-4/5 rounded-[2px] bg-surface-container" />
+          <span className="h-2 w-3/5 rounded-[2px] bg-surface-container" />
           {badge}
         </div>
       );
@@ -723,12 +723,12 @@ export function Example({ block, bare }: { block: Extract<Anatomy, { kind: "exam
   return (
     <div className="min-w-0">
       <div className={cn("mb-2.5 flex items-center gap-2", bare && "hidden")}>
-        <span className="rounded-[6px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
+        <span className="rounded-[2px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
           example
         </span>
         <span className="text-[13px] font-medium text-on-surface-variant">{block.caption}</span>
       </div>
-      <pre className="overflow-x-auto rounded-[8px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
+      <pre className="overflow-x-auto rounded-[3px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
         {block.value}
       </pre>
       {block.notes?.length ? (
@@ -781,7 +781,7 @@ export function WatchOut({ issues, action }: { issues: Issue[]; action?: React.R
           <li
             key={it.title}
             data-pick={it.title}
-            className="rounded-[8px] border border-clay-line bg-clay-surface/60 px-4 py-3"
+            className="rounded-[3px] border border-clay-line bg-clay-surface/60 px-4 py-3"
           >
             <p className="text-[14px] font-semibold text-clay-ink">{it.title}</p>
             <p className="mt-1 text-[13.5px] leading-relaxed text-on-surface">
@@ -825,7 +825,7 @@ export function CodeDrawer({
       <button
         onClick={onToggle}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-[6px] border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
+        className="flex items-center gap-2 rounded-[2px] border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
       >
         <span className="font-mono text-[12px]">{"</>"}</span>
         {open ? "Hide the code" : `The code behind this · ${refs.length} ${refs.length === 1 ? "place" : "places"}`}
@@ -861,7 +861,7 @@ function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: Ro
     <li
       data-pick={code.label}
       data-pick-code={`${code.file}:${code.start}-${code.end}`}
-      className="rounded-[8px] border border-border-gray bg-pure-white"
+      className="rounded-[3px] border border-border-gray bg-pure-white"
     >
       <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
         <span className="text-[13.5px] text-ink">{code.label}</span>
@@ -928,7 +928,7 @@ function DocPassage({ doc }: { doc: CodeRef }) {
   };
 
   return (
-    <li data-pick={doc.label} data-pick-code={`${doc.file}:${doc.start}-${doc.end}`} className="rounded-[8px] border border-border-gray bg-pure-white">
+    <li data-pick={doc.label} data-pick-code={`${doc.file}:${doc.start}-${doc.end}`} className="rounded-[3px] border border-border-gray bg-pure-white">
       <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
         <span className="text-[13.5px] text-ink">{doc.label}</span>
         <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">

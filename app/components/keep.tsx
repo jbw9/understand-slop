@@ -143,7 +143,7 @@ export function KeepAnswer({
         <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
           {stage.at === "asking" ? (
             <>
-              <div className="mb-4 rounded-[8px] border border-border-gray bg-surface-container-low px-3.5 py-3">
+              <div className="mb-4 rounded-[3px] border border-border-gray bg-surface-container-low px-3.5 py-3">
                 <p className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-faint">What Claude said</p>
                 <div className="max-h-[260px] overflow-auto whitespace-pre-wrap text-[13px] leading-[1.6] text-on-surface-variant">
                   <Prose text={exchange.said} />
@@ -169,7 +169,7 @@ export function KeepAnswer({
               <p className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-faint">
                 How it will look on the level
               </p>
-              <div className="mb-4 rounded-[8px] border border-border-gray px-4 py-4">
+              <div className="mb-4 rounded-[3px] border border-border-gray px-4 py-4">
                 {isExplained(stage.block) ? (
                   <ExplainedBlock block={stage.block} />
                 ) : (
@@ -306,7 +306,7 @@ export function CorrectSection({ path, onClose }: { path: string[]; onClose: () 
                   setProblem(null);
                 }}
                 className={cn(
-                  "cursor-pointer rounded-[6px] px-2.5 py-1 text-[12.5px]",
+                  "cursor-pointer rounded-[2px] px-2.5 py-1 text-[12.5px]",
                   route === k ? "bg-surface-container text-ink" : "text-muted-slate hover:text-ink",
                 )}
               >

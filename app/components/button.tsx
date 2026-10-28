@@ -32,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
       ref={ref}
       type={type}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[6px] font-sans font-medium transition-[background-color,border-color,color] duration-100",
+        "inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[2px] font-sans font-medium transition-[background-color,border-color,color] duration-100",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green/70",
         "disabled:cursor-default disabled:opacity-50",
         size === "sm" ? "h-6 px-2 text-[12px]" : "h-7 px-2.5 text-[12.5px]",
@@ -61,7 +61,7 @@ export function Kbd({ children, className }: { children: React.ReactNode; classN
   return (
     <kbd
       className={cn(
-        "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[4px] border border-border-gray bg-surface px-1 font-sans text-[10.5px] font-medium leading-none text-muted-slate",
+        "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[2px] border border-border-gray bg-surface px-1 font-sans text-[10.5px] font-medium leading-none text-muted-slate",
         className,
       )}
     >

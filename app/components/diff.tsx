@@ -169,7 +169,7 @@ export function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouch
   const t = TINT[verdict];
   return (
     <span
-      className="rounded-[6px] border px-2 py-[3px] font-mono text-[10.5px] leading-none"
+      className="rounded-[2px] border px-2 py-[3px] font-mono text-[10.5px] leading-none"
       style={{ color: t.ink, background: t.surface, borderColor: t.line }}
     >
       {children}
@@ -204,9 +204,9 @@ export function SectionTint({ path, children }: { path: string[]; children: Reac
   if (verdict === "untouched") return children;
   const t = TINT[verdict];
   return (
-    <div className="relative rounded-[8px]" style={{ background: t.surface, boxShadow: `inset 0 0 0 1.5px ${t.line}` }}>
+    <div className="relative rounded-[3px]" style={{ background: t.surface, boxShadow: `inset 0 0 0 1.5px ${t.line}` }}>
       <span
-        className="absolute -top-2 left-3 z-10 rounded-[5px] border px-1.5 py-[2px] font-mono text-[9.5px] uppercase leading-none tracking-[0.08em]"
+        className="absolute -top-2 left-3 z-10 rounded-[2px] border px-1.5 py-[2px] font-mono text-[9.5px] uppercase leading-none tracking-[0.08em]"
         style={{ color: t.ink, background: t.surface, borderColor: t.line }}
       >
         {WORD[verdict]}
@@ -233,7 +233,7 @@ export function RemovedSections({ path }: { path: string[] }) {
       {here.map((s) => (
         <div
           key={s.id}
-          className="rounded-[8px] border px-4 py-3"
+          className="rounded-[3px] border px-4 py-3"
           style={{ background: t.surface, borderColor: t.line }}
         >
           <span className="flex items-center gap-2">
@@ -291,7 +291,7 @@ function RowsDiff({ kind, rows, block }: { kind: Anatomy["kind"]; rows: RowDiff[
   return (
     <div className="min-w-0">
       {title ? <p className="mb-2.5 font-mono text-[12.5px] font-semibold text-ink">{title}</p> : null}
-      <div className="overflow-x-auto rounded-[8px] border border-border-gray bg-pure-white">
+      <div className="overflow-x-auto rounded-[3px] border border-border-gray bg-pure-white">
         <table className="w-full border-collapse text-left text-[13px]">
           {columns ? (
             <thead>
@@ -436,7 +436,7 @@ export function DiagramDiff({
                   y={y}
                   width={w}
                   height={BOX_H}
-                  rx="6"
+                  rx="3"
                   fill={t?.surface ?? "var(--color-pure-white)"}
                   stroke={t?.line ?? "var(--color-border-strong)"}
                   strokeWidth={t ? 2 : 1.5}

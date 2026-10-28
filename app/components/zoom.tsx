@@ -144,7 +144,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
     <Scale.Provider value={zoom}>
       <div ref={ref}>{children}</div>
       {zoom === 1 ? null : (
-        <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center overflow-hidden rounded-full border border-border-gray bg-pure-white text-[12.5px] text-ink shadow-lift">
+        <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center overflow-hidden rounded-[2px] border border-border-gray bg-pure-white text-[12.5px] text-ink shadow-lift">
           <button
             type="button"
             aria-label="Zoom out"
@@ -177,7 +177,10 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
 
 /** At 100% nothing is set, so the level lays out exactly as it always has. */
 function fit(box: HTMLElement, pane: HTMLElement, z: number) {
-  box.style.width = z === 1 ? "" : `${pane.clientWidth}px`;
+  // The pane's width less its padding: what the workspace window leaves of it.
+  const s = getComputedStyle(pane);
+  const w = pane.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
+  box.style.width = z === 1 ? "" : `${w}px`;
   box.style.transform = z === 1 ? "" : `scale(${z})`;
   box.style.transformOrigin = z === 1 ? "" : "0 0";
 }

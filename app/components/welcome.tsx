@@ -17,7 +17,7 @@ export function NoProject({ maps }: { maps: MapEntry[] }) {
     <main className="flex min-h-0 flex-1 justify-center overflow-y-auto bg-warm-cream px-6 py-16">
       <div className="w-full max-w-[520px]">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Open a project</h1>
-        <ul className="mt-5 flex flex-col divide-y divide-border-gray overflow-hidden rounded-[8px] border border-border-gray bg-pure-white">
+        <ul className="mt-5 flex flex-col divide-y divide-border-gray overflow-hidden rounded-[3px] border border-border-gray bg-pure-white">
           {maps.map((m) => (
             <li key={m.id}>
               <button

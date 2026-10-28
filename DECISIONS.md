@@ -1509,8 +1509,12 @@ together". Screenshots agreed: three surfaces each had their own idea of what
 a surface is, and a level's header mixed a mono button, a sans button and a
 pill.
 
-**Cost accepted:** the workspace still covers the right of the map while it
-is open. The status bar takes 24px of height on every screen.
+**Cost accepted:** the status bar takes 24px of height on every screen. (The
+workspace covered the right of the map while it was open; the map now keeps
+clear of it the way a plan does, laying its level out in what the window
+leaves, `--workspace-inset`, and never in less than 480px, past which the
+window covers it again. Opening the window reflows the level at once rather
+than with the slide.)
 **At scale:** the palette lists every level, 71 in this repository's map;
 it caps at 60 results and ranks by match, so a big map is still one keystroke
 plus a few letters.

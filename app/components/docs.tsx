@@ -348,7 +348,7 @@ export function DocView({ file, line }: { file: string; line?: number }) {
                         scrollToHeading(article.current, h.id);
                       }}
                       className={cn(
-                        "block truncate rounded-[4px] py-1 text-[12.5px] text-muted-slate hover:text-ink",
+                        "block truncate rounded-[2px] py-1 text-[12.5px] text-muted-slate hover:text-ink",
                         h.depth === 3 && "pl-3 text-[12px]",
                       )}
                       title={h.label}

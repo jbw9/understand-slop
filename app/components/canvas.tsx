@@ -266,7 +266,14 @@ export function Canvas() {
     >
       {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
       <SectionTabs path={path} />
-      <main ref={scrollRef} className={cn(GROUND[ground], "relative min-h-0 min-w-0 flex-1 overflow-auto")}>
+      <main
+        ref={scrollRef}
+        className={cn(GROUND[ground], "relative min-h-0 min-w-0 flex-1 overflow-auto")}
+        // The level is laid out in what the workspace window leaves of the
+        // width (components/workspace.tsx), but never in less than 480px: a
+        // window dragged nearly full width covers the map rather than crushing it.
+        style={{ paddingRight: "min(var(--workspace-inset, 0px), max(0px, 100% - 480px))" }}
+      >
         {/* In the desktop app the title bar carries where you are. */}
         {desktop ? null : (
           <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => goTo(path.slice(0, d))} />
@@ -756,7 +763,7 @@ function DataShapes({ owner, blocks, ctx }: { owner: string; blocks: DataBlock[]
           const { name, gloss, size } = labels[i];
           const shown = open.has(i);
           return (
-            <li key={i} data-pick={blockLabel(b)} className="overflow-hidden rounded-[8px] border border-border-gray bg-pure-white">
+            <li key={i} data-pick={blockLabel(b)} className="overflow-hidden rounded-[3px] border border-border-gray bg-pure-white">
               <button
                 onClick={() => toggle(i)}
                 aria-expanded={shown}
@@ -915,7 +922,7 @@ function List({
               onClick={go}
               disabled={!go}
               className={cn(
-                "group flex w-full items-center gap-2.5 rounded-[5px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
+                "group flex w-full items-center gap-2.5 rounded-[2px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
                 go && "hover:bg-surface-container-low",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
               )}
@@ -1042,7 +1049,7 @@ function Header({
           {origin ? <OriginMark origin={origin} /> : null}
           {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
           {shape?.kind === "count" ? (
-            <span className="rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
+            <span className="rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
               <span className="tnum font-semibold text-ink">{shape.value}</span> {shape.unit}
             </span>
           ) : null}
@@ -1137,7 +1144,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
       onClick={go}
       disabled={!go}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-[8px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
+        "group flex w-full items-start gap-3 rounded-[3px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
         go && "hover:border-border-strong hover:shadow-panel",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
@@ -1150,7 +1157,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
           </span>
           <StateChip state={node.state} alarm={node.alarm} />
           {node.issues?.length ? (
-            <span className="shrink-0 rounded-[6px] border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
+            <span className="shrink-0 rounded-[2px] border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
               ⚠ {node.issues.length} {node.issues.length === 1 ? "problem" : "problems"}
             </span>
           ) : null}

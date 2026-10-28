@@ -76,6 +76,7 @@ export function SectionTabs({ path }: { path: string[] }) {
   return (
     <div
       role="tablist"
+      data-chrome
       aria-label={`Open sections of ${name}`}
       className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border-gray bg-surface-container-low px-1.5"
     >
@@ -93,7 +94,7 @@ export function SectionTabs({ path }: { path: string[] }) {
         onClick={() => openInTab(name, [])}
         aria-label="New tab"
         title="New tab"
-        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-[5px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
       >
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
           <path d="M5 1.5v7M1.5 5h7" />
@@ -135,7 +136,7 @@ function SectionTab({
         }
       }}
       className={cn(
-        "group flex h-6 min-w-0 max-w-[200px] shrink-0 items-center gap-1 rounded-[5px] pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
+        "group flex h-6 min-w-0 max-w-[200px] shrink-0 items-center gap-1 rounded-[2px] pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
         onClose ? "pr-1" : "pr-2.5",
         active
           ? "border border-border-gray bg-warm-cream font-semibold text-ink"
@@ -152,7 +153,7 @@ function SectionTab({
           }}
           aria-label={`Close ${label}`}
           className={cn(
-            "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-faint hover:bg-border-gray hover:text-ink",
+            "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint hover:bg-border-gray hover:text-ink",
             active ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
           )}
         >

@@ -242,7 +242,7 @@ export function Palette() {
       <div
         role="dialog"
         aria-label="Go to"
-        className="flex h-fit max-h-[60vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[10px] border border-border-strong bg-pure-white shadow-lift"
+        className="flex h-fit max-h-[60vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[4px] border border-border-strong bg-pure-white shadow-lift"
       >
         <input
           ref={input}

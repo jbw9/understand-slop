@@ -99,7 +99,7 @@ export function HistoryDialog() {
                   {entries.map((e) => (
                     <li
                       key={e.id}
-                      className="flex items-start justify-between gap-3 rounded-[8px] border border-border-gray px-3 py-2"
+                      className="flex items-start justify-between gap-3 rounded-[3px] border border-border-gray px-3 py-2"
                     >
                       <span className="min-w-0 text-[13px] text-ink">
                         {says(e)}

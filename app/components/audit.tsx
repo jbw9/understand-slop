@@ -152,7 +152,7 @@ function Block({ b }: { b: Parsed }) {
       );
     case "table":
       return (
-        <div className="mb-3 overflow-x-auto rounded-[8px] border border-border-gray">
+        <div className="mb-3 overflow-x-auto rounded-[3px] border border-border-gray">
           <table className="w-full border-collapse text-left text-[12.5px]">
             <thead className="bg-surface-container-low text-ink">
               <tr>
@@ -179,7 +179,7 @@ function Block({ b }: { b: Parsed }) {
       );
     case "details":
       return (
-        <details className="mb-3 rounded-[8px] border border-border-gray bg-surface px-3 py-2 [&_ul]:mb-0">
+        <details className="mb-3 rounded-[3px] border border-border-gray bg-surface px-3 py-2 [&_ul]:mb-0">
           <summary className="cursor-pointer text-[12.5px] font-medium text-ink">{inline(b.summary)}</summary>
           <div className="mt-2 font-mono text-[11.5px]">
             {b.body.map((x, i) => (

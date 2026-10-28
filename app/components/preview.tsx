@@ -752,11 +752,11 @@ export function Preview({
               if (e.key === "Escape") (e.target as HTMLElement).blur();
             }}
             spellCheck={false}
-            className="h-6 w-full rounded-[6px] border border-border-gray bg-pure-white px-2 font-mono text-[11.5px] text-ink outline-none placeholder:text-faint focus:border-deep-green/60"
+            className="h-6 w-full rounded-[2px] border border-border-gray bg-pure-white px-2 font-mono text-[11.5px] text-ink outline-none placeholder:text-faint focus:border-deep-green/60"
           />
         </form>
         {/* The sizes a page is most often checked at, a click apart, as in Chrome's device toolbar. */}
-        <div role="group" aria-label="Device" className="mr-1 flex shrink-0 items-center rounded-[7px] bg-surface-container p-0.5">
+        <div role="group" aria-label="Device" className="mr-1 flex shrink-0 items-center rounded-[3px] bg-surface-container p-0.5">
           {DEVICES.map((d) => {
             const p = PRESETS.find((x) => x.id === d.id);
             const on = p ? !!size && ((size.w === p.w && size.h === p.h) || (size.w === p.h && size.h === p.w)) : fill;
@@ -768,7 +768,7 @@ export function Preview({
                 title={p ? `${d.label} · ${p.w} × ${p.h}` : d.label}
                 onClick={() => resize(p ? { w: p.w, h: p.h } : null)}
                 className={cn(
-                  "flex h-5 w-6 cursor-pointer items-center justify-center rounded-[5px]",
+                  "flex h-5 w-6 cursor-pointer items-center justify-center rounded-[2px]",
                   on ? "bg-pure-white text-ink shadow-[0_0_0_1px_var(--color-border-gray)]" : "text-muted-slate hover:text-ink",
                 )}
               >
@@ -786,12 +786,12 @@ export function Preview({
             setMenu({ x: r.left, y: r.bottom + 4 });
           }}
           title="Viewport size: drag the page's right or bottom edge, or pick one"
-          className="flex h-6 shrink-0 cursor-pointer items-center rounded-[6px] px-2 font-mono text-[11px] text-muted-slate tabular-nums hover:bg-surface-container hover:text-ink"
+          className="flex h-6 shrink-0 cursor-pointer items-center rounded-[2px] px-2 font-mono text-[11px] text-muted-slate tabular-nums hover:bg-surface-container hover:text-ink"
         >
           {vw && vh ? dims : "—"}
         </button>
         {claude ? (
-          <span className="mr-1 flex shrink-0 items-center gap-1.5 rounded-full bg-[#d97757]/12 px-2 py-0.5 text-[11px] text-[#b4553a]">
+          <span className="mr-1 flex shrink-0 items-center gap-1.5 rounded-[2px] bg-[#d97757]/12 px-2 py-0.5 text-[11px] text-[#b4553a]">
             <span className="size-1.5 animate-pulse rounded-full bg-[#d97757]" />
             Claude
           </span>
@@ -886,7 +886,7 @@ export function Preview({
           ref={sizeBadge}
           aria-hidden
           className={cn(
-            "pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[8px] bg-night/80 px-3 py-1.5 font-mono text-[13px] text-white tabular-nums",
+            "pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-night/80 px-3 py-1.5 font-mono text-[13px] text-white tabular-nums",
             // On at once, as Ghostty's is; it fades only on the way out, and
             // not at all in a hidden window, where the fade would never run.
             badge ? "opacity-100" : cn("opacity-0", typeof document !== "undefined" && document.visibilityState === "visible" && "transition-opacity duration-300"),
@@ -907,7 +907,7 @@ function Tool({ label, onClick, disabled, children }: { label: string; onClick: 
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-[6px] text-muted-slate hover:bg-surface-container hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+      className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-muted-slate hover:bg-surface-container hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {children}

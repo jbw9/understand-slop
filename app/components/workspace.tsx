@@ -33,8 +33,9 @@ import { cn } from "@/lib/utils";
  * Map context goes to a tab running Claude (lib/context.ts): the strip shows
  * what is waiting for its next prompt and what has gone.
  *
- * It floats rather than docks, so opening it never takes height or width from
- * the map, and its width gives way to the window's. Hiding it, or switching
+ * It floats rather than docks, and its width gives way to the window's. The
+ * map keeps clear of it, as a plan does: its level is laid out in what the
+ * window leaves (--workspace-inset), so nothing is hidden under it. Hiding it, or switching
  * tabs, never ends a program; a tab ends when it is closed or its shell exits.
  * Tabs belong to the project they were opened in.
  *
@@ -620,6 +621,16 @@ export function Workspace() {
   };
 
   const shown = open && panel.length > 0;
+  // What the window covers of the main view's right, gap included. The plan
+  // keeps clear of it, and so does the map (components/canvas.tsx), which is
+  // not drawn here and reads it as --workspace-inset.
+  const inset = shown ? `calc(min(${width}px, 100vw - ${2 * GAP}px) + ${2 * GAP}px)` : undefined;
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (inset) root.setProperty("--workspace-inset", inset);
+    else root.removeProperty("--workspace-inset");
+    return () => void root.removeProperty("--workspace-inset");
+  }, [inset]);
 
   /** Where the window is, or would be: dropped there, a tab goes back into it. */
   const panelLeft = () => window.innerWidth - GAP - Math.min(width, window.innerWidth - 2 * GAP);
@@ -714,7 +725,7 @@ export function Workspace() {
         data-close
         onClick={() => close(t.key)}
         aria-label={`Close ${nameOf(t)}`}
-        className="flex size-[18px] cursor-pointer items-center justify-center rounded-[4px] text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
+        className="flex size-[18px] cursor-pointer items-center justify-center rounded-[2px] text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
       >
         ×
       </button>
@@ -760,7 +771,8 @@ export function Workspace() {
         width: `min(${width}px, calc(100vw - ${2 * GAP}px))`,
         visibility: !shown && settled ? "hidden" : "visible",
       }}
-      className="fixed z-40 flex flex-col overflow-hidden rounded-[10px] border border-border-gray bg-surface-container-low shadow-[0_8px_28px_-8px_rgba(26,26,46,0.14)]"
+      data-chrome
+      className="fixed z-40 flex flex-col overflow-hidden rounded-[4px] border border-border-gray bg-surface-container-low shadow-[0_8px_28px_-8px_rgba(0,0,0,0.35)]"
     >
       <div
         onPointerDown={drag}
@@ -836,7 +848,7 @@ export function Workspace() {
       style={{ top: desktop ? TITLEBAR : 0, bottom: STATUSBAR }}
       className="pointer-events-none fixed inset-x-0 z-30 flex flex-col"
     >
-      <header role="tablist" className="pointer-events-auto flex h-9 shrink-0 items-stretch bg-surface-container">
+      <header role="tablist" data-chrome className="pointer-events-auto flex h-9 shrink-0 items-stretch bg-surface-container">
         <div
           role="tab"
           aria-selected={!upFront}
@@ -860,7 +872,7 @@ export function Workspace() {
         className={cn("relative min-h-0 flex-1 bg-surface-container-low", upFront ? "pointer-events-auto" : "invisible")}
       />
       {upFront?.pty !== undefined ? (
-        <div className="pointer-events-auto bg-surface-container-low">
+        <div data-chrome className="pointer-events-auto bg-surface-container-low">
           <Strip
             tab={upFront}
             pty={upFront.pty}
@@ -880,12 +892,12 @@ export function Workspace() {
               ? { top: (desktop ? TITLEBAR : 0) + GAP, bottom: STATUSBAR + GAP, right: GAP, left: panelLeft() }
               : { top: desktop ? TITLEBAR : 0, bottom: STATUSBAR, left: 0, right: shown ? window.innerWidth - panelLeft() + GAP : 0 }
           }
-          className="pointer-events-none fixed z-50 rounded-[10px] border-2 border-dashed border-deep-green/60 bg-deep-green/8"
+          className="pointer-events-none fixed z-50 rounded-[4px] border-2 border-dashed border-deep-green/60 bg-deep-green/8"
         />
         <div
           aria-hidden
           style={{ left: dragging.x + 12, top: dragging.y + 10 }}
-          className="pointer-events-none fixed z-50 flex items-center gap-1.5 rounded-[6px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
+          className="pointer-events-none fixed z-50 flex items-center gap-1.5 rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
         >
           {(() => {
             const t = tabs.find((x) => x.key === dragging.key);
@@ -934,7 +946,7 @@ export function Workspace() {
                 }
                 onShowClaude={claude ? () => bring(claude.key) : undefined}
                 // The window floats over the main view's right; the plan keeps clear of it.
-                inset={t.main && shown ? `calc(min(${width}px, 100vw - ${2 * GAP}px) + ${2 * GAP}px)` : undefined}
+                inset={t.main ? inset : undefined}
               />
               </Held>
             );
@@ -1026,7 +1038,7 @@ function Offer({ phones, onPick, onDismiss }: { phones: Platform[]; onPick: (p: 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
       style={{ bottom: STATUSBAR + GAP }}
-      className="fixed left-3 z-40 flex max-w-[340px] flex-col gap-2.5 rounded-[10px] border border-border-gray bg-pure-white p-3.5 shadow-lift"
+      className="fixed left-3 z-40 flex max-w-[340px] flex-col gap-2.5 rounded-[4px] border border-border-gray bg-pure-white p-3.5 shadow-lift"
     >
       <p className="text-[13px] leading-snug text-ink">
         This project has {what}. Run {phones.length > 1 ? "them" : "it"} here, in the app?
@@ -1037,7 +1049,7 @@ function Offer({ phones, onPick, onDismiss }: { phones: Platform[]; onPick: (p: 
             key={p}
             type="button"
             onClick={() => onPick(p)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-[6px] border border-border-strong px-2.5 py-1 text-[12px] text-ink hover:bg-surface-container"
+            className="flex cursor-pointer items-center gap-1.5 rounded-[2px] border border-border-strong px-2.5 py-1 text-[12px] text-ink hover:bg-surface-container"
           >
             <PhoneIcon />
             {p === "ios" ? "iOS Simulator" : "Android emulator"}
@@ -1143,9 +1155,9 @@ function paste(pty: number, text: string) {
  * else the agent last started there while the shell is busy with something.
  */
 const DOT: Record<Status, { colour: string; label: string }> = {
-  working: { colour: "bg-[#e3b341]", label: "Working" },
-  waiting: { colour: "bg-[#e5534b]", label: "Needs you" },
-  done: { colour: "bg-[#3fb950]", label: "Done" },
+  working: { colour: "bg-[#f0c674]", label: "Working" },
+  waiting: { colour: "bg-[#cf3e3e]", label: "Needs you" },
+  done: { colour: "bg-[#4caf50]", label: "Done" },
 };
 
 /** Yellow while the agent works, red when it waits on the user, green when it is done. */
@@ -1226,7 +1238,7 @@ function Strip({
                   ? "Runs slop-claude in this shell: your Claude Code, able to take map context"
                   : `Runs ${a.command} in this shell`
               }
-              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-border-strong px-2 py-px text-ink hover:bg-surface-container"
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] border border-border-strong px-2 py-px text-ink hover:bg-surface-container"
             >
               <AgentIcon id={a.id} />
               {a.id === CLAUDE.id ? "Claude" : a.label}
@@ -1246,7 +1258,7 @@ function Strip({
           key={p.key}
           title={p.status === "queued" ? "Goes with the next prompt to Claude here" : "Sent to Claude"}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-[6px] border px-2 py-px",
+            "flex shrink-0 items-center gap-1.5 rounded-[2px] border px-2 py-px",
             p.status === "queued" ? "border-deep-green/50 text-ink" : "border-border-gray text-faint",
           )}
         >

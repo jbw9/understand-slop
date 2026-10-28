@@ -29,16 +29,16 @@ export function Overlay({ onClose, children }: { onClose: () => void; children: 
 }
 
 export const DIALOG =
-  "flex max-h-full w-full flex-col overflow-hidden rounded-[12px] border border-border-gray bg-pure-white shadow-lift";
+  "flex max-h-full w-full flex-col overflow-hidden rounded-[4px] border border-border-gray bg-pure-white shadow-lift";
 
 export const INPUT =
-  "w-full rounded-[6px] border border-border-gray bg-pure-white px-3 py-2 font-mono text-[12.5px] text-ink placeholder:text-faint focus:border-deep-green focus:outline-none";
+  "w-full rounded-[2px] border border-border-gray bg-pure-white px-3 py-2 font-mono text-[12.5px] text-ink placeholder:text-faint focus:border-deep-green focus:outline-none";
 
 export const PRIMARY =
-  "cursor-pointer rounded-[6px] bg-deep-green px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-brand disabled:cursor-default disabled:opacity-50";
+  "cursor-pointer rounded-[2px] bg-deep-green px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-brand disabled:cursor-default disabled:opacity-50";
 
 export const QUIET =
-  "cursor-pointer rounded-[6px] px-3.5 py-1.5 text-[13px] text-muted-slate hover:bg-surface-container-low hover:text-ink";
+  "cursor-pointer rounded-[2px] px-3.5 py-1.5 text-[13px] text-muted-slate hover:bg-surface-container-low hover:text-ink";
 
 export function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (

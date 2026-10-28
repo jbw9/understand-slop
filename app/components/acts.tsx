@@ -53,7 +53,7 @@ export function Acts() {
   if (!missed) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center">
-      <p className="rounded-[8px] border border-amber-line bg-amber-surface px-3 py-2 text-[12.5px] text-amber-ink shadow-sm">
+      <p className="rounded-[3px] border border-amber-line bg-amber-surface px-3 py-2 text-[12.5px] text-amber-ink shadow-sm">
         No section on this map is called “{missed}”.
       </p>
     </div>

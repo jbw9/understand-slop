@@ -316,7 +316,7 @@ export function WireLayer({
         const ex = sameCard ? CB.left : rightward ? CB.left : CB.right;
         const dirOut: 1 | -1 = sameCard ? -1 : rightward ? 1 : -1;
 
-        const r = 7; // elbow radius, so corners read as drawn not aliased
+        const r = 4; // elbow radius, so corners read as drawn not aliased
         const gutter = Math.abs(ex - sx);
 
         let dd: string;

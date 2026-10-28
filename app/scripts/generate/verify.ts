@@ -17,7 +17,7 @@
 import type { CodeRef, Node } from "@/lib/data";
 import { ask, BACKEND, callsOf, invoke, MODELS, type Block, type Message } from "./bedrock";
 import { converse, runTool, TOOLS } from "./author";
-import { fileReader, sentences, words } from "./check";
+import { fileReader, LEAF, sentences, words } from "./check";
 import { numbered, type Inventory } from "./inventory";
 
 export interface Verdict {
@@ -199,9 +199,14 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
   n.issues = r.issues.length ? r.issues : undefined;
   (n.code ?? []).forEach((c, i) => { if (r.code_labels[i]) c.label = r.code_labels[i]; });
   const linesOf = fileReader(inv.repo);
+  // A leaf's refs are its code drawer, held to one piece of code (LEAF); a ref
+  // that would push it past that backs the claim at the cost of the drawer, so
+  // the claim stands on the review instead.
+  const fits = (code: CodeRef[]) =>
+    n.children?.length || (code.length <= LEAF.refs && new Set(code.map((x) => x.file)).size <= LEAF.files && code.reduce((a, x) => a + x.end - x.start + 1, 0) <= LEAF.lines);
   for (const c of r.add_refs) {
     const lines = linesOf(c.file);
-    if (lines && c.start >= 1 && c.start <= c.end && c.end <= lines.length) (n.code ??= []).push(c);
+    if (lines && c.start >= 1 && c.start <= c.end && c.end <= lines.length && fits([...(n.code ?? []), c])) (n.code ??= []).push(c);
   }
   v.rewritten = true;
   if (r.unresolvable.trim()) {

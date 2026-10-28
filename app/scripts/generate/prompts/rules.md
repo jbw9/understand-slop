@@ -22,10 +22,19 @@ The reader is a developer who has to *explain* this system under questioning: wh
 - **Roots are what someone does with the product**, cut by features and journeys, not by architecture layers. A library's "someone" is the caller ("Making A Request", "Retrying On Failure"). Layers like "API", "Database" or "Utils" say nothing specific about this product.
 - **The top level is a level too.** Above the roots sits the repository itself: a short detail and one diagram whose boxes open the roots, drawn after the roots are written, with an arrow only where the code goes from one root to another.
 - **Each level names its parts and never shows their contents.** Children are chapters: each one answers one question about its parent.
+- **Two kinds of level, and nothing else.**
+  - A **level with parts** is a picture: one `diagram` whose boxes open every child, plus at most two other blocks. Each part the reader sees on it leads down.
+  - A **leaf** is one piece of code: one function, handler, component, screen, query or config, the thing a reader would open to change it. Its `code` is that thing's own lines: at most 3 ranges, from at most 2 files, about 200 lines in all. It has no `diagram` (a diagram names parts, and a leaf has none) and 1–2 blocks that explain the lines. The first is picked by what the code is, so the same kind of code reads the same way in every map:
+    - a component, page or screen that draws something → `screen`
+    - a function, handler or action that does something → `flow`, its steps in order
+    - code whose point is talking to another system (an API, the database, a queue) → `sequence`
+    - a type, model, table definition or config → `schema` (its fields) or `table` (its values)
+    - a constant set of options or rules → `table`
+    Add a second block only when it shows something the first cannot: the stored value a `flow` writes as an `example`, say.
+  - The reader sees code only on a leaf; above it, `code` refs back the claims but are not shown. So when a node would cite several separate things (five route handlers, a form and the endpoint it posts to, a writer and a reader), each is its own leaf, and the node is a level whose diagram opens them. Never stop at a node that summarises several parts and hands over all their code at once.
 - **Depth belongs to the branch.**
-  - Most roots go 2–3 levels: root → parts → the mechanism or data one part turns on.
-  - Stop when there is nothing more to explain.
-  - The reader sees code only on the last level of a branch, a node with no children; above it, `code` refs back the claims but are not shown. So a leaf is where the lines are worth reading: don't pad a branch to reach code, and don't stop short of the interesting part either.
+  - Most roots go 2–3 levels: root → parts → the piece of code each part is.
+  - Go one level deeper only when a part is itself several pieces of code. Don't pad a branch with a level that says nothing new.
 - **Breadth:** 3–6 children per node is typical, never more than about 8.
 
 ## What a level shows
@@ -35,12 +44,13 @@ The level itself, `node` open:
 1. `title`: the thing's own name in 1–4 words, Title Case, everyday words a newcomer would use. Good: "Organisation Sign-Up", "Interest Categories", "Choosing The Home Screen". Bad: nicknames such as "Org Wizard" or "Role Lookup", code identifiers such as `rsvp` or `fetchAllEvents`, and file paths. Code identifiers belong in `detail` in backticks.
 2. `sub`: at most 8 words saying what this IS, plainly: "Add a repo and watch it get mapped". Not a list of its parts (the children already name them) and never a file path.
 3. `detail`: **at most two sentences and at most 40 words.** The one thing to know before looking at the pictures. Everything else is a block.
-4. `anatomy`: blocks drawn as the thing they describe. Use whichever fit; most levels have 1–3:
+4. `anatomy`: blocks drawn as the thing they describe. Use whichever fit; a level with parts has its diagram and at most two more, a leaf at most two and no diagram:
    - `diagram`: how the pieces connect. This is the main picture of a level.
      - Boxes sit on a grid (`col` left to right, `row` top to bottom, from 0). Never put two boxes in one cell. Keep it to about 5 columns and about 10 boxes.
      - A box is a thing at runtime ("users table", "Login screen", "Stripe webhook"). Its `sub` is a few words (about 25 characters at most): "row with this id", not a sentence — a long sub widens its whole column.
      - The checker lays the picture out as the page will and rejects one that is too wide to read, has a label drawn on another label or a box, or a line through a box it does not connect. Fix those by rearranging: put boxes an arrow joins next to each other, use more rows and fewer columns, and do not run an arrow across a box in between.
-     - A box that a child explains carries `opens: "<child id>"`, which makes the picture the way down. Give every child a box when you can: a level whose picture opens all its parts shows no separate list of them. Boxes with nothing to open are scenery.
+     - A box that a child explains carries `opens: "<child id>"`, which makes the picture the way down. Every child has a box that opens it.
+     - A box with no `opens` is scenery: something this level does not explain — the user, a browser, a database table, an outside service, or code another root explains. A box for code in this root that has no child is a part the reader cannot reach: give it a child, or leave it out.
    - `sequence`: who talks to whom, in order. Every `from`/`to` must be one of `actors`.
    - `table`: real values, such as the categories, the env vars, the fields a form sends, the routes. Every row must have exactly as many cells as `columns`.
    - `screen`: what a user sees on one screen, as `items` top to bottom, read from the JSX or template. No `shot`.

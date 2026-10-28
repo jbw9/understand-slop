@@ -148,6 +148,7 @@ export function check(
       if (n.shape?.kind === "marks")
         for (const m of n.shape.ids) if (!MARK_IDS.includes(m)) problems.push(`SHAPE ${n.id} mark "${m}" has no drawing (have: ${MARK_IDS.join(", ")})`);
       if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);
+      if (gen && n.id !== OVERVIEW_ID) problems.push(...levelProblems(n));
     }
     for (const [kind, list] of [["CODE", n.code], ["DOCS", n.docs]] as const)
       for (const c of list ?? []) {
@@ -180,6 +181,46 @@ export function check(
     }
   }
   return { problems, roots, refs, sources };
+}
+
+/**
+ * What a leaf may cite. The code drawer shows a leaf's refs and nothing above
+ * it, so a leaf citing every file its page mentions hands the reader the whole
+ * page's code where they asked for one part's.
+ */
+export const LEAF = { refs: 3, files: 2, lines: 200, blocks: 2 };
+/** A level with parts: its picture, and at most this many blocks beside it. */
+export const PARENT_BLOCKS = 3;
+
+/**
+ * The two kinds of level a generated map has. A level with parts is a picture
+ * whose boxes open every part, so each part leads somewhere; a leaf is one
+ * piece of code — one function, handler, screen or config — framed by one or
+ * two blocks, so digging into any part ends at that part's own lines.
+ */
+function levelProblems(n: any): string[] {
+  const out: string[] = [];
+  const blocks: any[] = n.anatomy ?? [];
+  const diagrams = blocks.filter((b) => b.kind === "diagram");
+  // Parts the reader added (lib/overlay.ts) have no box to be opened from.
+  const kids: any[] = (n.children ?? []).filter((k: any) => !k.origin);
+  if (kids.length) {
+    const opened = new Set(diagrams.flatMap((b) => b.boxes.map((x: any) => x.opens)));
+    const closed = kids.filter((k) => !opened.has(k.id)).map((k) => k.id);
+    if (!diagrams.length) out.push(`PARTS ${n.id} has children but no diagram — draw one whose boxes open every child`);
+    else if (closed.length) out.push(`PARTS ${n.id} — no box on its diagram opens ${closed.join(", ")}; give every child a box with \`opens\``);
+    if (blocks.length > PARENT_BLOCKS) out.push(`BLOCKS ${n.id} has ${blocks.length} blocks (max ${PARENT_BLOCKS}: the diagram and two more) — what explains one part belongs on that part`);
+    return out;
+  }
+  const code: any[] = n.code ?? [];
+  const files = new Set(code.map((c) => c.file)).size;
+  const lines = code.reduce((a, c) => a + c.end - c.start + 1, 0);
+  if (code.length > LEAF.refs || files > LEAF.files || lines > LEAF.lines)
+    out.push(`LEAF ${n.id} cites ${code.length} ranges in ${files} files, ${lines} lines (max ${LEAF.refs} ranges, ${LEAF.files} files, ${LEAF.lines} lines) — a leaf is one piece of code; make each part its own child citing its own lines, and this node a level whose diagram opens them`);
+  if (diagrams.length) out.push(`LEAF ${n.id} has a diagram — a diagram names parts and a leaf has none; show its steps as a flow or sequence, or make the boxes children`);
+  if (!blocks.length) out.push(`BLOCKS ${n.id} is a leaf with no block — give it the one that explains its lines: a screen, flow, sequence, schema or table`);
+  else if (blocks.length > LEAF.blocks) out.push(`BLOCKS ${n.id} is a leaf with ${blocks.length} blocks (max ${LEAF.blocks}) — on a leaf the code is the main thing`);
+  return out;
 }
 
 /** Widest a diagram may lay out — the explorify benchmark's widest is 1523. Past it the page holds the picture at its 70% floor and it scrolls far. */

@@ -560,7 +560,9 @@ fn start_android() -> Result<Running, String> {
             std::thread::sleep(Duration::from_secs(2));
         }
     }
-    let tail: String = std::fs::read_to_string(&log).unwrap_or_default().lines().rev().take(6).collect::<Vec<_>>().join("\n");
+    let log = std::fs::read_to_string(&log).unwrap_or_default();
+    let lines: Vec<&str> = log.lines().collect();
+    let tail = lines[lines.len().saturating_sub(6)..].join("\n");
     Err(format!("The emulator stopped while starting:\n{tail}"))
 }
 
@@ -676,6 +678,11 @@ fn input(platform: &str, i: &Input) -> Result<(), String> {
             "tap" => shell(&["tap", &px(i.x, w), &px(i.y, h)]),
             "swipe" => shell(&["swipe", &px(i.x, w), &px(i.y, h), &px(i.x2, w), &px(i.y2, h), &i.ms.max(100).to_string()]),
             "text" => {
+                // adb types ASCII alone, and fails partway, in Java, on anything else.
+                let other: String = i.text.chars().filter(|c| !c.is_ascii()).collect();
+                if !other.is_empty() {
+                    return Err(format!("The Android emulator can only be typed into in plain ASCII, and nothing was typed: not {other}."));
+                }
                 for (n, line) in i.text.split('\n').enumerate() {
                     if n > 0 {
                         shell(&["keyevent", "66"])?;
@@ -809,7 +816,38 @@ fn application_id(dir: &Path) -> Option<String> {
 
 /* ── Claude's `device` tool (mcp.rs) ──────────────────────────── */
 
-pub fn tool(args: &serde_json::Value) -> Result<Vec<serde_json::Value>, String> {
+/// A phone's screen is 2–3 times its points across. A picture that large is
+/// shrunk before Claude sees it, so coordinates read off it would land wide
+/// of the mark: it is made smaller by a whole factor here instead, to about
+/// a thousand pixels at most, and coordinates are taken in it. On an iPhone
+/// that is its points.
+fn divisor(w: u32, h: u32) -> u32 {
+    if cfg!(target_os = "macos") { w.max(h).div_ceil(1000).max(1) } else { 1 }
+}
+
+/// The screenshot made smaller by `divisor`, and the divisor it was; as it is
+/// where it cannot be (`sips` is macOS's own).
+fn shrink(png: &[u8], w: u32, h: u32) -> (Vec<u8>, u32) {
+    let d = divisor(w, h);
+    if d == 1 {
+        return (png.to_vec(), 1);
+    }
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = std::env::temp_dir();
+    let (from, to) = (tmp.join(format!("slop-shot-{}-{n}.png", std::process::id())), tmp.join(format!("slop-shot-{}-{n}-small.png", std::process::id())));
+    let small = std::fs::write(&from, png).ok().and_then(|_| {
+        ok(Command::new("sips").args(["--resampleWidth", &(w / d).to_string()]).arg(&from).arg("--out").arg(&to))?;
+        std::fs::read(&to).ok()
+    });
+    let _ = (std::fs::remove_file(&from), std::fs::remove_file(&to));
+    match small {
+        Some(s) => (s, d),
+        None => (png.to_vec(), 1),
+    }
+}
+
+pub fn tool(args: &serde_json::Value, app: &tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
     use serde_json::json;
     let p = phones().lock().unwrap();
     let platform = match args.get("platform").and_then(|v| v.as_str()) {
@@ -836,16 +874,20 @@ pub fn tool(args: &serde_json::Value) -> Result<Vec<serde_json::Value>, String> 
     if action == "screenshot" {
         let png = frame(&platform)?;
         let (w, h) = crate::mcp::png_size(&png).unwrap_or((0, 0));
+        let (png, d) = shrink(&png, w, h);
         return Ok(vec![
             json!({ "type": "image", "data": crate::mcp::base64(&png), "mimeType": "image/png" }),
-            json!({ "type": "text", "text": format!("The {platform} screen, {w}×{h} pixels.") }),
+            json!({ "type": "text", "text": format!("The {platform} screen, {}×{} pixels: coordinates are this picture's.", w / d, h / d) }),
         ]);
     }
     let (w, h) = match known {
         Some(s) => s,
         None => crate::mcp::png_size(&frame(&platform)?).ok_or("The screen's size is unknown.")?,
     };
-    let at = |key: &str| point(key).map(|(x, y)| (x / w as f64, y / h as f64)).ok_or_else(|| format!("{action} needs {key}: [x, y]."));
+    // Coordinates are the screenshot's, which is the screen made smaller.
+    let d = divisor(w, h) as f64;
+    let (w, h) = (w as f64 / d, h as f64 / d);
+    let at = |key: &str| point(key).map(|(x, y)| (x / w, y / h)).ok_or_else(|| format!("{action} needs {key}: [x, y]."));
     let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let i = match action {
         "tap" => {
@@ -860,6 +902,12 @@ pub fn tool(args: &serde_json::Value) -> Result<Vec<serde_json::Value>, String> 
         "key" => Input { kind: "key".into(), text, ..Default::default() },
         a => return Err(format!("No device action called {a}.")),
     };
+    // Claude's pointer goes there first, in the phone's tab (components/device.tsx), as it does on a page.
+    if matches!(action, "tap" | "swipe") {
+        use tauri::Emitter;
+        let _ = app.emit_to("main", "slop:device-touch", json!({ "platform": platform, "x": i.x, "y": i.y, "x2": i.x2, "y2": i.y2, "swipe": action == "swipe" }));
+        std::thread::sleep(Duration::from_millis(450));
+    }
     input(&platform, &i)?;
     Ok(vec![json!({ "type": "text", "text": format!("Done: {action}.") })])
 }
@@ -915,6 +963,14 @@ mod tests {
         assert_eq!(application_id(d.path()).as_deref(), Some("dev.example.app"));
         let d = project(&[("ios/Thing.xcodeproj/project.pbxproj", "")]);
         assert!(detect(&d).ios);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn a_phone_screen_is_shown_at_about_its_points() {
+        assert_eq!(divisor(1179, 2556), 3);
+        assert_eq!(divisor(1080, 2400), 3);
+        assert_eq!(divisor(800, 600), 1);
     }
 
     #[test]

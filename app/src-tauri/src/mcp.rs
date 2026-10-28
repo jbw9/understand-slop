@@ -170,7 +170,7 @@ fn call(name: &str, args: &Value, tab: u32, app: &AppHandle) -> Result<Vec<Value
         "navigate" => ask(app, tab, json!({ "op": "navigate", "url": args.get("url") })).map(said),
         "resize_preview" => ask(app, tab, json!({ "op": "resize", "args": args })).map(said),
         "read_console_messages" => ask(app, tab, json!({ "op": "console", "args": args })).map(said),
-        "device" => crate::devices::tool(args),
+        "device" => crate::devices::tool(args, app),
         _ => Err(format!("No tool called {name}.")),
     }
 }

@@ -120,9 +120,10 @@ fn one() -> isize {
 }
 
 /// Does `acts` in a webview: a page from the web by its label, or the
-/// window's own (where the preview's frame is) when there is none.
+/// window's own (where the preview's frame is) when there is none. Whether
+/// the window was active: WebKit follows a hover only in one that is.
 #[tauri::command]
-pub async fn native_input(app: AppHandle, view: Option<String>, acts: Vec<Act>) -> Result<(), String> {
+pub async fn native_input(app: AppHandle, view: Option<String>, acts: Vec<Act>) -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     {
         let (tx, rx) = mpsc::channel();
@@ -144,11 +145,12 @@ pub async fn native_input(app: AppHandle, view: Option<String>, acts: Vec<Act>) 
 #[cfg(target_os = "macos")]
 mod macos {
     use super::{code_of, Act};
-    use objc2::{sel, MainThreadMarker};
+    use objc2::runtime::NSObjectProtocol;
+    use objc2::{msg_send, sel, MainThreadMarker};
     use objc2_app_kit::{NSApplication, NSEvent, NSEventModifierFlags, NSEventType, NSView};
     use objc2_foundation::{NSPoint, NSProcessInfo, NSString};
 
-    pub fn send(view: &NSView, acts: &[Act]) -> Result<(), String> {
+    pub fn send(view: &NSView, acts: &[Act]) -> Result<bool, String> {
         let window = view.window().ok_or("The preview is not in a window.")?;
         let number = window.windowNumber();
         let start = NSProcessInfo::processInfo().systemUptime();
@@ -185,7 +187,14 @@ mod macos {
                     )
                     .ok_or("AppKit made no mouse event.")?;
                     match kind {
-                        NSEventType::MouseMoved => view.mouseMoved(&event),
+                        // WKWebView has no mouseMoved: of its own (its tracking
+                        // area takes moves), so a hover is given the way WebKit's
+                        // tests give one: it reaches the page with the window in
+                        // the back too.
+                        NSEventType::MouseMoved if view.respondsToSelector(sel!(_simulateMouseMove:)) => unsafe {
+                            let _: () = msg_send![view, _simulateMouseMove: &*event];
+                        },
+                        NSEventType::MouseMoved => window.sendEvent(&event),
                         NSEventType::LeftMouseDragged => view.mouseDragged(&event),
                         NSEventType::LeftMouseDown => view.mouseDown(&event),
                         NSEventType::RightMouseDown => view.rightMouseDown(&event),
@@ -206,7 +215,7 @@ mod macos {
                 other => return Err(format!("Unknown input: {other}")),
             }
         }
-        Ok(())
+        Ok(window.isKeyWindow())
     }
 
     fn key(view: &NSView, number: isize, time: f64, code: u16, chars: &str, flags: NSEventModifierFlags) -> Result<(), String> {

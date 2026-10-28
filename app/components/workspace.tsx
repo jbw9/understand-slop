@@ -227,6 +227,10 @@ export function Workspace() {
     setActive((a) => ({ ...a, [here]: open.key }));
     show(true);
   };
+  const touching = useRef(phone);
+  useEffect(() => {
+    touching.current = phone;
+  });
 
   // A project opening for the first time this session: how it runs is read,
   // its dev server started with a Preview in front, and a phone app offered
@@ -310,7 +314,15 @@ export function Workspace() {
   useEffect(() => {
     if (!desktop) return;
     const off = listen<{ id: number; tab: number; cmd: Call }>("slop:preview", (e) => void answering.current(e.payload));
-    return () => void off.then((f) => f());
+    // Claude touching a phone brings its tab forward, as acting on a page brings the Preview.
+    const touched = listen<{ platform: Platform }>("slop:device-touch", (e) => {
+      const { here } = latest.current;
+      if (tabsNow.current.some((t) => t.kind === e.payload.platform && t.cwd === here)) touching.current(e.payload.platform);
+    });
+    return () => {
+      void off.then((f) => f());
+      void touched.then((f) => f());
+    };
   }, [desktop]);
 
   const select = useCallback(

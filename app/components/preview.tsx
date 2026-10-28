@@ -80,6 +80,9 @@ const REAL = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 
 type Act = { kind: "move" | "down" | "up" | "drag" | "key" | "text"; x?: number; y?: number; button?: number; clicks?: number; text?: string };
 
+/** Where the agent found a click's target (agent.js `locate`). */
+type Located = { x: number; y: number; what: string; native: { kind: "select" | "file" | "color"; ref: string; options?: string } | null };
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The toolbar's device toggles: the whole tab, then presets (lib/preview.ts). */
@@ -97,6 +100,9 @@ type Said =
   | { type: "open"; url: string }
   | { type: "reply"; id: number; ok: boolean; value: unknown }
   | { type: "loaded" };
+
+/** What a page from the web has said since it was last asked (agent.js). */
+const DRAIN = "window.__slop ? window.__slop.drain() : []";
 
 interface Line {
   level: string;
@@ -153,6 +159,8 @@ export function Preview({
   const here = useRef("");
   const server = useRef(target);
   const log = useRef<Line[]>([]);
+  // The page's alerts and confirms since Claude last acted (agent.js answers them).
+  const dialogs = useRef<string[]>([]);
   const pending = useRef(new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>());
   const loads = useRef<(() => void)[]>([]);
   // The pages this tab has shown, for its own back and forward. The page's
@@ -285,6 +293,7 @@ export function Preview({
           t.at = t.list.length - 1;
         }
       } else if (m.type === "console") {
+        if (m.level === "dialog") dialogs.current.push(m.text);
         log.current.push({ level: m.level, text: m.text });
         if (log.current.length > 1000) log.current.shift();
       } else if (m.type === "open") {
@@ -317,7 +326,7 @@ export function Preview({
     const timer = setInterval(() => {
       if (busy) return;
       busy = true;
-      invoke<Said[] | null>("browser_eval", { label: web, js: "window.__slop ? window.__slop.drain() : []" })
+      invoke<Said[] | null>("browser_eval", { label: web, js: DRAIN })
         .then((all) => all?.forEach((m) => hear.current(m)))
         .catch(() => {})
         .finally(() => (busy = false));
@@ -455,15 +464,20 @@ export function Preview({
     return top === el;
   };
 
-  /** Mouse and key events at CSS pixels of the page, as points in its webview. */
+  /**
+   * Mouse and key events at CSS pixels of the page, as points in its webview.
+   * Whether the window was active, as a hover needs it to be.
+   */
   const real = async (acts: Act[]) => {
     const label = onWeb.current ? browser.current : null;
     const { scale: k } = view.current;
     const r = frame.current?.getBoundingClientRect();
     const ox = label ? 0 : (r?.x ?? 0);
     const oy = label ? 0 : (r?.y ?? 0);
-    if (!label) frame.current?.contentWindow?.focus();
-    await invoke("native_input", {
+    // Only when the keyboard is elsewhere in the app: focusing the frame's
+    // window takes it from a frame inside the page that a click just gave it to.
+    if (!label && document.activeElement !== frame.current) frame.current?.contentWindow?.focus();
+    return invoke<boolean>("native_input", {
       view: label,
       acts: acts.map((a) => (a.x === undefined ? a : { ...a, x: ox + a.x * k, y: oy + (a.y ?? 0) * k })),
     });
@@ -474,18 +488,32 @@ export function Preview({
     const action = a.action as string;
     const clicks = { left_click: 1, right_click: 1, double_click: 2, triple_click: 3 } as Record<string, number>;
     if (clicks[action]) {
-      const { x, y, what } = (await agent("locate", a)) as { x: number; y: number; what: string };
+      const { x, y, what, native } = (await agent("locate", a)) as Located;
+      // Its menu, file picker or color panel would open on the user's screen,
+      // out of Claude's sight and reach, and stay there.
+      if (native?.kind === "select")
+        return `${what} is a dropdown, whose menu is the system's: it was not opened. Choose an option with form_input on ${native.ref}. Options: ${native.options}.`;
+      if (native?.kind === "file")
+        return `${what} opens the system's file picker, which you cannot use, so it was not opened. Files cannot be chosen from these tools.`;
+      if (native?.kind === "color")
+        return `${what} opens the system's color panel, which you cannot use, so it was not opened. Set a color with form_input on ${native.ref}, as #rrggbb.`;
       const button = action === "right_click" ? 2 : 0;
       const acts: Act[] = [{ kind: "move", x, y }];
       for (let n = 1; n <= clicks[action]; n++) acts.push({ kind: "down", x, y, button, clicks: n }, { kind: "up", x, y, button, clicks: n });
       await real(acts);
       void agent("press", { x, y }).catch(() => {});
       await sleep(250);
-      return `Clicked ${what} at (${Math.round(x)}, ${Math.round(y)}).`;
+      const done = `Clicked ${what} at (${Math.round(x)}, ${Math.round(y)}).`;
+      if (button === 2 && !(await agent("menu", {}).catch(() => true)))
+        return `${done} The page has no menu of its own there; the browser's was kept closed.`;
+      return done;
     }
     if (action === "hover") {
-      const { x, y, what } = (await agent("locate", a)) as { x: number; y: number; what: string };
-      await real([{ kind: "move", x, y }]);
+      const { x, y, what } = (await agent("locate", a)) as Located;
+      // WebKit hit-tests a move only in the active window: with the app in
+      // the back, the agent's events at least reach the page's own listeners.
+      if (!(await real([{ kind: "move", x, y }])))
+        return `${await agent("computer", a)} The app is behind other windows, so this reached the page's mouse listeners but not its :hover styles.`;
       await sleep(150);
       return `Hovering ${what}.`;
     }
@@ -493,6 +521,8 @@ export function Preview({
       const [x0, y0] = (a.start_coordinate as number[]) ?? [];
       const [x1, y1] = (a.coordinate as number[]) ?? [];
       if ([x0, y0, x1, y1].some((n) => typeof n !== "number")) throw new Error("A drag needs start_coordinate and coordinate.");
+      // AppKit's drag session follows the real mouse, never these events: the agent drags instead.
+      if (await agent("draggable", { x: x0, y: y0 })) return null;
       await agent("glide", { x: x0, y: y0 });
       await real([{ kind: "move", x: x0, y: y0 }, { kind: "down", x: x0, y: y0 }]);
       void agent("glide", { x: x1, y: y1 }).catch(() => {});
@@ -564,11 +594,13 @@ export function Preview({
         };
       }
       case "agent": {
-        if (call.name === "computer" && reachable()) {
-          const done = await act(call.args);
-          if (done !== null) return done;
-        }
-        const said = await agent(call.name, call.args);
+        dialogs.current = [];
+        let said = call.name === "computer" && reachable() ? await act(call.args) : null;
+        if (said === null) said = (await agent(call.name, call.args)) as string;
+        // A page from the web is heard by polling: heard once more, so a dialog the action set off is in its answer.
+        if (onWeb.current && browser.current)
+          (await invoke<Said[] | null>("browser_eval", { label: browser.current, js: DRAIN }).catch(() => null))?.forEach((m) => hear.current(m));
+        if (dialogs.current.length) said += ` The page showed a dialog, answered OK: ${dialogs.current.join("; ")}.`;
         // The page knows itself by the proxy's address; Claude knows the dev server's.
         const p = proxy.current;
         return typeof said === "string" && p && server.current

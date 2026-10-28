@@ -1,7 +1,7 @@
 {
  "id": "check-in",
  "title": "Checking People In",
- "sub": "How an organisation sees who is coming and marks each person as arrived",
+ "sub": "Seeing who came, and marking them arrived",
  "footprint": {
   "dirs": [
    "app/org/index/eventdetails.tsx",
@@ -92,48 +92,70 @@
      "id": "rsvp",
      "label": "events.rsvp",
      "sub": "one JSON text",
-     "col": 3,
-     "row": 0,
+     "col": 4,
+     "row": 1,
      "opens": "ci-data"
+    },
+    {
+     "id": "tap",
+     "label": "Check-in tap",
+     "sub": "flips checkedIn",
+     "col": 3,
+     "row": 1,
+     "tone": "warn",
+     "opens": "ci-tap"
     }
    ],
    "arrows": [
     {
      "from": "ongoing",
      "to": "details",
-     "label": "tap"
+     "label": "tap",
+     "at": "app/org/index/components/ongoing.tsx:104"
     },
     {
      "from": "archive",
      "to": "details",
-     "label": "tap"
+     "label": "tap",
+     "at": "app/org/index/components/archive.tsx:104"
     },
     {
      "from": "search",
      "to": "details",
      "label": "other organisations' too",
-     "tone": "warn"
+     "tone": "warn",
+     "at": "app/org/index/search.tsx:83"
     },
     {
      "from": "details",
      "to": "rsvp",
-     "label": "fresh read"
+     "label": "fresh read",
+     "at": "app/org/index/eventdetails.tsx:148"
     },
     {
      "from": "details",
      "to": "profiles",
-     "label": "pictures"
+     "label": "pictures",
+     "at": "app/org/index/eventdetails.tsx:167"
     },
     {
      "from": "details",
      "to": "attendees",
-     "label": "View all"
+     "label": "View all",
+     "at": "app/org/index/eventdetails.tsx:200"
     },
     {
      "from": "attendees",
+     "to": "tap",
+     "label": "tap a person",
+     "at": "app/org/index/attendees.tsx:184"
+    },
+    {
+     "from": "tap",
      "to": "rsvp",
-     "label": "tap rewrites it all",
-     "tone": "warn"
+     "label": "rewrites it all",
+     "tone": "warn",
+     "at": "app/org/index/attendees.tsx:104"
     }
    ]
   },
@@ -231,7 +253,7 @@
   {
    "id": "ci-data",
    "title": "What An RSVP Holds",
-   "sub": "One entry per student in the event's guest-list text",
+   "sub": "One entry per student, in one text",
    "footprint": {
     "dirs": [
      "app/individual/index/components/rsvpDrawer.tsx",
@@ -246,62 +268,73 @@
    "code": [
     {
      "file": "app/individual/index/components/rsvpDrawer.tsx",
-     "start": 145,
-     "end": 170,
-     "label": "Joining sets one entry under the student's id"
-    },
-    {
-     "file": "app/individual/index/components/rsvpDrawer.tsx",
-     "start": 82,
-     "end": 90,
-     "label": "The dietary options"
-    },
-    {
-     "file": "app/individual/index/components/rsvpDrawer.tsx",
-     "start": 284,
-     "end": 298,
-     "label": "Other: typed text, split on commas"
+     "start": 157,
+     "end": 164,
+     "label": "One entry under the student's id"
     },
     {
      "file": "app/org/index/attendees.tsx",
      "start": 32,
      "end": 40,
      "label": "The fields the organiser's screen reads"
-    },
-    {
-     "file": "lib/localStorage.ts",
-     "start": 49,
-     "end": 53,
-     "label": "The student feed downloads every column, rsvp included"
     }
    ],
    "anatomy": [
     {
-     "kind": "sequence",
-     "caption": "How joining writes an entry",
-     "actors": [
-      "Student's phone",
-      "Database"
+     "kind": "diagram",
+     "caption": "Who writes the guest list text, and who reads it",
+     "boxes": [
+      {
+       "id": "join",
+       "label": "Join drawer",
+       "sub": "student's phone",
+       "col": 0,
+       "row": 0,
+       "opens": "ci-data-join"
+      },
+      {
+       "id": "feed",
+       "label": "Student feed",
+       "sub": "every campus event",
+       "col": 0,
+       "row": 1,
+       "tone": "warn",
+       "opens": "ci-data-feed"
+      },
+      {
+       "id": "rsvp",
+       "label": "events.rsvp",
+       "sub": "one JSON text",
+       "col": 1,
+       "row": 0
+      },
+      {
+       "id": "tap",
+       "label": "Check-in tap",
+       "sub": "organiser's phone",
+       "col": 2,
+       "row": 0
+      }
      ],
-     "rows": [
+     "arrows": [
       {
-       "from": "Student's phone",
-       "to": "Database",
-       "label": "read this event's rsvp text",
-       "state": "derived"
+       "from": "join",
+       "to": "rsvp",
+       "label": "writes whole text",
+       "at": "app/individual/index/components/rsvpDrawer.tsx:168"
       },
       {
-       "from": "Database",
-       "to": "Student's phone",
-       "label": "the text",
-       "note": "parsed; the entry under the student's id is set",
-       "state": "derived"
+       "from": "tap",
+       "to": "rsvp",
+       "label": "sets checkedIn",
+       "at": "app/org/index/attendees.tsx:104"
       },
       {
-       "from": "Student's phone",
-       "to": "Database",
-       "label": "write the whole text back",
-       "state": "derived"
+       "from": "feed",
+       "to": "rsvp",
+       "label": "reads every column",
+       "tone": "warn",
+       "at": "lib/localStorage.ts:51"
       }
      ]
     },
@@ -373,51 +406,156 @@
        "Organiser's check-in tap"
       ]
      ]
-    },
-    {
-     "kind": "table",
-     "caption": "Dietary options",
-     "columns": [
-      "Shown and stored as"
-     ],
-     "state": "derived",
-     "rows": [
-      [
-       "🥗 Vegetarian"
-      ],
-      [
-       "🕌 Halal"
-      ],
-      [
-       "🌾 Gluten-free"
-      ],
-      [
-       "🥛 Dairy-free"
-      ],
-      [
-       "🥕 Vegan"
-      ],
-      [
-       "🥜 Peanut"
-      ],
-      [
-       "Other → opens a text box; the typed words are stored one per comma, and \"Other\" itself is dropped"
-      ]
-     ]
     }
    ],
-   "issues": [
+   "issues": [],
+   "children": [
     {
-     "title": "Every student downloads every guest list",
-     "detail": "The student feed asks for every column of every event on the campus, and `rsvp` is one of them. Each student's phone receives the names, emails and user ids of everyone who joined any event there.",
-     "where": "lib/localStorage.ts:51"
+     "id": "ci-data-join",
+     "title": "Joining Writes An Entry",
+     "sub": "The join drawer adds one student's entry",
+     "state": "derived",
+     "detail": "The drawer reads the event's `rsvp` text, sets the entry under the student's id, and writes the whole text back. `Other` opens a text box whose words are stored one per comma.",
+     "code": [
+      {
+       "file": "app/individual/index/components/rsvpDrawer.tsx",
+       "start": 145,
+       "end": 170,
+       "label": "Read the text, set this student's entry, write it all back"
+      },
+      {
+       "file": "app/individual/index/components/rsvpDrawer.tsx",
+       "start": 82,
+       "end": 90,
+       "label": "The dietary options"
+      },
+      {
+       "file": "app/individual/index/components/rsvpDrawer.tsx",
+       "start": 284,
+       "end": 298,
+       "label": "Other: typed text, split on commas"
+      }
+     ],
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "How joining writes an entry",
+       "actors": [
+        "Student's phone",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Student's phone",
+         "to": "Database",
+         "label": "read this event's rsvp text",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Student's phone",
+         "label": "the text",
+         "note": "parsed; the entry under the student's id is set",
+         "state": "derived"
+        },
+        {
+         "from": "Student's phone",
+         "to": "Database",
+         "label": "write the whole text back",
+         "state": "derived"
+        }
+       ]
+      },
+      {
+       "kind": "table",
+       "caption": "Dietary options",
+       "columns": [
+        "Shown and stored as"
+       ],
+       "state": "derived",
+       "rows": [
+        [
+         "🥗 Vegetarian"
+        ],
+        [
+         "🕌 Halal"
+        ],
+        [
+         "🌾 Gluten-free"
+        ],
+        [
+         "🥛 Dairy-free"
+        ],
+        [
+         "🥕 Vegan"
+        ],
+        [
+         "🥜 Peanut"
+        ],
+        [
+         "Other → opens a text box; the typed words are stored one per comma, and \"Other\" itself is dropped"
+        ]
+       ]
+      }
+     ],
+     "col": 0,
+     "row": 0
+    },
+    {
+     "id": "ci-data-feed",
+     "title": "The Student Feed",
+     "sub": "Every published event on the student's campus",
+     "state": "derived",
+     "detail": "The feed loads every published event on the student's campus with `select(\"*\")`, so each event's `rsvp` text comes with it.",
+     "code": [
+      {
+       "file": "lib/localStorage.ts",
+       "start": 49,
+       "end": 54,
+       "label": "Every column of every published campus event"
+      }
+     ],
+     "issues": [
+      {
+       "title": "Every student downloads every guest list",
+       "detail": "The student feed asks for every column of every event on the campus, and `rsvp` is one of them. Each student's phone receives the names, emails and user ids of everyone who joined any event there.",
+       "where": "lib/localStorage.ts:51"
+      }
+     ],
+     "col": 0,
+     "row": 1,
+     "anatomy": [
+      {
+       "kind": "sequence",
+       "caption": "What the feed asks for",
+       "actors": [
+        "Student's phone",
+        "Database"
+       ],
+       "rows": [
+        {
+         "from": "Student's phone",
+         "to": "Database",
+         "label": "every column of this campus's published events",
+         "state": "derived"
+        },
+        {
+         "from": "Database",
+         "to": "Student's phone",
+         "label": "the rows, each with its rsvp text",
+         "note": "names and emails of everyone who joined",
+         "state": "derived"
+        }
+       ]
+      }
+     ]
     }
    ]
   },
   {
    "id": "ci-details",
    "title": "Event Details Page",
-   "sub": "The organiser's view of one event, with a headcount and faces",
+   "sub": "One event, with its headcount and faces",
    "footprint": {
     "dirs": [
      "app/org/index/eventdetails.tsx"
@@ -432,26 +570,14 @@
     {
      "file": "app/org/index/eventdetails.tsx",
      "start": 145,
-     "end": 187,
-     "label": "Fetch rsvp, then each student's picture"
-    },
-    {
-     "file": "app/org/index/eventdetails.tsx",
-     "start": 189,
-     "end": 192,
-     "label": "Headcount: sum of party sizes"
-    },
-    {
-     "file": "app/org/index/eventdetails.tsx",
-     "start": 199,
      "end": 201,
-     "label": "View all hands over the old event and the new list"
+     "label": "Fetch rsvp and pictures, count heads, hand over to View all"
     },
     {
      "file": "app/org/index/eventdetails.tsx",
      "start": 304,
      "end": 374,
-     "label": "Date is only shown when there is a dress code"
+     "label": "Two layouts: the date only shows with a dress code"
     },
     {
      "file": "app/org/index/eventdetails.tsx",
@@ -533,35 +659,6 @@
        "note": "the first three names; with more bookings it adds \"and N more are coming\", N = people minus 3"
       }
      ]
-    },
-    {
-     "kind": "sequence",
-     "caption": "What the Attendees section fetches",
-     "actors": [
-      "Phone",
-      "Database"
-     ],
-     "rows": [
-      {
-       "from": "Phone",
-       "to": "Database",
-       "label": "rsvp of this event",
-       "state": "derived"
-      },
-      {
-       "from": "Phone",
-       "to": "Database",
-       "label": "id and picture of each student in it",
-       "state": "derived"
-      },
-      {
-       "from": "Database",
-       "to": "Phone",
-       "label": "one profile per student who still exists",
-       "note": "the section is built from these, so deleted students drop out",
-       "state": "derived"
-      }
-     ]
     }
    ],
    "issues": [
@@ -575,7 +672,7 @@
   {
    "id": "ci-list",
    "title": "Attendee List Screen",
-   "sub": "Everyone who joined, their party size, and a tally of dietary needs",
+   "sub": "Everyone who joined, and their dietary needs",
    "footprint": {
     "dirs": [
      "app/org/index/attendees.tsx"
@@ -603,13 +700,7 @@
      "file": "app/org/index/attendees.tsx",
      "start": 150,
      "end": 221,
-     "label": "The screen"
-    },
-    {
-     "file": "app/org/index/attendees.tsx",
-     "start": 188,
-     "end": 191,
-     "label": "Pictures taken by position, not by person"
+     "label": "The screen; pictures taken by position at 188"
     }
    ],
    "anatomy": [
@@ -695,7 +786,7 @@
   {
    "id": "ci-tap",
    "title": "Marking Someone Arrived",
-   "sub": "One tap flips a person's checkedIn flag and rewrites the whole guest list",
+   "sub": "One tap rewrites the whole guest list",
    "footprint": {
     "dirs": [
      "app/org/index/attendees.tsx",
@@ -715,6 +806,12 @@
    "code": [
     {
      "file": "app/org/index/attendees.tsx",
+     "start": 97,
+     "end": 123,
+     "label": "Flip the flag, write the whole text, keep the reply"
+    },
+    {
+     "file": "app/org/index/attendees.tsx",
      "start": 42,
      "end": 45,
      "label": "The screen starts from the event it was handed"
@@ -724,39 +821,9 @@
      "start": 46,
      "end": 46,
      "label": "…which the Ongoing list loaded, rsvp and all"
-    },
-    {
-     "file": "app/org/index/attendees.tsx",
-     "start": 97,
-     "end": 123,
-     "label": "Flip the flag, write the whole text, keep the reply"
-    },
-    {
-     "file": "app/org/index/search.tsx",
-     "start": 81,
-     "end": 83,
-     "label": "Search opens any campus event in the same details page"
     }
    ],
    "anatomy": [
-    {
-     "kind": "screen",
-     "device": "phone",
-     "title": "After one tap",
-     "caption": "Leo Park tapped once",
-     "items": [
-      {
-       "type": "list",
-       "label": "Leo Park ✓",
-       "note": "checkedIn flipped to true and the whole guest list written back"
-      },
-      {
-       "type": "list",
-       "label": "Maya Chen ✓",
-       "note": "tapping again checks her out"
-      }
-     ]
-    },
     {
      "kind": "flow",
      "rows": [
@@ -826,28 +893,6 @@
        "note": "Leo's app still shows the event as joined",
        "state": "derived"
       }
-     ]
-    },
-    {
-     "kind": "table",
-     "caption": "Two writers of the same text, and how stale their copy can be",
-     "columns": [
-      "Writer",
-      "Reads rsvp",
-      "Window for losing someone else's change"
-     ],
-     "state": "derived",
-     "rows": [
-      [
-       "Student's join drawer",
-       "Just before writing",
-       "A fraction of a second"
-      ],
-      [
-       "Organiser's check-in tap",
-       "When the Ongoing list was opened, then from its own last write",
-       "The whole session on that screen"
-      ]
      ]
     }
    ],

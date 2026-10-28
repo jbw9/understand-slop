@@ -1599,3 +1599,34 @@ be linked to or left open beside the map's own Back.
 
 **Cost accepted:** a dependency for Markdown. Links to code files inside a doc
 are named, not opened; images in a doc do not load.
+
+
+## D67 — A leaf is one piece of code; every part is a box that leads to one
+
+**Chose:** a generated map has two kinds of level, and `check` holds both.
+A level with parts is one `diagram` whose boxes open every child, plus at
+most two blocks. A leaf is one function, handler, screen or config: at most 3
+code ranges from at most 2 files and 200 lines, no diagram, and 1–2 blocks,
+the first picked by what the code is (`screen` for what draws, `flow` for what
+does, `sequence` for what talks to another system, `schema`/`table` for data
+and config). Verify no longer adds a ref that would push a leaf past that.
+The exemplar was re-cut to the same shape (`ci-data` became a level with two
+leaves; every arrow cites its line).
+**Why:** the code drawer shows only a leaf's refs, and leaves had become
+pages. On the six landing demos, 43–78% of leaves cited more than one part
+(umami's Two-Factor Setup: five route files in one drawer), and 18–49% of
+parts had no box leading to them. The exemplar taught it: its leaves cited
+4–5 ranges under 2–4 blocks.
+**Measured:** six repos (ky, flask, saas-starter, taxonomy, realworld,
+explorify), mapped twice through Claude Code. Second round: 0 check problems,
+0% leaves over the limit, 0% parts without a box, no leaf diagrams, every
+leaf with a block; median detail 24–27 words and 4.7–6.2 boxes per diagram
+on every map; $3.81–9.67 a map against $8–45 before. `eval.mts` reports
+these as `fat leaves %`, `parts w/o box %`, `leaf diagrams %` and the leaf
+columns.
+**Beat:** opening a leaf's code by default in the app, which shows the same
+too-wide drawer sooner; and showing per-box code on a leaf's diagram, which
+is a level with parts that will not say so.
+
+**Cost accepted:** more, smaller nodes (a root is now usually 3 levels deep);
+a claim on a full leaf stands on the review rather than on a cited line.

@@ -92,7 +92,7 @@ export function system(): Block[] {
     { type: "text", text: readFileSync("scripts/generate/prompts/rules.md", "utf8") },
     {
       type: "text",
-      text: `# The types (lib/data.ts) — every field's comment is part of the standard\n\n${typeReference()}\n\n# A worked example: one root of a hand-authored map, at the standard to match\n\nIt was written before diagram arrows carried \`at\` and before a \`sub\` was held to 8 words; yours must do both. It is from a different repository — match its depth, density and honesty, not its content.\n\n${exemplar()}`,
+      text: `# The types (lib/data.ts) — every field's comment is part of the standard\n\n${typeReference()}\n\n# A worked example: one root of a hand-authored map, at the standard to match\n\nIt passes every check yours will. It is from a different repository — match its depth, density and honesty, not its content.\n\n${exemplar()}`,
       cache_control: { type: "ephemeral" },
     },
   ];
@@ -140,7 +140,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
     `## Task
 Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
-Aim for 2-3 levels, 3-6 children per node, a diagram on most levels whose boxes open the children they show, and real issues where the code has them.
+Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines. Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
 ${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
 Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");

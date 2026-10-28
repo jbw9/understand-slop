@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { rootOf } from "@/lib/maps";
-import { check } from "./check";
+import { check, LEAF } from "./check";
 import { owners, type Cut } from "./cut";
 
 export function evaluate(name: string, map: MapFile) {
@@ -29,6 +29,13 @@ export function evaluate(name: string, map: MapFile) {
   const generated = Boolean(map.RUN.models);
   const problems = existsSync(root) ? check(map, root, { generated }).problems.length : "no checkout";
   const depth = (n: Node): number => 1 + Math.max(0, ...(n.children ?? []).map(depth));
+  // How far each leaf is from being one piece of code (LEAF in check.ts).
+  const leaves = nodes.filter((n) => !n.children?.length);
+  const span = (n: Node) => (n.code ?? []).reduce((a, c) => a + c.end - c.start + 1, 0);
+  const fat = leaves.filter((n) => (n.code?.length ?? 0) > LEAF.refs || new Set((n.code ?? []).map((c) => c.file)).size > LEAF.files || span(n) > LEAF.lines);
+  const spans = leaves.map(span).sort((a, b) => a - b);
+  const parentBoxes = parents.flatMap((n) => (n.anatomy ?? []).flatMap((b: any) => (b.kind === "diagram" ? b.boxes : [])));
+  const median = (xs: number[]) => (xs.length ? xs[Math.floor(xs.length / 2)] : 0);
   return {
     map: name,
     roots: map.AUTHORED.length,
@@ -40,6 +47,15 @@ export function evaluate(name: string, map: MapFile) {
     "boxes/diagram": +(diagrams.reduce((a, d) => a + d.boxes.length, 0) / Math.max(1, diagrams.length)).toFixed(1),
     "opens %": Math.round((100 * linked.reduce((a, x) => a + x, 0)) / Math.max(1, linked.length)),
     "blocks/node": +(blocks.length / nodes.length).toFixed(1),
+    "parts w/o box %": Math.round((100 * linked.reduce((a, x) => a + (1 - x), 0)) / Math.max(1, linked.length)),
+    "inert boxes %": Math.round((100 * parentBoxes.filter((x: any) => !x.opens).length) / Math.max(1, parentBoxes.length)),
+    "fat leaves %": Math.round((100 * fat.length) / Math.max(1, leaves.length)),
+    "leaf refs": +(leaves.reduce((a, n) => a + (n.code?.length ?? 0), 0) / Math.max(1, leaves.length)).toFixed(1),
+    "leaf lines med": median(spans),
+    "leaf lines max": spans[spans.length - 1] ?? 0,
+    "leaf blocks": +(leaves.reduce((a, n) => a + (n.anatomy?.length ?? 0), 0) / Math.max(1, leaves.length)).toFixed(1),
+    "leaf diagrams %": Math.round((100 * leaves.filter((n) => n.anatomy?.some((b) => b.kind === "diagram")).length) / Math.max(1, leaves.length)),
+    "detail words": median(nodes.map((n) => (n.detail ?? "").split(/\s+/).filter(Boolean).length).sort((a, b) => a - b)),
     issues: nodes.reduce((a, n) => a + (n.issues?.length ?? 0), 0),
     "not certain %": Math.round((100 * nodes.filter((n) => n.state !== "derived").length) / nodes.length),
     problems,

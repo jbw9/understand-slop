@@ -22,6 +22,9 @@ export interface CheckResult {
 export const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 /** A card's `sub` is a glance, not a summary: its children already name its parts. */
 export const SUB_WORDS = 8;
+/** A block's caption is a heading over the picture, not a sentence about it.
+ *  What follows " — " is a gloss the page sets apart (canvas.tsx shapeLabel). */
+export const CAPTION_WORDS = 5;
 export const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
 
 /** How the overview is named in a problem: no node can have this id, so it never clashes with one. */
@@ -81,6 +84,11 @@ export function check(
         if (want.every((l: string, i: number) => l.trimEnd() === (got[i] ?? "").trimEnd())) sources.ok++;
         else { sources.bad++; problems.push(`MISMATCH ${owner} ${b.file}:${b.start}`); }
         deepest = Math.max(deepest, d + 1);
+      }
+      if (gen && typeof b.caption === "string") {
+        const head = b.caption.split(" — ")[0];
+        if (words(head) > CAPTION_WORDS)
+          problems.push(`CAPTION ${owner} ${b.kind} "${b.caption}" — ${words(head)} words (max ${CAPTION_WORDS}); a short heading, not a sentence`);
       }
       if (b.kind === "table")
         b.rows.forEach((r: string[], i: number) => {

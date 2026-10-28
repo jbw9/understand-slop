@@ -39,7 +39,7 @@
  "anatomy": [
   {
    "kind": "diagram",
-   "caption": "How the organiser reaches the guest list, and which copy each screen uses",
+   "caption": "Reaching the guest list",
    "boxes": [
     {
      "id": "ongoing",
@@ -184,7 +184,7 @@
   },
   {
    "kind": "sequence",
-   "caption": "Calls made, from opening the list to one check-in tap",
+   "caption": "From list to check-in",
    "actors": [
     "Phone",
     "Database"
@@ -282,7 +282,7 @@
    "anatomy": [
     {
      "kind": "diagram",
-     "caption": "Who writes the guest list text, and who reads it",
+     "caption": "Guest list writers and readers",
      "boxes": [
       {
        "id": "join",
@@ -340,7 +340,7 @@
     },
     {
      "kind": "example",
-     "caption": "What events.rsvp holds (example, two students)",
+     "caption": "events.rsvp — two students",
      "value": "{\n  \"6f1c2a…a2\": {\n    \"fullName\": \"Maya Chen\",\n    \"email\": \"maya@illinois.edu\",\n    \"partySize\": 2,\n    \"dietaryRestrictions\": [\"🥕 Vegan\"],\n    \"checkedIn\": true\n  },\n  \"b93e71…07\": {\n    \"fullName\": \"Leo Park\",\n    \"email\": \"leo@illinois.edu\",\n    \"partySize\": 1,\n    \"dietaryRestrictions\": [\"🕌 Halal\", \"no shellfish\"]\n  }\n}",
      "notes": [
       {
@@ -367,7 +367,7 @@
     },
     {
      "kind": "table",
-     "caption": "The fields of one entry",
+     "caption": "Fields of one entry",
      "columns": [
       "Field",
       "What it is",
@@ -591,7 +591,7 @@
      "kind": "screen",
      "device": "phone",
      "title": "Event details (organisation)",
-     "caption": "Robotics Demo Night, opened from Ongoing",
+     "caption": "Opened from Ongoing",
      "items": [
       {
        "type": "heading",
@@ -636,7 +636,7 @@
      "kind": "screen",
      "device": "phone",
      "title": "Attendees section",
-     "caption": "The same page, scrolled to the bottom",
+     "caption": "Scrolled to the bottom",
      "items": [
       {
        "type": "heading",
@@ -708,7 +708,7 @@
      "kind": "screen",
      "device": "phone",
      "title": "Attendees (6)",
-     "caption": "Robotics Demo Night: three bookings, Maya already checked in",
+     "caption": "Three bookings, one checked in",
      "items": [
       {
        "type": "button",
@@ -739,7 +739,7 @@
     },
     {
      "kind": "table",
-     "caption": "The tally for the three bookings above",
+     "caption": "Tally for those bookings",
      "columns": [
       "Booking",
       "Party size",
@@ -855,7 +855,7 @@
     },
     {
      "kind": "sequence",
-     "caption": "How a student's RSVP is erased",
+     "caption": "Erasing an RSVP",
      "actors": [
       "Organiser",
       "Database",

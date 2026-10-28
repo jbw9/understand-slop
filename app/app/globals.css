@@ -2,17 +2,19 @@
 
 @theme {
   /* ── surfaces ─────────────────────────────────────────────
-     Kraft paper, after the Kabadoni theme (github.com/nickberckley/
+     Paper, after the Kabadoni theme (github.com/nickberckley/
      kabadoni, MIT): the reading area is a soft warm ground that is
      easy on the eyes over long sessions, and the chrome around it
      stays dark in either theme ([data-chrome], below). Cards and
-     diagram boxes sit a step lighter than the paper. */
-  --color-warm-cream: #ebe0d8;
-  --color-pure-white: #f5efe9;
-  --color-surface: #e7dcd3;
-  --color-surface-container-low: #e3d6cc;
-  --color-surface-container: #dacdc2;
-  --color-surface-dim: #d2c6bc;
+     diagram boxes sit a step lighter than the paper. Kabadoni's
+     kraft leaned red; these keep its lightness at half the colour,
+     turned toward yellow, so the ground reads as paper, not pink. */
+  --color-warm-cream: #e4e2dc;
+  --color-pure-white: #f1f0ec;
+  --color-surface: #e0ded8;
+  --color-surface-container-low: #dbd8d1;
+  --color-surface-container: #d2cfc8;
+  --color-surface-dim: #cbc8c2;
 
   /* ── ink ───────────────────────────────────────────────── */
   --color-ink: #111111;
@@ -23,8 +25,8 @@
   --color-bezel: #252526;
   --color-on-surface: #1e1e1e;
   --color-on-surface-variant: #404040;
-  --color-muted-slate: #5a5550;
-  --color-faint: #857c74;
+  --color-muted-slate: #575653;
+  --color-faint: #807e78;
 
   /* ── green family — derived, compiler-resolved ─────────── */
   --color-deep-green: #3f6640;
@@ -44,16 +46,16 @@
 
 
   /* ── lines ─────────────────────────────────────────────── */
-  --color-border-gray: #d6c9be;
-  --color-border-strong: #c4b7ab;
-  --color-wire: #a3978d;
+  --color-border-gray: #cecbc4;
+  --color-border-strong: #bcb9b2;
+  --color-wire: #9c9993;
 
   /* ── shape ─────────────────────────────────────────────── */
   --radius-chip: 3px;
 
   /* ── elevation ─────────────────────────────────────────── */
-  --shadow-panel: 0 1px 2px rgba(60, 40, 25, 0.06);
-  --shadow-lift: 0 10px 34px -6px rgba(60, 40, 25, 0.16);
+  --shadow-panel: 0 1px 2px rgba(40, 38, 32, 0.06);
+  --shadow-lift: 0 10px 34px -6px rgba(40, 38, 32, 0.16);
 
 
 
@@ -62,15 +64,15 @@
      on the page — green for what the language itself says, clay
      for literal text, amber for numbers — so a code pane reads as
      part of this app and not as a pasted-in editor theme. */
-  --color-code: #e8ddd4;
+  --color-code: #e1dfd9;
   --color-code-plain: #1e1e1e;
-  --color-code-comment: #857c74;
+  --color-code-comment: #807e78;
   --color-code-string: #8a3f42;
   --color-code-number: #7a5c1c;
   --color-code-keyword: #3f6640;
   --color-code-type: #3f566d;
   --color-code-call: #7a5530;
-  --color-code-punct: #5a5550;
+  --color-code-punct: #575653;
   --color-code-annotation: #7a5c1c;
 }
 

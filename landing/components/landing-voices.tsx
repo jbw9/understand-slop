@@ -27,7 +27,7 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
       aria-label="What developers say"
       style={{ "--n": voices.length, "--dur": `${DUR}ms` } as React.CSSProperties}
     >
-      <div className={s.voiceStage}>
+      <div className={`${s.voiceStage} ${s.reveal}`}>
         {voices.map((v, i) => (
           <figure key={v.who} className={s.slide} data-on={i === at} aria-hidden={i !== at}>
             <blockquote>{v.quote}</blockquote>

@@ -43,23 +43,24 @@ export function LandingStart({ github }: { github: string }) {
   return (
     <>
       <section id="start" className={s.section} aria-labelledby="start-title">
-        <h2 id="start-title">Map your own repo.</h2>
+        <p className={`${s.eyebrow} ${s.reveal}`}>Your repo</p>
+        <h2 id="start-title" className={s.reveal}>Map your own repo.</h2>
         <ol className={s.steps}>
           {STEPS.map((st, i) => (
-            <li key={st.title}>
+            <li key={st.title} className={s.reveal} style={{ "--i": i } as React.CSSProperties}>
               <i aria-hidden>{i + 1}</i>
               <b>{st.title}</b>
               <p>{st.body}</p>
             </li>
           ))}
         </ol>
-        <p className={s.cap}>
+        <p className={`${s.cap} ${s.reveal}`}>
           Or build it yourself from <a href={github}>the source on GitHub</a>.
         </p>
       </section>
       <section id="questions" className={s.section} aria-labelledby="questions-title">
-        <h2 id="questions-title">Questions.</h2>
-        <div className={s.faq}>
+        <h2 id="questions-title" className={s.reveal}>Questions.</h2>
+        <div className={`${s.faq} ${s.reveal}`}>
           {QUESTIONS.map(({ q, a }) => (
             <details key={q}>
               <summary>{q}</summary>

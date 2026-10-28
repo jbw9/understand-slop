@@ -8,7 +8,8 @@ import s from "./landing.module.css";
 export function LandingAgent({ name, sections, changed }: { name: string; sections: string[]; changed: string }) {
   return (
     <section id="agent" className={`${s.section} ${s.agent}`} aria-labelledby="agent-title">
-      <div>
+      <div className={s.reveal}>
+        <p className={s.eyebrow}>Beside your agent</p>
         <h2 id="agent-title">Keep up with your agent.</h2>
         <p className={s.intro}>
           Claude Code, Codex and OpenCode open in tabs beside the map. Pick a section and it goes into Claude&rsquo;s
@@ -18,7 +19,7 @@ export function LandingAgent({ name, sections, changed }: { name: string; sectio
           When an agent edits the code, the map redoes only the sections it touched, and marks which ones changed.
         </p>
       </div>
-      <div aria-hidden className={`${s.frame} ${s.desk}`}>
+      <div aria-hidden className={`${s.frame} ${s.desk} ${s.reveal}`}>
         <div className={s.term}>
           <div className={s.termTabs}>
             <b>Claude Code</b>

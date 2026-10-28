@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LandingAgent } from "@/components/landing-agent";
 import { LandingDemo, StarCount, type DemoMap } from "@/components/landing-demo";
 import { LandingHow } from "@/components/landing-how";
+import { LandingNav } from "@/components/landing-nav";
 import { LandingStart } from "@/components/landing-start";
 import { LandingStruck, type Struck } from "@/components/landing-struck";
 import { LandingVoices, type Voice } from "@/components/landing-voices";
@@ -104,24 +105,29 @@ export default function Landing() {
   const first = flask.AUTHORED[0];
   const config = first.children!.find((c) => c.id === "ca-config")!;
 
+  const ctas = (
+    <>
+      {/* No build to link yet. */}
+      <a className={`${s.btn} ${s.primary}`} href="#">
+        Download for macOS
+      </a>
+      <a className={`${s.btn} ${s.ghost}`} href={GITHUB}>
+        <svg viewBox="0 0 16 16" aria-hidden className={s.gh}>
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+        </svg>
+        View on GitHub
+        <StarCount repo={REPO} />
+      </a>
+    </>
+  );
+
   return (
     // The layout locks the body, as the app's does for its canvas; this page scrolls itself.
     <div className={s.page}>
+      <LandingNav github={GITHUB} />
       <main>
         <div className={s.top}>
           <div className={s.wrap}>
-            <header className={s.nav}>
-              <a className={s.mark} href="#">
-                TBD
-              </a>
-              <nav aria-label="Sections">
-                <a href="#how">How it works</a>
-                <a href="#checks">What it checks</a>
-                <a href="#start">Your repo</a>
-                <a href="#questions">Questions</a>
-                <a href={GITHUB}>GitHub</a>
-              </nav>
-            </header>
             <section className={s.hero}>
               <h1 className={s.rise}>
                 Understand the code <em>you didn&rsquo;t write.</em>
@@ -132,17 +138,7 @@ export default function Landing() {
                   going until you reach the code.
                 </p>
                 <div className={`${s.ctas} ${s.rise}`} style={{ "--i": 2 } as React.CSSProperties}>
-                  {/* No build to link yet. */}
-                  <a className={`${s.btn} ${s.primary}`} href="#">
-                    Download for macOS
-                  </a>
-                  <a className={`${s.btn} ${s.ghost}`} href={GITHUB}>
-                    <svg viewBox="0 0 16 16" aria-hidden className={s.gh}>
-                      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                    </svg>
-                    View on GitHub
-                    <StarCount repo={REPO} />
-                  </a>
+                  {ctas}
                 </div>
               </div>
             </section>
@@ -170,17 +166,25 @@ export default function Landing() {
               lines: MAKE_CONFIG,
             }}
           />
-          <LandingStruck
-            items={struck}
-            checked={loaded.reduce((n, d) => n + d.report.roots.reduce((m, r) => m + (r.verify?.nodes ?? 0), 0), 0)}
-            removed={rewritten.reduce((n, r) => n + r.claims.length, 0)}
-          />
+        </div>
+        <LandingStruck
+          items={struck}
+          checked={loaded.reduce((n, d) => n + d.report.roots.reduce((m, r) => m + (r.verify?.nodes ?? 0), 0), 0)}
+          removed={rewritten.reduce((n, r) => n + r.claims.length, 0)}
+        />
+        <div className={s.wrap}>
           <LandingAgent
             name="flask"
             sections={flask.AUTHORED.map((r) => r.title)}
             changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
           />
           <LandingStart github={GITHUB} />
+          <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">
+            <h2 id="close-title">
+              Start broad. <em>End at the line.</em>
+            </h2>
+            <div className={s.ctas}>{ctas}</div>
+          </section>
         </div>
       </main>
 

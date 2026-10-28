@@ -157,6 +157,7 @@ export function Shell({
   onClaude,
   onOutput,
   onInput,
+  onScreen,
   onExit,
 }: {
   startClaude?: boolean;
@@ -173,6 +174,8 @@ export function Shell({
   onOutput?: (text: string) => void;
   /** The user typed into it: what the program prints next is the echo, not its own work. */
   onInput?: () => void;
+  /** How to read what is on screen now, line by line: how a plan's tab finds Claude Code's question. */
+  onScreen?: (read: () => string[]) => void;
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -180,9 +183,9 @@ export function Shell({
   const show = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest callbacks, so the effect below runs once per shell, not per render.
-  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onExit });
+  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onExit });
   useEffect(() => {
-    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onExit };
+    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onExit };
   });
   // The map's sections, for `slop-map-list`. Through a ref for the same
   // reason: a map that updates must not restart the shell.
@@ -311,6 +314,10 @@ export function Shell({
         if (run) void invoke("pty_write", { id, data: `${run}\r` });
         handlers.current.onTitle?.(spawned.shell);
         handlers.current.onSpawn?.(spawned.id);
+        handlers.current.onScreen?.(() => {
+          const b = term.buffer.active;
+          return Array.from({ length: term.rows }, (_, i) => b.getLine(b.baseY + i)?.translateToString(true) ?? "");
+        });
       } catch (e) {
         term.dispose();
         setError(`Could not start a shell: ${String(e)}`);

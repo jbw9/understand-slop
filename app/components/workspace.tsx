@@ -10,6 +10,7 @@ import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
 import { Preview } from "@/components/preview";
+import { PlanView, type Plan } from "@/components/plan";
 import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
@@ -47,6 +48,10 @@ import { cn } from "@/lib/utils";
  * server (src-tauri/src/mcp.rs), and this is where its calls find the right
  * project's preview.
  *
+ * A plan Claude writes in plan mode opens in a tab of its own, as a short
+ * design doc it can be accepted from (components/plan.tsx): in the main view
+ * beside the window, where Claude is, so the two are read side by side.
+ *
  * A tab can be dragged out of the window onto the map, into the main view:
  * there it takes the map's place, with a strip of its own whose first tab is
  * the map, and it is dragged back the same way. A tab is the same tab in
@@ -67,8 +72,8 @@ const STATUSBAR = 24;
 
 interface Tab {
   key: number;
-  /** A terminal, or the project running: its web app, or a phone. */
-  kind: "shell" | "preview" | Platform;
+  /** A terminal, the project running (its web app, or a phone), or a plan. */
+  kind: "shell" | "preview" | "plan" | Platform;
   /** The agent it opened into, or null for a plain shell. */
   start: string | null;
   /** The agent last started in it, from the menu or the strip: what a busy shell is running. */
@@ -95,6 +100,9 @@ interface Tab {
   main?: boolean;
   /** What the agent in front is doing, for the dot on the tab. */
   status?: Status;
+  /** A plan's tab: the plan, and the tab of the Claude that wrote it. */
+  plan?: Plan;
+  of?: number;
 }
 
 type Status = "working" | "waiting" | "done";
@@ -357,6 +365,31 @@ export function Workspace() {
     [select, show],
   );
 
+  // Each terminal's screen, for a plan's tab to read Claude Code's question off.
+  const screens = useRef<Record<number, () => string[]>>({});
+
+  // A plan opens beside the Claude that wrote it: in the main view while
+  // Claude is in the window, in the window while Claude is in the main view.
+  // A revised plan takes the last one's place, in the same tab.
+  const showPlan = (from: number, cwd: string, got: { text: string; file: string | null }) => {
+    const had = tabsNow.current.find((x) => x.kind === "plan" && x.of === from);
+    const asked = had?.plan?.state === "revising" ? had.plan.asked : undefined;
+    const plan: Plan = { ...got, version: (had?.plan?.version ?? 0) + 1, state: "open", after: asked };
+    const main = had ? !!had.main : !tabsNow.current.find((x) => x.key === from)?.main;
+    const key = had?.key ?? nextKey++;
+    if (had) patch(key, { plan });
+    else setTabs((t) => [...t, { key, kind: "plan", start: null, ran: null, title: "Plan", cwd, live: false, busy: false, plan, of: from, main }]);
+    if (main) setFront((f) => ({ ...f, [cwd]: key }));
+    else {
+      setActive((a) => ({ ...a, [cwd]: key }));
+      if (cwd === latest.current.here) show(true);
+    }
+  };
+  const planning = useRef(showPlan);
+  useEffect(() => {
+    planning.current = showPlan;
+  });
+
   // What is in front in each tab: Claude (the launcher keeps a marker), some
   // other program, or the shell at its prompt. Polled, since programs start
   // and quit inside the shell, unseen.
@@ -371,9 +404,21 @@ export function Workspace() {
     if (!ids.length) return;
     const tick = () =>
       ids.forEach(([key, pty, cwd]) =>
-        invoke<{ claude: boolean; busy: boolean; status: Status | null; turn: Turn | null; ended: string | null; acts: Act[] }>("pty_state", { id: pty })
-          .then(({ claude: live, busy, status: said, turn, ended, acts }) => {
+        invoke<{
+          claude: boolean;
+          busy: boolean;
+          status: Status | null;
+          turn: Turn | null;
+          ended: string | null;
+          acts: Act[];
+          plan: { text: string; file: string | null } | null;
+          approved: boolean;
+        }>("pty_state", { id: pty })
+          .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved }) => {
             if (turn && cwd) void updateMap(cwd, turn);
+            if (plan) planning.current(key, cwd, plan);
+            if (approved)
+              setTabs((all) => all.map((x) => (x.of === key && x.plan ? { ...x, plan: { ...x.plan, state: "approved" } } : x)));
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
@@ -622,7 +667,9 @@ export function Workspace() {
     const front = inFront(t);
     return t.kind === "preview"
       ? "Preview"
-      : t.kind !== "shell"
+      : t.kind === "plan"
+        ? "Plan"
+        : t.kind !== "shell"
         ? PLATFORM[t.kind].label
         : front
           ? `${front.command.replace(/^slop-/, "")} ${i + 1}`
@@ -630,7 +677,17 @@ export function Workspace() {
   };
   const iconOf = (t: Tab) => {
     const front = inFront(t);
-    return t.kind === "preview" ? <GlobeIcon /> : t.kind !== "shell" ? <PhoneIcon /> : front ? <AgentIcon id={front.id} /> : <TerminalIcon />;
+    return t.kind === "preview" ? (
+      <GlobeIcon />
+    ) : t.kind === "plan" ? (
+      <PlanIcon />
+    ) : t.kind !== "shell" ? (
+      <PhoneIcon />
+    ) : front ? (
+      <AgentIcon id={front.id} />
+    ) : (
+      <TerminalIcon />
+    );
   };
 
   /** A tab in either strip, drawn as an editor draws one. */
@@ -862,6 +919,26 @@ export function Workspace() {
               </Held>
             );
           }
+          if (t.kind === "plan") {
+            const claude = tabs.find((x) => x.key === t.of);
+            return !t.plan ? null : (
+              <Held key={t.key} slot={slot}>
+              <PlanView
+                plan={t.plan}
+                visible={visible}
+                status={claude?.status}
+                pty={claude?.pty}
+                read={() => (t.of === undefined ? [] : (screens.current[t.of]?.() ?? []))}
+                onAnswered={(next) =>
+                  setTabs((all) => all.map((x) => (x.key === t.key && x.plan ? { ...x, plan: { ...x.plan, ...next } } : x)))
+                }
+                onShowClaude={claude ? () => bring(claude.key) : undefined}
+                // The window floats over the main view's right; the plan keeps clear of it.
+                inset={t.main && shown ? `calc(min(${width}px, 100vw - ${2 * GAP}px) + ${2 * GAP}px)` : undefined}
+              />
+              </Held>
+            );
+          }
           if (t.kind !== "shell")
             return (
               <Held key={t.key} slot={slot}>
@@ -889,6 +966,7 @@ export function Workspace() {
               rang.current[t.key] = false;
             }}
             onTitle={(title) => patch(t.key, { title })}
+            onScreen={(read) => (screens.current[t.key] = read)}
             onClaude={(found) => patch(t.key, { found })}
             onSpawn={(pty) => {
               patch(t.key, { pty });
@@ -979,6 +1057,16 @@ function GlobeIcon() {
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden className="size-3 shrink-0">
       <circle cx="8" cy="8" r="6" />
       <path d="M2 8h12M8 2c1.7 1.8 2.5 3.8 2.5 6S9.7 12.2 8 14C6.3 12.2 5.5 10.2 5.5 8S6.3 3.8 8 2Z" />
+    </svg>
+  );
+}
+
+/** A page with a check: a plan's tab. */
+function PlanIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-3 shrink-0">
+      <path d="M4 1.5h5.5L12 4v10.5H4z" />
+      <path d="m6.2 9.2 1.4 1.4 2.4-2.8" />
     </svg>
   );
 }

@@ -36,6 +36,14 @@ const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
 /// The tools EDITED follows. Bash among them, since a shell command can edit too.
 const EDITING_TOOLS: &str = "Edit|Write|MultiEdit|NotebookEdit|Bash";
 
+/// A plan Claude asks to start on: the hook's input, which carries the plan's
+/// Markdown, kept whole for the app to draw (components/plan.tsx). Renamed
+/// into place, so a plan is never read half written.
+const PLAN: &str = r#"f="$SLOP_CONTEXT"; cat > "$f.plan.part" && mv "$f.plan.part" "$f.plan""#;
+/// ExitPlanMode only runs once the user has accepted the plan, in the terminal
+/// or from the plan's own tab.
+const APPROVED: &str = r#": > "$SLOP_CONTEXT.approved""#;
+
 /// What Claude is doing, for the dot on its tab: each hook below writes one
 /// word, `working`, `waiting` (a question or a permission only the user can
 /// answer) or `done`.
@@ -144,6 +152,22 @@ as a person would (screenshot, click, type, read the page, navigate, resize); us
 that a change you made works, or when the user asks about what the app shows. They are also \
 your browser: to search the web or read a page as the user would see it, navigate the preview \
 there, never another browser. \
+A plan you finish in plan mode opens beside you as a short visual design doc, drawn from its \
+Markdown, and is accepted from there. Most people skip a long plan, so write one they will read: \
+`# <what will be built>`, then one sentence on what the user gets. Then the picture, as a fenced \
+block of JSON: a ```diagram of how the pieces fit, {\"caption\" (a few words), \"boxes\": [{\"id\", \
+\"label\" (1-3 words), \"sub\" (a file, or a few words), \"col\", \"row\", \"change\"}], \"arrows\": \
+[{\"from\", \"to\", \"label\" (1-3 words), \"change\"}]}, on a grid read left to right and at most \
+three columns wide, where `change` is \"new\", \"changed\" or \"gone\" and what stays as it is has \
+none; and when the user will see the change, a ```screen \
+wireframe too, {\"title\", \"device\": \"web\" or \"phone\", \"route\", \"items\": [{\"type\": heading, \
+text, field, choice, button, list or image, \"label\", \"note\"}]}, with a note on each new item. \
+Then `## Steps`, numbered, at most six, each a short line in plain words on what changes, not \
+how (the how is for the code); `## Files`, a ```files block with one line per file: `+ path — \
+what it is`, `~ path — what changes` or `- path — why it goes`; `## Risks` only when there are \
+real ones; and `## Check`, one to three short bullets on how you will know it works. Keep the \
+words outside the blocks under 150: no context section, no restating the request, and code only \
+where a signature is the decision. \
 End on the answer itself.";
 
 #[derive(serde::Deserialize)]
@@ -240,6 +264,35 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue.with_extension("md.where"));
     let _ = std::fs::remove_file(queue.with_extension("md.where.sent"));
     let _ = std::fs::remove_file(queue.with_extension("md.status"));
+    let _ = std::fs::remove_file(queue.with_extension("md.plan"));
+    let _ = std::fs::remove_file(queue.with_extension("md.approved"));
+}
+
+/// A plan Claude is waiting to have accepted: its Markdown, and the file
+/// Claude Code keeps it in.
+#[derive(serde::Serialize, Debug)]
+pub struct Plan {
+    text: String,
+    file: Option<String>,
+}
+
+/// The plan Claude asked to start on since this was last asked. Taking it
+/// clears it, so each plan opens its tab once.
+pub fn take_plan(queue: &Path) -> Option<Plan> {
+    let marker = queue.with_extension("md.plan");
+    let hook = std::fs::read_to_string(&marker).ok()?;
+    let _ = std::fs::remove_file(&marker);
+    let input = serde_json::from_str::<serde_json::Value>(&hook).ok()?;
+    let input = input.get("tool_input")?;
+    Some(Plan {
+        text: input.get("plan")?.as_str()?.to_string(),
+        file: input.get("planFilePath").and_then(|f| f.as_str()).map(String::from),
+    })
+}
+
+/// Whether the plan was accepted since this was last asked; reported once.
+pub fn take_approved(queue: &Path) -> bool {
+    std::fs::remove_file(queue.with_extension("md.approved")).is_ok()
 }
 
 /// Something Claude asked the app to show. Serializes tagged on `verb`, for a
@@ -384,9 +437,13 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     let settings = serde_json::json!({
         "hooks": {
             "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }, status("working")] }],
-            "PreToolUse": [{ "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] }],
+            "PreToolUse": [
+                { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] },
+                { "matcher": "ExitPlanMode", "hooks": [{ "type": "command", "command": PLAN }] }
+            ],
             "PostToolUse": [
                 { "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] },
+                { "matcher": "ExitPlanMode", "hooks": [{ "type": "command", "command": APPROVED }] },
                 { "hooks": [status("working")] }
             ],
             "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [status("waiting")] }],
@@ -670,6 +727,38 @@ mod tests {
             take_acts(&q),
             vec![Act::Section { section: "A".into() }, Act::Section { section: "B".into() }]
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_plan_opens_once_and_its_acceptance_is_heard_once() {
+        use std::io::Write as _;
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        assert!(take_plan(&q).is_none());
+        // ExitPlanMode's PreToolUse hook, handed what Claude Code hands it.
+        let mut child = Command::new("sh")
+            .args(["-c", PLAN])
+            .env("SLOP_CONTEXT", &q)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(br##"{"tool_name":"ExitPlanMode","tool_input":{"plan":"# Add /health\n\nIt answers ok.","planFilePath":"/p/plan.md"}}"##)
+            .unwrap();
+        assert!(child.wait().unwrap().success());
+        let plan = take_plan(&q).unwrap();
+        assert_eq!(plan.text, "# Add /health\n\nIt answers ok.");
+        assert_eq!(plan.file.as_deref(), Some("/p/plan.md"));
+        assert!(take_plan(&q).is_none());
+
+        assert!(!take_approved(&q));
+        run(APPROVED, &q);
+        assert!(take_approved(&q));
+        assert!(!take_approved(&q));
     }
 
     /// The launcher as a tab runs it, with `bin` standing in for Claude.

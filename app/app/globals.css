@@ -364,6 +364,46 @@
   .doc-prose input[type="checkbox"] {
     margin-right: 0.4em;
   }
+
+  /* A plan's numbered steps, drawn as the map draws a sequence of parts:
+     numbered dots on one line (components/plan.tsx). */
+  .plan-prose ol {
+    list-style: none;
+    padding-left: 0;
+    counter-reset: step;
+  }
+  .plan-prose ol > li {
+    position: relative;
+    counter-increment: step;
+    padding-left: 36px;
+    padding-bottom: 0.7em;
+  }
+  .plan-prose ol > li + li {
+    margin-top: 0;
+  }
+  .plan-prose ol > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.18em;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--color-mint-line);
+    border-radius: 999px;
+    background: var(--color-mint-success);
+    color: var(--color-deep-green);
+    font: 600 10.5px/20px var(--font-mono), ui-monospace, monospace;
+    text-align: center;
+  }
+  .plan-prose ol > li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 11px;
+    /* Dot to dot: the next step's dot sits 0.18em into it. */
+    top: calc(0.18em + 25px);
+    bottom: calc(3px - 0.18em);
+    border-left: 1px solid var(--color-border-strong);
+  }
 }
 
 @layer utilities {

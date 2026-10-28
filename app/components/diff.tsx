@@ -353,14 +353,17 @@ function RowsDiff({ kind, rows, block }: { kind: Anatomy["kind"]; rows: RowDiff[
  * Fills and strokes are inline `var()`, which is exactly why the diff tokens
  * are declared outside `@theme` (app/globals.css).
  */
-function DiagramDiff({
+export function DiagramDiff({
   block,
   boxes,
   arrows,
+  legend = "red went, green arrived",
 }: {
   block: Extract<Anatomy, { kind: "diagram" }>;
   boxes: PartDiff[];
   arrows: PartDiff[];
+  /** What the colours mean here: a plan's are still to come (components/plan.tsx). */
+  legend?: string;
 }) {
   const verdictOf = new Map(boxes.map((b) => [b.key, b.verdict]));
   const arrowOf = new Map(arrows.map((a) => [a.key, a.verdict]));
@@ -378,7 +381,7 @@ function DiagramDiff({
     <figure className="min-w-0">
       <figcaption className="mb-3 max-w-[1000px]">
         <span className="text-[14px] font-medium text-on-surface">{block.caption}</span>
-        <span className="ml-2.5 whitespace-nowrap font-mono text-[10.5px] text-faint">red went, green arrived</span>
+        <span className="ml-2.5 whitespace-nowrap font-mono text-[10.5px] text-faint">{legend}</span>
       </figcaption>
       <div className="overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${block.caption} — what changed`} className="block h-auto" style={{ width: "100%", maxWidth: W * 1.35, minWidth: W * 0.7 }}>

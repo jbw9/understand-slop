@@ -44,6 +44,16 @@ const PLAN: &str = r#"f="$SLOP_CONTEXT"; cat > "$f.plan.part" && mv "$f.plan.par
 /// or from the plan's own tab.
 const APPROVED: &str = r#": > "$SLOP_CONTEXT.approved""#;
 
+/// Claude Code's own dialog shows the plan as its file reads once the hooks
+/// have run, and a ```diagram block's JSON is noise in a terminal; the plan's
+/// tab draws it. So the file goes without its diagrams while the dialog is up,
+/// and the whole plan waits beside the queue (`.hidden`) for RESTORE.
+const HIDE: &str = r#"h="$SLOP_CONTEXT.hidden"; p=$(sed -n 's/.*"planFilePath": *"\([^"]*\)".*/\1/p' | head -n 1); [ -f "$p" ] || exit 0; awk 'd { if (/^```[ \t]*$/) d = 0; next } /^```diagram[ \t]*$/ { d = 1; next } { print }' "$p" > "$h.shown" && ! cmp -s "$p" "$h.shown" && cp "$p" "$h" && printf '%s' "$p" > "$h.file" && cp "$h.shown" "$p"; exit 0"#;
+/// The whole plan back in its file, at the first hook after the dialog is
+/// answered, accepted or not, so a revision starts from it. Unless the file
+/// changed meanwhile (the user edited it with ctrl+g): then it is theirs.
+const RESTORE: &str = r#"h="$SLOP_CONTEXT.hidden"; [ -e "$h.file" ] || exit 0; p=$(cat "$h.file"); cmp -s "$p" "$h.shown" && cp "$h" "$p"; rm -f "$h" "$h.file" "$h.shown"; exit 0"#;
+
 /// What Claude is doing, for the dot on its tab: each hook below writes one
 /// word, `working`, `waiting` (a question or a permission only the user can
 /// answer) or `done`.
@@ -434,20 +444,24 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
         }
         std::fs::write(queue.with_extension("md.map"), format!("{text}\n"))?;
     }
+    let hook = |c: &str| serde_json::json!({ "type": "command", "command": c });
     let settings = serde_json::json!({
         "hooks": {
-            "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }, status("working")] }],
+            "UserPromptSubmit": [{ "hooks": [hook(HOOK), status("working")] }],
             "PreToolUse": [
                 { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] },
-                { "matcher": "ExitPlanMode", "hooks": [{ "type": "command", "command": PLAN }] }
+                { "matcher": "ExitPlanMode", "hooks": [hook(PLAN), hook(HIDE)] },
+                // Not on ExitPlanMode itself, whose HIDE runs beside it.
+                { "matcher": "^(?!ExitPlanMode$)", "hooks": [hook(RESTORE)] }
             ],
             "PostToolUse": [
-                { "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] },
-                { "matcher": "ExitPlanMode", "hooks": [{ "type": "command", "command": APPROVED }] },
-                { "hooks": [status("working")] }
+                { "matcher": EDITING_TOOLS, "hooks": [hook(EDITED)] },
+                { "matcher": "ExitPlanMode", "hooks": [hook(APPROVED)] },
+                { "hooks": [hook(RESTORE), status("working")] }
             ],
             "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [status("waiting")] }],
-            "Stop": [{ "hooks": [{ "type": "command", "command": TURN }, status("done")] }]
+            "Stop": [{ "hooks": [hook(TURN), hook(RESTORE), status("done")] }],
+            "SessionEnd": [{ "hooks": [hook(RESTORE)] }]
         },
         "permissions": {
             "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "mcp__slop-preview"],
@@ -727,6 +741,51 @@ mod tests {
             take_acts(&q),
             vec![Act::Section { section: "A".into() }, Act::Section { section: "B".into() }]
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_terminal_sees_a_plan_without_its_diagram_and_the_file_gets_it_back() {
+        use std::io::Write as _;
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let file = dir.path().join("plan.md");
+        let whole = "# Fix\n\nIt works.\n\n```diagram\n{\"boxes\": []}\n```\n\n```screen\n{}\n```\n\n## Steps\n1. Do it\n";
+        let hide = || {
+            let mut child = Command::new("sh")
+                .args(["-c", HIDE])
+                .env("SLOP_CONTEXT", &q)
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+            let input = serde_json::json!({ "tool_name": "ExitPlanMode", "tool_input": { "plan": "…", "planFilePath": file } });
+            child.stdin.take().unwrap().write_all(input.to_string().as_bytes()).unwrap();
+            assert!(child.wait().unwrap().success());
+        };
+        let read = || std::fs::read_to_string(&file).unwrap();
+
+        std::fs::write(&file, whole).unwrap();
+        hide();
+        assert_eq!(read(), "# Fix\n\nIt works.\n\n\n```screen\n{}\n```\n\n## Steps\n1. Do it\n");
+        run(RESTORE, &q);
+        assert_eq!(read(), whole);
+        // Once: a later hook finds nothing waiting.
+        std::fs::write(&file, "# Revised\n").unwrap();
+        run(RESTORE, &q);
+        assert_eq!(read(), "# Revised\n");
+
+        // A plan the user rewrote while the dialog was up is theirs, and stays.
+        std::fs::write(&file, whole).unwrap();
+        hide();
+        std::fs::write(&file, "# Mine\n").unwrap();
+        run(RESTORE, &q);
+        assert_eq!(read(), "# Mine\n");
+
+        // A plan with no diagram is left alone.
+        std::fs::write(&file, "# Plain\n").unwrap();
+        hide();
+        assert!(!q.with_extension("md.hidden.file").exists());
+        assert_eq!(read(), "# Plain\n");
     }
 
     #[cfg(unix)]

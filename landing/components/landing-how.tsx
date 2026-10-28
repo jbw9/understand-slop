@@ -58,8 +58,9 @@ export function LandingHow({ name, steps, opened, cited }: HowProps) {
 
   return (
     <section id="how" className={s.how} aria-labelledby="how-title">
-      <h2 id="how-title">From the whole repo to one line.</h2>
-      <div ref={box} className={`${s.frame} ${s.box}`}>
+      <p className={`${s.eyebrow} ${s.reveal}`}>How it works</p>
+      <h2 id="how-title" className={s.reveal}>From the whole repo to one line.</h2>
+      <div ref={box} className={`${s.frame} ${s.box} ${s.reveal}`}>
         <div className={s.rail} role="tablist" aria-label="How it works" aria-orientation="vertical">
           {TABS.map((t, i) => (
             <button

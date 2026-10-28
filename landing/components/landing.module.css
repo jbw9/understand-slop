@@ -1,5 +1,7 @@
-/* The landing page. Its palette is the app's own theme, renamed short. */
-.page {
+/* The landing page. Its palette is the app's own theme, renamed short, and
+   named again on the dark panel, whose [data-chrome] changes what they point at. */
+.page,
+.struck {
   --cream: var(--color-warm-cream);
   --white: var(--color-pure-white);
   --low: var(--color-surface-container-low);
@@ -12,6 +14,8 @@
   --mint: var(--color-mint-success);
   --border: var(--color-border-gray);
   --strong: var(--color-border-strong);
+}
+.page {
   --win: 0 1px 2px rgba(26, 26, 46, 0.06), 0 28px 56px -20px rgba(26, 26, 46, 0.3);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --gap: clamp(96px, 11vw, 160px);
@@ -21,6 +25,7 @@
   --screen-r: 15px;
   height: 100%;
   overflow-y: auto;
+  scroll-behavior: smooth;
   background: var(--cream);
   color: var(--ink);
   font-size: 14px;
@@ -31,6 +36,10 @@
   outline: 2px solid var(--green);
   outline-offset: 2px;
   border-radius: 6px;
+}
+/* Clear of the floating nav when a link jumps here. */
+.page section[id] {
+  scroll-margin-top: 88px;
 }
 .wrap {
   max-width: 1480px;
@@ -44,24 +53,57 @@
   isolation: isolate;
 }
 .nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 10px var(--gutter);
+}
+/* Full width at the top; past it, the same bar pulls in to a pill. */
+.navBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 24px;
-  padding: 22px 0;
+  max-width: calc(1480px - 2 * var(--gutter));
+  height: 56px;
+  margin: 0 auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  transition: max-width 0.6s var(--ease), padding 0.6s var(--ease), background-color 0.3s ease-out,
+    border-color 0.3s ease-out, box-shadow 0.3s ease-out;
+}
+.nav[data-float="true"] .navBar {
+  max-width: 820px;
+  padding: 0 8px 0 20px;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--white) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: 0 1px 2px rgba(26, 26, 46, 0.06), 0 12px 32px -12px rgba(26, 26, 46, 0.22);
+}
+.navBar nav {
+  margin-left: auto;
+}
+.navCta {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 14px;
 }
 .mark {
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
-.nav nav {
+.navBar nav {
   display: flex;
   gap: 26px;
   font-size: 14px;
   color: var(--muted);
 }
-.nav nav a:hover {
+.navBar nav a {
+  white-space: nowrap;
+}
+.navBar nav a:hover {
   color: var(--ink);
 }
 .hero {
@@ -69,7 +111,7 @@
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   align-items: end;
   gap: 28px 72px;
-  padding: 72px 0 56px;
+  padding: 56px 0 56px;
 }
 /* Two lines at every width: the size follows the line that has to fit. */
 .hero h1 {
@@ -161,6 +203,26 @@
     opacity: 0;
     transform: translateY(18px);
   }
+}
+/* Below the hero, each piece rises as it scrolls in, tied to the scroll so it
+   moves with the reader; where the browser can't, it is simply there. */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry calc(var(--i, 0) * 8%) entry calc(70% + var(--i, 0) * 8%);
+  }
+}
+.eyebrow {
+  display: inline-block;
+  margin: 0 0 20px;
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--low);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--variant);
 }
 
 /* ── the demo ─────────────────────────────────────────── */
@@ -903,8 +965,14 @@
 }
 
 /* ── what the checker took out ───────────────────────── */
+/* The one dark panel, edge to edge but for a margin, to break the page's run of paper. */
 .struck {
-  margin-top: var(--gap);
+  margin: var(--gap) 12px 0;
+  padding: clamp(80px, 9vw, 128px) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--frame-r);
+  background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(94, 143, 94, 0.16), transparent 70%) var(--color-surface);
+  color: var(--ink);
   --v-ink: var(--muted);
   --v-surface: var(--low);
   --v-line: var(--strong);
@@ -1210,6 +1278,32 @@
   color: var(--variant);
 }
 
+/* ── the close ─────────────────────────────────────────── */
+.close {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  margin-top: var(--gap);
+  padding: clamp(40px, 6vw, 80px) 0;
+  text-align: center;
+}
+.close h2 {
+  margin: 0;
+  font-size: clamp(40px, 6vw, 88px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 500;
+}
+.close h2 em {
+  display: block;
+  font-style: normal;
+  color: var(--green);
+}
+.close .ctas {
+  justify-content: center;
+}
+
 .end {
   display: flex;
   align-items: center;
@@ -1236,7 +1330,7 @@
     grid-template-columns: minmax(0, 1fr);
     padding-top: 48px;
   }
-  .nav nav a:not(:last-child) {
+  .navBar nav a:not(:last-child) {
     display: none;
   }
   .agent,
@@ -1444,7 +1538,11 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .page {
+    scroll-behavior: auto;
+  }
   .rise,
+  .reveal,
   .ring::after,
   .claim del,
   .progress span[data-now="true"]::after {
@@ -1466,7 +1564,8 @@
   .rail button,
   .rail i,
   .rail::after,
-  .btn {
+  .btn,
+  .navBar {
     transition: none;
   }
   .slide,

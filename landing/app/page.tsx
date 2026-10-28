@@ -129,15 +129,18 @@ export default function Landing() {
         <div className={s.top}>
           <div className={s.wrap}>
             <section className={s.hero}>
-              <h1 className={s.rise}>
+              <a className={`${s.kicker} ${s.rise}`} href="#agent">
+                Works beside Claude Code, Codex and OpenCode <span aria-hidden>&rarr;</span>
+              </a>
+              <h1 className={s.rise} style={{ "--i": 1 } as React.CSSProperties}>
                 Understand the code <em>you didn&rsquo;t write.</em>
               </h1>
               <div className={s.pitch}>
-                <p className={s.rise} style={{ "--i": 1 } as React.CSSProperties}>
+                <p className={s.rise} style={{ "--i": 2 } as React.CSSProperties}>
                   TBD splits a repository into the steps the program takes. Click a step to open its parts, and keep
                   going until you reach the code.
                 </p>
-                <div className={`${s.ctas} ${s.rise}`} style={{ "--i": 2 } as React.CSSProperties}>
+                <div className={`${s.ctas} ${s.rise}`} style={{ "--i": 3 } as React.CSSProperties}>
                   {ctas}
                 </div>
               </div>

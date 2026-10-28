@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,41 @@ export function Device({
       gone = true;
     };
   }, [phase, visible, platform]);
+
+  // Claude's pointer, gliding to where its tap or swipe lands just before it
+  // does (src-tauri/src/devices.rs), drawn as it is on a page (agent.js).
+  const pane = useRef<HTMLDivElement>(null);
+  const img = useRef<HTMLImageElement>(null);
+  const hand = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let fade: ReturnType<typeof setTimeout> | undefined;
+    const off = listen<{ platform: string; x: number; y: number; x2: number; y2: number; swipe: boolean }>("slop:device-touch", (e) =>
+      // A frame on, once the tab has come forward (components/workspace.tsx) and the screen has a size.
+      void setTimeout(() => glide(e.payload), 50),
+    );
+    const glide = ({ platform: on, x, y, x2, y2, swipe }: { platform: string; x: number; y: number; x2: number; y2: number; swipe: boolean }) => {
+      const box = pane.current?.getBoundingClientRect();
+      const r = img.current?.getBoundingClientRect();
+      const p = hand.current;
+      if (on !== platform || !box || !r || !p) return;
+      const at = (fx: number, fy: number) => `translate(${r.left - box.left + fx * r.width}px, ${r.top - box.top + fy * r.height}px)`;
+      p.style.opacity = "1";
+      p.style.transform = at(x, y);
+      if (swipe) setTimeout(() => (p.style.transform = at(x2, y2)), 380);
+      else
+        setTimeout(() => {
+          ring.current?.style.setProperty("transform", at(x, y));
+          ring.current?.animate([{ opacity: 0.95, scale: 0.3 }, { opacity: 0, scale: 1.7 }], { duration: 550, easing: "ease-out" });
+        }, 380);
+      clearTimeout(fade);
+      fade = setTimeout(() => (p.style.opacity = "0"), 5000);
+    };
+    return () => {
+      clearTimeout(fade);
+      void off.then((f) => f());
+    };
+  }, [platform]);
 
   const send = (input: Record<string, unknown>) =>
     void invoke("device_input", { platform, input }).catch((e) => setError(String(e)));
@@ -245,6 +281,7 @@ export function Device({
         </p>
       ) : null}
       <div
+        ref={pane}
         tabIndex={0}
         aria-label={`${device} screen: click to tap, drag to swipe, type to enter text`}
         onKeyDown={(e) => {
@@ -261,6 +298,7 @@ export function Device({
         {screen ? (
           // eslint-disable-next-line @next/next/no-img-element -- a stream of local frames, not an asset to optimise
           <img
+            ref={img}
             src={screen}
             alt={`${device} screen`}
             draggable={false}
@@ -282,6 +320,17 @@ export function Device({
         ) : (
           <p className="text-[12px] text-faint">Waiting for the screen…</p>
         )}
+        <div ref={ring} aria-hidden className="pointer-events-none absolute -left-3.5 -top-3.5 size-6 rounded-full border-2 border-[#d97757] opacity-0" />
+        <div
+          ref={hand}
+          aria-hidden
+          className="pointer-events-none absolute -left-0.5 -top-px opacity-0 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] transition-[transform,opacity] duration-[350ms] ease-[cubic-bezier(.3,.7,.25,1)]"
+        >
+          <svg width="22" height="24" viewBox="0 0 22 24">
+            <path d="M2 1.5 2 19.5 7 15 10.5 22.5 13.6 21 10.2 13.8 17 13.8Z" fill="#d97757" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+          </svg>
+          <span className="absolute left-[18px] top-5 whitespace-nowrap rounded-[5px] bg-[#d97757] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.3] text-white">Claude</span>
+        </div>
       </div>
     </Pane>
   );

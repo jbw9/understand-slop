@@ -45,6 +45,30 @@
   addEventListener("error", (e) => post({ type: "console", level: "error", text: `${e.message} (${e.filename}:${e.lineno})` }));
   addEventListener("unhandledrejection", (e) => post({ type: "console", level: "error", text: `Unhandled rejection: ${show(e.reason)}` }));
 
+  // The app's webviews show no dialogs (wry has none): an alert passed
+  // unseen and a confirm always said no, so nothing behind one could be done.
+  // Each is answered OK here instead, and said in the console.
+  const dialog = (kind, message, answer) => post({ type: "console", level: "dialog", text: `${kind}(${JSON.stringify(String(message ?? ""))}) → ${answer}` });
+  window.alert = (message) => dialog("alert", message, "OK");
+  window.confirm = (message) => (dialog("confirm", message, "OK"), true);
+  window.prompt = (message, value) => {
+    const answer = value == null ? "" : String(value);
+    dialog("prompt", message, JSON.stringify(answer));
+    return answer;
+  };
+
+  // Claude's right-click where the page has no menu of its own would open
+  // WebKit's, which Claude can neither see nor use, so it is kept closed. On
+  // the window, and added first, so the page's own listeners have been heard.
+  let menuFor = 0;
+  let pageMenu = false;
+  addEventListener("contextmenu", (e) => {
+    if (performance.now() - menuFor > 2000) return;
+    menuFor = 0;
+    pageMenu = e.defaultPrevented;
+    e.preventDefault();
+  });
+
   const where = () => post({ type: "location", url: location.href, title: document.title });
   for (const k of ["pushState", "replaceState"]) {
     const own = history[k];
@@ -113,8 +137,9 @@
     if (r) return r;
     if (el.tagName === "INPUT") {
       const t = (el.type || "text").toLowerCase();
-      return { checkbox: "checkbox", radio: "radio", button: "button", submit: "button", reset: "button", range: "slider", search: "searchbox" }[t] || "textbox";
+      return { checkbox: "checkbox", radio: "radio", button: "button", submit: "button", reset: "button", range: "slider", search: "searchbox", file: "button", color: "button" }[t] || "textbox";
     }
+    if (el.isContentEditable && el.hasAttribute("contenteditable")) return "textbox";
     if (el.tagName === "A" && !el.hasAttribute("href")) return null;
     return ROLES[el.tagName] || null;
   };
@@ -147,6 +172,9 @@
     return clip(el.innerText || el.textContent);
   };
 
+  const optionsOf = (select) =>
+    JSON.stringify([...select.options].slice(0, 40).map((o) => clip(o.text, 40)));
+
   /** The page as a tree of what matters, one element per line. */
   const readPage = ({ filter = "all", ref } = {}) => {
     const lines = [];
@@ -167,6 +195,8 @@
         if (el.tagName === "A" && el.getAttribute("href")) line += ` href="${clip(el.getAttribute("href"), 60)}"`;
         if ("value" in el && !["BUTTON", "LI"].includes(el.tagName) && !["checkbox", "radio", "password"].includes(el.type) && el.value !== undefined && el.value !== "")
           line += ` value="${clip(String(el.value), 60)}"`;
+        if (el.tagName === "SELECT") line += ` options=${optionsOf(el)}`;
+        if (el.type === "file") line += " file picker";
         if (el.type === "checkbox" || el.type === "radio") line += el.checked ? " checked" : " unchecked";
         if (el.disabled) line += " disabled";
         if (act) line += ` [${refOf(el)}]`;
@@ -275,6 +305,8 @@
     if (!pointer) return;
     pointer.p.style.transition = "none";
     pointer.p.style.opacity = "0";
+    // A page out of sight never finishes the ring's animation.
+    pointer.ring.classList.remove("on");
     void pointer.p.offsetWidth;
     pointer.p.style.transition = "";
   };
@@ -351,6 +383,42 @@
       else mouse(el, "click", x, y, { button, detail: i });
     }
     if (count === 2) mouse(el, "dblclick", x, y, { detail: 2 });
+  };
+
+  /**
+   * HTML5 drag and drop, as the page hears it from a person: one
+   * DataTransfer from dragstart to drop, dragenter and dragover on whatever is
+   * passed over, and a drop only where the page said it may land.
+   */
+  const dragAndDrop = async (source, x0, y0, x1, y1) => {
+    const data = new DataTransfer();
+    const drag = (el, type, x, y) =>
+      el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, dataTransfer: data }));
+    if (!drag(source, "dragstart", x0, y0)) return `The page would not let ${describe(source)} be dragged.`;
+    let over = null;
+    let allowed = false;
+    for (let i = 1; i <= 8; i++) {
+      const x = x0 + ((x1 - x0) * i) / 8;
+      const y = y0 + ((y1 - y0) * i) / 8;
+      const el = document.elementFromPoint(x, y);
+      drag(source, "drag", x, y);
+      if (el !== over) {
+        if (over) drag(over, "dragleave", x, y);
+        if (el) drag(el, "dragenter", x, y);
+        over = el;
+      }
+      // Cancelled, a dragover says a drop is welcome here.
+      allowed = !!el && !drag(el, "dragover", x, y);
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const dropped = allowed && over;
+    if (dropped) drag(over, "drop", x1, y1);
+    else if (over) drag(over, "dragleave", x1, y1);
+    drag(source, "dragend", x1, y1);
+    await frames();
+    return dropped
+      ? `Dragged ${describe(source)} onto ${describe(over)} at (${x1}, ${y1}).`
+      : `Dragged ${describe(source)} to (${x1}, ${y1}), where the page takes no drop.`;
   };
 
   const describe = (el) => {
@@ -537,6 +605,12 @@
           const [x1, y1] = a.coordinate || [];
           const from = document.elementFromPoint(x0, y0);
           if (!from) throw new Error(`Nothing at (${x0}, ${y0}).`);
+          const source = from.closest('[draggable="true"]');
+          if (source) {
+            await glide(x0, y0);
+            void glide(x1, y1);
+            return dragAndDrop(source, x0, y0, x1, y1);
+          }
           mouse(from, "pointerdown", x0, y0, { buttons: 1 });
           mouse(from, "mousedown", x0, y0, { buttons: 1 });
           for (let i = 1; i <= 8; i++) {
@@ -560,11 +634,35 @@
           throw new Error(`Unknown action: ${a.action}`);
       }
     },
-    /** Where to act, for input given from outside the page: the pointer goes there first. */
+    /**
+     * Where to act, for input given from outside the page: the pointer goes
+     * there first. `native` names a control whose click opens the system's
+     * own UI, which is out of the page and out of Claude's sight and reach.
+     */
     async locate(a) {
       const t = target(a);
       await glide(t.x, t.y);
-      return { x: t.x, y: t.y, what: describe(t.el) };
+      if (a.action === "right_click") [menuFor, pageMenu] = [performance.now(), false];
+      const field = t.el.closest("label")?.control ?? t.el;
+      const select = t.el.closest("select");
+      const native = select
+        ? { kind: "select", ref: refOf(select), options: optionsOf(select) }
+        : field instanceof HTMLInputElement && (field.type === "file" || field.type === "color")
+          ? { kind: field.type, ref: refOf(field) }
+          : null;
+      // A ref's element can be under another, which a real click lands on.
+      const top = document.elementFromPoint(t.x, t.y);
+      const covered = top && !t.el.contains(top) && !top.contains(t.el);
+      const what = covered ? `${describe(t.el)} (under ${describe(top)}, which is what was hit)` : describe(t.el);
+      return { x: t.x, y: t.y, what, native };
+    },
+    /** Whether a right-click just now opened a menu of the page's own. */
+    menu() {
+      return pageMenu;
+    },
+    /** Whether a drag from (x, y) is HTML5 drag and drop, which follows only a real mouse. */
+    draggable({ x, y }) {
+      return !!document.elementFromPoint(x, y)?.closest('[draggable="true"]');
     },
     async glide({ x, y }) {
       await glide(x, y);
@@ -623,25 +721,26 @@
 
   // A link off this machine cannot be framed: the preview opens it as a page
   // from the web instead. Left to the page first, which may route it itself.
+  // The preview is one page, so what would open a new window opens there too.
   const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/;
-  const outside = (href) => {
+  const outside = (href, local = false) => {
     try {
       const u = new URL(href, location.href);
-      return /^https?:$/.test(u.protocol) && !LOCAL.test(u.hostname) ? u.href : null;
+      return /^https?:$/.test(u.protocol) && (local || !LOCAL.test(u.hostname)) ? u.href : null;
     } catch {
       return null;
     }
   };
   addEventListener("click", (e) => {
     const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
-    const url = a && !e.defaultPrevented && e.button === 0 && outside(a.href);
+    const url = a && !e.defaultPrevented && e.button === 0 && outside(a.href, a.target === "_blank");
     if (!url) return;
     e.preventDefault();
     post({ type: "open", url });
   });
   const open = window.open;
   window.open = function (url, ...rest) {
-    const away = url && outside(String(url));
+    const away = url && String(url).trim() && outside(String(url), true);
     if (!away) return open.call(this, url, ...rest);
     post({ type: "open", url: away });
     return null;

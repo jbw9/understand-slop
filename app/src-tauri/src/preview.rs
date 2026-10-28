@@ -284,7 +284,11 @@ fn serve(client: TcpStream, to: &Upstream, port: u16) -> std::io::Result<()> {
     let mut headers: Vec<(String, String)> = req
         .headers
         .iter()
-        .filter(|(k, _)| !k.eq_ignore_ascii_case("host") && !k.eq_ignore_ascii_case("accept-encoding") && (upgrade || !hop(k)))
+        // The body's length is said again below, once it is read: a server
+        // turns away a request that says it twice.
+        .filter(|(k, _)| {
+            !k.eq_ignore_ascii_case("host") && !k.eq_ignore_ascii_case("accept-encoding") && (upgrade || (!hop(k) && !k.eq_ignore_ascii_case("content-length")))
+        })
         .map(|(k, v)| match k.to_ascii_lowercase().as_str() {
             "origin" | "referer" => (k.clone(), swap(v)),
             _ => (k.clone(), v.clone()),
@@ -476,6 +480,23 @@ mod tests {
         assert!(out.starts_with("HTTP/1.1 302 Found"));
         assert!(out.ends_with("\r\n\r\nok"));
         assert!(!out.contains("slop-agent"));
+    }
+
+    #[test]
+    fn a_body_is_sent_on_with_its_length_said_once() {
+        let l = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = l.local_addr().unwrap().port();
+        let seen = std::thread::spawn(move || {
+            let (s, _) = l.accept().unwrap();
+            let mut r = BufReader::new(s.try_clone().unwrap());
+            let head = read_head(&mut r).unwrap();
+            let body = read_body(&mut r, &head, false).unwrap();
+            let mut s = s;
+            s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n").unwrap();
+            (head.headers.iter().filter(|(k, _)| k.eq_ignore_ascii_case("content-length")).count(), body)
+        });
+        through(port, "POST /api HTTP/1.1\r\nHost: x\r\nContent-Length: 4\r\n\r\nping");
+        assert_eq!(seen.join().unwrap(), (1, b"ping".to_vec()));
     }
 
     #[test]

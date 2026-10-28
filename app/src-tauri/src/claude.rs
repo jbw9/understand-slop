@@ -36,6 +36,13 @@ const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
 /// The tools EDITED follows. Bash among them, since a shell command can edit too.
 const EDITING_TOOLS: &str = "Edit|Write|MultiEdit|NotebookEdit|Bash";
 
+/// What Claude is doing, for the dot on its tab: each hook below writes one
+/// word, `working`, `waiting` (a question or a permission only the user can
+/// answer) or `done`.
+fn status(word: &str) -> serde_json::Value {
+    serde_json::json!({ "type": "command", "command": format!(r#"printf {word} > "$SLOP_CONTEXT.status""#) })
+}
+
 /// At the end of every turn, two markers, for two different readers.
 ///
 /// `.ended` is written always: it names the session's transcript, which is how
@@ -232,6 +239,7 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue.with_extension("md.map"));
     let _ = std::fs::remove_file(queue.with_extension("md.where"));
     let _ = std::fs::remove_file(queue.with_extension("md.where.sent"));
+    let _ = std::fs::remove_file(queue.with_extension("md.status"));
 }
 
 /// Something Claude asked the app to show. Serializes tagged on `verb`, for a
@@ -327,6 +335,11 @@ pub fn running(queue: &Path) -> bool {
     live(queue).exists()
 }
 
+/// The last word a status hook wrote; none before Claude's first prompt.
+pub fn status_of(queue: &Path) -> Option<String> {
+    std::fs::read_to_string(queue.with_extension("md.status")).ok().map(|s| s.trim().to_string())
+}
+
 /// The launcher, and the scripts Claude talks back through beside it, written
 /// where every tab's PATH can find them. Rewritten only when they differ, so
 /// an upgrade of the app replaces old ones.
@@ -370,9 +383,14 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     }
     let settings = serde_json::json!({
         "hooks": {
-            "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }] }],
-            "PostToolUse": [{ "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] }],
-            "Stop": [{ "hooks": [{ "type": "command", "command": TURN }] }]
+            "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": HOOK }, status("working")] }],
+            "PreToolUse": [{ "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] }],
+            "PostToolUse": [
+                { "matcher": EDITING_TOOLS, "hooks": [{ "type": "command", "command": EDITED }] },
+                { "hooks": [status("working")] }
+            ],
+            "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [status("waiting")] }],
+            "Stop": [{ "hooks": [{ "type": "command", "command": TURN }, status("done")] }]
         },
         "permissions": {
             "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "mcp__slop-preview"],

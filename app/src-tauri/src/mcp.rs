@@ -33,6 +33,9 @@ static SERVER: OnceLock<Server> = OnceLock::new();
 type Reply = Result<Value, String>;
 static PENDING: OnceLock<Mutex<HashMap<u64, mpsc::Sender<Reply>>>> = OnceLock::new();
 static NEXT: AtomicU64 = AtomicU64::new(1);
+/// Claude sends a batch of actions at once, each on its own connection; taken
+/// in turn, a click has landed before the typing after it looks for focus.
+static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
 fn pending() -> &'static Mutex<HashMap<u64, mpsc::Sender<Reply>>> {
     PENDING.get_or_init(Default::default)
@@ -137,6 +140,7 @@ fn rpc(msg: &Value, tab: u32, app: &AppHandle) -> Option<Value> {
         "tools/call" => {
             let name = params.get("name").and_then(Value::as_str).unwrap_or("");
             let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+            let _turn = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
             Ok(match call(name, &args, tab, app) {
                 Ok(content) => json!({ "content": content }),
                 Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),

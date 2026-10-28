@@ -156,6 +156,7 @@ export function Shell({
   onSpawn,
   onClaude,
   onOutput,
+  onInput,
   onExit,
 }: {
   startClaude?: boolean;
@@ -170,6 +171,8 @@ export function Shell({
   onClaude?: (found: boolean) => void;
   /** What the program prints, as text: how the dev server's tab hears its address. */
   onOutput?: (text: string) => void;
+  /** The user typed into it: what the program prints next is the echo, not its own work. */
+  onInput?: () => void;
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -177,9 +180,9 @@ export function Shell({
   const show = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest callbacks, so the effect below runs once per shell, not per render.
-  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onExit });
+  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onExit });
   useEffect(() => {
-    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onExit };
+    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onExit };
   });
   // The map's sections, for `slop-map-list`. Through a ref for the same
   // reason: a map that updates must not restart the shell.
@@ -314,7 +317,10 @@ export function Shell({
         return;
       }
 
-      const input = term.onData((data) => void invoke("pty_write", { id, data }));
+      const input = term.onData((data) => {
+        void invoke("pty_write", { id, data });
+        handlers.current.onInput?.();
+      });
       const seen = new ResizeObserver(refit);
       seen.observe(el.current);
       show.current = () => {

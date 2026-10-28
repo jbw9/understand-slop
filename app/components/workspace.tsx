@@ -93,7 +93,11 @@ interface Tab {
   dev?: boolean;
   /** Moved out of the window, into the main view in front of the map. */
   main?: boolean;
+  /** What the agent in front is doing, for the dot on the tab. */
+  status?: Status;
 }
+
+type Status = "working" | "waiting" | "done";
 
 /** How a project is run, from its files (src-tauri/src/devices.rs). */
 interface Project {
@@ -254,6 +258,18 @@ export function Workspace() {
   // The dev server's tab, read as it prints until it gives its address. Only
   // whole lines, so an address split across two reads is never taken short.
   const tails = useRef<Record<number, string>>({});
+  // Agents other than Claude have no hooks to say what they are doing, so it
+  // is read off the terminal: printing is working, quiet is done, and a bell
+  // asks for the user. Echoes of the user's own typing are not the agent's.
+  const printed = useRef<Record<number, number>>({});
+  const typed = useRef<Record<number, number>>({});
+  const rang = useRef<Record<number, boolean>>({});
+  const printing = useCallback((key: number, text: string) => {
+    if (Date.now() - (typed.current[key] ?? 0) < 500) return;
+    printed.current[key] = Date.now();
+    // The bell that ends a title escape (ESC ] … BEL) is not a ring.
+    if (text.replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, "").includes("\x07")) rang.current[key] = true;
+  }, []);
   const heard = (t: Tab, text: string) => {
     if (tails.current[t.key] === null) return;
     const tail = ((tails.current[t.key] ?? "") + text).slice(-4000);
@@ -355,8 +371,8 @@ export function Workspace() {
     if (!ids.length) return;
     const tick = () =>
       ids.forEach(([key, pty, cwd]) =>
-        invoke<{ claude: boolean; busy: boolean; turn: Turn | null; ended: string | null; acts: Act[] }>("pty_state", { id: pty })
-          .then(({ claude: live, busy, turn, ended, acts }) => {
+        invoke<{ claude: boolean; busy: boolean; status: Status | null; turn: Turn | null; ended: string | null; acts: Act[] }>("pty_state", { id: pty })
+          .then(({ claude: live, busy, status: said, turn, ended, acts }) => {
             if (turn && cwd) void updateMap(cwd, turn);
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
@@ -364,9 +380,19 @@ export function Workspace() {
             acts?.forEach(announceAct);
             // Same array when nothing moved: a new one every tick would reset
             // the paste effect's timer below before it could ever fire.
+            const statusOf = (x: Tab): Status | undefined =>
+              live
+                ? (said ?? undefined)
+                : inFront({ ...x, live, busy })
+                  ? rang.current[key]
+                    ? "waiting"
+                    : Date.now() - (printed.current[key] ?? 0) < 3000
+                      ? "working"
+                      : "done"
+                  : undefined;
             setTabs((all) =>
-              all.some((x) => x.key === key && (x.live !== live || x.busy !== busy))
-                ? all.map((x) => (x.key === key ? { ...x, live, busy } : x))
+              all.some((x) => x.key === key && (x.live !== live || x.busy !== busy || x.status !== statusOf(x)))
+                ? all.map((x) => (x.key === key ? { ...x, live, busy, status: statusOf(x) } : x))
                 : all,
             );
           })
@@ -376,6 +402,27 @@ export function Workspace() {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [started]);
+
+  // A chime when an agent finishes or needs the user, heard wherever they are
+  // looking: the dot alone is easy to miss with the workspace closed.
+  const was = useRef<Record<number, Status | undefined>>({});
+  useEffect(() => {
+    // WebKit lets a page sound only once the user has pressed something in it.
+    const unlock = () => void (audio ??= new AudioContext()).resume();
+    window.addEventListener("pointerdown", unlock, { once: true, capture: true });
+    window.addEventListener("keydown", unlock, { once: true, capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock, { capture: true });
+      window.removeEventListener("keydown", unlock, { capture: true });
+    };
+  }, []);
+  useEffect(() => {
+    for (const t of tabs) {
+      const before = was.current[t.key];
+      if (t.status !== before && ((t.status === "done" && before === "working") || t.status === "waiting")) chime(t.status);
+      was.current[t.key] = t.status;
+    }
+  }, [tabs]);
 
   // A new tab's agent is up once something is in front of its shell; give it
   // a moment to draw its prompt, then paste what was handed to it.
@@ -603,6 +650,7 @@ export function Workspace() {
       <button type="button" onClick={(c) => c.detail === 0 && select(t.key)} className="flex cursor-pointer items-center gap-1.5">
         {iconOf(t)}
         {nameOf(t)}
+        {t.status && <StatusDot status={t.status} />}
       </button>
       <button
         type="button"
@@ -832,7 +880,14 @@ export function Workspace() {
             run={t.run ?? (t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined)}
             cwd={t.cwd || undefined}
             visible={visible}
-            onOutput={t.dev ? (text) => heard(t, text) : undefined}
+            onOutput={(text) => {
+              if (t.dev) heard(t, text);
+              printing(t.key, text);
+            }}
+            onInput={() => {
+              typed.current[t.key] = Date.now();
+              rang.current[t.key] = false;
+            }}
             onTitle={(title) => patch(t.key, { title })}
             onClaude={(found) => patch(t.key, { found })}
             onSpawn={(pty) => {
@@ -999,6 +1054,46 @@ function paste(pty: number, text: string) {
  * The agent in front in a tab, if any: Claude when its launcher says so,
  * else the agent last started there while the shell is busy with something.
  */
+const DOT: Record<Status, { colour: string; label: string }> = {
+  working: { colour: "bg-[#e3b341]", label: "Working" },
+  waiting: { colour: "bg-[#e5534b]", label: "Needs you" },
+  done: { colour: "bg-[#3fb950]", label: "Done" },
+};
+
+/** Yellow while the agent works, red when it waits on the user, green when it is done. */
+function StatusDot({ status }: { status: Status }) {
+  const { colour, label } = DOT[status];
+  return (
+    <span role="img" aria-label={label} title={label} className="relative flex size-2">
+      {status !== "done" && <span className={cn("absolute inset-0 animate-ping rounded-full opacity-60", colour)} />}
+      <span className={cn("relative size-2 rounded-full", colour)} />
+    </span>
+  );
+}
+
+let audio: AudioContext | null = null;
+/** Two soft notes, rising when done and falling when the agent needs the user. */
+function chime(status: Status) {
+  try {
+    audio ??= new AudioContext();
+    const notes = status === "done" ? [660, 880] : [700, 520];
+    notes.forEach((hz, i) => {
+      const at = audio!.currentTime + i * 0.14;
+      const osc = audio!.createOscillator();
+      const gain = audio!.createGain();
+      osc.frequency.value = hz;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.12, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+      osc.connect(gain).connect(audio!.destination);
+      osc.start(at);
+      osc.stop(at + 0.32);
+    });
+  } catch {
+    /* no audio: the dot still says it */
+  }
+}
+
 function inFront(t: Tab): Agent | undefined {
   if (t.live) return CLAUDE;
   if (t.busy && t.ran !== CLAUDE.id) return agentById(t.ran ?? undefined);

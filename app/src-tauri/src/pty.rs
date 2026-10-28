@@ -212,6 +212,8 @@ fn queue_of(ptys: &Ptys, id: u32) -> Result<PathBuf, String> {
 pub struct State {
     claude: bool,
     busy: bool,
+    /// What Claude is doing: `working`, `waiting` for the user, or `done`.
+    status: Option<String>,
     /// Claude finished a turn the map should follow; reported once.
     turn: Option<claude::Turn>,
     /// The transcript of the turn Claude just finished, whatever it did, so the
@@ -239,6 +241,7 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
     Ok(State {
         claude: claude::running(&p.context),
         busy,
+        status: claude::status_of(&p.context),
         turn: claude::take_turn(&p.context),
         ended: claude::take_ended(&p.context),
         acts: claude::take_acts(&p.context),

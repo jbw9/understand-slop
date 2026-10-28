@@ -784,7 +784,7 @@ export function Workspace() {
       {/* Tabs as an editor draws them: the open one is the colour of the
           pane below it and has no line under it, so it reads as the front of
           the terminal rather than a pill above it. */}
-      <header className="flex h-9 shrink-0 items-stretch bg-surface-container" role="tablist">
+      <header className="flex h-7 shrink-0 items-stretch bg-surface-container" role="tablist">
         <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
           {panel.map((t) => tabView(t, t.key === current?.key))}
         </div>
@@ -797,7 +797,7 @@ export function Workspace() {
           aria-label="New tab"
           aria-haspopup="menu"
           title="New tab (Ctrl+T for a terminal, Ctrl+Shift+T for the default agent)"
-          className="flex w-9 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+          className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           +
         </button>
@@ -807,7 +807,7 @@ export function Workspace() {
           onClick={() => show(false)}
           aria-label="Hide workspace"
           title="Hide (Ctrl+`) — everything keeps running. Ctrl+W closes a tab."
-          className="flex w-9 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+          className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           ✕
         </button>
@@ -848,7 +848,7 @@ export function Workspace() {
       style={{ top: desktop ? TITLEBAR : 0, bottom: STATUSBAR }}
       className="pointer-events-none fixed inset-x-0 z-30 flex flex-col"
     >
-      <header role="tablist" data-chrome className="pointer-events-auto flex h-9 shrink-0 items-stretch bg-surface-container">
+      <header role="tablist" data-chrome className="pointer-events-auto flex h-7 shrink-0 items-stretch bg-surface-container">
         <div
           role="tab"
           aria-selected={!upFront}

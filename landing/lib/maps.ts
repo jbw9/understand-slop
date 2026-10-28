@@ -14,15 +14,9 @@ export interface DemoFile {
   AUTHORED: DemoNode[];
 }
 
-/** What the page reads of a map's report: the claims verification rewrote. */
-export interface DemoReport {
-  roots: { verify?: { nodes: number; rewritten: { id: string; claims: string[] }[] } }[];
-}
-
 /**
  * The demo maps, kept with this page (landing/demo) now that the app ships
  * none (D63), read at build time: the page is static.
  */
-const read = (id: string, file: string) => JSON.parse(readFileSync(join(process.cwd(), "demo", id, file), "utf8"));
-export const loadMap = (id: string): DemoFile => read(id, "map.json");
-export const loadReport = (id: string): DemoReport => read(id, "report.json");
+export const loadMap = (id: string): DemoFile =>
+  JSON.parse(readFileSync(join(process.cwd(), "demo", id, "map.json"), "utf8"));

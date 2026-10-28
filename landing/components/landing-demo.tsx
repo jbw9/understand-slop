@@ -105,13 +105,6 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
               <span />
               <span />
             </div>
-            {/* The tour shows and hides this, and the bubble below, itself. */}
-            <button ref={replay} className={s.replay} aria-label="Take the tour" hidden>
-              <svg viewBox="0 0 16 16" aria-hidden>
-                <path d="M2.75 8a5.25 5.25 0 1 0 1.6-3.77M2.75 2.5v3h3" />
-              </svg>
-              <span>Take the tour</span>
-            </button>
             <span className={s.meta}>
               {current.files.toLocaleString("en-US")} files · {current.commit}
             </span>
@@ -132,10 +125,19 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
           </div>
         </div>
       </div>
-      <p className={s.cap}>
-        This is the app, running on maps of real repositories. Click a step to open it, and press <kbd>Esc</kbd> to go
-        back.
-      </p>
+      <div className={s.under}>
+        {/* The tour shows and hides this, and the bubble in the frame, itself. */}
+        <button ref={replay} className={`${s.btn} ${s.ghost} ${s.replay}`} hidden>
+          <svg viewBox="0 0 16 16" aria-hidden>
+            <path d="M2.75 8a5.25 5.25 0 1 0 1.6-3.77M2.75 2.5v3h3" />
+          </svg>
+          Give me a tour
+        </button>
+        <p className={s.cap}>
+          This is the app, running on maps of real repositories. Click a step to open it, and press <kbd>Esc</kbd> to go
+          back.
+        </p>
+      </div>
     </>
   );
 }

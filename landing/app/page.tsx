@@ -4,10 +4,9 @@ import { LandingDemo, StarCount, type DemoMap } from "@/components/landing-demo"
 import { LandingHow } from "@/components/landing-how";
 import { LandingNav } from "@/components/landing-nav";
 import { LandingStart } from "@/components/landing-start";
-import { LandingStruck, type Struck } from "@/components/landing-struck";
 import { LandingVoices, type Voice } from "@/components/landing-voices";
 import s from "@/components/landing.module.css";
-import { loadMap, loadReport, type DemoNode } from "@/lib/maps";
+import { loadMap } from "@/lib/maps";
 
 export const metadata: Metadata = {
   title: "TBD",
@@ -46,22 +45,6 @@ const VOICES: Voice[] = [
   },
 ];
 
-// One sentence the checker removed from each map, found by its text in that map's report.
-const STRUCK = [
-  { id: "umami", has: "bounce rate can exceed 100%" },
-  { id: "fastapi", has: "Go Back button" },
-  { id: "understand-slop", has: "Alarm dashed red" },
-  { id: "flask", has: "wires up the Jinja" },
-  { id: "ky", has: "Hooks can lower" },
-];
-
-function* walk(nodes: DemoNode[]): Generator<DemoNode> {
-  for (const n of nodes) {
-    yield n;
-    if (n.children) yield* walk(n.children);
-  }
-}
-
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.
 const MAKE_CONFIG = [
   "root_path = self.root_path",
@@ -76,29 +59,9 @@ const MAKE_CONFIG = [
 const sentence = (sub: string) => `${sub.split(" — ")[0].replace(/\.$/, "")}.`;
 
 export default function Landing() {
-  const loaded = DEMOS.map((d) => ({
-    ...d,
-    file: loadMap(d.id),
-    report: loadReport(d.id),
-  }));
-  const maps: DemoMap[] = loaded.map(({ id, label, file }) => ({
-    id,
-    label,
-    files: file.RUN.files ?? 0,
-    commit: file.RUN.commit ?? "",
-  }));
-
-  const rewritten = loaded.flatMap((d) => d.report.roots.flatMap((r) => r.verify?.rewritten ?? []));
-  const struck: Struck[] = STRUCK.map(({ id, has }) => {
-    const d = loaded.find((x) => x.id === id)!;
-    const hit = d.report.roots
-      .flatMap((r) => r.verify?.rewritten ?? [])
-      .flatMap((r) => r.claims.map((c) => ({ node: r.id, c })))
-      .find((x) => x.c.includes(has))!;
-    // "<claim> — <verdict>: <reason>"
-    const [, claim, verdict, why] = hit.c.match(/^(.*) — (contradicted|not_shown): (.*)$/)!;
-    const where = [...walk(d.file.AUTHORED)].find((n) => n.id === hit.node)!.title;
-    return { repo: id, where, claim, verdict: verdict === "contradicted" ? "contradicted" : "not shown", why };
+  const maps: DemoMap[] = DEMOS.map(({ id, label }) => {
+    const file = loadMap(id);
+    return { id, label, files: file.RUN.files ?? 0, commit: file.RUN.commit ?? "" };
   });
 
   const flask = loadMap("flask");
@@ -169,13 +132,6 @@ export default function Landing() {
               lines: MAKE_CONFIG,
             }}
           />
-        </div>
-        <LandingStruck
-          items={struck}
-          checked={loaded.reduce((n, d) => n + d.report.roots.reduce((m, r) => m + (r.verify?.nodes ?? 0), 0), 0)}
-          removed={rewritten.reduce((n, r) => n + r.claims.length, 0)}
-        />
-        <div className={s.wrap}>
           <LandingAgent
             name="flask"
             sections={flask.AUTHORED.map((r) => r.title)}

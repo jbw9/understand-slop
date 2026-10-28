@@ -1,7 +1,5 @@
-/* The landing page. Its palette is the app's own theme, renamed short, and
-   named again on the dark panel, whose [data-chrome] changes what they point at. */
-.page,
-.struck {
+/* The landing page. Its palette is the app's own theme, renamed short. */
+.page {
   --cream: var(--color-warm-cream);
   --white: var(--color-pure-white);
   --low: var(--color-surface-container-low);
@@ -14,8 +12,6 @@
   --mint: var(--color-mint-success);
   --border: var(--color-border-gray);
   --strong: var(--color-border-strong);
-}
-.page {
   --win: 0 1px 2px rgba(26, 26, 46, 0.06), 0 28px 56px -20px rgba(26, 26, 46, 0.3);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --gap: clamp(96px, 11vw, 160px);
@@ -337,38 +333,23 @@
   font-variant-numeric: tabular-nums;
 }
 .replay {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--white);
-  font-size: 12px;
-  color: var(--variant);
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14.5px;
 }
+/* Hidden while the tour runs, but holding its place so the caption doesn't jump. */
 .replay[hidden] {
-  display: none;
-}
-.replay:hover {
-  background: var(--low);
-  color: var(--ink);
+  display: inline-flex;
+  visibility: hidden;
 }
 .replay svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.replay:not([hidden]) + .meta {
-  margin-left: 12px;
 }
 .stage {
   position: relative;
@@ -396,9 +377,17 @@
   font: 11.5px var(--font-mono);
   color: var(--muted);
 }
+.under {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+  text-align: center;
+}
 .cap {
   max-width: 40em;
-  margin: 18px 0 0;
+  margin: 0;
   font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
@@ -591,7 +580,6 @@
   margin-top: var(--gap);
 }
 .how h2,
-.struck h2,
 .section h2 {
   margin: 0;
   font-size: clamp(36px, 4.8vw, 68px);
@@ -987,106 +975,12 @@
   transition-duration: 0.12s;
 }
 
-/* ── what the checker took out ───────────────────────── */
-/* The one dark panel, edge to edge but for a margin, to break the page's run of paper. */
-.struck {
-  margin: var(--gap) 12px 0;
-  padding: clamp(80px, 9vw, 128px) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--frame-r);
-  background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(94, 143, 94, 0.16), transparent 70%) var(--color-surface);
-  color: var(--ink);
-  --v-ink: var(--muted);
-  --v-surface: var(--low);
-  --v-line: var(--strong);
-}
 .intro {
   max-width: 34em;
   margin: 22px 0 0;
   font-size: clamp(17px, 1.4vw, 20px);
   line-height: 1.5;
   color: var(--variant);
-}
-.tally {
-  margin: 14px 0 0;
-  font: 12px var(--font-mono);
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.errata {
-  margin: 48px 0 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--border);
-}
-.errata li {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  grid-template-areas: "where where" "claim why";
-  gap: 12px 64px;
-  padding: 30px 0 34px;
-  border-bottom: 1px solid var(--border);
-}
-.errata li[data-verdict="alarm"] {
-  --v-ink: var(--color-clay-ink);
-  --v-surface: var(--color-clay-surface);
-  --v-line: var(--color-clay-line);
-}
-.where {
-  grid-area: where;
-  margin: 0;
-  font: 11.5px var(--font-mono);
-  color: var(--faint);
-}
-.claim {
-  grid-area: claim;
-  margin: 0;
-  font-size: clamp(20px, 1.9vw, 26px);
-  line-height: 1.35;
-  letter-spacing: -0.018em;
-  font-weight: 500;
-}
-/* A background, not text-decoration, so the strike can grow along the lines in order. */
-.claim del {
-  text-decoration: none;
-  color: var(--muted);
-  background: linear-gradient(var(--v-ink), var(--v-ink)) 0 58% / 100% 2px no-repeat;
-}
-@supports (animation-timeline: view()) {
-  .claim del {
-    animation: strike linear both;
-    animation-timeline: view();
-    animation-range: entry 100% cover 45%;
-  }
-}
-@keyframes strike {
-  from {
-    color: var(--ink);
-    background-size: 0% 2px;
-  }
-}
-.why {
-  grid-area: why;
-}
-.chip {
-  display: inline-block;
-  padding: 2px 9px;
-  border: 1px solid var(--v-line);
-  border-radius: 999px;
-  background: var(--v-surface);
-  font: 10px/1.6 var(--font-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--v-ink);
-}
-.why p {
-  margin: 10px 0 0;
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--variant);
-}
-.errata code {
-  font: 0.86em var(--font-mono);
 }
 
 /* ── beside your agent ───────────────────────────────── */
@@ -1359,10 +1253,6 @@
   .steps::before {
     display: none;
   }
-  .errata li {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "where" "claim" "why";
-  }
 }
 @media (max-width: 1080px) {
   .box {
@@ -1520,12 +1410,6 @@
   .tabs button {
     padding: 7px 11px;
   }
-  .replay {
-    padding: 6px;
-  }
-  .replay span {
-    display: none;
-  }
   .voices {
     padding: 64px 0;
   }
@@ -1560,7 +1444,6 @@
   .rise,
   .reveal,
   .ring::after,
-  .claim del,
   .progress span[data-now="true"]::after {
     animation: none;
   }

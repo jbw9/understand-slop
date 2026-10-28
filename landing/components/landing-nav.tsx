@@ -5,7 +5,6 @@ import s from "./landing.module.css";
 
 const LINKS = [
   { href: "#how", label: "How it works" },
-  { href: "#checks", label: "What it checks" },
   { href: "#start", label: "Your repo" },
   { href: "#questions", label: "Questions" },
 ];

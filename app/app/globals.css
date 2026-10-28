@@ -2,55 +2,58 @@
 
 @theme {
   /* ── surfaces ─────────────────────────────────────────────
-     Warm cream ground with a container ramp, so panels sit on
-     paper rather than on flat white. */
-  --color-warm-cream: #fafaf8;
-  --color-pure-white: #ffffff;
-  --color-surface: #f9f9f7;
-  --color-surface-container-low: #f4f4f2;
-  --color-surface-container: #eeeeec;
-  --color-surface-dim: #dadad8;
+     Kraft paper, after the Kabadoni theme (github.com/nickberckley/
+     kabadoni, MIT): the reading area is a soft warm ground that is
+     easy on the eyes over long sessions, and the chrome around it
+     stays dark in either theme ([data-chrome], below). Cards and
+     diagram boxes sit a step lighter than the paper. */
+  --color-warm-cream: #ebe0d8;
+  --color-pure-white: #f5efe9;
+  --color-surface: #e7dcd3;
+  --color-surface-container-low: #e3d6cc;
+  --color-surface-container: #dacdc2;
+  --color-surface-dim: #d2c6bc;
 
   /* ── ink ───────────────────────────────────────────────── */
-  --color-ink: #1a1a2e;
+  --color-ink: #111111;
   /* The veil behind a dialog, and a phone's notch: dark in either theme. */
-  --color-night: #1a1a2e;
+  --color-night: #1e1e1e;
   /* A phone's frame. Not `night`: in the dark theme that is the ground's own
      colour, and the bezel vanished into it. */
-  --color-bezel: #1a1a2e;
-  --color-on-surface: #1a1c1b;
-  --color-on-surface-variant: #404945;
-  --color-muted-slate: #6b7280;
-  --color-faint: #9aa0a6;
+  --color-bezel: #252526;
+  --color-on-surface: #1e1e1e;
+  --color-on-surface-variant: #404040;
+  --color-muted-slate: #5a5550;
+  --color-faint: #857c74;
 
   /* ── green family — derived, compiler-resolved ─────────── */
-  --color-deep-green: #1f5c4d;
-  --color-brand: #004437;
-  --color-mint-success: #e8f5e9;
-  --color-mint-line: #cfe6d4;
+  --color-deep-green: #3f6640;
+  --color-brand: #2f4f30;
+  --color-mint-success: #dfe0cb;
+  --color-mint-line: #b8c2a0;
 
   /* ── amber family — partial, found but incomplete ──────── */
-  --color-amber-ink: #8a6416;
-  --color-amber-surface: #fdf6e3;
-  --color-amber-line: #e2c77e;
+  --color-amber-ink: #7a5c1c;
+  --color-amber-surface: #efdfbe;
+  --color-amber-line: #d2b370;
 
   /* ── clay family — the one alarming finding ────────────── */
-  --color-clay-ink: #8e3320;
-  --color-clay-surface: #fbede9;
-  --color-clay-line: #e0b3a5;
+  --color-clay-ink: #8a3f42;
+  --color-clay-surface: #ecd2cc;
+  --color-clay-line: #cfa09c;
 
 
   /* ── lines ─────────────────────────────────────────────── */
-  --color-border-gray: #e7e5e0;
-  --color-border-strong: #d6d3cc;
-  --color-wire: #b9b6ae;
+  --color-border-gray: #d6c9be;
+  --color-border-strong: #c4b7ab;
+  --color-wire: #a3978d;
 
   /* ── shape ─────────────────────────────────────────────── */
-  --radius-chip: 6px;
+  --radius-chip: 3px;
 
   /* ── elevation ─────────────────────────────────────────── */
-  --shadow-panel: 0 1px 2px rgba(26, 26, 46, 0.04);
-  --shadow-lift: 0 10px 34px -6px rgba(26, 26, 46, 0.1);
+  --shadow-panel: 0 1px 2px rgba(60, 40, 25, 0.06);
+  --shadow-lift: 0 10px 34px -6px rgba(60, 40, 25, 0.16);
 
 
 
@@ -59,16 +62,16 @@
      on the page — green for what the language itself says, clay
      for literal text, amber for numbers — so a code pane reads as
      part of this app and not as a pasted-in editor theme. */
-  --color-code: #fcfcfa;
-  --color-code-plain: #1a1c1b;
-  --color-code-comment: #7d8a85;
-  --color-code-string: #8e3320;
-  --color-code-number: #8a6416;
-  --color-code-keyword: #1f5c4d;
-  --color-code-type: #2f5d8a;
-  --color-code-call: #4a3f87;
-  --color-code-punct: #6b7280;
-  --color-code-annotation: #8a6416;
+  --color-code: #e8ddd4;
+  --color-code-plain: #1e1e1e;
+  --color-code-comment: #857c74;
+  --color-code-string: #8a3f42;
+  --color-code-number: #7a5c1c;
+  --color-code-keyword: #3f6640;
+  --color-code-type: #3f566d;
+  --color-code-call: #7a5530;
+  --color-code-punct: #5a5550;
+  --color-code-annotation: #7a5c1c;
 }
 
 /* These are referenced only from inline `var()` in SVG attributes and style
@@ -87,20 +90,20 @@
      read as one thing. Seven, because no diagram opens more
      (measured: the widest is 7). Each pair is a tint for the
      box and an ink for its label and dot. */
-  --color-sec-1-surface: #e7f1ec;
-  --color-sec-1-ink: #2f6f5e;
-  --color-sec-2-surface: #eceffa;
-  --color-sec-2-ink: #3f4a91;
-  --color-sec-3-surface: #fbefdd;
-  --color-sec-3-ink: #8a5a16;
-  --color-sec-4-surface: #f8ecf6;
-  --color-sec-4-ink: #7d3573;
-  --color-sec-5-surface: #e5f2f7;
-  --color-sec-5-ink: #246079;
-  --color-sec-6-surface: #fdecea;
-  --color-sec-6-ink: #90392a;
-  --color-sec-7-surface: #eff0e6;
-  --color-sec-7-ink: #5d6327;
+  --color-sec-1-surface: #dbe0cc;
+  --color-sec-1-ink: #3f6640;
+  --color-sec-2-surface: #d6dbe0;
+  --color-sec-2-ink: #3f566d;
+  --color-sec-3-surface: #ecdcb8;
+  --color-sec-3-ink: #7a5c1c;
+  --color-sec-4-surface: #e3d2dc;
+  --color-sec-4-ink: #6e4a72;
+  --color-sec-5-surface: #d3e0dc;
+  --color-sec-5-ink: #3a6866;
+  --color-sec-6-surface: #ecd2cc;
+  --color-sec-6-ink: #8a3f42;
+  --color-sec-7-surface: #ead6c2;
+  --color-sec-7-ink: #7a5530;
 
   /* ── actors ───────────────────────────────────────────────
      One hue per participant in a sequence, assigned by position.
@@ -108,14 +111,14 @@
      the reader re-read the labels to track who is speaking; a
      colour per lifeline answers it at a glance. Four, because no
      authored sequence has more actors than that. */
-  --color-actor-1: #2f6f5e;
-  --color-actor-1-surface: #e6f1ed;
-  --color-actor-2: #39428a;
-  --color-actor-2-surface: #eceefa;
-  --color-actor-3: #8a5a16;
-  --color-actor-3-surface: #faf0df;
-  --color-actor-4: #7a3570;
-  --color-actor-4-surface: #f7ebf5;
+  --color-actor-1: #3f6640;
+  --color-actor-1-surface: #dbe0cc;
+  --color-actor-2: #3f566d;
+  --color-actor-2-surface: #d6dbe0;
+  --color-actor-3: #7a5c1c;
+  --color-actor-3-surface: #ecdcb8;
+  --color-actor-4: #6e4a72;
+  --color-actor-4-surface: #e3d2dc;
 
   /* ── diff ─────────────────────────────────────────────────
      Red for what a commit took away, green for what it added.
@@ -133,94 +136,100 @@
      and `stroke`, which Tailwind's scanner never sees as a class, so
      an `@theme` declaration would be dropped and every box would
      render black in light mode. */
-  --color-diff-add-ink: #166534;
-  --color-diff-add-surface: #e7f7ec;
-  --color-diff-add-line: #86c79b;
-  --color-diff-remove-ink: #b01c1c;
-  --color-diff-remove-surface: #fdeaea;
-  --color-diff-remove-line: #e59a9a;
+  --color-diff-add-ink: #2e6b31;
+  --color-diff-add-surface: #d9e5cc;
+  --color-diff-add-line: #8fb98a;
+  --color-diff-remove-ink: #a8302f;
+  --color-diff-remove-surface: #efd0ca;
+  --color-diff-remove-line: #d99189;
 }
 
-/* Dark: the same tokens, pointed at night colours, so every class and every
-   diagram that reads them follows. <html data-theme> is set before first
-   paint by the script in app/layout.tsx, from Settings or the system. Text on
-   a filled green button is `text-white`, which does not flip. */
-:root[data-theme="dark"] {
+/* Dark: the same tokens, pointed at Kabadoni's neutral greys, so every class
+   and every diagram that reads them follows. <html data-theme> is set before
+   first paint by the script in app/layout.tsx, from Settings or the system.
+   Text on a filled green button is `text-white`, which does not flip.
+
+   The chrome — title bar, status bar, tab strips, the workspace window, its
+   terminals, menus — is marked [data-chrome] and takes these in the light
+   theme too: as in Kabadoni, only the reading area is paper, and the UI
+   around it stays calm and dark. */
+:root[data-theme="dark"],
+[data-chrome] {
   color-scheme: dark;
 
-  --color-warm-cream: #121317;
-  --color-pure-white: #1b1d23;
-  --color-surface: #17191e;
-  --color-surface-container-low: #1f2128;
-  --color-surface-container: #262932;
-  --color-surface-dim: #30343e;
+  --color-warm-cream: #1e1e1e;
+  --color-pure-white: #2a2a2b;
+  --color-surface: #232324;
+  --color-surface-container-low: #252526;
+  --color-surface-container: #333333;
+  --color-surface-dim: #3c3c3c;
 
-  --color-ink: #ececf1;
-  --color-on-surface: #e3e3e6;
-  --color-on-surface-variant: #b7bcc4;
-  --color-muted-slate: #9aa1ad;
-  --color-faint: #6e7581;
+  --color-ink: #e6e6e6;
+  --color-on-surface: #dedede;
+  --color-on-surface-variant: #c9c9c9;
+  --color-muted-slate: #a3a3a3;
+  --color-faint: #848484;
 
-  --color-deep-green: #3f8f76;
-  --color-brand: #4fa088;
-  --color-mint-success: #16302a;
-  --color-mint-line: #2c5446;
+  --color-deep-green: #5e8f5e;
+  --color-brand: #76a876;
+  --color-mint-success: #1f2a1f;
+  --color-mint-line: #3a503a;
 
-  --color-amber-ink: #e2c77e;
-  --color-amber-surface: #2b2414;
-  --color-amber-line: #6b5520;
+  --color-amber-ink: #d8ae5b;
+  --color-amber-surface: #2d2718;
+  --color-amber-line: #6b5a2c;
 
-  --color-clay-ink: #f0a58e;
-  --color-clay-surface: #331f1a;
-  --color-clay-line: #7a4436;
+  --color-clay-ink: #d98a8c;
+  --color-clay-surface: #2f2121;
+  --color-clay-line: #6a3c3e;
 
 
-  --color-border-gray: #2b2e37;
-  --color-border-strong: #3a3e4a;
-  --color-wire: #4a4f5c;
-  --color-bezel: #3b3f4a;
+  --color-border-gray: #333333;
+  --color-border-strong: #474747;
+  --color-wire: #5a5a5a;
+  --color-bezel: #474747;
 
-  --color-actor-1: #6cc2a4;
-  --color-actor-1-surface: #16302a;
-  --color-actor-2: #aab6f0;
-  --color-actor-2-surface: #1d2133;
-  --color-actor-3: #e2c77e;
-  --color-actor-3-surface: #2b2414;
-  --color-actor-4: #e2a3d6;
-  --color-actor-4-surface: #2e1c2b;
+  --color-actor-1: #8fbf8f;
+  --color-actor-1-surface: #1f2a1f;
+  --color-actor-2: #8fa8c0;
+  --color-actor-2-surface: #1f252c;
+  --color-actor-3: #d8ae5b;
+  --color-actor-3-surface: #2d2718;
+  --color-actor-4: #c7a0cb;
+  --color-actor-4-surface: #2a2029;
 
-  --color-sec-1-surface: #17302a;
-  --color-sec-1-ink: #6cc2a4;
-  --color-sec-2-surface: #1e2238;
-  --color-sec-2-ink: #a8b4f0;
-  --color-sec-3-surface: #2e2515;
-  --color-sec-3-ink: #e2c77e;
-  --color-sec-4-surface: #2f1d2c;
-  --color-sec-4-ink: #e2a3d6;
-  --color-sec-5-surface: #152a33;
-  --color-sec-5-ink: #83c3dd;
-  --color-sec-6-surface: #331e1a;
-  --color-sec-6-ink: #f0a58e;
-  --color-sec-7-surface: #26291a;
-  --color-sec-7-ink: #bcc47e;
+  --color-sec-1-surface: #1f2a1f;
+  --color-sec-1-ink: #8fbf8f;
+  --color-sec-2-surface: #1f252c;
+  --color-sec-2-ink: #8fa8c0;
+  --color-sec-3-surface: #2d2718;
+  --color-sec-3-ink: #d8ae5b;
+  --color-sec-4-surface: #2a2029;
+  --color-sec-4-ink: #c7a0cb;
+  --color-sec-5-surface: #1c2a29;
+  --color-sec-5-ink: #86bab6;
+  --color-sec-6-surface: #2f2121;
+  --color-sec-6-ink: #d98a8c;
+  --color-sec-7-surface: #2e2419;
+  --color-sec-7-ink: #c4996c;
 
-  --color-code: #16181d;
-  --color-code-plain: #e3e3e6;
-  --color-code-comment: #6f7a84;
-  --color-code-string: #f0a58e;
-  --color-code-number: #e2c77e;
-  --color-code-keyword: #6cc2a4;
-  --color-code-type: #87b7e6;
-  --color-code-call: #b7a8f0;
-  --color-code-punct: #9aa1ad;
-  --color-code-annotation: #e2c77e;
+  --color-code: #1a1a1a;
+  --color-code-plain: #dedede;
+  --color-code-comment: #848484;
+  --color-code-string: #d98a8c;
+  --color-code-number: #d8ae5b;
+  --color-code-keyword: #8fbf8f;
+  --color-code-type: #8fa8c0;
+  --color-code-call: #c4996c;
+  --color-code-punct: #a3a3a3;
+  --color-code-annotation: #d8ae5b;
 
-  --color-diff-add-ink: #74d99a;
-  --color-diff-add-surface: #11301d;
-  --color-diff-add-line: #2f6b44;
-  --color-diff-remove-ink: #f08b8b;
-  --color-diff-remove-surface: #331617;
-  --color-diff-remove-line: #7a3536;
+  --color-diff-add-ink: #7fc782;
+  --color-diff-add-surface: #1d2e1e;
+  --color-diff-add-line: #3a6b3c;
+  --color-diff-remove-ink: #e88080;
+  --color-diff-remove-surface: #331d1d;
+  --color-diff-remove-line: #7a3535;
 
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.5);
@@ -237,6 +246,10 @@
   }
   body {
     background: var(--color-warm-cream);
+    color: var(--color-ink);
+  }
+  /* `color` inherits as the body resolved it; the chrome's own ink is light. */
+  [data-chrome] {
     color: var(--color-ink);
   }
   /* While an edge is dragged, a framed page would take the pointer's moves for its own. */
@@ -323,7 +336,7 @@
     font-size: 0.86em;
     background: var(--color-surface-container);
     color: var(--color-on-surface-variant);
-    border-radius: 3px;
+    border-radius: 2px;
     padding: 1px 5px;
   }
   .doc-prose pre {
@@ -332,7 +345,7 @@
     line-height: 1.6;
     background: var(--color-pure-white);
     border: 1px solid var(--color-border-gray);
-    border-radius: 8px;
+    border-radius: 3px;
     padding: 12px 16px;
     overflow-x: auto;
   }

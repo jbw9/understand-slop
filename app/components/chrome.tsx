@@ -122,7 +122,7 @@ export function Crumbs({
             <MapSwitcher
               map={map}
               maps={maps}
-              className="rounded-[5px] border border-border-strong bg-pure-white px-2 py-1 text-[12.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+              className="rounded-[2px] border border-border-strong bg-pure-white px-2 py-1 text-[12.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
             />
           </label>
         )}
@@ -142,7 +142,7 @@ export function Crumbs({
                     disabled={here}
                     aria-current={here ? "page" : undefined}
                     className={cn(
-                      "rounded-[5px] px-1.5 py-0.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
+                      "rounded-[2px] px-1.5 py-0.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
                       i === 0 && "font-mono text-[12.5px]",
                       here ? "font-semibold text-ink" : "text-muted-slate hover:bg-surface-container-low hover:text-ink",
                     )}

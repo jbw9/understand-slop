@@ -27,7 +27,7 @@ export function StateChip({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-[6px] px-2 py-[3px]",
+        "inline-flex shrink-0 items-center rounded-[2px] px-2 py-[3px]",
         "font-mono text-[10px] leading-none tracking-wide",
         state === "partial" && !alarm && "border border-amber-line bg-amber-surface text-amber-ink",
         state === "partial" && alarm && "border border-clay-line bg-clay-surface text-clay-ink",
@@ -63,7 +63,7 @@ export function Eyebrow({
 /** Monospace code identifier inline in prose. */
 export function Ident({ children }: { children: React.ReactNode }) {
   return (
-    <code className="rounded-[3px] bg-surface-container px-[5px] py-[1px] font-mono text-[0.86em] text-on-surface-variant">
+    <code className="rounded-[2px] bg-surface-container px-[5px] py-[1px] font-mono text-[0.86em] text-on-surface-variant">
       {children}
     </code>
   );

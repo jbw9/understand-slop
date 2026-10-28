@@ -18,57 +18,34 @@ import { cn } from "@/lib/utils";
  */
 
 /**
- * The palettes, one per theme (app/globals.css). The background is the
- * window's own, `surface-container-low`, so the terminal sits in the page as a
- * tool rather than another card. The light one darkens every ANSI colour so
- * it still reads on paper.
+ * The palette. A terminal is chrome ([data-chrome], app/globals.css), dark in
+ * either theme as Kabadoni keeps its UI, so there is one: the background is
+ * the window's own, `surface-container-low`, so the terminal sits in it as a
+ * tool rather than another card, and the colours are the page's accents
+ * lifted for the dark.
  */
-const DARK = {
-  background: "#1f2128",
-  foreground: "#e7e5e0",
-  cursor: "#cfe6d4",
-  cursorAccent: "#1f2128",
-  selectionBackground: "#404945",
-  black: "#1a1a2e",
-  red: "#e0b3a5",
-  green: "#9fd3b0",
-  yellow: "#e2c77e",
-  blue: "#9cb8e0",
-  magenta: "#c9a8de",
-  cyan: "#8fd0c8",
-  white: "#e7e5e0",
-  brightBlack: "#6b7280",
-  brightRed: "#f0c4b6",
-  brightGreen: "#cfe6d4",
-  brightYellow: "#f2dca0",
-  brightBlue: "#bcd0ee",
-  brightMagenta: "#ddc2ec",
-  brightCyan: "#b4e3dc",
+const PALETTE = {
+  background: "#252526",
+  foreground: "#dedede",
+  cursor: "#e6e6e6",
+  cursorAccent: "#252526",
+  selectionBackground: "#474747",
+  black: "#1e1e1e",
+  red: "#d98a8c",
+  green: "#8fbf8f",
+  yellow: "#d8ae5b",
+  blue: "#8fa8c0",
+  magenta: "#c7a0cb",
+  cyan: "#86bab6",
+  white: "#dedede",
+  brightBlack: "#848484",
+  brightRed: "#e88080",
+  brightGreen: "#7fc782",
+  brightYellow: "#f0c674",
+  brightBlue: "#a9bfd4",
+  brightMagenta: "#dcbcdf",
+  brightCyan: "#a8d3cf",
   brightWhite: "#ffffff",
-};
-
-const LIGHT = {
-  background: "#f4f4f2",
-  foreground: "#1a1c1b",
-  cursor: "#1f5c4d",
-  cursorAccent: "#f4f4f2",
-  selectionBackground: "#cfe6d4",
-  black: "#1a1a2e",
-  red: "#8e3320",
-  green: "#2e7d32",
-  yellow: "#8a6416",
-  blue: "#2f5d9e",
-  magenta: "#7b3f9e",
-  cyan: "#1f6f6a",
-  white: "#555b63",
-  brightBlack: "#6b7280",
-  brightRed: "#b5452b",
-  brightGreen: "#3c9441",
-  brightYellow: "#a87b1c",
-  brightBlue: "#3f73bd",
-  brightMagenta: "#9653bd",
-  brightCyan: "#26877f",
-  brightWhite: "#9aa0a6",
 };
 
 /* ── keys ─────────────────────────────────────────────────────── */
@@ -128,17 +105,6 @@ function zoom(by: number | null) {
   }
   window.dispatchEvent(new CustomEvent(ZOOMED, { detail: next }));
 }
-
-/** The palette for the theme on screen: `<html data-theme>`, set by lib/settings.ts. */
-const palette = () => (document.documentElement.dataset.theme === "dark" ? DARK : LIGHT);
-
-/**
- * Programs that assume a dark terminal pick their own colours in RGB, which no
- * palette reaches: Claude Code in its default dark theme draws white bullets,
- * pale links and dim grey on paper. On the light palette xterm lifts any
- * foreground below this contrast with the cell it sits on, so they still read.
- */
-const contrast = () => (document.documentElement.dataset.theme === "dark" ? 1 : 4.5);
 
 /**
  * One tab's terminal: the user's shell on a pty, an xterm drawing it. Lives as
@@ -229,8 +195,7 @@ export function Shell({
       ]);
       if (gone || !el.current) return;
       const term = new Terminal({
-        theme: palette(),
-        minimumContrastRatio: contrast(),
+        theme: PALETTE,
         fontFamily: `${family}, ui-monospace, monospace`,
         // A whole pixel size: a fractional one gives fractional cells, which
         // drift out of line across a row.
@@ -335,12 +300,6 @@ export function Shell({
         term.focus();
       };
       show.current();
-      // The theme can change under a running shell: Settings, or the system's.
-      const themed = new MutationObserver(() => {
-        term.options.theme = palette();
-        term.options.minimumContrastRatio = contrast();
-      });
-      themed.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       // Zoom in one tab, and every tab follows; the grid is re-fitted to the new cells.
       const onZoom = (e: Event) => {
         term.options.fontSize = (e as CustomEvent<number>).detail;
@@ -349,7 +308,6 @@ export function Shell({
       window.addEventListener(ZOOMED, onZoom);
       cleanup = () => {
         window.removeEventListener(ZOOMED, onZoom);
-        themed.disconnect();
         seen.disconnect();
         input.dispose();
         term.dispose();
@@ -371,7 +329,8 @@ export function Shell({
   }, [visible]);
 
   return (
-    <div className={cn("absolute inset-0 px-3 pb-1", !visible && "hidden")}>
+    // Chrome wherever it is, the window or the main view: a terminal is dark in either theme.
+    <div data-chrome className={cn("absolute inset-0 bg-surface-container-low px-3 pb-1", !visible && "hidden")}>
       {error ? (
         <p className="font-mono text-[11.5px] text-clay-ink">{error}</p>
       ) : (

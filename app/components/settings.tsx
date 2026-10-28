@@ -87,7 +87,7 @@ export function SettingsDialog() {
               type="submit"
               aria-label="Close"
               title="Close (Esc)"
-              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[6px] text-muted-slate hover:bg-surface-container hover:text-ink"
+              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-muted-slate hover:bg-surface-container hover:text-ink"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
                 <path d="m4.5 4.5 7 7m0-7-7 7" />
@@ -97,7 +97,7 @@ export function SettingsDialog() {
         />
         <div className="flex flex-col gap-5 px-5 py-5">
           <Field label="Theme" hint="System follows your desktop's light or dark setting.">
-            <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {THEMES.map((t) => (
                 <button
                   key={t.value}
@@ -106,7 +106,7 @@ export function SettingsDialog() {
                   aria-checked={draft.theme === t.value}
                   onClick={() => set({ theme: t.value })}
                   className={cn(
-                    "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
                     draft.theme === t.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -116,7 +116,7 @@ export function SettingsDialog() {
             </div>
           </Field>
           <Field label="Background" hint="What the map is drawn on.">
-            <div role="radiogroup" aria-label="Background" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Background" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {GROUNDS.map((g) => (
                 <button
                   key={g.value}
@@ -125,7 +125,7 @@ export function SettingsDialog() {
                   aria-checked={draft.ground === g.value}
                   onClick={() => set({ ground: g.value })}
                   className={cn(
-                    "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
                     draft.ground === g.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -138,7 +138,7 @@ export function SettingsDialog() {
             label="Default agent"
             hint="What a tab opens into when the app opens one for you: Ctrl+`, Ctrl+Shift+T, the title bar, or the first in the + menu. Map context goes to Claude either way."
           >
-            <div role="radiogroup" aria-label="Default agent" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Default agent" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {agents.map((a) => (
                 <button
                   key={a.id}
@@ -147,7 +147,7 @@ export function SettingsDialog() {
                   aria-checked={draft.agent === a.id}
                   onClick={() => set({ agent: a.id })}
                   className={cn(
-                    "flex cursor-pointer items-center gap-1.5 rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    "flex cursor-pointer items-center gap-1.5 rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
                     draft.agent === a.id ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -158,7 +158,7 @@ export function SettingsDialog() {
             </div>
           </Field>
           <Field label="Dev server" hint="Start a project's dev server when it opens, and show the running app in a Preview tab.">
-            <div role="radiogroup" aria-label="Dev server" className="inline-flex rounded-[8px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Dev server" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {[
                 { value: true, label: "Start it" },
                 { value: false, label: "Leave it" },
@@ -170,7 +170,7 @@ export function SettingsDialog() {
                   aria-checked={draft.devServer === o.value}
                   onClick={() => set({ devServer: o.value })}
                   className={cn(
-                    "cursor-pointer rounded-[6px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
                     draft.devServer === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
                   )}
                 >

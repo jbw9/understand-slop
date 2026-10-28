@@ -68,8 +68,9 @@ export function Menu({
     <div
       ref={ref}
       role="menu"
+      data-chrome
       style={{ left: at.x, top: at.y }}
-      className="fixed z-50 min-w-[220px] max-w-[320px] overflow-hidden rounded-[8px] border border-border-gray bg-pure-white py-1 shadow-lift"
+      className="fixed z-50 min-w-[220px] max-w-[320px] overflow-hidden rounded-[3px] border border-border-gray bg-pure-white py-1 shadow-lift"
     >
       {title ? (
         <p className="truncate border-b border-border-gray px-3 pb-1.5 pt-1 text-[11.5px] text-faint">{title}</p>

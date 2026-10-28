@@ -209,7 +209,7 @@ export function Device({
                       .then((cmd) => onCommand(cmd, `${label} setup`))
                       .catch((e) => setError(String(e)))
                   }
-                  className="cursor-pointer rounded-[6px] bg-deep-green px-3 py-1.5 text-[12.5px] text-white hover:bg-brand"
+                  className="cursor-pointer rounded-[2px] bg-deep-green px-3 py-1.5 text-[12.5px] text-white hover:bg-brand"
                 >
                   Set up {device}
                 </button>
@@ -217,7 +217,7 @@ export function Device({
               <button
                 type="button"
                 onClick={check}
-                className="cursor-pointer rounded-[6px] border border-border-strong px-3 py-1.5 text-[12.5px] text-ink hover:bg-surface-container"
+                className="cursor-pointer rounded-[2px] border border-border-strong px-3 py-1.5 text-[12.5px] text-ink hover:bg-surface-container"
               >
                 Check again
               </button>
@@ -243,7 +243,7 @@ export function Device({
               <button
                 type="button"
                 onClick={start}
-                className="mt-2 cursor-pointer rounded-[6px] bg-deep-green px-3 py-1.5 text-[12.5px] text-white hover:bg-brand"
+                className="mt-2 cursor-pointer rounded-[2px] bg-deep-green px-3 py-1.5 text-[12.5px] text-white hover:bg-brand"
               >
                 Start
               </button>
@@ -270,7 +270,7 @@ export function Device({
               .catch((e) => setError(String(e)))
           }
           title="Builds this project's app and opens it here, in a terminal tab"
-          className="ml-1 cursor-pointer rounded-[6px] bg-deep-green px-2.5 py-0.5 text-white hover:bg-brand"
+          className="ml-1 cursor-pointer rounded-[2px] bg-deep-green px-2.5 py-0.5 text-white hover:bg-brand"
         >
           Run app
         </button>
@@ -329,7 +329,7 @@ export function Device({
           <svg width="22" height="24" viewBox="0 0 22 24">
             <path d="M2 1.5 2 19.5 7 15 10.5 22.5 13.6 21 10.2 13.8 17 13.8Z" fill="#d97757" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
           </svg>
-          <span className="absolute left-[18px] top-5 whitespace-nowrap rounded-[5px] bg-[#d97757] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.3] text-white">Claude</span>
+          <span className="absolute left-[18px] top-5 whitespace-nowrap rounded-[2px] bg-[#d97757] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.3] text-white">Claude</span>
         </div>
       </div>
     </Pane>
@@ -346,7 +346,7 @@ function Middle({ children }: { children: React.ReactNode }) {
 
 function Small({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="cursor-pointer rounded-[6px] px-2 py-0.5 text-muted-slate hover:bg-surface-container hover:text-ink">
+    <button type="button" onClick={onClick} className="cursor-pointer rounded-[2px] px-2 py-0.5 text-muted-slate hover:bg-surface-container hover:text-ink">
       {children}
     </button>
   );

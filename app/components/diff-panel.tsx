@@ -51,7 +51,7 @@ export function DiffPanel() {
   if (!shown || !d) return null;
   const shownEntries = only ? moved.filter((s) => s.verdict === only) : moved;
   const select =
-    "rounded-[5px] border border-border-strong bg-pure-white px-2 py-1 font-mono text-[11.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green";
+    "rounded-[2px] border border-border-strong bg-pure-white px-2 py-1 font-mono text-[11.5px] text-ink focus-visible:outline-2 focus-visible:outline-deep-green";
 
   /** The trail to a section, in the titles the reader sees rather than ids. */
   const trail = (s: SectionDiff) =>
@@ -114,7 +114,7 @@ export function DiffPanel() {
                     type="button"
                     aria-pressed={only === c.v}
                     onClick={() => setOnly(only === c.v ? null : c.v)}
-                    className="cursor-pointer rounded-[6px] focus-visible:outline-2 focus-visible:outline-deep-green"
+                    className="cursor-pointer rounded-[2px] focus-visible:outline-2 focus-visible:outline-deep-green"
                     style={only && only !== c.v ? { opacity: 0.45 } : undefined}
                   >
                     <Pill verdict={c.v}>
@@ -186,7 +186,7 @@ function Entry({ section, trail, onOpen }: { section: SectionDiff; trail: string
     <button
       type="button"
       onClick={onOpen}
-      className="block w-full cursor-pointer rounded-[8px] border border-border-gray px-3 py-2 text-left hover:border-border-strong hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
+      className="block w-full cursor-pointer rounded-[3px] border border-border-gray px-3 py-2 text-left hover:border-border-strong hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
     >
       <span className="flex items-baseline gap-2">
         <span className="shrink-0 font-mono text-[12px] leading-none" style={{ color: t.ink }}>

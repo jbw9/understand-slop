@@ -178,7 +178,7 @@ export function PlanView({
       <footer className="sticky bottom-0 border-t border-border-gray bg-warm-cream/95 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-[920px] flex-col gap-2.5 px-10 py-3.5">
           {plan.state === "approved" ? (
-            <Line dot="bg-[#3fb950]" text={
+            <Line dot="bg-[#4caf50]" text={
                 status === "working"
                   ? "Accepted. Claude is building it."
                   : status === "waiting"
@@ -189,7 +189,7 @@ export function PlanView({
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="mr-auto flex items-center gap-2 text-[13px] font-medium text-ink">
-                  <span className="size-2 rounded-full bg-[#e5534b]" />
+                  <span className="size-2 rounded-full bg-[#cf3e3e]" />
                   Build this plan?
                 </span>
                 {yes
@@ -218,7 +218,7 @@ export function PlanView({
                     value={words}
                     onChange={(e) => setWords(e.target.value)}
                     placeholder={`${change.label}…`}
-                    className="h-8 min-w-0 flex-1 rounded-[6px] border border-border-gray bg-pure-white px-3 text-[13px] text-ink placeholder:text-faint focus:border-border-strong focus:outline-none"
+                    className="h-8 min-w-0 flex-1 rounded-[2px] border border-border-gray bg-pure-white px-3 text-[13px] text-ink placeholder:text-faint focus:border-border-strong focus:outline-none"
                   />
                   <Button type="submit" disabled={!words.trim()}>
                     Send
@@ -227,7 +227,7 @@ export function PlanView({
               ) : null}
             </>
           ) : plan.state === "revising" || status === "working" ? (
-            <Line dot="bg-[#e3b341]" text={plan.asked ? `Asked: “${plan.asked}”. Claude is revising the plan.` : "Claude is revising the plan."} action={onShowClaude} />
+            <Line dot="bg-[#f0c674]" text={plan.asked ? `Asked: “${plan.asked}”. Claude is revising the plan.` : "Claude is revising the plan."} action={onShowClaude} />
           ) : (
             <Line dot="bg-border-strong" text={pty === undefined ? "Claude's tab is closed." : "Not accepted yet. Claude's tab has the conversation."} action={onShowClaude} />
           )}
@@ -389,7 +389,7 @@ function figureOf(lang: string, body: string): React.ReactNode {
 /** The files a plan touches, marked as the map marks a diff. */
 function Files({ lines }: { lines: FileLine[] }) {
   return (
-    <ul className="max-w-[860px] overflow-hidden rounded-[8px] border border-border-gray bg-pure-white">
+    <ul className="max-w-[860px] overflow-hidden rounded-[3px] border border-border-gray bg-pure-white">
       {lines.map((f, i) => {
         const t = TINT[f.verdict];
         return (

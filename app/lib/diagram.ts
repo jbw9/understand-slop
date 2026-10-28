@@ -69,7 +69,10 @@ export function layoutDiagram(block: Block) {
   );
   const colX = colW.map((_, c) => PAD + colW.slice(0, c).reduce((a, w) => a + w + gap, 0));
   let W = colX[cols - 1] + colW[cols - 1] + PAD;
-  const H = PAD * 2 + rows * BOX_H + (rows - 1) * ROW_GAP;
+  let H = PAD * 2 + rows * BOX_H + (rows - 1) * ROW_GAP;
+  // Below the bottom row: the way round for a line that has no other, such as
+  // one row's last box back to its first, and the picture grows to hold it.
+  const under = H - PAD + ROW_GAP / 2;
   const at = new Map<string, PlacedBox>(
     block.boxes.map((b) => [b.id, { x: colX[b.col], y: PAD + b.row * (BOX_H + ROW_GAP), w: colW[b.col], b }]),
   );
@@ -119,6 +122,11 @@ export function layoutDiagram(block: Block) {
       const c = cost(pts);
       if (c < best.c) best = { pts, c };
     }
+    if (segmentsOf(best.pts).some((s) => boxRects.some((b) => overlaps(s, inset(b)))))
+      for (const pts of detours(f, t, [], [under])) {
+        const c = cost(pts);
+        if (c < best.c) [best, H] = [{ pts, c }, under + PAD];
+      }
     for (const seg of segmentsOf(best.pts)) drawn.push({ seg, from: a.from, to: a.to });
     return best;
   });

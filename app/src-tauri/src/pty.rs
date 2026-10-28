@@ -222,6 +222,10 @@ pub struct State {
     /// What Claude asked the app to show — a section, a diff — taken mid-turn
     /// so the user is looking at it while the answer streams; reported once.
     acts: Vec<claude::Act>,
+    /// A plan Claude is waiting to have accepted; reported once.
+    plan: Option<claude::Plan>,
+    /// The plan was accepted; reported once.
+    approved: bool,
 }
 
 #[tauri::command]
@@ -245,6 +249,8 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
         turn: claude::take_turn(&p.context),
         ended: claude::take_ended(&p.context),
         acts: claude::take_acts(&p.context),
+        plan: claude::take_plan(&p.context),
+        approved: claude::take_approved(&p.context),
     })
 }
 

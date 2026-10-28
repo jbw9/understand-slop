@@ -45,6 +45,7 @@ The level itself, `node` open:
 2. `sub`: at most 8 words saying what this IS, plainly: "Add a repo and watch it get mapped". Not a list of its parts (the children already name them) and never a file path.
 3. `detail`: **at most two sentences and at most 40 words.** The one thing to know before looking at the pictures. Everything else is a block.
 4. `anatomy`: blocks drawn as the thing they describe. Use whichever fit; a level with parts has its diagram and at most two more, a leaf at most two and no diagram:
+   - A block's `caption` is a heading over it: **at most 5 words**, naming what the picture shows, not a sentence explaining it. Good: "How the roots connect", "Who writes the guest list", "Dietary options". Bad: "The seven roots and how the code connects them", "Calls made, from opening the list to one check-in tap". What the picture means belongs in `detail`; an `example` may add " — " and a few words on which example it is ("events.rsvp — two students").
    - `diagram`: how the pieces connect. This is the main picture of a level.
      - Boxes sit on a grid (`col` left to right, `row` top to bottom, from 0). Never put two boxes in one cell. Keep it to about 5 columns and about 10 boxes.
      - A box is a thing at runtime ("users table", "Login screen", "Stripe webhook"). Its `sub` is a few words (about 25 characters at most): "row with this id", not a sentence — a long sub widens its whole column.

@@ -65,7 +65,7 @@ function brief(roots: Node[], cut: Cut, inv: Inventory): string {
 Write the top level of the map: the repository itself, the level a reader lands on before opening any root. Submit it with \`root\`, a node with no \`id\`, \`title\` or \`children\`:
 - \`sub\`: at most 8 words, what this repository IS.
 - \`detail\`: at most two sentences and 40 words, the one thing to know before the picture.
-- \`anatomy\`: exactly one \`diagram\`. One box per root, labelled with the root's title, with \`opens\` set to the root's id; lay them out left to right in the order someone meets them, a branch on a row of its own. Add a box that opens nothing only for a thing outside every root that the roots meet (the database, an outside API).
+- \`anatomy\`: exactly one \`diagram\`, its \`caption\` a heading of at most 5 words ("How the roots connect"), not a sentence. One box per root, labelled with the root's title, with \`opens\` set to the root's id; lay them out left to right in the order someone meets them, a branch on a row of its own. Add a box that opens nothing only for a thing outside every root that the roots meet (the database, an outside API).
 - Arrows only where the code goes from one root to another — a call, a redirect, a write another reads — each with \`at\` as file:line. The evidence above is a start; read the lines before you use them. Roots with nothing between them get no arrow.
 - \`code\`: the lines that show how the whole fits together (the entry point, the router), \`state\`, and \`issues\` only if one spans roots.
 Budget: about 8 tool calls before you submit.`,

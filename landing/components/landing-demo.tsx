@@ -19,8 +19,8 @@ const src = (id: string) => (process.env.NODE_ENV === "production" ? `${process.
  * The real canvas, framed. Each tab points the frame at another committed
  * map, so what a visitor explores is the product itself, not a recording. The
  * page is static and has no server to read maps, so each tab opens that map's
- * own export, published beside it. A guided tour starts on the first map
- * and points at the real cards inside the frame.
+ * own export, published beside it. The button under the frame starts a
+ * guided tour that points at the real cards inside it.
  */
 export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const [open, setOpen] = useState(maps[0].id);
@@ -115,7 +115,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
           ))}
         </div>
       </div>
-      <div className={`${s.frame} ${s.rise}`} style={{ "--i": 4 } as React.CSSProperties}>
+      <div className={s.rise} style={{ "--i": 4 } as React.CSSProperties}>
         <div className={s.canvas}>
           <div className={s.bar}>
             <div aria-hidden className={s.lights}>
@@ -161,7 +161,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
             </button>
           </div>
           {/* The tour shows and hides this, and the bubble in the frame, itself. */}
-          <button ref={replay} className={`${s.btn} ${s.ghost} ${s.replay}`} hidden>
+          <button ref={replay} className={`${s.btn} ${s.ghost} ${s.replay}`}>
             Give me a tour
           </button>
         </div>
@@ -350,7 +350,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonEl
   let read = 0;
   let raf = 0;
   let near = true;
-  let seen = false;
   let reloading = false;
   let hooked: Document | null = null;
   let watch: MutationObserver | null = null;
@@ -544,9 +543,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonEl
     if (reloading) {
       reloading = false;
       go();
-    } else if (!seen) {
-      seen = true;
-      begin();
     }
   };
   const io = new IntersectionObserver(([e]) => {

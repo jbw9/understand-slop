@@ -108,7 +108,7 @@ export default function Landing() {
                 </div>
               </div>
             </section>
-            <section aria-label="Live demo">
+            <section aria-label="Live demo" className={s.demo}>
               <LandingDemo maps={maps} />
             </section>
           </div>
@@ -132,11 +132,13 @@ export default function Landing() {
               lines: MAKE_CONFIG,
             }}
           />
-          <LandingAgent
-            name="flask"
-            sections={flask.AUTHORED.map((r) => r.title)}
-            changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
-          />
+        </div>
+        <LandingAgent
+          name="flask"
+          sections={flask.AUTHORED.map((r) => r.title)}
+          changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
+        />
+        <div className={s.wrap}>
           <LandingStart github={GITHUB} />
           <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">
             <h2 id="close-title">

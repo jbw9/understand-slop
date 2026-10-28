@@ -1,18 +1,26 @@
 /* The landing page's green is brighter than the app's: an emerald, cooler than
    the paper, so it stands off it instead of sinking in. Still 4.5:1 under white
    text in light, and under dark text in dark. */
+/* In light, the landing's paper is brighter than the app's too: off-white, not tan. */
 :root:not([data-theme="dark"]) .page {
+  --color-warm-cream: #f4f3ef;
+  --color-pure-white: #fdfcfa;
+  --color-surface-container-low: #eceae6;
+  --color-border-gray: #dedbd5;
   --color-deep-green: #078543;
   --color-mint-success: #d5ebdb;
   --on-green: #fff;
 }
-:root[data-theme="dark"] .page {
+:root[data-theme="dark"] .page,
+.page .dark {
   --color-deep-green: #4ac777;
   --color-mint-success: #173020;
   --on-green: #0f1a12;
 }
-/* The landing page. Its palette is the app's own theme, renamed short. */
-.page {
+/* The landing page. Its palette is the app's own theme, renamed short, and
+   named again on the dark panel, whose [data-chrome] changes what they point at. */
+.page,
+.dark {
   --cream: var(--color-warm-cream);
   --white: var(--color-pure-white);
   --low: var(--color-surface-container-low);
@@ -25,6 +33,8 @@
   --mint: var(--color-mint-success);
   --border: var(--color-border-gray);
   --strong: var(--color-border-strong);
+}
+.page {
   --win: 0 1px 2px rgba(26, 26, 46, 0.06), 0 28px 56px -20px rgba(26, 26, 46, 0.3);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --gap: clamp(96px, 11vw, 160px);
@@ -60,6 +70,7 @@
 .top {
   position: relative;
   isolation: isolate;
+  overflow-x: clip;
 }
 .nav {
   position: sticky;
@@ -227,8 +238,15 @@
   fill: currentColor;
 }
 .rise {
-  animation: rise 0.9s var(--ease) both;
+  animation: enter 1s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 90ms);
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(8px);
+  }
 }
 @keyframes rise {
   from {
@@ -246,7 +264,9 @@
   }
 }
 .eyebrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 20px;
   padding: 4px 11px;
   border: 1px solid var(--border);
@@ -256,8 +276,36 @@
   font-weight: 500;
   color: var(--variant);
 }
+.eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent);
+}
 
 /* ── the demo ─────────────────────────────────────────── */
+/* Light from behind the frame, so it reads as lit rather than pasted on. */
+.demo {
+  position: relative;
+}
+.demo::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -60px -8% 40%;
+  background: radial-gradient(45% 60% at 26% 45%, color-mix(in srgb, var(--green) 55%, transparent), transparent 72%),
+    radial-gradient(42% 55% at 76% 40%, rgba(56, 152, 220, 0.42), transparent 72%);
+  filter: blur(60px);
+  animation: drift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes drift {
+  to {
+    transform: translate3d(0, -28px, 0) scale(1.06);
+  }
+}
 .switcher {
   display: flex;
   justify-content: center;
@@ -299,7 +347,7 @@
   outline-offset: -2px;
   border-radius: 9px;
 }
-/* The same frame holds the demo and the How it works box. */
+/* The same frame holds the How it works box and the agent's desk. */
 .frame {
   padding: var(--frame-p);
   border: 1px solid var(--border);
@@ -316,6 +364,7 @@
   border-radius: var(--screen-r);
   overflow: hidden;
   background: var(--white);
+  box-shadow: var(--win);
 }
 .bar {
   display: flex;
@@ -652,6 +701,7 @@
   margin-top: var(--gap);
 }
 .how h2,
+.dark h2,
 .section h2 {
   margin: 0;
   font-size: clamp(36px, 4.8vw, 68px);
@@ -1055,6 +1105,18 @@
 }
 
 /* ── beside your agent ───────────────────────────────── */
+/* The one dark panel, edge to edge but for a margin, to break the page's run of
+   paper: lit green from above, with a little grain. */
+.dark {
+  margin: var(--gap) 12px 0;
+  padding: clamp(80px, 9vw, 128px) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--frame-r);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 55% at 50% 0%, color-mix(in srgb, var(--green) 18%, transparent), transparent 70%),
+    var(--color-surface);
+  color: var(--ink);
+}
 .section {
   margin-top: var(--gap);
 }
@@ -1268,6 +1330,8 @@
 
 /* ── the close ─────────────────────────────────────────── */
 .close {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1275,6 +1339,15 @@
   margin-top: var(--gap);
   padding: clamp(40px, 6vw, 80px) 0;
   text-align: center;
+}
+.close::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 15%;
+  background: radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--green) 22%, transparent), transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
 }
 .close h2 {
   margin: 0;
@@ -1514,6 +1587,7 @@
   }
   .rise,
   .reveal,
+  .demo::before,
   .ring::after,
   .progress span[data-now="true"]::after {
     animation: none;

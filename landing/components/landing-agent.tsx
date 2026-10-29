@@ -7,7 +7,7 @@ import s from "./landing.module.css";
  */
 export function LandingAgent({ name, sections, changed }: { name: string; sections: string[]; changed: string }) {
   return (
-    <section id="agent" className={s.band} aria-labelledby="agent-title">
+    <section id="agent" className={s.section} aria-labelledby="agent-title">
       <div className={`${s.wrap} ${s.agent}`}>
         <div className={s.reveal}>
           <p className={s.eyebrow}>Beside your agent</p>

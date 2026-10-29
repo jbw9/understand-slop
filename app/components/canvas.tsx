@@ -721,8 +721,8 @@ function Level({
 
         {/* The repository's way in comes after its picture: the walkthrough
             opens parts the reader has just seen drawn. */}
-        {explainOn && top && !run && (map.OVERVIEW?.walkthrough || map.OVERVIEW?.glossary?.length) ? (
-          <StartHere walkthrough={map.OVERVIEW.walkthrough} glossary={map.OVERVIEW.glossary} onOpen={onOpen} />
+        {explainOn && top && !run && map.OVERVIEW?.walkthrough ? (
+          <StartHere walkthrough={map.OVERVIEW.walkthrough} onOpen={onOpen} />
         ) : null}
 
         {node.issues?.length ? (

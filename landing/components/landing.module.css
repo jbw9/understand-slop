@@ -11,16 +11,13 @@
   --color-mint-success: #d5ebdb;
   --on-green: #fff;
 }
-:root[data-theme="dark"] .page,
-.page .dark {
+:root[data-theme="dark"] .page {
   --color-deep-green: #4ac777;
   --color-mint-success: #173020;
   --on-green: #0f1a12;
 }
-/* The landing page. Its palette is the app's own theme, renamed short, and
-   named again on the dark panel, whose [data-chrome] changes what they point at. */
-.page,
-.dark {
+/* The landing page. Its palette is the app's own theme, renamed short. */
+.page {
   --cream: var(--color-warm-cream);
   --white: var(--color-pure-white);
   --low: var(--color-surface-container-low);
@@ -103,7 +100,8 @@
 .navBar nav {
   margin-left: auto;
 }
-.navCta {
+/* Past .btn, which is declared later. */
+.navBar .navCta {
   height: 38px;
   padding: 0 16px;
   border-radius: 10px;
@@ -497,6 +495,17 @@
   outline-offset: -2px;
   border-radius: 9px;
 }
+/* Icons only, each a square, so the pair sits small among the links. */
+.navMode {
+  padding: 3px;
+  border-radius: 11px;
+}
+.navMode button {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
+}
 .mode svg {
   width: 14px;
   height: 14px;
@@ -701,7 +710,6 @@
   margin-top: var(--gap);
 }
 .how h2,
-.dark h2,
 .section h2 {
   margin: 0;
   font-size: clamp(36px, 4.8vw, 68px);
@@ -1105,18 +1113,6 @@
 }
 
 /* ── beside your agent ───────────────────────────────── */
-/* The one dark panel, edge to edge but for a margin, to break the page's run of
-   paper: lit green from above, with a little grain. */
-.dark {
-  margin: var(--gap) 12px 0;
-  padding: clamp(80px, 9vw, 128px) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--frame-r);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse 70% 55% at 50% 0%, color-mix(in srgb, var(--green) 18%, transparent), transparent 70%),
-    var(--color-surface);
-  color: var(--ink);
-}
 .section {
   margin-top: var(--gap);
 }
@@ -1225,7 +1221,13 @@
   border-color: var(--color-amber-line);
   background: var(--color-amber-surface);
 }
+.miniTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mini em {
+  flex-shrink: 0;
   margin-left: auto;
   padding: 2px 6px;
   border: 1px solid var(--color-amber-line);
@@ -1579,6 +1581,15 @@
   .code {
     font-size: 10.5px;
     mask-image: linear-gradient(90deg, #000 82%, transparent);
+  }
+}
+/* Mira, the theme and Download only: the hero has the link to GitHub. */
+@media (max-width: 420px) {
+  .navBar {
+    gap: 12px;
+  }
+  .navBar nav a {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

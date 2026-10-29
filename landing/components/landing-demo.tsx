@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { SETTINGS_KEY } from "../../app/lib/theme";
+import { useEffect, useRef, useState } from "react";
 import s from "./landing.module.css";
+import { onTheme, readTheme } from "./landing-theme";
 
 export interface DemoMap {
   id: string;
@@ -32,23 +32,17 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const replay = useRef<HTMLButtonElement>(null);
   const guide = useRef<Tour>(null);
   const shownMap = useRef(open);
-  const theme = useSyncExternalStore(onTheme, readTheme, () => null);
 
-  // Saved where the app keeps its own choice, so the frame, and every map opened in it later, follows.
-  const pick = (t: "light" | "dark") => {
-    const apply = () => {
-      document.documentElement.dataset.theme = t;
-      try {
-        frame.current!.contentDocument!.documentElement.dataset.theme = t;
-      } catch {}
-    };
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"), theme: t }));
-    } catch {}
-    if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      document.startViewTransition(apply);
-    } else apply();
-  };
+  // The page's theme is picked in the nav. The observer runs before a view transition's snapshot, so the frame turns with the page.
+  useEffect(
+    () =>
+      onTheme(() => {
+        try {
+          frame.current!.contentDocument!.documentElement.dataset.theme = readTheme();
+        } catch {}
+      }),
+    [],
+  );
 
   // The first frame is server-rendered and can finish loading before React
   // hydrates, so its load event is missed. Read the document instead.
@@ -145,21 +139,6 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
       </div>
       <div className={s.under}>
         <div className={s.controls}>
-          <div className={s.mode} role="group" aria-label="Theme">
-            <button aria-pressed={theme === "light"} onClick={() => pick("light")}>
-              <svg viewBox="0 0 16 16" aria-hidden>
-                <circle cx="8" cy="8" r="2.75" />
-                <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9" />
-              </svg>
-              Light
-            </button>
-            <button aria-pressed={theme === "dark"} onClick={() => pick("dark")}>
-              <svg viewBox="0 0 16 16" aria-hidden>
-                <path d="M13.25 9.6A5.5 5.5 0 0 1 6.4 2.75a5.5 5.5 0 1 0 6.85 6.85z" />
-              </svg>
-              Dark
-            </button>
-          </div>
           {/* The tour shows and hides this, and the bubble in the frame, itself. */}
           <button ref={replay} className={`${s.btn} ${s.ghost} ${s.replay}`}>
             Give me a tour
@@ -173,14 +152,6 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
     </>
   );
 }
-
-// The theme is set on <html> before React loads, so the server can't know it.
-const readTheme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-const onTheme = (f: () => void) => {
-  const o = new MutationObserver(f);
-  o.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => o.disconnect();
-};
 
 type Step = { text: string; find: (d: Document) => Element | undefined };
 

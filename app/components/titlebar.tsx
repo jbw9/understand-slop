@@ -13,6 +13,8 @@ import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon } from "@/components/docs";
+import { LOGOS } from "@/components/agents";
+import { STATIC_MAP } from "@/lib/source";
 import { cn } from "@/lib/utils";
 
 /**
@@ -91,9 +93,16 @@ export function Titlebar({ bare }: { bare?: boolean }) {
         {bare ? null : <MapTools />}
         <span aria-hidden className="mx-1 h-4 w-px bg-border-strong" />
         {bare ? null : (
-          <Control label="Claude Code & terminal (Ctrl+`)" onClick={toggleWorkspace}>
-            <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
-            <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
+          <Control label={STATIC_MAP ? "Claude (Ctrl+`)" : "Claude Code & terminal (Ctrl+`)"} onClick={toggleWorkspace}>
+            {/* A published page has no terminal, only Claude (components/claude-web.tsx). */}
+            {STATIC_MAP ? (
+              <path d={LOGOS.claude.d} transform="scale(0.6667)" fill={LOGOS.claude.color} stroke="none" />
+            ) : (
+              <>
+                <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
+                <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
+              </>
+            )}
           </Control>
         )}
         <Control label="Settings" onClick={openSettings}>

@@ -32,7 +32,7 @@ export interface Inventory {
   repo: string;
   name: string;
   commit: string;
-  /** Tracked files that differ from the commit: the map is read from disk, so it describes those edits, not the commit alone. */
+  /** Files that differ from the commit, new ones included: the map is read from disk, so it describes those edits, not the commit alone. */
   dirty: string[];
   files: RepoFile[];
   readme: string;
@@ -150,12 +150,12 @@ function resolveImport(from: string, spec: string, known: Set<string>, alias: [s
 }
 
 /**
- * `untracked` adds files git does not know yet (not ignored): an update maps
- * the working tree as an agent leaves it, new files included.
+ * The working tree as it is, files git does not know yet (not ignored)
+ * included: a map is of the code on disk, committed or not.
  */
-export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inventory {
-  const args = opts.untracked ? ["ls-files", "--cached", "--others", "--exclude-standard"] : ["ls-files"];
-  const listed = [...new Set(git(repo, ...args).split("\n").filter(Boolean))].sort();
+export function inventory(repo: string): Inventory {
+  const untracked = git(repo, "ls-files", "--others", "--exclude-standard").split("\n").filter(Boolean);
+  const listed = [...new Set([...git(repo, "ls-files").split("\n").filter(Boolean), ...untracked])].sort();
   const files: RepoFile[] = [];
   for (const path of listed) {
     if (SKIP.some((r) => r.test(path))) continue;
@@ -201,7 +201,7 @@ export function inventory(repo: string, opts: { untracked?: boolean } = {}): Inv
     repo,
     name: repo.replace(/\/+$/, "").split("/").pop()!,
     commit: git(repo, "rev-parse", "--short", "HEAD"),
-    dirty: git(repo, "diff", "HEAD", "--name-only", "--relative").split("\n").filter(Boolean),
+    dirty: [...git(repo, "diff", "HEAD", "--name-only", "--relative").split("\n").filter(Boolean), ...untracked],
     files,
     readme: readmeFile ? readFileSync(join(repo, readmeFile), "utf8").slice(0, 8000) : "",
     instructions,

@@ -7,8 +7,7 @@ import s from "./landing.module.css";
  */
 export function LandingAgent({ name, sections, changed }: { name: string; sections: string[]; changed: string }) {
   return (
-    // [data-chrome] takes the app's dark tokens, so the panel is dark in either theme.
-    <section id="agent" className={s.dark} aria-labelledby="agent-title" data-chrome>
+    <section id="agent" className={s.band} aria-labelledby="agent-title">
       <div className={`${s.wrap} ${s.agent}`}>
         <div className={s.reveal}>
           <p className={s.eyebrow}>Beside your agent</p>

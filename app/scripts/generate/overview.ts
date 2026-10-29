@@ -14,7 +14,7 @@ import type { Node } from "@/lib/data";
 import type { Overview } from "@/lib/map";
 import { converse, runTool } from "./author";
 import { type Handled } from "./claude-code";
-import { check, OVERVIEW_ID } from "./check";
+import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { owners, type Cut } from "./cut";
 import type { Inventory } from "./inventory";
 import { shapeProblems } from "./schema";
@@ -78,13 +78,24 @@ Write the top level of the map: the repository itself, the level a reader lands 
 - Arrows only where the code goes from one root to another — a call, a redirect, a write another reads — each with \`at\` as file:line. The evidence above is a start; read the lines before you use them. Roots with nothing between them get no arrow.
 - \`code\`: the lines that show how the whole fits together (the entry point, the router), \`state\`, and \`issues\` only if one spans roots.
 
-Then the way in for a reader who has never seen this project or its field — shown under an Explain toggle, so it can say more than the rest of the map:
+${WAY_IN[EXPLAIN_LEVEL]}Budget: about 10 tool calls before you submit.`,
+  ].filter(Boolean).join("\n\n");
+}
+
+/** What the top level adds for a newcomer, at the map's explain level (D70). The full text is D68's, unchanged. */
+const WAY_IN = {
+  full: `Then the way in for a reader who has never seen this project or its field — shown under an Explain toggle, so it can say more than the rest of the map:
 - \`explain\`: \`body\` is 2-4 short paragraphs (blank line between, at most 200 words): what this system is for and who uses it, the problem it solves, and the idea behind how it works, defining each word of its field the first time. \`blocks\` holds 0-2 pictures only where they teach more than the prose — usually one \`diagram\` of the system in its world (the users, the machines, the outside services, and what flows between them), its boxes opening nothing and its arrows needing no \`at\`.
 - \`glossary\`: 4-12 terms the map's titles and details lean on, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words. Terms of the field ("quorum", "webhook") and of this project ("metadata image") alike; skip words everyone knows.
 - \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system from start to end ("A new broker joins the cluster", "A visitor pays for a plan"), 3-8 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one or two plain sentences, and \`path\` the ids from a root down to the part where it happens (from the list above), as deep as the step is specific.
-Budget: about 10 tool calls before you submit.`,
-  ].filter(Boolean).join("\n\n");
-}
+`,
+  brief: `Then a short way in for a reader who knows this kind of software but not this project — shown under an Explain toggle:
+- \`explain\`: \`body\` is one to three sentences, at most 60 words: what this system is for and the idea behind how it is built. No \`blocks\`.
+- \`glossary\`: 3-8 terms, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words — only this project's own words, or words a developer outside this field would not know.
+- \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system, 3-5 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one plain sentence, and \`path\` the ids from a root down to the part where it happens (from the list above).
+`,
+  none: "",
+};
 
 /** Problems with a submitted overview: its shape, the checker's verdict on it, and a box for every root. */
 export function overviewProblems(o: any, roots: Node[], repo: string): string[] {

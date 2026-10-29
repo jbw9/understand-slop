@@ -483,6 +483,40 @@
   }
 }
 
+@layer utilities {
+  /* A part still being written: a light passing over its box (D69). */
+  .shimmer {
+    background-image: linear-gradient(
+      100deg,
+      transparent 30%,
+      color-mix(in srgb, var(--color-ink) 7%, transparent) 50%,
+      transparent 70%
+    );
+    background-size: 220% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+  /* A line arriving at the top of a feed. */
+  .arrive {
+    animation: arrive 400ms ease-out both;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

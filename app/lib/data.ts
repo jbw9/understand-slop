@@ -409,6 +409,11 @@ export interface Node {
   detail?: string;
   /** This level for a reader new to the project, behind the Explain toggle. Every generated node has one. */
   explain?: Explainer;
+  /**
+   * A root the generator handed in and is still checking, shown while the map
+   * is made (D69). Never in a map file: lib/maps.ts marks it on the way to the page.
+   */
+  draft?: boolean;
   /** Where this lives in the code. Every authored node has at least one. */
   code?: CodeRef[];
   /**
@@ -509,6 +514,12 @@ export interface Run {
   elapsed: string;
   /** Absolute path of the mapped checkout. Set by the generator; overrides `repo`. */
   root?: string;
+  /**
+   * How much the map explains for a newcomer, chosen when the project was
+   * imported (D70): no plain-words layer, a sentence or two per level, or the
+   * full layer. Absent means full, or a map made before the choice existed.
+   */
+  explain?: "none" | "brief" | "full";
   /** Which model ran each generator stage. Absent on hand-authored maps. */
   models?: Record<string, string>;
   /** Web address of the repository, read from the checkout's git remote when the page is built. */

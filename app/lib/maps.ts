@@ -8,10 +8,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { Run } from "@/lib/data";
+import type { Node, Run } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { apply, overlayFile, readOverlay } from "@/lib/overlay";
-import { listProjects, mapFileOf, markOpened, projectDir } from "@/lib/vault";
+import { listProjects, mapFileOf, markOpened, progressOf, projectDir, type Progress, type Project } from "@/lib/vault";
 
 /** One entry in the map picker. */
 export interface MapEntry {
@@ -33,10 +33,28 @@ export function auditOf(id: string): string | null {
   return f && existsSync(f) ? readFileSync(f, "utf8") : null;
 }
 
-/** Every map that can be opened: the reader's projects that have one. */
+/**
+ * A project opens as soon as its first run starts, before it has a map: the
+ * page shows the run building one (D69). One whose first run ended without a
+ * map still opens, on what went wrong.
+ */
+const runFile = (id: string) => join(projectDir(id), "progress.json");
+const openable = (p: Project) => Boolean(mapFileOf(p.id)) || p.map.status === "generating" || existsSync(runFile(p.id));
+
+/**
+ * How far the run making this map has got, while there is one to show: the
+ * run in flight, or for a map never made, the run that failed to make it.
+ */
+function progressFor(p: Project): Progress | undefined {
+  if (p.map.status === "generating") return progressOf(p.id);
+  if (mapFileOf(p.id)) return undefined;
+  return { ...progressOf(p.id), stage: p.map.status === "cancelled" ? "cancelled" : "failed" };
+}
+
+/** Every map that can be opened: the reader's projects that have one, or are making one. */
 export function listMaps(): MapEntry[] {
   return listProjects()
-    .filter((p) => mapFileOf(p.id))
+    .filter(openable)
     .map((p) => ({ id: p.id, label: p.name, local: true }));
 }
 
@@ -47,26 +65,50 @@ export function listMaps(): MapEntry[] {
  * a project, the reader's most recently opened project opens; null when they
  * have none yet.
  */
-export function loadMap(name: string | undefined): { name: string; version?: string; file: MapFile } | null {
+export function loadMap(name: string | undefined): { name: string; version?: string; file: MapFile; progress?: Progress } | null {
   const projects = listProjects();
   const opened = (p: (typeof projects)[number]) => Date.parse(p.openedAt ?? p.addedAt);
   const project =
-    (name ? projects.find((p) => p.id === name && mapFileOf(p.id)) : undefined) ??
+    (name ? projects.find((p) => p.id === name && openable(p)) : undefined) ??
     projects.filter((p) => mapFileOf(p.id)).sort((a, b) => opened(b) - opened(a))[0];
-  const file = project && mapFileOf(project.id);
-  if (project && file) {
-    markOpened(project.id);
-    const version = mapVersion(project.id);
-    return { name: project.id, version, file: readMap(project.id, project.root, file) };
-  }
-  return null;
+  if (!project || !openable(project)) return null;
+  markOpened(project.id);
+  const version = mapVersion(project.id);
+  const progress = progressFor(project);
+  return { name: project.id, version, file: readMap(project, progress), progress };
 }
 
-function readMap(id: string, root: string, file: string): MapFile {
-  const map: MapFile = JSON.parse(readFileSync(file, "utf8"));
-  map.RUN.root = root;
+function readMap(p: Project, progress: Progress | undefined): MapFile {
+  const file = mapFileOf(p.id);
+  // Before the first root is accepted there is no file: the run's own
+  // progress is the whole page, over an empty map.
+  const map: MapFile = file
+    ? JSON.parse(readFileSync(file, "utf8"))
+    : { RUN: { command: `mira map ${p.name}`, repo: p.name, commit: "", files: 0, elapsed: "" }, AUTHORED: [], LINKS: [] };
+  map.RUN.root = p.root;
+  if (progress) withDrafts(map, p.id, progress);
   // What the reader added, composed in here so every consumer sees it.
-  return apply(map, readOverlay(id)).file;
+  return apply(map, readOverlay(p.id)).file;
+}
+
+/**
+ * The roots still being checked, in their place among the accepted ones and
+ * marked `draft` so the page draws them dimmed (D69). A root accepted from a
+ * previous run keeps its place until this run's version is accepted.
+ */
+function withDrafts(map: MapFile, id: string, progress: Progress) {
+  let drafts: Record<string, Node> = {};
+  try {
+    drafts = JSON.parse(readFileSync(join(projectDir(id), "drafts.json"), "utf8"));
+  } catch {
+    return;
+  }
+  const order = progress.roots.map((r) => r.id);
+  const have = new Set(map.AUTHORED.map((n) => n.id));
+  const added = order.flatMap((r) => (drafts[r] && !have.has(r) ? [{ ...drafts[r], draft: true }] : []));
+  if (!added.length) return;
+  const at = (n: Node) => (order.includes(n.id) ? order.indexOf(n.id) : order.length);
+  map.AUTHORED = [...map.AUTHORED, ...added].sort((a, b) => at(a) - at(b)).map((n, i) => ({ ...n, col: 0, row: i }));
 }
 
 const mtime = (f: string) => (existsSync(f) ? statSync(f).mtimeMs : 0);
@@ -78,8 +120,14 @@ const mtime = (f: string) => (existsSync(f) ? statSync(f).mtimeMs : 0);
  * (app/api/map/route.ts). Undefined for anything that is not a project with a map.
  */
 export function mapVersion(id: string): string | undefined {
-  const file = listProjects().some((p) => p.id === id) && mapFileOf(id);
-  return file ? `${mtime(file)}:${mtime(overlayFile(id))}` : undefined;
+  const p = listProjects().find((q) => q.id === id);
+  if (!p || !openable(p)) return undefined;
+  const file = mapFileOf(id);
+  const made = `${file ? mtime(file) : 0}:${mtime(overlayFile(id))}`;
+  // While a run makes the map, its progress and drafts are part of what the page shows.
+  return p.map.status === "generating" || !file
+    ? `${made}:${p.map.status}:${mtime(runFile(id))}:${mtime(join(projectDir(id), "drafts.json"))}`
+    : made;
 }
 
 /**
@@ -88,14 +136,14 @@ export function mapVersion(id: string): string | undefined {
  * the file newer than its stamp, so the next poll reads it again rather than
  * missing it.
  */
-export function liveMap(id: string): { version: string; file: MapFile } | null {
+export function liveMap(id: string): { version: string; file: MapFile; progress: Progress | null } | null {
   const project = listProjects().find((p) => p.id === id);
   const version = mapVersion(id);
-  const f = project && mapFileOf(id);
-  if (!project || !version || !f) return null;
-  const file = readMap(id, project.root, f);
+  if (!project || !version) return null;
+  const progress = progressFor(project);
+  const file = readMap(project, progress);
   file.RUN.url ??= remoteOf(file.RUN);
-  return { version, file };
+  return { version, file, progress: progress ?? null };
 }
 
 /**

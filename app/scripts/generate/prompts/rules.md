@@ -31,6 +31,7 @@ The reader is a developer who has to *explain* this system under questioning: wh
     - a type, model, table definition or config → `schema` (its fields) or `table` (its values)
     - a constant set of options or rules → `table`
     Add a second block only when it shows something the first cannot: the stored value a `flow` writes as an `example`, say.
+  - **Every step of a leaf's `flow` and every message of its `sequence` cites the lines it happens on** in `at`, as `file:start-end`: the few lines (at most 40) where that one step is done, not the whole function. The reader clicks a step to see exactly those lines, so the code arrives attached to the sentence that explains it. They are usually inside the leaf's own `code`; a step that happens in code another part explains (the other side of a race, say) cites that code.
   - The reader sees code only on a leaf; above it, `code` refs back the claims but are not shown. So when a node would cite several separate things (five route handlers, a form and the endpoint it posts to, a writer and a reader), each is its own leaf, and the node is a level whose diagram opens them. Never stop at a node that summarises several parts and hands over all their code at once.
 - **Depth belongs to the branch.**
   - Most roots go 2–3 levels: root → parts → the piece of code each part is.
@@ -68,6 +69,24 @@ The level itself, `node` open:
    - No issue is better than a weak one. Mature code often has none on most levels; never add one to fill the section.
    - Don't quote secrets. Name the line instead.
 6. `children`: its parts, and `edges` among them only when `group.ordering` is `sequence`.
+
+## The plain-words layer: `explain`
+
+Everything above is terse on purpose, for a reader who knows the field. Every node also has an `explain` for one who does not: someone new to this project and to its domain, who has never heard of a quorum or a webhook. The page shows it under an Explain toggle, so it never gets in the way of a reader who already knows.
+
+- `body`: 2–4 short paragraphs, a blank line between them, at most 200 words (a leaf's is often 40–100).
+  - Start from the problem: what would go wrong without this, or what it is for. Then how it works, in everyday words.
+  - Define each word of the project or its field the first time it appears, in the sentence that uses it: "the *leader* — the one controller allowed to accept changes". Don't assume the parent's explainer was read.
+  - Be concrete: a small case with names and numbers ("three controllers; two vote for C1, so C1 leads epoch 7") teaches more than a definition.
+  - An analogy only when it is exact, and say where it stops holding. No code identifiers unless you say what they are.
+  - Don't restate `detail`; say what someone needs before `detail` makes sense.
+- `blocks`: 0–2 pictures, each chosen for what it teaches, case by case. Add one only when it shows what the prose cannot:
+  - how things relate, or where this sits in the larger system → `diagram`. It draws the idea, not the code: its boxes open nothing and its arrows need no `at`.
+  - back and forth between parties over time (who asks, who answers, what happens when one is late) → `sequence`
+  - what the data looks like → `example`
+  - comparing cases, states or options side by side → `table`
+  - a process in order → `flow`
+  A level with parts often wants one picture of the idea; most leaves need none, because their own block already shows the steps. A leaf's explain picture is never the same kind as one of its own blocks.
 
 ## Things you may not use
 

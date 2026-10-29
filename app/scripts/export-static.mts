@@ -22,6 +22,9 @@ const root = opt("--root") ?? rootOf(file.RUN);
 const cited = new Set<string>();
 const walk = (n: Node) => {
   for (const c of n.code ?? []) cited.add(c.file);
+  // A step's own lines open from the step, and may sit in a file the node does not cite.
+  for (const b of n.anatomy ?? [])
+    if (b.kind === "flow" || b.kind === "sequence") for (const r of b.rows) if (r.at) cited.add(r.at.replace(/:[\d-]+$/, ""));
   (n.children ?? []).forEach(walk);
 };
 file.AUTHORED.forEach(walk);

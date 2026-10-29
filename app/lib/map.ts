@@ -8,7 +8,7 @@
  * file, not a copy of the tree plumbing.
  */
 
-import type { Anatomy, CodeRef, Link, Node, Run } from "@/lib/data";
+import type { Anatomy, CodeRef, Link, Node, Run, Term, Walkthrough } from "@/lib/data";
 import { rowId } from "@/lib/data";
 import { share } from "@/lib/share";
 
@@ -17,7 +17,12 @@ import { share } from "@/lib/share";
  * boxes open the roots. Absent on a map still being made, whose top level is
  * then its roots listed (D60).
  */
-export type Overview = Pick<Node, "sub" | "detail" | "anatomy" | "issues" | "code" | "state" | "unsure">;
+export type Overview = Pick<Node, "sub" | "detail" | "anatomy" | "issues" | "code" | "state" | "unsure" | "explain"> & {
+  /** The words the whole map leans on, defined once (the Explain layer). */
+  glossary?: Term[];
+  /** One thing followed through every root, for a first-time reader. */
+  walkthrough?: Walkthrough;
+};
 
 export interface MapFile {
   RUN: Run;

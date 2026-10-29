@@ -16,6 +16,38 @@
  "col": 0,
  "row": 5,
  "detail": "There is no guest-list table: each event row holds its guest list as one JSON text, rsvp. The organiser opens it from the event's details and taps a person to mark them arrived, which rewrites the whole text.",
+ "explain": {
+  "body": "Explorify is a campus events app: student organisations post events, and students join them from their phones. On the night, the organisation wants to know who actually came, so an organiser opens the event and ticks people off as they arrive.\n\nMost apps keep a guest list as a table of its own, one row per guest. Explorify does not: each event's row in the database has one text column, `rsvp`, holding the whole guest list as a single piece of JSON (a text format for nested data). Joining, cancelling and checking in all read that text, change it, and write all of it back.\n\nThat design is why this part has a problem worth knowing before you touch it: when two people change the list at nearly the same moment, the later write wins and the earlier change is lost.",
+  "blocks": [
+   {
+    "kind": "table",
+    "caption": "A guest list, two ways",
+    "columns": [
+     "",
+     "The usual design",
+     "Explorify"
+    ],
+    "state": "derived",
+    "rows": [
+     [
+      "Where the list lives",
+      "A table, one row per guest",
+      "One JSON text on the event"
+     ],
+     [
+      "Adding a guest",
+      "Insert one row",
+      "Rewrite the whole text"
+     ],
+     [
+      "Two changes at once",
+      "Both kept",
+      "The later write erases the earlier"
+     ]
+    ]
+   }
+  ]
+ },
  "code": [
   {
    "file": "app/org/index/eventdetails.tsx",
@@ -265,6 +297,9 @@
    "col": 0,
    "row": 0,
    "detail": "Each student who joins gets one entry in the event's rsvp text, keyed by their user id. The join drawer writes the entry; the organiser's tap only adds checkedIn.",
+   "explain": {
+    "body": "Every student who joins gets one entry in the event's guest-list text. The entry is filed under the student's user id, the random code the app gave their account, so joining a second time replaces the old entry rather than adding another.\n\nAn entry holds what the student typed when joining: their name, how to reach them, how many people they are bringing, and any food needs. The organiser's check-in tap only ever adds one more field to it, `checkedIn`, true or false."
+   },
    "code": [
     {
      "file": "app/individual/index/components/rsvpDrawer.tsx",
@@ -416,6 +451,9 @@
      "sub": "The join drawer adds one student's entry",
      "state": "derived",
      "detail": "The drawer reads the event's `rsvp` text, sets the entry under the student's id, and writes the whole text back. `Other` opens a text box whose words are stored one per comma.",
+     "explain": {
+      "body": "When a student taps Join, a drawer slides up asking for their name, how to reach them, party size and food needs. Saving it does three things in order: fetch the event's current guest-list text, add or replace this student's entry in it, and save the whole text back.\n\nBecause the whole text is saved, anything that changed between the fetch and the save is overwritten."
+     },
      "code": [
       {
        "file": "app/individual/index/components/rsvpDrawer.tsx",
@@ -449,20 +487,23 @@
          "from": "Student's phone",
          "to": "Database",
          "label": "read this event's rsvp text",
-         "state": "derived"
+         "state": "derived",
+         "at": "app/individual/index/components/rsvpDrawer.tsx:145-149"
         },
         {
          "from": "Database",
          "to": "Student's phone",
          "label": "the text",
          "note": "parsed; the entry under the student's id is set",
-         "state": "derived"
+         "state": "derived",
+         "at": "app/individual/index/components/rsvpDrawer.tsx:155-164"
         },
         {
          "from": "Student's phone",
          "to": "Database",
          "label": "write the whole text back",
-         "state": "derived"
+         "state": "derived",
+         "at": "app/individual/index/components/rsvpDrawer.tsx:166-170"
         }
        ]
       },
@@ -507,6 +548,9 @@
      "sub": "Every published event on the student's campus",
      "state": "derived",
      "detail": "The feed loads every published event on the student's campus with `select(\"*\")`, so each event's `rsvp` text comes with it.",
+     "explain": {
+      "body": "A student's home screen, the feed, shows every published event on their campus. To build it, the app asks the database for every column of those events, and one of those columns is the guest-list text.\n\nSo each student's phone quietly downloads the names, emails and food needs of everyone who joined every event on campus, though the feed never shows them."
+     },
      "code": [
       {
        "file": "lib/localStorage.ts",
@@ -537,14 +581,16 @@
          "from": "Student's phone",
          "to": "Database",
          "label": "every column of this campus's published events",
-         "state": "derived"
+         "state": "derived",
+         "at": "lib/localStorage.ts:49-54"
         },
         {
          "from": "Database",
          "to": "Student's phone",
          "label": "the rows, each with its rsvp text",
          "note": "names and emails of everyone who joined",
-         "state": "derived"
+         "state": "derived",
+         "at": "lib/localStorage.ts:49-54"
         }
        ]
       }
@@ -566,6 +612,9 @@
    "col": 0,
    "row": 1,
    "detail": "The organiser's view of one event, opened from the Ongoing or Archive list or from search. It ends in an Attendees section that re-reads the guest list and fetches each student's picture.",
+   "explain": {
+    "body": "When an organiser opens one of their events, they land on its details page: the cover picture, when and where it is, what to wear and what food there is, and at the bottom a small Attendees section with a headcount and a row of faces. Tapping View all opens the full list, where checking in happens."
+   },
    "code": [
     {
      "file": "app/org/index/eventdetails.tsx",
@@ -683,6 +732,9 @@
    "col": 0,
    "row": 2,
    "detail": "A tally of dietary needs, then one row per booking from the event's rsvp text. Tapping a row checks that person in, or out again.",
+   "explain": {
+    "body": "The full attendee list is the screen an organiser holds at the door. At the top, a tally of food needs helps whoever orders the food; below it, one row per booking. A booking is one student's entry, and it can bring more than one person.\n\nTapping a row marks that booking arrived with a green tick; tapping again takes the tick away."
+   },
    "code": [
     {
      "file": "app/org/index/attendees.tsx",
@@ -803,6 +855,9 @@
    "col": 0,
    "row": 3,
    "detail": "A tap flips one person's checkedIn flag and writes the whole guest list back, without reading it first. The copy it writes can be as old as the Ongoing list, so newer RSVPs are erased.",
+   "explain": {
+    "body": "Checking someone in should change one thing: that person's tick. But the guest list is one text, so the app sets the tick in its own copy of the text and saves the whole copy back.\n\nThat copy is whatever the screen was handed when the organiser opened it, possibly minutes ago. If a student joined since then, the saved copy does not include them and they vanish from the list. The sequence on this page shows it happening with two students, Maya and Leo."
+   },
    "code": [
     {
      "file": "app/org/index/attendees.tsx",
@@ -831,25 +886,29 @@
        "n": 1,
        "title": "Start from a copy",
        "detail": "The event row the Ongoing list loaded, handed on unchanged by the details page.",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/attendees.tsx:42-45"
       },
       {
        "n": 2,
        "title": "Flip the flag",
        "detail": "checkedIn = !checkedIn on that person's entry.",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/attendees.tsx:99-100"
       },
       {
        "n": 3,
        "title": "Write it all back",
        "detail": "The whole edited object replaces the rsvp column, with no read first.",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/attendees.tsx:102-106"
       },
       {
        "n": 4,
        "title": "Keep the reply",
        "detail": "The updated row becomes the copy for the next tap, so each tap writes the list as it was at the previous one.",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/attendees.tsx:110-112"
       }
      ]
     },
@@ -866,32 +925,37 @@
        "from": "Organiser",
        "to": "Database",
        "label": "opens Ongoing — guest list is { Maya }",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/components/ongoing.tsx:46"
       },
       {
        "from": "Student",
        "to": "Database",
        "label": "Leo joins: reads { Maya }",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/individual/index/components/rsvpDrawer.tsx:145-149"
       },
       {
        "from": "Student",
        "to": "Database",
        "label": "writes { Maya, Leo }",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/individual/index/components/rsvpDrawer.tsx:166-170"
       },
       {
        "from": "Organiser",
        "to": "Database",
        "label": "taps Maya: writes { Maya ✓ } from its copy",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/attendees.tsx:102-106"
       },
       {
        "from": "Database",
        "to": "Organiser",
        "label": "{ Maya ✓ } — Leo is gone",
        "note": "Leo's app still shows the event as joined",
-       "state": "derived"
+       "state": "derived",
+       "at": "app/org/index/attendees.tsx:110-112"
       }
      ]
     }

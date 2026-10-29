@@ -5,9 +5,10 @@ import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
-import { CodeDrawer, DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
+import { DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
+import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, type CodeFocus } from "@/components/explain";
 import { InlineMarks, ShapeView } from "@/components/shapes";
-import { Eyebrow, OriginMark, Prose, StateChip } from "@/components/state";
+import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Zoom, useZoomScale } from "@/components/zoom";
 import { Crumbs, goTo, useLocation } from "@/components/chrome";
@@ -544,11 +545,20 @@ function Level({
     owns,
   );
   // The code is the last layer: a level with parts below it points down at
-  // them, and only a level with nothing below it shows its lines.
+  // them, and only a level with nothing below it shows its lines — opened
+  // over the page from the step that explains them, or all at once from the
+  // header, never listed under the level (D68).
   const code = node.children?.length ? [] : codeAt(map, path);
-  // A leaf with nothing else on it opens on its code, so the bottom of a
-  // branch is never a title over an empty page.
-  const [codeOpen, setCodeOpen] = useState(blocks.length === 0 && !figure);
+  const [codeFocus, setCodeFocus] = useState<CodeFocus | null>(null);
+  const showStep = (at: string, heading: string, detail?: string) => {
+    const ref = parseAt(at);
+    if (ref) setCodeFocus({ heading, detail, refs: [ref] });
+  };
+  const levelCtx: RowCtx = { ...ctx, onStepCode: showStep };
+  const [explainOn] = useExplain();
+  // Only a map made with the plain-words layer offers the toggle.
+  const explains = Boolean(map.OVERVIEW?.explain || map.L0.some((r) => r.explain));
+  const trail = [RUN.repo, ...path.map((_, i) => nodeAt(path.slice(0, i + 1))?.title ?? "")];
   const answer = useLatestAnswer();
   // Empty outside diff mode, so the block render below is unchanged then.
   const blockDiffs = useBlockDiffs(path);
@@ -559,7 +569,7 @@ function Level({
   const grouped = shapes.length > 1 && !shapes.some((i) => blockDiffs.has(i));
 
   return (
-    <>
+    <Glossary.Provider value={explainOn ? (map.OVERVIEW?.glossary ?? []) : []}>
       <Header
         path={path}
         back={
@@ -591,17 +601,13 @@ function Level({
         }
         link={top && RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
         shape={figure ? undefined : node.shape}
-        onCode={
-          code.length
-            ? () => {
-                setCodeOpen(true);
-                requestAnimationFrame(() =>
-                  document.getElementById("code")?.scrollIntoView({ behavior: "smooth" }),
-                );
-              }
-            : undefined
+        onCode={code.length ? () => setCodeFocus({ heading: `The code behind ${node.title}`, refs: code }) : undefined}
+        actions={
+          <>
+            {explains ? <ExplainToggle /> : null}
+            <FixAndKeep path={path} answer={answer} />
+          </>
         }
-        actions={<FixAndKeep path={path} answer={answer} />}
       />
 
       {/* One hairline between every block, the full width of the level, so it
@@ -609,6 +615,10 @@ function Level({
           a table is its own thing, not more of the table. Each block's width
           cap is on an inner box, so the line never stops at a ragged edge. */}
       <div className="flex flex-col [&>*+*]:mt-10 [&>*+*]:border-t [&>*+*]:border-border-gray [&>*+*]:pt-10">
+        {/* For a reader new to all of this: the level in plain words, before
+            any of the terse parts. */}
+        {explainOn && node.explain ? <Explainer owner={node.id} explain={node.explain} ctx={levelCtx} /> : null}
+
         {/* The picture is the main thing on the level, not a thumbnail in
             the header's corner. */}
         {figure ? (
@@ -622,7 +632,7 @@ function Level({
         {blocks.map((b, i) =>
           grouped && shapes.includes(i) ? (
             i === shapes[0] ? (
-              <DataShapes key={i} owner={node.id} blocks={shapes.map((j) => blocks[j] as DataBlock)} ctx={ctx} />
+              <DataShapes key={i} owner={node.id} blocks={shapes.map((j) => blocks[j] as DataBlock)} ctx={levelCtx} />
             ) : null
           ) : blockDiffs.has(i) ? (
             <div key={i} data-pick={blockLabel(b)}>
@@ -641,6 +651,7 @@ function Level({
                   hrefFor={(id) =>
                     `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
                   }
+                  onCode={showStep}
                 />
               </div>
             </div>
@@ -649,7 +660,7 @@ function Level({
             // lifts them to reading size without forking their type scale.
             <div key={i} data-pick={blockLabel(b)}>
               <div className="max-w-[900px] [zoom:1.18]">
-                <AnatomyView owner={node.id} blocks={[b]} ctx={ctx} />
+                <AnatomyView owner={node.id} blocks={[b]} ctx={levelCtx} />
               </div>
             </div>
           ),
@@ -689,6 +700,12 @@ function Level({
             Renders nothing when there are none, diff mode or not. */}
         <RemovedSections path={path} />
 
+        {/* The repository's way in comes after its picture: the walkthrough
+            opens parts the reader has just seen drawn. */}
+        {explainOn && top && (map.OVERVIEW?.walkthrough || map.OVERVIEW?.glossary?.length) ? (
+          <StartHere walkthrough={map.OVERVIEW.walkthrough} glossary={map.OVERVIEW.glossary} onOpen={onOpen} />
+        ) : null}
+
         {node.issues?.length ? (
           <div>
             <div className="max-w-[820px]">
@@ -705,21 +722,12 @@ function Level({
           </div>
         ) : null}
 
-        {code.length ? (
-          <div>
-            <div className="max-w-[1320px]">
-              <CodeDrawer
-                owner={node.id}
-                refs={code}
-                ctx={ctx}
-                open={codeOpen}
-                onToggle={() => setCodeOpen((v) => !v)}
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
-    </>
+
+      {codeFocus ? (
+        <CodePopup focus={codeFocus} trail={trail} owner={node.id} ctx={ctx} onClose={() => setCodeFocus(null)} />
+      ) : null}
+    </Glossary.Provider>
   );
 }
 

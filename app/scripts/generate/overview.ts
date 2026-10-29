@@ -28,7 +28,7 @@ export interface Overviewed {
 
 /** An overview's own fields, out of the node it was checked as. */
 export const toOverview = (n: any): Overview =>
-  Object.fromEntries(["sub", "detail", "anatomy", "issues", "code", "state", "unsure"].filter((k) => n[k] !== undefined).map((k) => [k, n[k]])) as Overview;
+  Object.fromEntries(["sub", "detail", "anatomy", "issues", "code", "state", "unsure", "explain", "glossary", "walkthrough"].filter((k) => n[k] !== undefined).map((k) => [k, n[k]])) as Overview;
 
 /** Arrows anywhere under a root whose cited line is in a file another root owns. */
 function crossings(roots: Node[], cut: Cut): string[] {
@@ -50,6 +50,14 @@ function crossings(roots: Node[], cut: Cut): string[] {
   return out;
 }
 
+/** Every part's id and title, indented as the tree nests: what a walkthrough step's `path` is made of. */
+function tree(roots: Node[]): string {
+  const out: string[] = [];
+  const walk = (n: Node, d: number) => { out.push(`${"  ".repeat(d)}- ${n.id}: ${n.title} — ${n.sub}`); (n.children ?? []).forEach((c) => walk(c, d + 1)); };
+  roots.forEach((r) => walk(r, 0));
+  return out.join("\n");
+}
+
 function brief(roots: Node[], cut: Cut, inv: Inventory): string {
   const cross = crossings(roots, cut);
   return [
@@ -58,6 +66,7 @@ function brief(roots: Node[], cut: Cut, inv: Inventory): string {
     `## Its roots, as their authors wrote them — ${cut.about}\n${roots
       .map((r) => `- ${r.id}: ${r.title} — ${r.sub}\n  ${r.detail ?? ""}\n  cites: ${(r.code ?? []).map((c) => `${c.file}:${c.start}-${c.end}`).join(", ")}`)
       .join("\n")}`,
+    `## Every part, by id\n${tree(roots)}`,
     cross.length
       ? `## Arrows inside the roots that cite a file another root owns — evidence for an arrow between roots\n${cross.slice(0, 60).join("\n")}`
       : "",
@@ -68,7 +77,12 @@ Write the top level of the map: the repository itself, the level a reader lands 
 - \`anatomy\`: exactly one \`diagram\`, its \`caption\` a heading of at most 5 words ("How the roots connect"), not a sentence. One box per root, labelled with the root's title, with \`opens\` set to the root's id; lay them out left to right in the order someone meets them, a branch on a row of its own. Add a box that opens nothing only for a thing outside every root that the roots meet (the database, an outside API).
 - Arrows only where the code goes from one root to another — a call, a redirect, a write another reads — each with \`at\` as file:line. The evidence above is a start; read the lines before you use them. Roots with nothing between them get no arrow.
 - \`code\`: the lines that show how the whole fits together (the entry point, the router), \`state\`, and \`issues\` only if one spans roots.
-Budget: about 8 tool calls before you submit.`,
+
+Then the way in for a reader who has never seen this project or its field — shown under an Explain toggle, so it can say more than the rest of the map:
+- \`explain\`: \`body\` is 2-4 short paragraphs (blank line between, at most 200 words): what this system is for and who uses it, the problem it solves, and the idea behind how it works, defining each word of its field the first time. \`blocks\` holds 0-2 pictures only where they teach more than the prose — usually one \`diagram\` of the system in its world (the users, the machines, the outside services, and what flows between them), its boxes opening nothing and its arrows needing no \`at\`.
+- \`glossary\`: 4-12 terms the map's titles and details lean on, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words. Terms of the field ("quorum", "webhook") and of this project ("metadata image") alike; skip words everyone knows.
+- \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system from start to end ("A new broker joins the cluster", "A visitor pays for a plan"), 3-8 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one or two plain sentences, and \`path\` the ids from a root down to the part where it happens (from the list above), as deep as the step is specific.
+Budget: about 10 tool calls before you submit.`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -105,6 +119,6 @@ export async function overviewOf(roots: Node[], cut: Cut, inv: Inventory, model:
     return { content: `Not accepted. Fix every one of these, then submit the whole overview again with \`root\`:\n- ${problems.slice(0, 40).join("\n- ")}`, isError: true };
   };
 
-  const r = await converse<Overviewed>({ prompt: brief(roots, cut, inv), handle, model, stage: "overview", maxTurns: 15, nudge: "Continue: finish by calling submit with the overview as `root`." });
+  const r = await converse<Overviewed>({ prompt: brief(roots, cut, inv), handle, model, stage: "overview", maxTurns: 22, nudge: "Continue: finish by calling submit with the overview as `root`." });
   return { ...(r.value ?? res), turns: r.turns };
 }

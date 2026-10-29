@@ -36,6 +36,9 @@ export function evaluate(name: string, map: MapFile) {
   const spans = leaves.map(span).sort((a, b) => a - b);
   const parentBoxes = parents.flatMap((n) => (n.anatomy ?? []).flatMap((b: any) => (b.kind === "diagram" ? b.boxes : [])));
   const median = (xs: number[]) => (xs.length ? xs[Math.floor(xs.length / 2)] : 0);
+  // How much of a leaf's explanation leads to its code, and how much of the map a newcomer can read.
+  const steps = leaves.flatMap((n) => (n.anatomy ?? []).flatMap((b: any) => (b.kind === "flow" || b.kind === "sequence" ? b.rows : [])));
+  const explained = nodes.filter((n) => n.explain?.body);
   return {
     map: name,
     roots: map.AUTHORED.length,
@@ -55,6 +58,13 @@ export function evaluate(name: string, map: MapFile) {
     "leaf lines max": spans[spans.length - 1] ?? 0,
     "leaf blocks": +(leaves.reduce((a, n) => a + (n.anatomy?.length ?? 0), 0) / Math.max(1, leaves.length)).toFixed(1),
     "leaf diagrams %": Math.round((100 * leaves.filter((n) => n.anatomy?.some((b) => b.kind === "diagram")).length) / Math.max(1, leaves.length)),
+    "steps cited %": Math.round((100 * steps.filter((r: any) => r.at).length) / Math.max(1, steps.length)),
+    "explain %": Math.round((100 * explained.length) / nodes.length),
+    "explain words": median(explained.map((n) => n.explain!.body.split(/\s+/).filter(Boolean).length).sort((a, b) => a - b)),
+    "explain pics %": Math.round((100 * explained.filter((n) => n.explain!.blocks?.length).length) / Math.max(1, explained.length)),
+    "explain kinds": [...new Set(explained.flatMap((n) => (n.explain!.blocks ?? []).map((b) => b.kind)))].join(","),
+    glossary: map.OVERVIEW?.glossary?.length ?? 0,
+    walk: map.OVERVIEW?.walkthrough?.steps.length ?? 0,
     "detail words": median(nodes.map((n) => (n.detail ?? "").split(/\s+/).filter(Boolean).length).sort((a, b) => a - b)),
     issues: nodes.reduce((a, n) => a + (n.issues?.length ?? 0), 0),
     "not certain %": Math.round((100 * nodes.filter((n) => n.state !== "derived").length) / nodes.length),

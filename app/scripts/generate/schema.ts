@@ -61,20 +61,11 @@ export function shapeProblems(node: any, prefix: string, isRoot = true): string[
   });
   for (const [i, iss] of (node.issues ?? []).entries())
     if (!isStr(iss?.title) || !isStr(iss?.detail)) out.push(at(`issues[${i}]`) + " needs title and detail");
-  for (const [i, b] of (node.anatomy ?? []).entries()) {
-    const need = KINDS[b?.kind];
-    if (!need) { out.push(at(`anatomy[${i}]`) + ` kind "${b?.kind}" is not one of ${Object.keys(KINDS).join(", ")}`); continue; }
-    for (const k of need) if (b[k] === undefined) out.push(at(`anatomy[${i}]`) + ` (${b.kind}) missing ${k}`);
-    if (b.kind === "diagram") {
-      for (const x of b.boxes ?? []) if (!isStr(x?.id) || !isStr(x?.label) || !isInt(x?.col) || !isInt(x?.row)) out.push(at(`anatomy[${i}]`) + " diagram box needs id, label, col, row");
-      for (const a of b.arrows ?? []) if (!isStr(a?.from) || !isStr(a?.to)) out.push(at(`anatomy[${i}]`) + " diagram arrow needs from, to");
-    }
-    if (b.kind === "table" && (!Array.isArray(b.columns) || !Array.isArray(b.rows) || b.rows.some((r: any) => !Array.isArray(r)))) out.push(at(`anatomy[${i}]`) + " table needs columns: string[] and rows: string[][]");
-    if (b.kind === "screen" && (b.items ?? []).some((x: any) => !["heading", "text", "field", "choice", "button", "list", "image"].includes(x?.type)))
-      out.push(at(`anatomy[${i}]`) + " screen item type must be heading/text/field/choice/button/list/image");
-    if (b.kind === "screen" && !["phone", "web"].includes(b.device)) out.push(at(`anatomy[${i}]`) + ' screen needs device: "phone" or "web" — see the brief');
-    if (b.kind === "screen" && b.route !== undefined && !(isStr(b.route) && b.route.startsWith("/")))
-      out.push(at(`anatomy[${i}]`) + ' screen route is a URL path starting with "/", not a file path');
+  out.push(...blockShapeProblems(node.anatomy ?? [], "anatomy", at));
+  if (node.explain !== undefined) {
+    if (typeof node.explain !== "object" || typeof node.explain.body !== "string") out.push(at("explain") + " must be {body: string, blocks?: Anatomy[]}");
+    else if (node.explain.blocks !== undefined && !Array.isArray(node.explain.blocks)) out.push(at("explain.blocks") + " must be an array of blocks");
+    else out.push(...blockShapeProblems(node.explain.blocks ?? [], "explain.blocks", at));
   }
   if (node.children !== undefined && !Array.isArray(node.children)) out.push(at("children") + " must be an array");
   (node.children ?? []).forEach((c: any, i: number) => {
@@ -82,6 +73,27 @@ export function shapeProblems(node: any, prefix: string, isRoot = true): string[
     out.push(...shapeProblems(c, prefix, false));
   });
   if (isRoot) { node.col = 0; node.row = 0; }
+  return out;
+}
+
+/** A list of blocks' shape, field by field, wherever on a node it sits. */
+function blockShapeProblems(blocks: any[], field: string, at: (k: string) => string): string[] {
+  const out: string[] = [];
+  for (const [i, b] of blocks.entries()) {
+    const need = KINDS[b?.kind];
+    if (!need) { out.push(at(`${field}[${i}]`) + ` kind "${b?.kind}" is not one of ${Object.keys(KINDS).join(", ")}`); continue; }
+    for (const k of need) if (b[k] === undefined) out.push(at(`${field}[${i}]`) + ` (${b.kind}) missing ${k}`);
+    if (b.kind === "diagram") {
+      for (const x of b.boxes ?? []) if (!isStr(x?.id) || !isStr(x?.label) || !isInt(x?.col) || !isInt(x?.row)) out.push(at(`${field}[${i}]`) + " diagram box needs id, label, col, row");
+      for (const a of b.arrows ?? []) if (!isStr(a?.from) || !isStr(a?.to)) out.push(at(`${field}[${i}]`) + " diagram arrow needs from, to");
+    }
+    if (b.kind === "table" && (!Array.isArray(b.columns) || !Array.isArray(b.rows) || b.rows.some((r: any) => !Array.isArray(r)))) out.push(at(`${field}[${i}]`) + " table needs columns: string[] and rows: string[][]");
+    if (b.kind === "screen" && (b.items ?? []).some((x: any) => !["heading", "text", "field", "choice", "button", "list", "image"].includes(x?.type)))
+      out.push(at(`${field}[${i}]`) + " screen item type must be heading/text/field/choice/button/list/image");
+    if (b.kind === "screen" && !["phone", "web"].includes(b.device)) out.push(at(`${field}[${i}]`) + ' screen needs device: "phone" or "web" — see the brief');
+    if (b.kind === "screen" && b.route !== undefined && !(isStr(b.route) && b.route.startsWith("/")))
+      out.push(at(`${field}[${i}]`) + ' screen route is a URL path starting with "/", not a file path');
+  }
   return out;
 }
 

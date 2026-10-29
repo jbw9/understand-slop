@@ -1,5 +1,6 @@
+import { createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
-import type { Origin, State } from "@/lib/data";
+import type { Origin, State, Term } from "@/lib/data";
 
 /**
  * The three states, rendered as a material property rather than a badge.
@@ -73,7 +74,17 @@ export function Ident({ children }: { children: React.ReactNode }) {
  * Prose with `backticked` code identifiers set as `Ident`. Fixture prose names
  * columns and functions in backticks; printed raw they read as stray marks.
  */
+/**
+ * The map's glossary while the Explain layer is on, empty while it is off:
+ * prose marks the words a newcomer would trip on, and a reader who switched
+ * the layer off sees plain text.
+ */
+export const Glossary = createContext<Term[]>([]);
+
 export function Prose({ text }: { text: string }) {
+  const terms = useContext(Glossary);
+  // Each term is marked once per passage: the first use is where it is met.
+  const seen = new Set<string>();
   return (
     <>
       {text.split(/`([^`]+)`/).map((part, i) =>
@@ -81,10 +92,47 @@ export function Prose({ text }: { text: string }) {
           <Ident key={i}>{part}</Ident>
         ) : (
           // *word* is emphasis, as authors write it in plain text.
-          part.split(/\*([^*\n]+)\*/).map((bit, j) => (j % 2 ? <em key={`${i}.${j}`}>{bit}</em> : bit))
+          part.split(/\*([^*\n]+)\*/).map((bit, j) =>
+            j % 2 ? <em key={`${i}.${j}`}>{marked(bit, terms, seen)}</em> : marked(bit, terms, seen),
+          )
         ),
       )}
     </>
+  );
+}
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `text` with each glossary term's first use wrapped in its definition; plurals count as uses. */
+function marked(text: string, terms: Term[], seen: Set<string>): React.ReactNode {
+  if (!terms.length) return text;
+  const byWord = new Map(terms.map((t) => [t.term.toLowerCase(), t]));
+  const words = [...byWord.keys()].sort((a, b) => b.length - a.length).map(escape);
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(new RegExp(`\\b(${words.join("|")})(?:e?s)?\\b`, "gi"))) {
+    const term = byWord.get(m[1].toLowerCase())!;
+    if (seen.has(term.term)) continue;
+    seen.add(term.term);
+    out.push(text.slice(last, m.index), <TermMark key={m.index} term={term}>{m[0]}</TermMark>);
+    last = m.index + m[0].length;
+  }
+  if (!out.length) return text;
+  out.push(text.slice(last));
+  return out;
+}
+
+function TermMark({ term, children }: { term: Term; children: string }) {
+  return (
+    <span tabIndex={0} className="group/term relative cursor-help underline decoration-faint decoration-dotted underline-offset-[3px] outline-none">
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible absolute bottom-full left-0 z-50 mb-1.5 w-[280px] rounded-[3px] border border-border-gray bg-pure-white px-3 py-2 text-[12.5px] font-normal not-italic leading-snug text-on-surface shadow-lift group-hover/term:visible group-focus/term:visible"
+      >
+        <span className="font-semibold text-ink">{term.term}</span> — {term.meaning}
+      </span>
+    </span>
   );
 }
 

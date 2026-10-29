@@ -39,6 +39,12 @@ export interface RowCtx {
   open: string | null;
   /** Drill into the level this row owns. Same gesture as opening a card. */
   onOpenRow: (id: string) => void;
+  /**
+   * Show the lines a step cites (`Step.at`), over the page. Set only on the
+   * open level, where there is room for the code; a step with `at` then opens
+   * its code instead of tracing.
+   */
+  onStepCode?: (at: string, heading: string, detail?: string) => void;
 }
 
 export function AnatomyView({
@@ -568,8 +574,13 @@ function Block({
               <button
                 ref={ctx.anchor(id)}
                 data-row={id}
+                data-code-step={s.at && ctx.onStepCode ? "" : undefined}
                 // See the map row above: the click must not reach the card.
                 onClick={(e) => {
+                  if (s.at && ctx.onStepCode) {
+                    e.stopPropagation();
+                    return ctx.onStepCode(s.at, `Step ${s.n} · ${s.title}`, s.detail);
+                  }
                   if (!s.under) return ctx.onTrace(id);
                   e.stopPropagation();
                   ctx.onOpenRow(id);
@@ -593,6 +604,11 @@ function Block({
                     {s.title}
                   </span>
                   <StateChip state={s.state} />
+                  {s.at && ctx.onStepCode ? (
+                    <span className="ml-auto shrink-0 font-mono text-[9px] text-faint" title="Show the code for this step">
+                      {"</>"}
+                    </span>
+                  ) : null}
                   {s.under ? (
                     <span className="ml-auto">
                       <Caret open={ctx.open === id} />

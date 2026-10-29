@@ -10,7 +10,7 @@ import { ExplainedBlock, isExplained } from "@/components/blocks";
 import { useMap } from "@/components/map-context";
 import { readSource } from "@/lib/source";
 import type { Slice } from "@/lib/repo";
-import type { Anatomy, Explainer as ExplainerData, Term, Walkthrough } from "@/lib/data";
+import type { Anatomy, Explainer as ExplainerData, Walkthrough } from "@/lib/data";
 
 /* ── the toggle ──────────────────────────────────────────────── */
 
@@ -113,16 +113,14 @@ export function Explainer({ owner, explain, ctx }: { owner: string; explain: Exp
 
 /**
  * The repository level's way in: one concrete thing followed through the
- * roots, each step opening the part where it happens, and the words the map
- * leans on.
+ * roots, each step opening the part where it happens. The map's words are
+ * defined where they are used, on hover, so they get no list of their own.
  */
 export function StartHere({
   walkthrough,
-  glossary,
   onOpen,
 }: {
   walkthrough?: Walkthrough;
-  glossary?: Term[];
   onOpen: (path: string[]) => void;
 }) {
   const { nodeAt } = useMap();
@@ -165,19 +163,6 @@ export function StartHere({
               );
             })}
           </ol>
-        </div>
-      ) : null}
-      {glossary?.length ? (
-        <div className={walkthrough ? "mt-8" : ""}>
-          <Eyebrow className="text-deep-green">Words this map uses</Eyebrow>
-          <dl className="mt-3 grid max-w-[1100px] grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-8 gap-y-3">
-            {glossary.map((t) => (
-              <div key={t.term}>
-                <dt className="text-[13.5px] font-semibold text-ink">{t.term}</dt>
-                <dd className="mt-0.5 text-[13px] leading-relaxed text-on-surface-variant">{t.meaning}</dd>
-              </div>
-            ))}
-          </dl>
         </div>
       ) : null}
     </section>

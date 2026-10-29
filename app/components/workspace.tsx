@@ -528,7 +528,8 @@ export function Workspace() {
   );
 
   useEffect(() => {
-    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(main));
+    // Opening an empty panel gives a plain terminal; an agent is one menu pick or Ctrl+Shift+T away.
+    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(null));
     // Asked for from the map: a tab running Claude, shown; or a new one.
     const toClaude = () => {
       const last = (current?.live ? current : undefined) ?? (upFront?.live ? upFront : undefined) ?? mine.findLast((t) => t.live);
@@ -818,11 +819,11 @@ export function Workspace() {
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            // The default agent first, then the rest in their usual order.
+            // A terminal first, then the default agent and the rest in their usual order.
+            { label: "Terminal", icon: <TerminalIcon />, onClick: () => add(null) },
             ...[...agents]
               .sort((a, b) => Number(b.id === main) - Number(a.id === main))
               .map((a) => ({ label: a.label, icon: <AgentIcon id={a.id} />, onClick: () => add(a.id) })),
-            { label: "Terminal", icon: <TerminalIcon />, onClick: () => add(null) },
             { label: "Preview", icon: <GlobeIcon />, onClick: () => preview(here) },
             ...phones.map((p) => ({ label: PLATFORM[p].label === "iOS" ? "iOS Simulator" : "Android emulator", icon: <PhoneIcon />, onClick: () => phone(p) })),
           ]}

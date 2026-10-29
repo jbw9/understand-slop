@@ -187,31 +187,34 @@ type Step = { text: string; find: (d: Document) => Element | undefined };
 const STEPS: Step[] = [
   { text: "Each card is one step the program takes. Click one to open it.", find: (d) => openable(d, 1) },
   { text: "These are that step's parts. Click one to see what it does.", find: (d) => openable(d, 2) },
-  { text: "A part cites the code it describes. Click to see where.", find: (d) => drawers(d)[0] },
-  { text: "Each row is a place in the code. Click one to read its lines.", find: (d) => refs(d)[0] },
+  { text: "Each step names the code that does it. Click one to see its lines.", find: (d) => codeSteps(d)[0] ?? viewCode(d) },
   {
-    text: "These are the exact lines. Press <kbd>Esc</kbd> to close them.",
-    find: (d) => refs(d).find(isOpen)?.parentElement ?? undefined,
+    text: "These are the exact lines, under the step they do. Press <kbd>Esc</kbd> to close them.",
+    find: (d) => d.querySelector('[role="dialog"]') ?? undefined,
   },
 ];
 
 const visible = (d: Document, sel: string) => [...d.querySelectorAll<HTMLElement>(sel)].filter((e) => e.offsetWidth);
+// A level whose parts are all boxes on its diagram has no list: the boxes (SVG links, no offsetWidth) are the way down.
 const openable = (d: Document, depth: number) =>
-  visible(d, "button[data-path]:not([disabled])").find((b) => JSON.parse(b.dataset.path!).length === depth);
-const isOpen = (b: Element) => b.getAttribute("aria-expanded") === "true";
-/** The buttons that fold the code drawer: one on the level's header, and one above the drawer once it's open. */
-const drawers = (d: Document) => visible(d, "button").filter((b) => /(View|Hide) the code/.test(b.textContent ?? ""));
-/** The code drawer's rows, one per place in the code, each naming its `file:line`. */
-const refs = (d: Document) =>
-  visible(d, "button[aria-expanded]").filter((b) => /:\d+(–\d+)?/.test(b.textContent ?? "") && !b.closest("header"));
+  [...d.querySelectorAll<Element>("button[data-path]:not([disabled]), a[data-opens]")]
+    .filter((e) => e.getBoundingClientRect().width)
+    .find((e) =>
+      e instanceof HTMLElement && e.dataset.path
+        ? JSON.parse(e.dataset.path).length === depth
+        : new URLSearchParams(e.getAttribute("href")!.slice(1)).getAll("at").length === depth,
+    );
+/** Steps and messages that open the lines they cite (D68). */
+const codeSteps = (d: Document) => visible(d, "[data-code-step]");
+/** A leaf whose blocks cite no lines still opens its code from the header. */
+const viewCode = (d: Document) => visible(d, "button").find((b) => /View the code/.test(b.textContent ?? ""));
 
 /**
  * Where the visitor is decides the step, not which click they were asked
  * for: going off script, or back up, shows the step for where they are.
  */
 function stepOf(d: Document) {
-  if (refs(d).some(isOpen)) return 4;
-  if (drawers(d).some(isOpen)) return 3;
+  if (d.querySelector('[role="dialog"]')) return 3;
   return Math.min(new URLSearchParams(d.defaultView!.location.search).getAll("at").length, 2);
 }
 
@@ -447,16 +450,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonEl
     }
   };
 
-  // In the demo, Esc closes the open lines, then the open code, before the canvas leaves the level.
-  // It listens on the document, under the window's own listeners, so an open dialog or menu closes first.
-  const onEsc = (e: KeyboardEvent) => {
-    if (e.key !== "Escape" || e.defaultPrevented || (e.target as Element).closest?.("input, textarea, [contenteditable]")) return;
-    const d = doc();
-    const open = d && (refs(d).find(isOpen) ?? drawers(d).find(isOpen));
-    if (!open) return;
-    e.stopPropagation();
-    open.click();
-  };
   const onInput = () => {
     if (scrolling && performance.now() < scrolling.until) {
       const b = scrolling.box;
@@ -467,7 +460,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonEl
   const inputs = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
   const unhook = () => {
     watch?.disconnect();
-    hooked?.removeEventListener("keydown", onEsc);
     for (const t of inputs) hooked?.removeEventListener(t, onInput, true);
   };
   const hook = () => {
@@ -475,7 +467,6 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonEl
     if (!d || hooked === d) return;
     unhook();
     contain(d);
-    d.addEventListener("keydown", onEsc);
     for (const t of inputs) d.addEventListener(t, onInput, { capture: true, passive: true });
     watch = new MutationObserver(() => (stale = true));
     watch.observe(d.body, {

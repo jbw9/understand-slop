@@ -3,7 +3,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow, OriginMark, Prose } from "@/components/state";
-import { SourceView, type RowCtx } from "@/components/anatomy";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
@@ -31,6 +30,7 @@ export function ExplainedBlock({
   block,
   onOpen,
   hrefFor,
+  onCode,
 }: {
   block: Explained;
   /** Opens the part a diagram box names (D40). Absent where a block is drawn
@@ -39,6 +39,8 @@ export function ExplainedBlock({
   /** That part's own URL, so a box is a real link: focusable, and openable
       in a new tab like any other. */
   hrefFor?: (id: string) => string;
+  /** Shows the lines a sequence message cites (`Message.at`). */
+  onCode?: (at: string, heading: string, detail?: string) => void;
 }) {
   switch (block.kind) {
     case "diagram":
@@ -46,7 +48,7 @@ export function ExplainedBlock({
     case "table":
       return <Table block={block} />;
     case "sequence":
-      return <Sequence block={block} />;
+      return <Sequence block={block} onCode={onCode} />;
     case "screen":
       return <Screen block={block} />;
     case "example":
@@ -390,7 +392,13 @@ function actorTone(i: number) {
   return { ink: `var(--color-actor-${k})`, surface: `var(--color-actor-${k}-surface)` };
 }
 
-function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) {
+function Sequence({
+  block,
+  onCode,
+}: {
+  block: Extract<Anatomy, { kind: "sequence" }>;
+  onCode?: (at: string, heading: string, detail?: string) => void;
+}) {
   const n = block.actors.length;
   const centre = (a: string) => ((block.actors.indexOf(a) + 0.5) / n) * 100;
   const toneOfActor = (a: string) => actorTone(block.actors.indexOf(a));
@@ -431,14 +439,24 @@ function Sequence({ block }: { block: Extract<Anatomy, { kind: "sequence" }> }) 
               const left = Math.min(a, b);
               const width = Math.abs(b - a);
               const warn = m.state !== "derived";
+              const code = m.at && onCode ? () => onCode(m.at!, `${i + 1} · ${m.from} → ${m.to}`, `${m.label}${m.note ? ` — ${m.note}` : ""}`) : undefined;
               return (
                 <li
                   key={i}
                   data-pick={m.label}
                   data-pick-text={`${m.from} → ${m.to}: ${m.label}${m.note ? ` (${m.note})` : ""}`}
-                  className="relative h-[76px]"
+                  onClick={code}
+                  onKeyDown={code ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), code()) : undefined}
+                  role={code ? "button" : undefined}
+                  data-code-step={code ? "" : undefined}
+                  tabIndex={code ? 0 : undefined}
+                  title={code ? "Show the code for this message" : undefined}
+                  className={cn("relative h-[76px]", code && "cursor-pointer rounded-[2px] transition-colors hover:bg-surface-container-low")}
                 >
-                  <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">{i + 1}</span>
+                  <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">
+                    {i + 1}
+                    {code ? <span className="ml-1.5">{"</>"}</span> : null}
+                  </span>
                   {self ? (
                     <div
                       className="absolute top-[8px] -translate-x-1/2 rounded-[2px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
@@ -796,99 +814,6 @@ export function WatchOut({ issues, action }: { issues: Issue[]; action?: React.R
 }
 
 /* ── the code, last ──────────────────────────────────────────── */
-
-/**
- * The code behind this level, folded. Each place opens on its own, read live
- * from disk and editable through the same view the old leaf level used — so
- * the code is never more than two clicks away and never in the way.
- */
-export function CodeDrawer({
-  owner,
-  refs,
-  ctx,
-  open,
-  onToggle,
-}: {
-  owner: string;
-  refs: CodeRef[];
-  ctx: RowCtx;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <section
-      id="code"
-      data-pick="The code behind this"
-      data-pick-text={refs.map((r) => `${r.file}:${r.start}-${r.end} — ${r.label}`).join("\n")}
-      className="scroll-mt-16"
-    >
-      <button
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex items-center gap-2 rounded-[2px] border border-border-gray bg-pure-white px-3.5 py-1.5 text-[13px] text-on-surface-variant transition-colors hover:border-border-strong hover:text-ink"
-      >
-        <span className="font-mono text-[12px]">{"</>"}</span>
-        {open ? "Hide the code" : `The code behind this · ${refs.length} ${refs.length === 1 ? "place" : "places"}`}
-      </button>
-      {open ? (
-        <ul className="mt-4 flex flex-col gap-2">
-          {refs.map((r) => (
-            <CodePlace key={`${r.file}:${r.start}`} owner={owner} code={r} ctx={ctx} />
-          ))}
-        </ul>
-      ) : null}
-    </section>
-  );
-}
-
-function CodePlace({ owner, code, ctx }: { owner: string; code: CodeRef; ctx: RowCtx }) {
-  const [slice, setSlice] = useState<RepoSlice | null | "failed">(null);
-  const [shown, setShown] = useState(false);
-  const { name: map } = useMap();
-
-  const toggle = async () => {
-    setShown((v) => !v);
-    if (slice) return;
-    try {
-      const r = await readSource({ map, file: code.file, start: code.start, end: code.end });
-      setSlice("slice" in r ? r.slice : "failed");
-    } catch {
-      setSlice("failed");
-    }
-  };
-
-  return (
-    <li
-      data-pick={code.label}
-      data-pick-code={`${code.file}:${code.start}-${code.end}`}
-      className="rounded-[3px] border border-border-gray bg-pure-white"
-    >
-      <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
-        <span className="text-[13.5px] text-ink">{code.label}</span>
-        <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">
-          {code.file}:{code.start}–{code.end}
-        </span>
-        <span aria-hidden className="text-[11px] text-faint">{shown ? "▾" : "▸"}</span>
-      </button>
-      {shown ? (
-        <div className="border-t border-border-gray p-3">
-          {slice === "failed" ? (
-            <p className="text-[12.5px] text-clay-ink">Could not read this file from the repository.</p>
-          ) : slice ? (
-            <SourceView
-              owner={`${owner}@${code.file}:${code.start}`}
-              block={{ kind: "source", file: code.file, start: slice.start, code: slice.code }}
-              ctx={ctx}
-            />
-          ) : (
-            <p className="text-[12.5px] text-faint">Reading…</p>
-          )}
-        </div>
-      ) : null}
-    </li>
-  );
-}
-
 
 /* ── docs ────────────────────────────────────────────────────── */
 

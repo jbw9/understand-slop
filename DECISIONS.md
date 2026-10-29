@@ -1634,3 +1634,34 @@ is a level with parts that will not say so.
 
 **Cost accepted:** more, smaller nodes (a root is now usually 3 levels deep);
 a claim on a full leaf stands on the review rather than on a cited line.
+
+## D68 — Code opens from the step that does it, and every level says itself in plain words
+
+**Chose:** every step of a leaf's `flow` and every message of its `sequence`
+cites the lines it happens on (`at`, at most 40), and clicking it opens those
+lines in a popup headed by the trail to this level and the step's own words.
+The code drawer at the foot of a leaf is gone; "View the code" in the header
+opens the leaf's refs the same way. Every node also carries `explain`: 25–200
+words for someone new to the project and its field, defining each term where
+it is used, with 0–2 pictures chosen for what they teach (an explain diagram
+draws the idea and opens nothing). The repository level adds a glossary
+(4–12 terms, each underlined at its first use on a level) and a walkthrough
+(3–8 steps following one thing through the roots, each opening a real part),
+shown below its diagram. An Explain toggle in the header hides all of it; it
+is on by default and remembered per browser.
+**Why:** a reader asked why the code was "laid down there" with nothing
+saying what it belonged to, and found the map hard to follow with no
+background in the project. The drawer listed ranges under a level with no
+link to the sentence each one proved.
+**Measured:** ky, saas-starter, flask and the kafka control plane, from the
+D67 cuts: 0 check problems, 100% of steps cited, 100% of levels explained
+(median 72–89 words), glossaries of 10–12 terms and walkthroughs of 6–7
+steps; cost and node counts within D67's range ($5.90–21.59). 2 leaves out of
+~150 repeated their own block as their explain picture; `check` now rejects
+that.
+**Beat:** linking code from diagram boxes, which on a leaf there are none of;
+and a separate "beginner mode" map, which would double the generation and
+drift from the real one.
+
+**Cost accepted:** the top of every level is longer when Explain is on, so a
+level's picture sits lower; the tour scrolls to it.

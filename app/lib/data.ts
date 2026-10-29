@@ -43,6 +43,13 @@ export interface Step {
   title: string;
   detail: string;
   state: State;
+  /**
+   * `file:start-end` (or `file:line`): the lines where this step happens. The
+   * reader clicks the step to see them, so the code arrives attached to the
+   * sentence that explains it rather than in a list at the bottom. On a leaf
+   * every step has one, usually inside the leaf's own `code`.
+   */
+  at?: string;
   /** What happens inside this step. Same contract as `Mapping.under`. */
   under?: Anatomy[];
 }
@@ -137,6 +144,66 @@ export interface Message {
   label: string;
   note?: string;
   state: State;
+  /** `file:start-end` where this message is sent or answered. Same contract as `Step.at`. */
+  at?: string;
+}
+
+/**
+ * The same level said again for a reader who has never seen this project or
+ * its field — shown under a toggle, so a reader who already knows skips it.
+ *
+ * The rest of a level is terse on purpose (D38): a `detail` of 40 words and
+ * pictures of the code. That serves someone who knows what a quorum or a
+ * webhook is and fails someone who does not, because every sentence leans on
+ * words it never defines. This is where those words get defined.
+ */
+export interface Explainer {
+  /**
+   * Plain prose, 2-4 short paragraphs (blank line between), about 60-160 words;
+   * a leaf's can be shorter. What problem this solves and why it exists, then
+   * how it works in everyday terms — each project or domain word defined the
+   * first time it appears ("an *epoch* is a term number that goes up with
+   * every election"). A small concrete case with names and numbers beats an
+   * abstract definition. An analogy only when it is exact, saying where it
+   * stops holding. Not a restatement of `detail`.
+   */
+  body: string;
+  /**
+   * 0-2 pictures that teach the idea, each picked for what it explains: how
+   * things relate or where this sits in the system → `diagram`; back and forth
+   * between parties over time → `sequence`; what the data looks like →
+   * `example`; comparing cases, states or options → `table`; a process in
+   * order → `flow`. Only when it shows what the prose cannot. A `diagram` here
+   * draws the idea, not the code: its boxes open nothing and its arrows need
+   * no `at`.
+   */
+  blocks?: Anatomy[];
+}
+
+/** A word the map leans on, for the glossary on the repository's level. */
+export interface Term {
+  /** As it appears in the map's text: "epoch", "broker". */
+  term: string;
+  /** One plain sentence, at most 25 words, for someone outside the field. */
+  meaning: string;
+}
+
+/**
+ * One concrete thing followed through the whole system — "a new broker joins
+ * the cluster" — so a first-time reader sees the roots as a story before they
+ * open any. Each step opens the part where it happens.
+ */
+export interface Walkthrough {
+  /** What is being followed, as a short sentence: "A broker joins the cluster". */
+  title: string;
+  steps: {
+    /** A few words: "Its disk is formatted". */
+    title: string;
+    /** One or two plain sentences on what happens here. */
+    detail: string;
+    /** The ids from a root down to the part where this happens: ["formatting-storage"] or ["electing-a-leader", "el-votes"]. */
+    path: string[];
+  }[];
 }
 
 /**
@@ -340,6 +407,8 @@ export interface Node {
    * explains the code is exactly what this tool replaces (D38).
    */
   detail?: string;
+  /** This level for a reader new to the project, behind the Explain toggle. Every generated node has one. */
+  explain?: Explainer;
   /** Where this lives in the code. Every authored node has at least one. */
   code?: CodeRef[];
   /**

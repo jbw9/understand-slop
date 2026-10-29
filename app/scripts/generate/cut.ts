@@ -100,7 +100,7 @@ export function owners(cut: Cut, path: string): string[] {
   return ids;
 }
 
-const excludedBy = (cut: Cut, path: string) => cut.excluded.some((e) => e.path === path || (e.path.endsWith("/") && path.startsWith(e.path)));
+export const excludedBy = (cut: Cut, path: string) => cut.excluded.some((e) => e.path === path || (e.path.endsWith("/") && path.startsWith(e.path)));
 
 function problems(cut: Cut, inv: Inventory): string[] {
   const out: string[] = [];

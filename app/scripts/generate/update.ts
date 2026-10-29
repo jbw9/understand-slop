@@ -338,7 +338,7 @@ export async function update(args: string[]) {
   }
   if (corrections.length) console.log(`${corrections.length} corrections from the agent${unmatched.length ? `; no section named ${unmatched.join(", ")}` : ""}`);
 
-  const inv = inventory(repo, { untracked: true });
+  const inv = inventory(repo);
   const isCode = new Map(inv.files.map((f) => [f.path, isSource(f)]));
   const citedAnywhere = new Set(walk(map.AUTHORED).flatMap((p) => refs(p.node).map((r) => r.file)));
   // Only code the map covers or could, and docs it cites: a lockfile or a test changing moves nothing.

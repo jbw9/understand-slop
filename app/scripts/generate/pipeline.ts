@@ -15,7 +15,7 @@ import { authorRoot, type Authored } from "./author";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
 import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
-import { cutRepo, type Cut } from "./cut";
+import { cutRepo, excludedBy, owners, type Cut } from "./cut";
 import { inventory, isSource } from "./inventory";
 import { overviewOf, toOverview, type Overviewed } from "./overview";
 import { shapeProblems } from "./schema";
@@ -163,12 +163,17 @@ export async function main(args: string[]) {
   flush();
 
   // A re-run keeps the cut of the map that is there unless asked for a fresh
-  // one: a new cut could rename every root. Edges of a cut made before D60
-  // are dropped; the overview draws how roots connect now.
-  const cutReused = Boolean(!has("--fresh") && existsSync(`${out}/.cache/cut.json`));
+  // one: a new cut could rename every root. But not once code has arrived
+  // that none of its roots claims: kept, that code would be in no root at all.
+  // Edges of a cut made before D60 are dropped; the overview draws how roots
+  // connect now.
+  const cached: Cut | null = !has("--fresh") && existsSync(`${out}/.cache/cut.json`) ? withoutEdges(JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8"))) : null;
+  const unclaimed = cached ? inv.files.filter((f) => isSource(f) && !owners(cached, f.path).length && !excludedBy(cached, f.path)).map((f) => f.path) : [];
+  if (unclaimed.length) say(`${unclaimed.length} files the last cut does not claim (${unclaimed.slice(0, 3).join(", ")}${unclaimed.length > 3 ? ", …" : ""}); cutting again`);
+  const cutReused = Boolean(cached && !unclaimed.length);
   const { cut, leftover, rejected } =
     cutReused
-      ? { cut: withoutEdges(JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8"))), leftover: [] as string[], rejected: [] as string[][] }
+      ? { cut: cached!, leftover: [] as string[], rejected: [] as string[][] }
       : await lap("cut", () => cutRepo(inv, sums, models.cut));
   writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(cut, null, 1));
   for (const r of cut.roots) say(`${r.id.padEnd(18)} ${r.title} — ${r.files.length} paths`);

@@ -30,8 +30,6 @@
   --mint: var(--color-mint-success);
   --border: var(--color-border-gray);
   --strong: var(--color-border-strong);
-}
-.page {
   --win: 0 1px 2px rgba(26, 26, 46, 0.06), 0 28px 56px -20px rgba(26, 26, 46, 0.3);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --gap: clamp(96px, 11vw, 160px);
@@ -97,9 +95,6 @@
   backdrop-filter: blur(14px) saturate(1.4);
   box-shadow: 0 1px 2px rgba(26, 26, 46, 0.06), 0 12px 32px -12px rgba(26, 26, 46, 0.22);
 }
-.navBar nav {
-  margin-left: auto;
-}
 /* Past .btn, which is declared later. */
 .navBar .navCta {
   height: 38px;
@@ -114,6 +109,7 @@
 }
 .navBar nav {
   display: flex;
+  margin-left: auto;
   gap: 26px;
   font-size: 14px;
   color: var(--muted);
@@ -414,11 +410,6 @@
   padding: 0 16px;
   font-size: 14.5px;
 }
-/* Hidden while the tour runs, but holding its place so the caption doesn't jump. */
-.replay[hidden] {
-  display: inline-flex;
-  visibility: hidden;
-}
 .stage {
   position: relative;
   flex: 1;
@@ -459,25 +450,25 @@
   justify-content: center;
   gap: 10px;
 }
-/* The same pill as the repository tabs above the frame, pressed rather than selected. */
+/* Light and dark in the nav: icons only, each a square, so the pair sits small among the links. */
 .mode {
   display: flex;
   gap: 2px;
-  padding: 4px;
+  padding: 3px;
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: 11px;
   background: var(--low);
 }
 .mode button {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  width: 30px;
   height: 30px;
-  padding: 0 14px;
+  padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: none;
-  font-size: 14px;
   color: var(--muted);
   cursor: pointer;
   transition: background-color 0.2s ease-out, color 0.2s ease-out, box-shadow 0.2s ease-out;
@@ -494,17 +485,6 @@
 .page .mode button:focus-visible {
   outline-offset: -2px;
   border-radius: 9px;
-}
-/* Icons only, each a square, so the pair sits small among the links. */
-.navMode {
-  padding: 3px;
-  border-radius: 11px;
-}
-.navMode button {
-  width: 30px;
-  padding: 0;
-  justify-content: center;
-  border-radius: 8px;
 }
 .mode svg {
   width: 14px;
@@ -533,9 +513,6 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-}
-.tour[hidden] {
-  display: none;
 }
 .ring {
   position: absolute;
@@ -845,9 +822,6 @@
   background: var(--white);
   box-shadow: var(--win);
   overflow: hidden;
-}
-.win[hidden] {
-  display: none;
 }
 .winBar {
   display: flex;
@@ -1410,6 +1384,7 @@
     padding: 0;
   }
   .rail button {
+    grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     padding: 10px 10px 12px;
     border-bottom: 0;
@@ -1417,9 +1392,6 @@
   .rail::before,
   .rail::after {
     display: none;
-  }
-  .rail button {
-    grid-template-columns: minmax(0, 1fr);
   }
   .rail i {
     grid-row: auto;

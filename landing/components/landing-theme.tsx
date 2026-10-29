@@ -22,7 +22,7 @@ export function ThemeToggle() {
   };
 
   return (
-    <div className={`${s.mode} ${s.navMode}`} role="group" aria-label="Theme">
+    <div className={s.mode} role="group" aria-label="Theme">
       <button aria-pressed={theme === "light"} aria-label="Light" title="Light" onClick={() => pick("light")}>
         <svg viewBox="0 0 16 16" aria-hidden>
           <circle cx="8" cy="8" r="2.75" />

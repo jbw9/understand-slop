@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import s from "./landing.module.css";
+import { ThemeToggle } from "./landing-theme";
 
 const LINKS = [
   { href: "#how", label: "How it works" },
@@ -36,6 +37,7 @@ export function LandingNav({ github }: { github: string }) {
           ))}
           <a href={github}>GitHub</a>
         </nav>
+        <ThemeToggle />
         {/* No build to link yet. */}
         <a className={`${s.btn} ${s.primary} ${s.navCta}`} href="#">
           Download

@@ -9,69 +9,69 @@
   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
  },
  "elapsed": {
-  "summarize": 0,
-  "cut": 220,
-  "author": 313,
-  "overview": 64,
-  "verify": 351,
-  "total": 948
+  "summarize": 245,
+  "cut": 721,
+  "author": 834,
+  "overview": 61,
+  "verify": 471,
+  "total": 2331
  },
- "usd": 23.78,
- "fullUsd": 45.21,
+ "usd": 21.99,
+ "fullUsd": 21.99,
  "bill": {
   "summarize": {
-   "calls": 519,
-   "cached": 519,
-   "input": 10584533,
-   "output": 1631131,
-   "cacheRead": 426590,
-   "usd": 0,
-   "fullUsd": 21.428014750000003
+   "calls": 37,
+   "cached": 0,
+   "input": 783940,
+   "output": 127300,
+   "cacheRead": 13014,
+   "usd": 1.6176969000000003,
+   "fullUsd": 1.6176969000000003
   },
   "cut": {
    "calls": 2,
    "cached": 0,
-   "input": 142568,
-   "output": 14070,
-   "cacheRead": 0,
-   "usd": 1.2427925,
-   "fullUsd": 1.2427925
+   "input": 61476,
+   "output": 57419,
+   "cacheRead": 98535,
+   "usd": 1.86895625,
+   "fullUsd": 1.86895625
   },
   "author": {
-   "calls": 8,
+   "calls": 9,
    "cached": 0,
-   "input": 943856,
-   "output": 140430,
-   "cacheRead": 7653032,
-   "usd": 13.2362235,
-   "fullUsd": 13.2362235
+   "input": 747418,
+   "output": 203932,
+   "cacheRead": 6082792,
+   "usd": 12.8109085,
+   "fullUsd": 12.8109085
   },
   "overview": {
    "calls": 1,
    "cached": 0,
-   "input": 18871,
-   "output": 3509,
-   "cacheRead": 283630,
-   "usd": 0.3474675,
-   "fullUsd": 0.3474675
+   "input": 16423,
+   "output": 4532,
+   "cacheRead": 172170,
+   "usd": 0.3020175,
+   "fullUsd": 0.3020175
   },
   "verify": {
-   "calls": 41,
+   "calls": 35,
    "cached": 0,
-   "input": 569689,
-   "output": 72012,
-   "cacheRead": 17857,
-   "usd": 1.07392445,
-   "fullUsd": 1.07392445
+   "input": 506671,
+   "output": 80724,
+   "cacheRead": 35086,
+   "usd": 1.0394510999999997,
+   "fullUsd": 1.0394510999999997
   },
   "verify-review": {
-   "calls": 69,
+   "calls": 50,
    "cached": 0,
-   "input": 733838,
-   "output": 83919,
-   "cacheRead": 2405051,
-   "usd": 7.881291750000001,
-   "fullUsd": 7.881291750000001
+   "input": 423808,
+   "output": 48989,
+   "cacheRead": 1065701,
+   "usd": 4.35202175,
+   "fullUsd": 4.35202175
   }
  },
  "throttled": {
@@ -80,233 +80,228 @@
  },
  "files": {
   "listed": 7557,
-  "summarised": 4021,
+  "summarised": 290,
   "unassigned": []
  },
  "excluded": [
   {
-   "path": "generator/",
-   "reason": "Build-time code generator that produces Java message classes from JSON schemas; pure tooling."
-  },
-  {
-   "path": "api-checker/",
-   "reason": "Gradle/Maven plugins that verify API surface compatibility; build-time tooling only."
-  },
-  {
-   "path": "jmh-benchmarks/",
-   "reason": "JMH performance benchmarks for internal subsystems; testing tooling, not product code."
-  },
-  {
-   "path": "trogdor/",
-   "reason": "Fault injection and workload testing framework with its own REST server; testing tooling."
-  },
-  {
-   "path": "release/",
-   "reason": "Python scripts automating the Apache release process (SVN, Maven, Docker); pure release tooling."
-  },
-  {
-   "path": "committer-tools/",
-   "reason": "Helper scripts for committers to merge PRs, verify licenses, and manage collaborators; pure tooling."
-  },
-  {
-   "path": ".github/scripts/",
-   "reason": "CI helper scripts for checkstyle annotations, JUnit reporting, PR linting, and flaky test reports; pure CI tooling."
+   "path": "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java",
+   "reason": "Categorized as 'Other files' by the scope definition; it is the monolithic Raft client implementation (>4k lines) whose behaviour is better understood through the interfaces (RaftClient) and state machines it drives, which are all in scope."
   }
  ],
  "overview": {
   "accepted": true,
-  "turns": 18,
-  "submits": 1,
+  "turns": 14,
+  "submits": 2,
   "lastProblems": []
  },
  "roots": [
   {
-   "id": "produce-consume",
-   "title": "Producing and Consuming",
+   "id": "formatting-storage",
+   "title": "Formatting Storage",
    "accepted": true,
-   "turns": 34,
-   "reads": 28,
-   "submits": 3,
+   "turns": 30,
+   "reads": 23,
+   "submits": 5,
    "lastProblems": [],
    "verify": {
     "nodes": 11,
-    "ok": 11,
-    "flagged": 10,
-    "rewritten": [
-     {
-      "id": "pc-send-batch",
-      "claims": [
-       "RecordAccumulator maintains a ConcurrentMap of topic to partition queues — contradicted: Line 92 shows: `protected final ConcurrentMap<String /*topic*/, TopicInfo> topicInfoMap = new CopyOnWriteMap<>();` This is a ConcurrentMap from topic to TopicInfo, not directly to partition queues. The partition queues are inside TopicInfo (accessed via `topicInfo.batches` at line 324)."
-      ]
-     },
-     {
-      "id": "pc-receive",
-      "claims": [
-       "Both use FetchRequestManager to issue FetchRequest RPCs — not_shown"
-      ]
-     }
-    ],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "broker",
-   "title": "Running the Broker",
-   "accepted": true,
-   "turns": 25,
-   "reads": 21,
-   "submits": 2,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 7,
-    "ok": 7,
-    "flagged": 4,
-    "rewritten": [],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "store",
-   "title": "Storing Records",
-   "accepted": true,
-   "turns": 31,
-   "reads": 25,
-   "submits": 4,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 15,
-    "ok": 15,
-    "flagged": 12,
-    "rewritten": [
-     {
-      "id": "st-producer",
-      "claims": [
-       "detects duplicates — not_shown"
-      ]
-     }
-    ],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "raft",
-   "title": "Reaching Consensus",
-   "accepted": true,
-   "turns": 32,
-   "reads": 28,
-   "submits": 2,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 10,
     "ok": 10,
-    "flagged": 8,
-    "rewritten": [],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "coordinate",
-   "title": "Coordinating Groups",
-   "accepted": true,
-   "turns": 29,
-   "reads": 25,
-   "submits": 2,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 20,
-    "ok": 19,
-    "flagged": 12,
+    "flagged": 3,
     "rewritten": [
      {
-      "id": "coordinate",
+      "id": "fs-bootstrap",
       "claims": [
-       "Three separate coordinators share a generic replicated state machine framework (`CoordinatorRuntime`) — not_shown: The detail mentions three coordinators but the cited code for label [0] describes CoordinatorRuntime as a generic framework (lines 76-77: 'provides a framework to implement coordinators such as the group coordinator or the transaction coordinator'). Label [1] shows GroupCoordinatorService building a CoordinatorRuntime instance at line 278. Label [2] shows ShareCoordinatorService building a CoordinatorRuntime instance at line 229. The transaction coordinator is not shown building its own instance in the cited code.",
-       "The transaction coordinator tracks transaction lifecycles via `__transaction_state` — not_shown: The transaction coordinator is not shown in the cited code samples. No evidence of transaction coordinator building a CoordinatorRuntime or using `__transaction_state` is presented."
-      ]
-     },
-     {
-      "id": "co-assign-streams",
-      "claims": [
-       "Standby tasks use `RackAwareStandbyPicker` — not_shown"
-      ]
-     },
-     {
-      "id": "co-txn-log",
-      "claims": [
-       "Tombstone records (null value) expire dead transactions — not_shown: Lines 127-128 show that when `valueBuffer == null`, a `TxnTombstone` is returned. The comment at lines 113 describes this. However, the code does not explicitly show that tombstones 'expire' transactions—they represent null values in the log."
-      ]
-     },
-     {
-      "id": "co-share",
-      "claims": [
-       "writeState: generates snapshot or update records"
+       "fromRecords builds records from feature map — contradicted: Lines 139-152 define `fromRecords` which takes a list of records and extracts the metadata version level, constructing a BootstrapMetadata. This doesn't build from a feature map but rather validates that a metadata version record exists."
       ]
      }
     ],
     "downgraded": [
-     "co-assign-streams"
+     "fs-bootstrap"
     ]
    }
   },
   {
-   "id": "streams",
-   "title": "Processing Streams",
+   "id": "starting-a-node",
+   "title": "Starting a Node",
    "accepted": true,
-   "turns": 28,
-   "reads": 22,
+   "turns": 19,
+   "reads": 14,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 19,
+    "ok": 19,
+    "flagged": 3,
+    "rewritten": [
+     {
+      "id": "sn-shared",
+      "claims": [
+       "ensureNotRaftLeader shuts down entire RaftManager instead of just resigning leadership — intended: Lines 376-383 show `ensureNotRaftLeader()` calls `_raftManager.shutdown()` on line 380. The comment on lines 377-378 states: 'Ideally, this would just resign our leadership, if we had it. But we don't have an API in RaftManager for that yet, so shut down the RaftManager.' This is documented intended behavior, not a bug."
+      ]
+     },
+     {
+      "id": "sn-brk-coordinators",
+      "claims": [
+       "Each uses a CoordinatorLoaderImpl",
+       "Each uses CoordinatorPartitionWriter"
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "electing-a-leader",
+   "title": "Electing a Leader",
+   "accepted": true,
+   "turns": 25,
+   "reads": 17,
+   "submits": 6,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 18,
+    "ok": 18,
+    "flagged": 11,
+    "rewritten": [
+     {
+      "id": "el-epoch-states",
+      "claims": [
+       "EpochState has six implementations — contradicted: Line 22 lists 'permits LeaderState, FollowerState, UnattachedState, ResignedState, NomineeState' — that is five permitted types. NomineeState appears to be an interface (not a direct implementation), as ProspectiveState and CandidateState implement it, making it an intermediate abstraction. So there are five directly sealed types, not six."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "raft-log-and-snapshots",
+   "title": "Raft Log and Snapshots",
+   "accepted": true,
+   "turns": 24,
+   "reads": 18,
    "submits": 4,
    "lastProblems": [],
    "verify": {
-    "nodes": 7,
-    "ok": 7,
+    "nodes": 18,
+    "ok": 18,
+    "flagged": 8,
+    "rewritten": [
+     {
+      "id": "raft-log-and-snapshots",
+      "claims": [
+       "a network layer transports Raft protocol messages between nodes — not_shown: The cited code does not show or mention any network layer code. RaftLog, KafkaRaftLog focus on log storage, not network transport."
+      ]
+     },
+     {
+      "id": "rl-snapshots",
+      "claims": [
+       "Snapshots compact old metadata log entries into immutable files identified by offset and epoch — not_shown: The code does not explain the purpose of snapshots or what they compact. The code labels and methods show file operations but not the functional purpose."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "registering-nodes",
+   "title": "Registering Nodes",
+   "accepted": true,
+   "turns": 18,
+   "reads": 12,
+   "submits": 4,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 14,
+    "ok": 14,
     "flagged": 5,
+    "rewritten": [
+     {
+      "id": "rn-broker-reg-data",
+      "claims": [
+       "all collections made immutable — contradicted: Lines 191, 193, 200-201: listeners is set to Collections.unmodifiableMap(), supportedFeatures is copied to HashMap (not made immutable in code shown), directories is set to Collections.unmodifiableList(), cordonedDirectories is set to Collections.unmodifiableList() or null."
+      ]
+     }
+    ],
+    "downgraded": []
+   }
+  },
+  {
+   "id": "active-controller",
+   "title": "Active Controller",
+   "accepted": true,
+   "turns": 22,
+   "reads": 18,
+   "submits": 2,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 25,
+    "ok": 24,
+    "flagged": 12,
+    "rewritten": [
+     {
+      "id": "ac-append",
+      "claims": [
+       "This terminates the process rather than allowing inconsistent in-memory state — not_shown: The code shows fatalFaultHandler is called and the exception is thrown, but the cited lines do not show what fatalFaultHandler.handleFault does or whether it terminates the process."
+      ]
+     },
+     {
+      "id": "ac-config-security",
+      "claims": [
+       "Five sub-managers handle non-replication metadata"
+      ]
+     }
+    ],
+    "downgraded": [
+     "ac-append"
+    ]
+   }
+  },
+  {
+   "id": "metadata-image",
+   "title": "The Metadata Image",
+   "accepted": true,
+   "turns": 25,
+   "reads": 20,
+   "submits": 3,
+   "lastProblems": [],
+   "verify": {
+    "nodes": 16,
+    "ok": 16,
+    "flagged": 3,
     "rewritten": [],
     "downgraded": []
    }
   },
   {
-   "id": "connect",
-   "title": "Connecting Systems",
+   "id": "propagating-metadata",
+   "title": "Propagating Metadata",
    "accepted": true,
-   "turns": 27,
-   "reads": 23,
-   "submits": 2,
+   "turns": 26,
+   "reads": 19,
+   "submits": 5,
    "lastProblems": [],
    "verify": {
     "nodes": 17,
     "ok": 17,
-    "flagged": 10,
-    "rewritten": [
-     {
-      "id": "cn-mm-heartbeat",
-      "claims": [
-       "Clients use heartbeats to detect replication lag and cluster connectivity — not_shown: The code shown does not contain any explanation or implementation of how clients consume or use the heartbeat records. This is application-level usage not shown in the connector/task code."
-      ]
-     }
-    ],
+    "flagged": 1,
+    "rewritten": [],
     "downgraded": []
    }
   },
   {
-   "id": "manage",
-   "title": "Managing the Cluster",
+   "id": "inspecting-the-cluster",
+   "title": "Inspecting the Cluster",
    "accepted": true,
-   "turns": 23,
-   "reads": 20,
-   "submits": 1,
+   "turns": 24,
+   "reads": 17,
+   "submits": 5,
    "lastProblems": [],
    "verify": {
-    "nodes": 11,
-    "ok": 11,
-    "flagged": 7,
-    "rewritten": [
-     {
-      "id": "mg-topics",
-      "claims": [
-       "any error during close is swallowed and the original exit code is overridden"
-      ]
-     }
-    ],
+    "nodes": 13,
+    "ok": 13,
+    "flagged": 3,
+    "rewritten": [],
     "downgraded": []
    }
   }
@@ -315,44 +310,49 @@
   "problems": [],
   "depth": [
    {
-    "id": "produce-consume",
+    "id": "formatting-storage",
     "depth": 3,
     "nodes": 11
    },
    {
-    "id": "broker",
-    "depth": 2,
-    "nodes": 7
-   },
-   {
-    "id": "store",
+    "id": "starting-a-node",
     "depth": 3,
-    "nodes": 15
+    "nodes": 19
    },
    {
-    "id": "raft",
+    "id": "electing-a-leader",
+    "depth": 4,
+    "nodes": 18
+   },
+   {
+    "id": "raft-log-and-snapshots",
     "depth": 3,
-    "nodes": 10
+    "nodes": 18
    },
    {
-    "id": "coordinate",
+    "id": "registering-nodes",
     "depth": 3,
-    "nodes": 20
+    "nodes": 14
    },
    {
-    "id": "streams",
-    "depth": 2,
-    "nodes": 7
+    "id": "active-controller",
+    "depth": 3,
+    "nodes": 25
    },
    {
-    "id": "connect",
+    "id": "metadata-image",
+    "depth": 3,
+    "nodes": 16
+   },
+   {
+    "id": "propagating-metadata",
     "depth": 3,
     "nodes": 17
    },
    {
-    "id": "manage",
+    "id": "inspecting-the-cluster",
     "depth": 3,
-    "nodes": 11
+    "nodes": 13
    }
   ]
  },

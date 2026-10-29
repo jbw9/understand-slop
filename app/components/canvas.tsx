@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -565,10 +565,10 @@ function Level({
         back={
           top
             ? undefined
-            : {
-                label: parent?.title ?? RUN.repo,
-                onClick: () => onOpen(path.slice(0, -1)),
-              }
+            : path.slice(0, -1).reduce(
+                (crumbs, _, i) => [...crumbs, { label: nodeAt(path.slice(0, i + 1))?.title ?? "", onClick: () => onOpen(path.slice(0, i + 1)) }],
+                [{ label: RUN.repo, onClick: () => onOpen([]) }],
+              )
         }
         eyebrow={top ? "Repository" : `Inside ${parent?.title ?? RUN.repo}`}
         title={node.title}
@@ -997,7 +997,7 @@ function Header({
   /** Where this level is, so it can be handed to Claude from its header. */
   path: string[];
   /** The level above, named — so "back" says where it goes. */
-  back?: { label: string; onClick: () => void };
+  back?: { label: string; onClick: () => void }[];
   eyebrow: string;
   title: string;
   state?: Node["state"];
@@ -1023,12 +1023,22 @@ function Header({
           mismatched buttons in a rail beside the prose, which read as parts
           from different apps (D62). */}
       <div className="mb-5 flex min-h-7 flex-wrap items-center gap-2">
-        {back ? (
-          <Button variant="ghost" onClick={back.onClick} className="-ml-2.5 text-muted-slate" title="Back (Esc)">
-            <span aria-hidden>←</span>
-            {back.label}
-          </Button>
-        ) : null}
+        {/* The whole way down, each step a way back to it, so a level always
+            says what it is part of; the last is the one Esc goes back to. */}
+        {back?.map((crumb, i) => (
+          <Fragment key={i}>
+            {i > 0 ? <span aria-hidden className="text-muted-slate">›</span> : null}
+            <Button
+              variant="ghost"
+              onClick={crumb.onClick}
+              className={`${i === 0 ? "-ml-2.5" : ""} text-muted-slate`}
+              title={i === back.length - 1 ? "Back (Esc)" : undefined}
+            >
+              {i === 0 ? <span aria-hidden>←</span> : null}
+              {crumb.label}
+            </Button>
+          </Fragment>
+        ))}
         <span className="flex-1" />
         {onCode ? (
           <Button onClick={onCode} icon={<CodeIcon />}>

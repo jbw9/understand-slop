@@ -494,6 +494,17 @@
   outline-offset: -2px;
   border-radius: 9px;
 }
+/* Icons only, each a square, so the pair sits small among the links. */
+.navMode {
+  padding: 3px;
+  border-radius: 11px;
+}
+.navMode button {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
+}
 .mode svg {
   width: 14px;
   height: 14px;

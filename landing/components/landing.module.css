@@ -100,7 +100,8 @@
 .navBar nav {
   margin-left: auto;
 }
-.navCta {
+/* Past .btn, which is declared later. */
+.navBar .navCta {
   height: 38px;
   padding: 0 16px;
   border-radius: 10px;
@@ -1220,7 +1221,13 @@
   border-color: var(--color-amber-line);
   background: var(--color-amber-surface);
 }
+.miniTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mini em {
+  flex-shrink: 0;
   margin-left: auto;
   padding: 2px 6px;
   border: 1px solid var(--color-amber-line);
@@ -1574,6 +1581,15 @@
   .code {
     font-size: 10.5px;
     mask-image: linear-gradient(90deg, #000 82%, transparent);
+  }
+}
+/* Mira, the theme and Download only: the hero has the link to GitHub. */
+@media (max-width: 420px) {
+  .navBar {
+    gap: 12px;
+  }
+  .navBar nav a {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

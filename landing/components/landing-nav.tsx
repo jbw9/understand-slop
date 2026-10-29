@@ -26,7 +26,7 @@ export function LandingNav({ github }: { github: string }) {
     <header ref={bar} className={s.nav} data-float={floating}>
       <div className={s.navBar}>
         <a className={s.mark} href="#">
-          TBD
+          Mira
         </a>
         <nav aria-label="Sections">
           {LINKS.map((l) => (

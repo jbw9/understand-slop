@@ -120,9 +120,9 @@ const baked = new Map<string, Record<string, string>>();
  * A demo's cited files as they were when its map was made (`source.json`
  * beside it), for a machine without its checkout. Keyed by repo-relative path,
  * so a caller's path never reaches the disk. Undefined when one of the
- * reader's projects has the same name: a project mapped from this very
- * checkout is called `understand-slop` too, and its code is on disk, as it is
- * now, not as the demo froze it.
+ * reader's projects has the same name: a project mapped from a demo's own
+ * checkout takes its name too, and its code is on disk, as it is now, not as
+ * the demo froze it.
  */
 export function demoSource(name: string | undefined): Record<string, string> | undefined {
   if (!isDemo(name) || listProjects().some((p) => p.id === name && mapFileOf(p.id))) return undefined;

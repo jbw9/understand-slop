@@ -24,7 +24,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, 
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-const IDENTIFIER = "dev.understand-slop.app";
+const IDENTIFIER = "dev.mira.app";
 
 function dataDir(): string {
   const home = homedir();

@@ -116,7 +116,7 @@ fn handle(conn: TcpStream, app: &AppHandle) -> std::io::Result<()> {
     }
 }
 
-const INSTRUCTIONS: &str = "These tools use the Preview tab in understand-slop: the user's project, \
+const INSTRUCTIONS: &str = "These tools use the Preview tab in Mira: the user's project, \
 running as a web app beside you, exactly as the user sees it, and any page on the web. Use them \
 to check that what you built works: take a screenshot, then click, type and read the page, as \
 you would in a browser. They are your browser here: to look something up or read a page on \
@@ -132,7 +132,7 @@ fn rpc(msg: &Value, tab: u32, app: &AppHandle) -> Option<Value> {
         "initialize" => Ok(json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or("2025-06-18"),
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "understand-slop", "version": env!("CARGO_PKG_VERSION") },
+            "serverInfo": { "name": "mira", "version": env!("CARGO_PKG_VERSION") },
             "instructions": INSTRUCTIONS,
         })),
         "ping" => Ok(json!({})),

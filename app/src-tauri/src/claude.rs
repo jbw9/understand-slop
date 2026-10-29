@@ -78,8 +78,8 @@ const TURN: &str = r#"f="$SLOP_CONTEXT"; s=$(cat); printf '%s' "$s" > "$f.ended.
 /// What Claude runs when it finds the map wrong: one line per section, kept
 /// beside the tab's queue until the turn ends. Allowed without asking.
 const FIX: &str = r#"#!/bin/sh
-# Tells understand-slop its map is wrong about a section (src-tauri/src/claude.rs).
-[ -n "$SLOP_CONTEXT" ] || { echo "Not in an understand-slop tab; nothing to correct." >&2; exit 1; }
+# Tells Mira its map is wrong about a section (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; nothing to correct." >&2; exit 1; }
 [ $# -ge 2 ] || { echo 'usage: slop-map-fix "<section title>" "<what the map gets wrong, and what is true>"' >&2; exit 2; }
 printf '%s\t%s\n' "$(printf '%s' "$1" | tr '\t\n' '  ')" "$(printf '%s' "$2" | tr '\t\n' '  ')" >> "$SLOP_CONTEXT.fix"
 echo "Noted. The map's \"$1\" will be corrected after this turn."
@@ -90,8 +90,8 @@ echo "Noted. The map's \"$1\" will be corrected after this turn."
 /// the turn. Refs are written as the user said them and resolved by the app.
 /// Allowed without asking.
 const SHOW: &str = r#"#!/bin/sh
-# Drives understand-slop's map: shows a section, or a diff (src-tauri/src/claude.rs).
-[ -n "$SLOP_CONTEXT" ] || { echo "Not in an understand-slop tab; nothing to show." >&2; exit 1; }
+# Drives Mira's map: shows a section, or a diff (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; nothing to show." >&2; exit 1; }
 clean() { printf '%s' "$1" | tr '\t\n' '  '; }
 case "$1" in
 section)
@@ -120,13 +120,13 @@ esac
 /// not ask to be. The outline is written beside the tab's queue when the tab
 /// starts (pty.rs), from the map the page already has.
 const LIST: &str = r#"#!/bin/sh
-# Lists understand-slop's map, section by section (src-tauri/src/claude.rs).
-[ -n "$SLOP_CONTEXT" ] || { echo "Not in an understand-slop tab; no map to list." >&2; exit 1; }
+# Lists Mira's map, section by section (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; no map to list." >&2; exit 1; }
 [ -s "$SLOP_CONTEXT.map" ] || { echo "This repository has no map yet." >&2; exit 1; }
 cat "$SLOP_CONTEXT.map"
 "#;
 
-const SYSTEM: &str = "This session was opened from understand-slop, an app that maps this \
+const SYSTEM: &str = "This session was opened from Mira, an app that maps this \
 repository as a tree of sections (user journey, data flow, the code behind each). The user \
 can attach things they picked on the map: a whole section arrives as a block starting with \
 `[Map section:`, one element of a section (a row, a diagram box, a step, a line of code) as \
@@ -190,7 +190,7 @@ pub struct Launch {
 /// goes on any exit — a quit, a crash, Ctrl+C — and the script's status is
 /// Claude's.
 const LAUNCHER: &str = r#"#!/bin/sh
-# Claude Code with understand-slop's map-context hook (src-tauri/src/claude.rs).
+# Claude Code with Mira's map-context hook (src-tauri/src/claude.rs).
 trap 'rm -f "$SLOP_CONTEXT.live"' EXIT INT TERM HUP
 : > "$SLOP_CONTEXT.live"
 "$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} ${SLOP_CLAUDE_MCP:+--mcp-config "$SLOP_CLAUDE_MCP"} "$@"
@@ -258,7 +258,7 @@ pub async fn claude_detect(configured: Option<String>) -> Option<Detected> {
 /// removes it each time it delivers.
 pub fn queue(id: u32) -> PathBuf {
     std::env::temp_dir()
-        .join("understand-slop")
+        .join("mira")
         .join(format!("context-{}-{id}.md", std::process::id()))
 }
 
@@ -407,7 +407,7 @@ pub fn status_of(queue: &Path) -> Option<String> {
 /// where every tab's PATH can find them. Rewritten only when they differ, so
 /// an upgrade of the app replaces old ones.
 fn launcher() -> std::io::Result<PathBuf> {
-    let dir = std::env::temp_dir().join("understand-slop").join("bin");
+    let dir = std::env::temp_dir().join("mira").join("bin");
     install(&dir.join("slop-map-fix"), FIX)?;
     install(&dir.join("slop-map-show"), SHOW)?;
     install(&dir.join("slop-map-list"), LIST)?;

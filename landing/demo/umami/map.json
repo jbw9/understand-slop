@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "understand-slop map umami",
+  "command": "mira map umami",
   "repo": "umami",
   "commit": "e92fdab",
   "files": 1651,

@@ -17,7 +17,7 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   // A published export is one map, and its tab says which.
-  title: process.env.NEXT_PUBLIC_STATIC_MAP ?? "understand-slop",
+  title: process.env.NEXT_PUBLIC_STATIC_MAP ?? "Mira",
   description:
     "See what an agent actually changed in your codebase — and what the analysis could not prove.",
 };

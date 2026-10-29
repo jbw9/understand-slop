@@ -9,7 +9,7 @@ import s from "@/components/landing.module.css";
 import { loadMap } from "@/lib/maps";
 
 export const metadata: Metadata = {
-  title: "TBD",
+  title: "Mira",
   description: "A visual way to explore a codebase: start broad, go deeper, down to the line.",
 };
 
@@ -18,7 +18,7 @@ const GITHUB = `https://github.com/${REPO}`;
 
 // This repo first: the demo opens on the project explaining itself.
 const DEMOS = [
-  { id: "understand-slop", label: "TBD itself" },
+  { id: "mira", label: "Mira itself" },
   { id: "flask", label: "Flask" },
   { id: "fastapi", label: "FastAPI" },
   { id: "ky", label: "ky" },
@@ -100,7 +100,7 @@ export default function Landing() {
               </h1>
               <div className={s.pitch}>
                 <p className={s.rise} style={{ "--i": 2 } as React.CSSProperties}>
-                  TBD splits a repository into the steps the program takes. Click a step to open its parts, and keep
+                  Mira splits a repository into the steps the program takes. Click a step to open its parts, and keep
                   going until you reach the code.
                 </p>
                 <div className={`${s.ctas} ${s.rise}`} style={{ "--i": 3 } as React.CSSProperties}>
@@ -151,7 +151,7 @@ export default function Landing() {
 
       <footer className={s.wrap}>
         <div className={s.end}>
-          <b>TBD</b>
+          <b>Mira</b>
           <a href={GITHUB}>{REPO}</a>
         </div>
       </footer>

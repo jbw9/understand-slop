@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
 import { DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
+import { Building, DraftNote, Stages, isBuilding, useDrawIn } from "@/components/building";
 import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, type CodeFocus } from "@/components/explain";
 import { InlineMarks, ShapeView } from "@/components/shapes";
 import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
@@ -567,6 +568,14 @@ function Level({
   // cards. Not in a diff that touches one: the red and green must be on screen.
   const shapes = blocks.flatMap((b, i) => (b.kind === "schema" || b.kind === "example" ? [i] : []));
   const grouped = shapes.length > 1 && !shapes.some((i) => blockDiffs.has(i));
+  // A map still being made (D69): until its overview lands the repository's
+  // level is the run itself, and a root still being checked is a draft.
+  const run = top && isBuilding(map.progress, Boolean(map.OVERVIEW)) ? map.progress : undefined;
+  const [watched, setWatched] = useState(false);
+  if (run && !watched) setWatched(true);
+  const column = useRef<HTMLDivElement>(null);
+  useDrawIn(column, top && watched && !run);
+  const draft = !top && Boolean(nodeAt(path.slice(0, 1))?.draft);
 
   return (
     <Glossary.Provider value={explainOn ? (map.OVERVIEW?.glossary ?? []) : []}>
@@ -592,14 +601,14 @@ function Level({
         unsure={node.state === "derived" ? undefined : node.unsure}
         meta={
           top
-            ? `${RUN.files} files · commit ${RUN.commit}`
+            ? RUN.commit ? `${RUN.files} files · commit ${RUN.commit}` : undefined
             : !nearBottom(node)
             ? undefined
             : node.footprint
               ? `${node.footprint.dirs.join("  ")}  ·  ${node.footprint.files} files`
               : node.evidence
         }
-        link={top && RUN.url ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
+        link={top && RUN.url && RUN.commit ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
         shape={figure ? undefined : node.shape}
         onCode={code.length ? () => setCodeFocus({ heading: `The code behind ${node.title}`, refs: code }) : undefined}
         actions={
@@ -614,14 +623,24 @@ function Level({
           is plain where one thing ends and the next begins — a picture under
           a table is its own thing, not more of the table. Each block's width
           cap is on an inner box, so the line never stops at a ragged edge. */}
-      <div className="flex flex-col [&>*+*]:mt-10 [&>*+*]:border-t [&>*+*]:border-border-gray [&>*+*]:pt-10">
+      {draft ? (
+        <div className="mb-8">
+          <DraftNote detail={map.progress?.roots.find((r) => r.id === path[0])?.detail} />
+        </div>
+      ) : null}
+      <div
+        ref={column}
+        className={cn("flex flex-col [&>*+*]:mt-10 [&>*+*]:border-t [&>*+*]:border-border-gray [&>*+*]:pt-10", draft && "opacity-60")}
+      >
+        {run ? <Building progress={run} onOpen={onOpen} /> : null}
+        {top && !run && map.progress && map.progress.stage !== "done" ? <Stages progress={map.progress} /> : null}
         {/* For a reader new to all of this: the level in plain words, before
             any of the terse parts. */}
         {explainOn && node.explain ? <Explainer owner={node.id} explain={node.explain} ctx={levelCtx} /> : null}
 
         {/* The picture is the main thing on the level, not a thumbnail in
             the header's corner. */}
-        {figure ? (
+        {figure && !run ? (
           <div data-pick="The picture">
             <div className="max-w-[540px]">
               <ShapeView shape={figure} />
@@ -629,7 +648,7 @@ function Level({
           </div>
         ) : null}
 
-        {blocks.map((b, i) =>
+        {(run ? [] : blocks).map((b, i) =>
           grouped && shapes.includes(i) ? (
             i === shapes[0] ? (
               <DataShapes key={i} owner={node.id} blocks={shapes.map((j) => blocks[j] as DataBlock)} ctx={levelCtx} />
@@ -667,7 +686,7 @@ function Level({
         )}
 
         {/* When every part is a box on the picture, the picture is the list. */}
-        {kids.length && onDiagram.size < kids.length ? (
+        {kids.length && onDiagram.size < kids.length && !run ? (
           <section>
             <Caption
               count={kids.length}
@@ -702,7 +721,7 @@ function Level({
 
         {/* The repository's way in comes after its picture: the walkthrough
             opens parts the reader has just seen drawn. */}
-        {explainOn && top && (map.OVERVIEW?.walkthrough || map.OVERVIEW?.glossary?.length) ? (
+        {explainOn && top && !run && (map.OVERVIEW?.walkthrough || map.OVERVIEW?.glossary?.length) ? (
           <StartHere walkthrough={map.OVERVIEW.walkthrough} glossary={map.OVERVIEW.glossary} onOpen={onOpen} />
         ) : null}
 

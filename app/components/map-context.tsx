@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { buildMap, type BuiltMap, type MapFile } from "@/lib/map";
 import type { MapEntry } from "@/lib/maps";
+import type { Progress } from "@/lib/vault";
 import { changedPaths } from "@/lib/share";
 
 /**
@@ -17,7 +18,8 @@ export interface Fresh {
 
 const NONE: Fresh = { at: 0, paths: new Set() };
 
-const MapContext = createContext<(BuiltMap & { maps: MapEntry[]; fresh: Fresh }) | null>(null);
+/** `progress`: the run making this map, while there is one (D69). */
+const MapContext = createContext<(BuiltMap & { maps: MapEntry[]; fresh: Fresh; progress?: Progress }) | null>(null);
 
 /** How often the open map looks for a newer file of itself. */
 const POLL_MS = 1000;
@@ -27,6 +29,7 @@ interface Live {
   prop: MapFile;
   map: BuiltMap;
   fresh: Fresh;
+  progress?: Progress;
 }
 
 /** `map` rebuilt from `file`, keeping what did not change, and what did. */
@@ -47,6 +50,7 @@ export function MapProvider({
   name,
   file,
   version,
+  progress,
   maps,
   children,
 }: {
@@ -54,15 +58,16 @@ export function MapProvider({
   file: MapFile;
   /** The file's version as the server read it; absent for a map that never changes (a demo, a static export). */
   version?: string;
+  progress?: Progress;
   maps: MapEntry[];
   children: React.ReactNode;
 }) {
-  const [live, setLive] = useState<Live>(() => ({ prop: file, map: buildMap(file, name), fresh: NONE }));
+  const [live, setLive] = useState<Live>(() => ({ prop: file, map: buildMap(file, name), fresh: NONE, progress }));
   // A new render from the server — a refresh, or another map — is taken the
   // same way a poll is; another map starts over.
   if (live.prop !== file) {
     const next = live.map.name === name ? adopt(live, file) : { map: buildMap(file, name), fresh: NONE };
-    setLive({ ...next, prop: file });
+    setLive({ ...next, prop: file, progress });
   }
 
   const since = useRef(version);
@@ -75,8 +80,8 @@ export function MapProvider({
       busy = true;
       fetch(`/api/map?id=${encodeURIComponent(name)}&since=${encodeURIComponent(since.current ?? "")}`)
         .then((r) => r.json())
-        .then((r: { version?: string; file?: MapFile } | null) => {
-          if (r?.file) setLive((l) => (l.map.name === name ? adopt(l, r.file!) : l));
+        .then((r: { version?: string; file?: MapFile; progress?: Progress | null } | null) => {
+          if (r?.file) setLive((l) => (l.map.name === name ? { ...adopt(l, r.file!), progress: r.progress ?? undefined } : l));
           if (r?.version) since.current = r.version;
         })
         .catch(() => {})
@@ -86,7 +91,7 @@ export function MapProvider({
     return () => clearInterval(timer);
   }, [name, version]);
 
-  const value = useMemo(() => ({ ...live.map, maps, fresh: live.fresh }), [live.map, live.fresh, maps]);
+  const value = useMemo(() => ({ ...live.map, maps, fresh: live.fresh, progress: live.progress }), [live.map, live.fresh, live.progress, maps]);
   return <MapContext.Provider value={value}>{children}</MapContext.Provider>;
 }
 

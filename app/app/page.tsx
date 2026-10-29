@@ -15,6 +15,7 @@ import { Palette } from "@/components/palette";
 import { StatusBar } from "@/components/statusbar";
 import { listMaps, loadDemo, loadMap, remoteOf, rootOf } from "@/lib/maps";
 import { STATIC_MAP } from "@/lib/source";
+import type { Progress } from "@/lib/vault";
 
 // The open level lives in the URL, and `useSearchParams` needs a Suspense
 // boundary to prerender. `?map=` picks which repository's map is read. In the
@@ -52,13 +53,15 @@ export default async function Home({
   const { name, file } = open;
   // Only a project of the reader's has one: its map follows its file as it is rewritten.
   const version = "version" in open ? (open.version as string | undefined) : undefined;
+  // A project's map still being made carries how far its run has got (D69).
+  const progress = "progress" in open ? (open.progress as Progress | undefined) : undefined;
   file.RUN.url ??= remoteOf(file.RUN);
   // A published page has no checkout to read, and must not carry this machine's paths.
   // The desktop app's tabs start in the checkout, so it is named in full.
   if (STATIC_MAP) delete file.RUN.root;
   else file.RUN.root = rootOf(file.RUN);
   return (
-    <MapProvider name={name} file={file} version={version} maps={STATIC_MAP || embed ? [{ id: name, label: name, local: false }] : listMaps()}>
+    <MapProvider name={name} file={file} version={version} progress={progress} maps={STATIC_MAP || embed ? [{ id: name, label: name, local: false }] : listMaps()}>
       <div className="flex h-full flex-col">
         {/* The title bar reads the open level from the URL, as the map does. */}
         <Suspense>

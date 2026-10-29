@@ -49,7 +49,7 @@ export function fileReader(repo: string) {
  * three levels under every root.
  */
 export function check(
-  map: Pick<MapFile, "AUTHORED" | "OVERVIEW" | "LINKS">,
+  map: Pick<MapFile, "AUTHORED" | "OVERVIEW" | "LINKS"> & { RUN?: Pick<MapFile["RUN"], "explain"> },
   repo: string,
   opts: { generated?: boolean; only?: Set<string> } = {},
 ): CheckResult {
@@ -59,6 +59,7 @@ export function check(
   const sources = { ok: 0, bad: 0 };
   let refs = 0;
   const gen = Boolean(opts.generated);
+  const level = map.RUN?.explain ?? EXPLAIN_LEVEL;
   const inRange = (file: string, start: number, end: number) => {
     const lines = linesOf(file);
     return lines !== null && start >= 1 && start <= end && end <= lines.length;
@@ -172,7 +173,7 @@ export function check(
         for (const m of n.shape.ids) if (!MARK_IDS.includes(m)) problems.push(`SHAPE ${n.id} mark "${m}" has no drawing (have: ${MARK_IDS.join(", ")})`);
       if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);
       if (gen && n.id !== OVERVIEW_ID) problems.push(...levelProblems(n));
-      if (gen) problems.push(...explainProblems(n));
+      if (gen) problems.push(...explainProblems(n, level));
     }
     for (const [kind, list] of [["CODE", n.code], ["DOCS", n.docs]] as const)
       for (const c of list ?? []) {
@@ -200,7 +201,7 @@ export function check(
   if (!opts.only) {
     // The repository's own level (D60) is held to what any level is.
     if (map.OVERVIEW) walk({ ...map.OVERVIEW, id: OVERVIEW_ID, title: "Overview", sub: map.OVERVIEW.sub ?? "", children: [] }, 0);
-    if (gen && map.OVERVIEW) problems.push(...startProblems(map.OVERVIEW, (p) => p.length > 0 && tree.nodeAt(p) !== null));
+    if (gen && map.OVERVIEW) problems.push(...startProblems(map.OVERVIEW, (p) => p.length > 0 && tree.nodeAt(p) !== null, level));
     for (const l of map.LINKS ?? []) for (const k of [l.from, l.to]) {
       const owner = k.slice(0, k.indexOf(":"));
       if (!ids.has(owner)) problems.push(`LINK owner ${owner} unknown`);
@@ -251,23 +252,37 @@ function levelProblems(n: any): string[] {
 
 /** A clicked step shows its own lines; past this it is the function, not the step. */
 export const STEP_LINES = 40;
+/**
+ * How much a map explains for a newcomer (D70), asked when the project is
+ * imported: `none` is the map without the plain-words layer, `brief` a
+ * sentence or two per level for a reader who knows the field, `full` the
+ * layer as D68 made it. A finished map records its level in `RUN.explain`.
+ */
+export type ExplainLevel = "none" | "brief" | "full";
+export const EXPLAIN_LEVEL: ExplainLevel = (["none", "brief", "full"] as const).find((l) => l === process.env.SLOP_EXPLAIN) ?? "full";
+
 /** An explainer's body: enough to define the words a level leans on, short enough to read. */
-export const EXPLAIN = { min: 25, max: 200, blocks: 2 };
+const BOUNDS = {
+  full: { min: 25, max: 200, blocks: 2, terms: [4, 12], steps: [3, 8] },
+  brief: { min: 8, max: 60, blocks: 0, terms: [3, 8], steps: [3, 5] },
+} as const;
 
 /**
  * The plain-words layer (`Node.explain`): every generated level has one, a
  * leaf's steps each cite the lines they describe, and the body stays a few
  * short paragraphs rather than an essay.
  */
-function explainProblems(n: any): string[] {
+function explainProblems(n: any, level: ExplainLevel): string[] {
   const out: string[] = [];
   const e = n.explain;
+  if (level === "none") return stepProblems(n);
+  const EXPLAIN = BOUNDS[level];
   if (!e || typeof e.body !== "string" || !e.body.trim())
     out.push(`EXPLAIN ${n.id} has no explain — give \`explain.body\`: this level in plain words for someone new to the project and its field, defining each word it leans on`);
   else {
     const w = words(e.body);
     if (w < EXPLAIN.min) out.push(`EXPLAIN ${n.id} — ${w} words (min ${EXPLAIN.min}); say what problem this solves and how, defining its terms`);
-    if (w > EXPLAIN.max) out.push(`EXPLAIN ${n.id} — ${w} words (max ${EXPLAIN.max}); a few short paragraphs, and a picture where it says more`);
+    if (w > EXPLAIN.max) out.push(`EXPLAIN ${n.id} — ${w} words (max ${EXPLAIN.max}); ${level === "brief" ? "a sentence or two" : "a few short paragraphs, and a picture where it says more"}`);
   }
   if ((e?.blocks ?? []).length > EXPLAIN.blocks) out.push(`EXPLAIN ${n.id} has ${e.blocks.length} pictures (max ${EXPLAIN.blocks})`);
   if (!n.children?.length) {
@@ -275,6 +290,12 @@ function explainProblems(n: any): string[] {
     for (const b of e?.blocks ?? [])
       if (own.has(b.kind)) out.push(`EXPLAIN ${n.id} draws a ${b.kind} the leaf already shows — an explain picture must show what the leaf's own blocks cannot, or be left out`);
   }
+  return [...out, ...stepProblems(n)];
+}
+
+/** Every step of a leaf cites the lines it describes, whatever the map explains (D68). */
+function stepProblems(n: any): string[] {
+  const out: string[] = [];
   if (!n.children?.length)
     for (const b of n.anatomy ?? [])
       if (b.kind === "flow" || b.kind === "sequence")
@@ -285,17 +306,19 @@ function explainProblems(n: any): string[] {
 }
 
 /** The repository level's way in for a first-time reader: a glossary and one walkthrough whose steps open real parts. */
-function startProblems(o: any, resolves: (path: string[]) => boolean): string[] {
+function startProblems(o: any, resolves: (path: string[]) => boolean, level: ExplainLevel): string[] {
   const out: string[] = [];
+  if (level === "none") return out;
+  const { terms, steps } = BOUNDS[level];
   const g: any[] = o.glossary ?? [];
-  if (g.length < 4 || g.length > 12) out.push(`GLOSSARY ${OVERVIEW_ID} has ${g.length} terms (want 4-12) — the words a newcomer must know to read this map`);
+  if (g.length < terms[0] || g.length > terms[1]) out.push(`GLOSSARY ${OVERVIEW_ID} has ${g.length} terms (want ${terms[0]}-${terms[1]}) — the words ${level === "brief" ? "a developer outside this field would not know" : "a newcomer must know to read this map"}`);
   for (const t of g)
     if (typeof t?.term !== "string" || typeof t?.meaning !== "string" || !t.meaning.trim()) out.push(`GLOSSARY ${OVERVIEW_ID} term needs term and meaning`);
     else if (words(t.meaning) > 25) out.push(`GLOSSARY ${OVERVIEW_ID} "${t.term}" — ${words(t.meaning)} words (max 25)`);
   const w = o.walkthrough;
   if (!w || typeof w.title !== "string" || !Array.isArray(w.steps)) out.push(`WALK ${OVERVIEW_ID} has no walkthrough — one concrete thing followed through the roots, each step opening the part where it happens`);
   else {
-    if (w.steps.length < 3 || w.steps.length > 8) out.push(`WALK ${OVERVIEW_ID} has ${w.steps.length} steps (want 3-8)`);
+    if (w.steps.length < steps[0] || w.steps.length > steps[1]) out.push(`WALK ${OVERVIEW_ID} has ${w.steps.length} steps (want ${steps[0]}-${steps[1]})`);
     w.steps.forEach((s: any, i: number) => {
       if (typeof s?.title !== "string" || typeof s?.detail !== "string") out.push(`WALK ${OVERVIEW_ID} step ${i + 1} needs title and detail`);
       if (!Array.isArray(s?.path) || !resolves(s.path)) out.push(`WALK ${OVERVIEW_ID} step ${i + 1} path ${JSON.stringify(s?.path)} is not a part of the map — ids from a root down`);

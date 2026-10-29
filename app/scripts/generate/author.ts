@@ -16,6 +16,7 @@ import { ccAgent, type Handled } from "./claude-code";
 import type { Cut, Root } from "./cut";
 import { owners } from "./cut";
 import { isSource, numbered, type Inventory } from "./inventory";
+import { EXPLAIN_LEVEL } from "./check";
 import { submitProblems, typeReference } from "./schema";
 import { fit, full, oneLine, type FileSummary } from "./summarize";
 
@@ -83,13 +84,39 @@ export const TOOLS: Tool[] = [
  * with figures and screenshots stripped, which generated maps may not use.
  */
 function exemplar(): string {
-  return readFileSync("scripts/generate/prompts/exemplar.json", "utf8").trimEnd();
+  const text = readFileSync("scripts/generate/prompts/exemplar.json", "utf8").trimEnd();
+  if (EXPLAIN_LEVEL === "full") return text;
+  // At a lesser level the example's explainers would teach the wrong length:
+  // brief keeps each one's first sentence, none drops them.
+  const cut = (n: any): any => {
+    const { explain, children, ...rest } = n;
+    const first = explain?.body?.split(/(?<=[.!?])\s+/)[0];
+    return { ...rest, ...(EXPLAIN_LEVEL === "brief" && first ? { explain: { body: first } } : {}), ...(children ? { children: children.map(cut) } : {}) };
+  };
+  return JSON.stringify(cut(JSON.parse(text)), null, 2);
+}
+
+/** The rules at the map's explain level (D70): the plain-words section as written, shortened, or gone. */
+const BRIEF_RULES = `## The plain-words layer: \`explain\`
+
+The reader of this map knows the field; what they lack is this project. Every node has a short \`explain\`, shown under an Explain toggle:
+
+- \`body\`: one or two sentences, at most 60 words: what this part is for in this project, naming any word the project uses in its own sense ("a *job* here is one queued email, not a cron task"). Don't restate \`detail\`, and don't explain the field.
+- No \`blocks\`.
+
+`;
+function rules(): string {
+  const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
+  if (EXPLAIN_LEVEL === "full") return all;
+  const from = all.indexOf("## The plain-words layer");
+  const to = all.indexOf("## ", from + 3);
+  return all.slice(0, from) + (EXPLAIN_LEVEL === "brief" ? BRIEF_RULES : "") + all.slice(to);
 }
 
 let systemCache: Block[] | null = null;
 export function system(): Block[] {
   systemCache ??= [
-    { type: "text", text: readFileSync("scripts/generate/prompts/rules.md", "utf8") },
+    { type: "text", text: rules() },
     {
       type: "text",
       text: `# The types (lib/data.ts) — every field's comment is part of the standard\n\n${typeReference()}\n\n# A worked example: one root of a hand-authored map, at the standard to match\n\nIt passes every check yours will. It is from a different repository — match its depth, density and honesty, not its content.\n\n${exemplar()}`,
@@ -140,7 +167,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
     `## Task
 Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
-Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. Every level also has an \`explain\` for a reader new to the project and its field. Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
+Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
 ${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
 Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");
@@ -213,8 +240,8 @@ function withCacheMark(messages: Message[]): Message[] {
 }
 
 /**
- * `onSubmit` hears each submit's verdict as it comes, the one in-flight fact
- * the run's progress can show.
+ * `onSubmit` hears each submit's verdict as it comes, with the tree handed
+ * in, so the run's progress can show the draft while it is being checked.
  */
 export async function authorRoot(
   root: Root,
@@ -222,7 +249,7 @@ export async function authorRoot(
   inv: Inventory,
   sums: Record<string, FileSummary>,
   model: string,
-  onSubmit: (submit: number, problems: number) => void,
+  onSubmit: (submit: number, problems: number, draft: unknown) => void,
 ): Promise<Authored> {
   const known = new Set(inv.files.map((f) => f.path));
   const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
@@ -248,7 +275,7 @@ export async function authorRoot(
       : submitProblems(node, root.prefix, inv.repo);
     res.problems = problems;
     res.trail.push(stepOf(name, input, "", problems));
-    onSubmit(res.submits, problems.length);
+    onSubmit(res.submits, problems.length, node);
     // The whole result rides on `done`: Claude Code caches it, and a replay calls no tools.
     if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { ...res, root: node } };
     return { content: `Not accepted. Fix every one of these, then submit with \`replace\`: only the nodes you changed.\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };

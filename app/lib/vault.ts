@@ -23,6 +23,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
+import type { Run } from "@/lib/data";
 
 const IDENTIFIER = "dev.mira.app";
 
@@ -52,6 +53,8 @@ export interface Project {
   openedAt?: string;
   /** The checkout's git state when it was imported. */
   git?: { remote?: string; branch?: string };
+  /** How much its map explains, from what the reader said they know when they imported it (D70). Absent means full. */
+  explain?: Explain;
   map: {
     status: MapStatus;
     startedAt: string;
@@ -214,7 +217,9 @@ function freeId(name: string, taken: Set<string>) {
 export class ImportError extends Error {}
 
 /** Register a checkout and start mapping it. */
-export function importProject(rootIn: string, nameIn: string | undefined, claude?: string): Project {
+export type Explain = NonNullable<Run["explain"]>;
+
+export function importProject(rootIn: string, nameIn: string | undefined, claude?: string, explain?: Explain): Project {
   const root = resolve(rootIn.replace(/^~(?=$|\/)/, homedir()));
   if (!existsSync(root) || !statSync(root).isDirectory()) throw new ImportError("That is not a directory.");
   const v = readVault();
@@ -229,6 +234,7 @@ export function importProject(rootIn: string, nameIn: string | undefined, claude
     root,
     addedAt: now,
     git: { remote: git(root, "remote", "get-url", "origin"), branch: git(root, "rev-parse", "--abbrev-ref", "HEAD") },
+    explain,
     map: { status: "generating", startedAt: now },
   };
   v.projects.push(project);
@@ -259,6 +265,8 @@ export function createProject(parentIn: string, nameIn: string): Project {
     name,
     root,
     addedAt: now,
+    // Its reader is the one writing it: a map of their own code needs no explaining.
+    explain: "none",
     map: { status: "empty", startedAt: now },
   };
   v.projects.push(project);
@@ -271,7 +279,8 @@ export function createProject(parentIn: string, nameIn: string): Project {
  * Claude Code. Detached, in its own process group, so it survives a reload of
  * this server and Cancel can end it and every `claude` it started at once.
  */
-export function generate(id: string, claude?: string): Project | undefined {
+export function generate(id: string, claude?: string, explain?: Explain): Project | undefined {
+  if (explain) update(id, (q) => (q.explain = explain));
   const p = getProject(id);
   if (!p) return undefined;
   if (p.map.status === "generating" && p.map.pid && alive(p.map.pid)) return p;
@@ -283,6 +292,7 @@ export function generate(id: string, claude?: string): Project | undefined {
   // The last run's progress would otherwise read as this one's until the
   // first stage overwrites it.
   rmSync(join(dir, "progress.json"), { force: true });
+  rmSync(join(dir, "drafts.json"), { force: true });
   const log = openSync(join(dir, "generate.log"), "w");
   const child = spawn(
     "npx",
@@ -291,7 +301,7 @@ export function generate(id: string, claude?: string): Project | undefined {
       cwd: process.cwd(),
       detached: true,
       stdio: ["ignore", log, log],
-      env: { ...process.env, SLOP_BACKEND: "claude-code", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
+      env: { ...process.env, SLOP_BACKEND: "claude-code", SLOP_EXPLAIN: p.explain ?? "full", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
     },
   );
   closeSync(log);
@@ -396,7 +406,7 @@ export function updateMap(root: string, claude?: string, turn?: Turn): Project |
       cwd: process.cwd(),
       detached: true,
       stdio: ["ignore", log, log],
-      env: { ...process.env, SLOP_BACKEND: "claude-code", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
+      env: { ...process.env, SLOP_BACKEND: "claude-code", SLOP_EXPLAIN: p.explain ?? "full", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
     },
   );
   closeSync(log);
@@ -428,7 +438,9 @@ export function mapFileOf(id: string): string | undefined {
 export interface Progress {
   startedAt: string;
   stage: string;
-  roots: { id: string; title: string; status: "queued" | "drafting" | "done" | "failed"; detail?: string }[];
+  roots: { id: string; title: string; sub?: string; status: "queued" | "drafting" | "done" | "failed"; detail?: string }[];
+  /** While the code is read: every file to read, those read so far in the order they were, and what the last few are for. */
+  reading?: { files: string[]; read: string[]; recent: { path: string; purpose: string }[] };
   /** The generator's last line, when it has not written a progress file yet. */
   line?: string;
 }

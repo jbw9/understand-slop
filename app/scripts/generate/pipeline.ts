@@ -4,19 +4,21 @@
  * .mts as ESM and .ts as CommonJS, and two instances meant the cache and the
  * bill were set in one and read from the other.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Node, Run } from "@/lib/data";
 import type { MapFile, Overview } from "@/lib/map";
+import type { Progress } from "@/lib/vault";
 import { parseArgs } from "./args";
 import { auditMarkdown } from "./audit";
 import { authorRoot, type Authored } from "./author";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
-import { check, OVERVIEW_ID } from "./check";
+import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, type Cut } from "./cut";
 import { inventory, isSource } from "./inventory";
 import { overviewOf, toOverview, type Overviewed } from "./overview";
+import { shapeProblems } from "./schema";
 import { summarize } from "./summarize";
 import { verifyTree, type Verdict } from "./verify";
 
@@ -56,11 +58,18 @@ async function redraw(out: string, inv: ReturnType<typeof inventory>, model: str
   await ccClose();
 }
 
-export type RootStatus = "queued" | "drafting" | "done" | "failed";
-export interface Progress {
-  startedAt: string;
-  stage: string;
-  roots: { id: string; title: string; status: RootStatus; detail?: string }[];
+export type RootStatus = Progress["roots"][number]["status"];
+
+/**
+ * A map asked to explain nothing (D70) keeps nothing explained: the types the
+ * authors read describe `explain`, and measured, they wrote it on half the
+ * levels unasked.
+ */
+function plain(n: Node): Node {
+  if (EXPLAIN_LEVEL !== "none") return n;
+  const out = { ...n, ...(n.children ? { children: n.children.map(plain) } : {}) };
+  delete out.explain;
+  return out;
 }
 
 export async function main(args: string[]) {
@@ -101,6 +110,11 @@ export async function main(args: string[]) {
   // one's, so the first write happens before any work.
   const progress: Progress = { startedAt: new Date(t0).toISOString(), stage: "summarize", roots: [] };
   const flush = () => atomic(`${out}/progress.json`, JSON.stringify(progress, null, 1) + "\n");
+  // A root's latest submit while it is still being checked, which the app
+  // shows dimmed (D69). Its own file, beside the map: it is not the map.
+  const drafts: Record<string, Node> = {};
+  let drafting = Promise.resolve();
+  const writeDrafts = () => (drafting = drafting.then(() => atomic(`${out}/drafts.json`, JSON.stringify(drafts) + "\n")));
   const mark = (id: string, status: RootStatus, detail?: string) => {
     const r = progress.roots.find((x) => x.id === id);
     if (!r) return;
@@ -113,16 +127,35 @@ export async function main(args: string[]) {
   const say = (s: string) => console.log(`  ${s}`);
   // Each submit's verdict is the one in-flight fact an author reports, so
   // "revising" is all the app can say of a root being drafted.
-  const submitted = (id: string) => (n: number, problems: number) => {
+  const submitted = (id: string, prefix: string) => (n: number, problems: number, draft: unknown) => {
     say(`${id}: submit ${n} — ${problems ? `${problems} problems` : "clean"}`);
     if (problems) mark(id, "drafting", `revising — ${problems} problem${problems === 1 ? "" : "s"}`);
+    // Only a tree the page can draw: one whose shape holds, whatever its claims.
+    if (problems && draft && !shapeProblems(structuredClone(draft), prefix).length) {
+      drafts[id] = draft as Node;
+      void writeDrafts();
+    }
   };
 
   const code = inv.files.filter(isSource);
   console.log(`${inv.name} @ ${inv.commit}: ${inv.files.length} files, ${code.length} to summarise, marks [${inv.marks.join(", ")}]`);
 
+  // The reading, file by file, for the app to show while it waits (D69).
+  // Written at most four times a second: a cached run reads hundreds at once.
+  const reading = { files: code.map((f) => f.path), read: [] as string[], recent: [] as { path: string; purpose: string }[] };
+  progress.reading = reading;
+  flush();
+  let flushed = 0;
   const sums = await lap("summarize", () =>
-    summarize(inv, (n, of) => { if (n % 25 === 0 || n === of) say(`summarised ${n}/${of}`); }),
+    summarize(inv, (n, of, path, purpose) => {
+      if (n % 25 === 0 || n === of) say(`summarised ${n}/${of}`);
+      reading.read.push(path);
+      if (purpose) reading.recent = [{ path, purpose }, ...reading.recent].slice(0, 8);
+      if (n === of || Date.now() - flushed > 250) {
+        flushed = Date.now();
+        flush();
+      }
+    }),
   );
   writeFileSync(`${out}/.cache/summaries.json`, JSON.stringify(sums, null, 1));
   if (stopAfter === "summarize") return;
@@ -155,13 +188,15 @@ export async function main(args: string[]) {
   const assemble = (run: Run): MapFile => {
     const AUTHORED = cut.roots.flatMap((r, i) => {
       const n = authored[r.id]?.root;
-      return n ? [{ ...n, col: 0, row: i }] : [];
+      return n ? [{ ...plain(n), col: 0, row: i }] : [];
     });
-    return { RUN: run, ...(overview ? { OVERVIEW: overview } : {}), AUTHORED, LINKS: [] };
+    const top = overview && { ...overview };
+    if (top && EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary", "walkthrough"] as const) delete top[k];
+    return { RUN: run, ...(top ? { OVERVIEW: top } : {}), AUTHORED, LINKS: [] };
   };
 
   progress.stage = "author";
-  progress.roots = cut.roots.map((r) => ({ id: r.id, title: r.title, status: "queued" as RootStatus, detail: "queued" }));
+  progress.roots = cut.roots.map((r) => ({ id: r.id, title: r.title, sub: r.sub, status: "queued" as RootStatus, detail: "queued" }));
   flush();
 
   // The RUN of a map still being made: the same facts as the final one, with
@@ -174,6 +209,7 @@ export async function main(args: string[]) {
     files: inv.scope ? code.length : inv.files.length,
     elapsed: `${Math.round((Date.now() - t0) / 60000)} min`,
     root: repo,
+    explain: EXPLAIN_LEVEL,
     models,
   });
 
@@ -199,7 +235,9 @@ export async function main(args: string[]) {
           return;
         }
         mark(r.id, "drafting", "drafting");
-        authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, submitted(r.id));
+        authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, submitted(r.id, r.prefix));
+        delete drafts[r.id];
+        void writeDrafts();
         say(`${r.id}: ${authored[r.id].root ? "accepted" : "FAILED"} after ${authored[r.id].turns + 1} turns, ${authored[r.id].reads} reads`);
         // Accepted means it already passed, inside authorRoot's submit, the
         // same check() the finished map passes — so showing it now shows
@@ -212,6 +250,8 @@ export async function main(args: string[]) {
     ),
   );
   await writing;
+  await drafting;
+  rmSync(`${out}/drafts.json`, { force: true });
 
   // The top level is drawn last, from the roots as accepted (D60). A repair
   // that leaves the same roots standing keeps the overview it had.

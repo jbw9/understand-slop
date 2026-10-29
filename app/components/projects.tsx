@@ -8,7 +8,7 @@ import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dial
 import { useMaybeMap } from "@/components/map-context";
 import { PanelHead } from "@/components/panel";
 import { readSettings } from "@/lib/settings";
-import type { Progress, Project } from "@/lib/vault";
+import type { Explain, Progress, Project } from "@/lib/vault";
 import { cn } from "@/lib/utils";
 
 /**
@@ -98,16 +98,17 @@ export function ProjectsDialog() {
 
   if (!open) return null;
 
-  const act = async (body: Record<string, unknown>) => {
+  // The project the action returned, or null when it failed.
+  const act = async (body: Record<string, unknown>): Promise<Partial<Project> | null> => {
     setBusy(true);
     setError(null);
     try {
-      await post(body);
+      const out = await post(body);
       await refresh();
-      return true;
+      return out ?? {};
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -119,24 +120,27 @@ export function ProjectsDialog() {
     if (typeof dir === "string") setRoot(dir);
   };
 
-  const importIt = async () => {
+  const importIt = async (explain?: Explain) => {
     try {
       const body = fresh
         ? { action: "create", root: root.trim(), name: label.trim() }
-        : { action: "import", root: root.trim(), name: label.trim(), claude: await claudePath() };
-      if (await act(body)) {
+        : { action: "import", root: root.trim(), name: label.trim(), claude: await claudePath(), explain };
+      const made = await act(body);
+      if (made) {
         setRoot("");
         setLabel("");
         setWizard(false);
+        // A map is being made: watch it build (D69).
+        if (made.id && made.map?.status === "generating") openMap(made.id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const regenerate = async (id: string) => {
+  const regenerate = async (id: string, explain?: Explain) => {
     try {
-      await act({ action: "regenerate", id, claude: await claudePath() });
+      if (await act({ action: "regenerate", id, claude: await claudePath(), explain })) openMap(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -176,7 +180,7 @@ export function ProjectsDialog() {
               busy={busy}
               error={error}
               onBrowse={isTauri() ? () => void browse() : undefined}
-              onStart={() => void importIt()}
+              onStart={(explain) => void importIt(explain)}
               onCancel={() => {
                 setWizard(false);
                 setFresh(null);
@@ -203,7 +207,7 @@ export function ProjectsDialog() {
                     current={p.id === current}
                     busy={busy}
                     onOpen={(at) => openMap(p.id, at)}
-                    onRegenerate={() => void regenerate(p.id)}
+                    onRegenerate={(explain) => void regenerate(p.id, explain)}
                     onAudit={() => {
                       close();
                       openAudit(p.id);
@@ -229,7 +233,26 @@ export function ProjectsDialog() {
   );
 }
 
-const STEPS = ["Start", "Folder", "Name", "Review"] as const;
+const STEPS = ["Start", "Folder", "Name", "You", "Review"] as const;
+
+/**
+ * How much the map explains (D70), from what the reader knows: someone who
+ * wrote the code, or knows the field and has used it, gets the map alone; one
+ * new to both gets every level explained; anyone between, a sentence or two.
+ */
+const levelOf = (code: number, field: number): Explain =>
+  code === 2 || (code === 1 && field === 2) ? "none" : code === 0 && field === 0 ? "full" : "brief";
+
+export const EXPLAINS: Record<Explain, { label: string; note: string }> = {
+  none: { label: "No explanations", note: "The map alone: parts, pictures and the code behind each step." },
+  brief: { label: "Brief explanations", note: "A sentence or two per level on what it is for, a short glossary and walkthrough." },
+  full: { label: "Full explanations", note: "Every level said again in plain words, with pictures, a glossary and a walkthrough." },
+};
+
+const KNOW = [
+  { q: "How well do you know this codebase?", a: ["Never opened it", "Used it or read some", "Wrote parts of it"] },
+  { q: "How well do you know what this kind of software does?", a: ["New to it", "Some", "Expert"] },
+] as const;
 const folderName = (root: string) => root.trim().replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
 const joinPath = (parent: string, name: string) => `${parent.trim().replace(/[\\/]+$/, "")}/${name}`;
 
@@ -262,14 +285,19 @@ function NewProject({
   busy: boolean;
   error: string | null;
   onBrowse?: () => void;
-  onStart: () => void;
+  onStart: (explain?: Explain) => void;
   onCancel: () => void;
 }) {
   // Opened on a folder already chosen (the titlebar's import), it starts at the folder.
   const [step, setStep] = useState(fresh === false ? 1 : 0);
+  // A new folder has no code to explain, so it skips "You".
+  const steps = fresh ? STEPS.filter((s) => s !== "You") : STEPS;
+  const at = steps[step];
+  const [know, setKnow] = useState<[number | null, number | null]>([null, null]);
+  const explain = know[0] !== null && know[1] !== null ? levelOf(know[0], know[1]) : undefined;
   const name = label.trim() || (fresh ? "" : folderName(root));
-  const canNext = [fresh !== null, Boolean(root.trim()), !fresh || Boolean(label.trim())][step] ?? true;
-  const last = step === STEPS.length - 1;
+  const canNext = { Start: fresh !== null, Folder: Boolean(root.trim()), Name: !fresh || Boolean(label.trim()), You: Boolean(explain), Review: true }[at];
+  const last = step === steps.length - 1;
   const choose = (v: boolean) => {
     setFresh(v);
     setStep(1);
@@ -279,20 +307,20 @@ function NewProject({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (last) onStart();
+        if (last) onStart(fresh ? undefined : explain);
         else if (canNext) setStep(step + 1);
       }}
       className="flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4"
     >
       <ol className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.09em]">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s} className={i === step ? "text-deep-green" : i < step ? "text-on-surface-variant" : "text-faint"}>
             {i < step ? "✓" : i + 1} {s}
           </li>
         ))}
       </ol>
 
-      {step === 0 ? (
+      {at === "Start" ? (
         <div className="grid grid-cols-2 gap-3">
           {[
             { v: true, title: "Start from scratch", note: "Make a new, empty folder for it." },
@@ -312,7 +340,7 @@ function NewProject({
             </button>
           ))}
         </div>
-      ) : step === 1 ? (
+      ) : at === "Folder" ? (
         <Field
           label={fresh ? "Where should it go?" : "Which folder?"}
           hint={fresh ? "The folder the new project is made inside." : "A project on this machine, usually a git checkout."}
@@ -333,7 +361,35 @@ function NewProject({
             ) : null}
           </div>
         </Field>
-      ) : step === 2 ? (
+      ) : at === "You" ? (
+        <div className="flex flex-col gap-4">
+          {KNOW.map((k, qi) => (
+            <Field key={k.q} label={k.q} hint={qi ? "Its field: what a web store, a message queue or a compiler is for." : "So the map says as much as you need, and no more."}>
+              <div className="grid grid-cols-3 gap-2">
+                {k.a.map((a, ai) => (
+                  <button
+                    key={a}
+                    type="button"
+                    aria-pressed={know[qi] === ai}
+                    onClick={() => setKnow((k) => (qi ? [k[0], ai] : [ai, k[1]]))}
+                    className={cn(
+                      "cursor-pointer rounded-[2px] border bg-pure-white px-3 py-2 text-left text-[12.5px] text-ink transition-colors hover:border-deep-green",
+                      know[qi] === ai ? "border-deep-green" : "border-border-gray",
+                    )}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          ))}
+          {explain ? (
+            <p className="text-[12px] text-muted-slate">
+              <span className="font-semibold text-ink">{EXPLAINS[explain].label}.</span> {EXPLAINS[explain].note}
+            </p>
+          ) : null}
+        </div>
+      ) : at === "Name" ? (
         <Field label="What should it be called?" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>
           <input
             autoFocus
@@ -353,6 +409,12 @@ function NewProject({
             </dd>
             <dt className="text-muted-slate">Name</dt>
             <dd className="truncate font-mono text-ink">{name}</dd>
+            {explain && !fresh ? (
+              <>
+                <dt className="text-muted-slate">Explains</dt>
+                <dd className="text-ink">{EXPLAINS[explain].label}</dd>
+              </>
+            ) : null}
           </dl>
           <p className="text-[12px] text-muted-slate">
             {fresh
@@ -429,13 +491,15 @@ function ProjectRow({
   current: boolean;
   busy: boolean;
   onOpen: (at?: string) => void;
-  onRegenerate: () => void;
+  onRegenerate: (explain: Explain) => void;
   onAudit: () => void;
   onCancel: () => void;
   onRemove: () => void;
 }) {
   // Forgetting a project takes a second click: it deletes the map, not the code.
   const [confirm, setConfirm] = useState(false);
+  // What the next run explains; changing it takes effect when the map is made again.
+  const [explain, setExplain] = useState<Explain>(p.explain ?? "full");
   const { status } = p.map;
 
   return (
@@ -459,9 +523,24 @@ function ProjectRow({
             Cancel
           </button>
         ) : (
-          <button type="button" onClick={onRegenerate} disabled={busy} className={cn(QUIET, "py-1")}>
-            {status === "ready" ? "Regenerate" : status === "empty" ? "Map it" : "Retry"}
-          </button>
+          <>
+            <select
+              value={explain}
+              onChange={(e) => setExplain(e.target.value as Explain)}
+              disabled={busy}
+              title="How much the map explains, used the next time it is made"
+              className="cursor-pointer rounded-[2px] border border-border-gray bg-pure-white px-1.5 py-1 text-[12px] text-on-surface-variant"
+            >
+              {(Object.keys(EXPLAINS) as Explain[]).map((l) => (
+                <option key={l} value={l}>
+                  {EXPLAINS[l].label}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => onRegenerate(explain)} disabled={busy} className={cn(QUIET, "py-1")}>
+              {status === "ready" ? "Regenerate" : status === "empty" ? "Map it" : "Retry"}
+            </button>
+          </>
         )}
         <button
           type="button"

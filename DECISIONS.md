@@ -1665,3 +1665,75 @@ drift from the real one.
 
 **Cost accepted:** the top of every level is longer when Explain is on, so a
 level's picture sits lower; the tour scrolls to it.
+
+## D69 — A map is watched while it is made
+
+**Chose:** a project opens the moment its run starts, and until its overview
+lands the repository's level is the run itself:
+
+- **Reading:** every file to read is a cell under its folder, lit as it is
+  read, beside the last few files and what each turned out to be for.
+- **Dividing:** placeholder boxes wait while the code is split into parts.
+- **Writing:** one box per root, from the cut. Each shimmers while its
+  author works and opens as soon as there is something to read: first its
+  latest submit, then the accepted root.
+- **Overview:** the real picture of how the parts connect replaces the
+  boxes. Its boxes settle and each arrow is traced in, once, on arrival.
+
+A strip of the five stages sits above all of it. The pipeline writes what
+this needs beside the map: `progress.json` gains the reading and each root's
+`sub`; `drafts.json` holds each root's latest submit whose shape holds,
+removed when the root is accepted or fails. lib/maps.ts composes drafts into
+the page's map marked `draft`. A draft opens dimmed under a note that it is
+still being checked. Neither file is the map, and nothing in `map.json`
+changes.
+**Why:** a first map takes 10–30 minutes, and the only sign of it was a line
+in the Projects list. A reader asked to see the diagram build "as ppl can get
+bored easily while waiting".
+**Measured:** realworld (62 files) imported through the app: open on the
+reading at once; 32 files read in 19s; six boxes from the cut; the first root
+opened and read while the other five were still being written; two roots shown
+as drafts with 1–2 problems before they passed; the overview drawn in with its
+10 arrows traced. The whole run took 12.6 minutes and cost $5.92, with 0 check
+problems.
+**Beat:** streaming the agents' own text, which shows effort rather than the
+map; and writing drafts into `map.json`, which every other reader of that
+file (export, check, update) would then have to tell from the real thing.
+
+**Cost accepted:** a draft can be wrong in ways the checker has already
+flagged; the note says so, and it is replaced within a submit or two.
+
+## D70 — How much a map explains is asked, not assumed
+
+**Chose:** importing a folder asks two questions: how well the reader knows
+this codebase (never opened it / used it or read some / wrote parts of it),
+and how well they know this kind of software (new to it / some / expert).
+The answers pick one of three levels, which the project keeps and every run
+and update follows (`SLOP_EXPLAIN`, recorded on the map as `RUN.explain`):
+
+- **None** for someone who wrote the code, or knows the field and has used
+  it: the map as it was before D68's plain-words layer. Steps still open
+  their lines; that is how the map reads, not an explanation.
+- **Full** for someone new to both: D68's layer, unchanged.
+- **Brief** for everyone else: one or two sentences per level on what this
+  project means by it, no pictures, a glossary of 3–8 terms a developer
+  outside the field would not know, and a walkthrough of 3–5 steps.
+
+The author's rules, its worked example and the overview's task follow the
+level, and so does the checker. A project made from scratch is `none`. The
+level can be changed beside Regenerate, and takes effect on the next run.
+**Measured:** realworld at each level, from one cut: none $4.80 and 11
+minutes, brief $5.37 and 13 minutes (explainers of about 28 words, a 6-term
+glossary, a 4-step walkthrough), full $5.92 and 13 minutes (about 78 words,
+10 terms, 5 steps). All three had 0 check problems. At none the authors still
+wrote an explainer on 51% of levels, unasked; the pipeline now drops them.
+**Why:** the full layer is "a lot" for a reader who already knows the
+project. Hiding it behind a toggle still pays for it, and still has the
+agents spend their turns on it.
+**Beat:** asking the reader to pick a level by name, which asks them to
+predict what a level contains; and choosing per reader at view time, which
+would need every map generated at full.
+
+**Cost accepted:** a map is often read by someone other than the person who
+imported it, and their answers set it for every reader. Regenerating at
+another level redoes the roots; the summaries and the cut replay from cache.

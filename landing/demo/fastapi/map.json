@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "understand-slop map full-stack-fastapi-template",
+  "command": "mira map full-stack-fastapi-template",
   "repo": "full-stack-fastapi-template",
   "commit": "b1125d8",
   "files": 231,

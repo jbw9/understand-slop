@@ -88,7 +88,7 @@ const AROUND = 30;
  * Each cited range with the code around it. With only the cited lines, most
  * of what the screen flagged was a constant or call just outside them, and the
  * reviewer's searches to dismiss those cost more than the rest of the run's
- * checking (understand-slop: 39 flags, 4 upheld).
+ * checking (mira: 39 flags, 4 upheld).
  */
 export function evidence(n: Node, inv: Inventory): string {
   const shown = new Set<string>();

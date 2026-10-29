@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "understand-slop map flask",
+  "command": "mira map flask",
   "repo": "flask",
   "commit": "d086db8",
   "files": 227,

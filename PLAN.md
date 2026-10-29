@@ -1,4 +1,4 @@
-# understand-slop
+# Mira
 
 ## The problem
 

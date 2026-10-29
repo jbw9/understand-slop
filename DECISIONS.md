@@ -298,7 +298,7 @@ a caret and opens nothing, which is the worst failure mode available.
 
 ## D10 — Push on a green gate, not on a clock
 
-`understand-slop` commits and pushes at each **verified milestone**: `tsc
+`mira` commits and pushes at each **verified milestone**: `tsc
 --noEmit` clean, `eslint` clean, and the changed behaviour actually driven in the
 running app. No milestone, no push; no asking when one is reached.
 
@@ -1529,7 +1529,7 @@ project. `maps/` is now git-ignored local output from the generator.
 **Kept:** the generator's worked example. The author prompt quoted one root of
 the explorify map, so that root, stripped exactly as before, is now
 `scripts/generate/prompts/exemplar.json`: generation is unchanged.
-**The landing keeps its demo.** Five of the maps (understand-slop, flask,
+**The landing keeps its demo.** Five of the maps (mira, flask,
 fastapi, ky, umami: `map.json`, `report.json`, `source.json`) now live in
 `landing/demo/`, with the page that quotes them. The app reads them
 (`loadDemo` in `lib/maps.ts`) only for a page the landing frames (`?embed`)
@@ -1594,7 +1594,7 @@ lighting — the passage a section cites. The docs are listed from git
 (`/api/docs`) and found from the palette (typed with the levels, or "Read the
 docs…"), a title-bar button, and "Open the whole doc" on a cited passage. Their
 text comes through `/api/source`, behind the code's containment check.
-**Fixed with it:** a project whose id matched a landing demo (`understand-slop`)
+**Fixed with it:** a project whose id matched a landing demo (`mira`)
 read the demo's frozen `source.json` instead of its checkout; a project now
 wins over a demo of the same name.
 **Beat:** opening docs in a terminal tab or the system's editor, which leaves

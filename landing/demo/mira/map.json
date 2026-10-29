@@ -1,7 +1,7 @@
 {
  "RUN": {
-  "command": "understand-slop map understand-slop",
-  "repo": "understand-slop",
+  "command": "mira map mira",
+  "repo": "mira",
   "commit": "c0c5eac",
   "files": 109,
   "elapsed": "28 min",

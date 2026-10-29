@@ -167,7 +167,7 @@ export async function main(args: string[]) {
   // The RUN of a map still being made: the same facts as the final one, with
   // the time so far in place of the total the run does not have yet.
   const runNow = (): Run => ({
-    command: `understand-slop map ${inv.name}`,
+    command: `mira map ${inv.name}`,
     // A scoped map is named for its part and counts only the files it covers.
     repo: inv.scope ? name : inv.name,
     commit: inv.commit,

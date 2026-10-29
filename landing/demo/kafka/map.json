@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "understand-slop map kafka",
+  "command": "mira map kafka",
   "repo": "kafka",
   "commit": "d18f93f",
   "files": 7557,

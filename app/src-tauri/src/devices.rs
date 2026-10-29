@@ -134,7 +134,7 @@ fn home() -> PathBuf {
 
 /// The app's data folder, where Tauri keeps it.
 fn data() -> PathBuf {
-    let id = "dev.understand-slop.app";
+    let id = "dev.mira.app";
     if cfg!(target_os = "macos") {
         home().join("Library/Application Support").join(id)
     } else {
@@ -223,7 +223,7 @@ fn booted(sdk: &Path, serial: &str) -> bool {
 }
 
 const ANDROID_SETUP: &str = r#"#!/bin/sh
-# Sets up the Android emulator for understand-slop, without Android Studio
+# Sets up the Android emulator for Mira, without Android Studio
 # (src-tauri/src/devices.rs). Safe to run again: it skips what is there.
 set -e
 SDK=__SDK__
@@ -292,7 +292,7 @@ fn idb() -> Option<PathBuf> {
 }
 
 const IOS_SETUP: &str = r#"#!/bin/sh
-# Sets up the iOS Simulator for understand-slop (src-tauri/src/devices.rs).
+# Sets up the iOS Simulator for Mira (src-tauri/src/devices.rs).
 # The simulator comes only with Xcode; it is installed once and never opened.
 XCODE=$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'" 2>/dev/null | head -n 1)
 [ -n "$XCODE" ] || XCODE=/Applications/Xcode.app

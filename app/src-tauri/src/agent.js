@@ -1,4 +1,4 @@
-// understand-slop's preview agent (src-tauri/src/preview.rs puts it in every
+// Mira's preview agent (src-tauri/src/preview.rs puts it in every
 // page the preview frames). It answers the window around the frame
 // (components/preview.tsx): reads the page, and clicks, types and scrolls in it
 // the way a person would, for the user's tools and for Claude's, and draws

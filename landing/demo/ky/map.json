@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "understand-slop map ky",
+  "command": "mira map ky",
   "repo": "ky",
   "commit": "3541888",
   "files": 112,

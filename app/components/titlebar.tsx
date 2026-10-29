@@ -4,7 +4,6 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { openSettings } from "@/lib/settings";
-import { Kbd } from "@/components/button";
 import { openPalette } from "@/components/palette";
 import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
@@ -19,8 +18,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The window's own title bar. The native one is off (`decorations: false` in
- * tauri.conf.json), so this draws the map's name, which switches maps, a box
- * that opens the palette (components/palette.tsx), the tools, and the window
+ * tauri.conf.json), so this draws the map's name, which switches maps, the tools, and the window
  * buttons, in the page's palette rather than the desktop's. The map below has no header of its
  * own in the desktop app.
  *
@@ -64,16 +62,14 @@ export function Titlebar({ bare }: { bare?: boolean }) {
   if (!desktop) return null;
   const win = getCurrentWindow();
   return (
-    // Three columns, the outer two equal, so the command centre sits at the
-    // middle of the window rather than of whatever room the trail leaves. The
-    // right one never gives up its buttons; when the window is too narrow for
-    // both, the trail truncates first and the centre drifts left.
+    // Two columns: the right one never gives up its buttons; when the window
+    // is too narrow for both, the map's name truncates first.
     <header
       data-tauri-drag-region
       data-chrome
-      className="grid h-9 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,372px)_minmax(max-content,1fr)] items-center border-b border-border-gray bg-surface-container-low"
+      className="grid h-9 shrink-0 select-none grid-cols-[minmax(0,1fr)_max-content] items-center border-b border-border-gray bg-surface-container-low"
     >
-      {/* The Mac's traffic lights take the left edge, inside this column so the centre stays the window's. */}
+      {/* The Mac's traffic lights take the left edge. */}
       <div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center", mac ? "pl-[78px]" : "pl-1.5")}>
         {bare ? (
           <span data-tauri-drag-region className="px-2 font-mono text-[11.5px] font-semibold text-ink">
@@ -82,9 +78,6 @@ export function Titlebar({ bare }: { bare?: boolean }) {
         ) : (
           <Where />
         )}
-      </div>
-      <div data-tauri-drag-region className="flex h-full min-w-0 items-center justify-center px-4">
-          {bare ? null : <Centre />}
       </div>
       <div data-tauri-drag-region className="flex h-full items-center justify-end">
         <Control label="Projects — start a new one, or switch maps" onClick={() => openProjects()}>
@@ -155,28 +148,6 @@ function Where() {
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-faint">
           <path d="m2.5 4 2.5 2.5L7.5 4" />
         </svg>
-      </button>
-    </>
-  );
-}
-
-function Centre() {
-  const { name } = useMap();
-  return (
-    <>
-      {/* The command centre, as in VS Code: where you go to get anywhere. */}
-      <button
-        type="button"
-        onClick={() => openPalette()}
-        className="flex h-[22px] w-full max-w-[340px] cursor-pointer items-center gap-2 rounded-[2px] border border-border-gray bg-warm-cream px-2.5 text-[12px] text-faint transition-colors hover:border-border-strong hover:text-muted-slate"
-      >
-        <svg aria-hidden width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <circle cx="7" cy="7" r="4.5" />
-          <path d="m10.5 10.5 3.5 3.5" />
-        </svg>
-        <span className="truncate">Go to a level in {name}</span>
-        <span className="flex-1" />
-        <Kbd className="h-4 text-[10px]">Ctrl K</Kbd>
       </button>
     </>
   );

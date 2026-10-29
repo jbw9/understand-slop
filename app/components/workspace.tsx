@@ -15,7 +15,9 @@ import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
-import { useLocation } from "@/components/chrome";
+import { goTo, useLocation } from "@/components/chrome";
+import { TAB_STRIP, TabClose, TabLabel, openInTab, tabLook } from "@/components/tabs";
+import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
 import type { Exchange } from "@/lib/keep";
@@ -158,6 +160,10 @@ export function Workspace() {
   // The section in front (components/tabs.tsx), which every prompt to Claude
   // here is told about without being shown (src-tauri/src/claude.rs, place).
   const { path, crumbs } = useLocation();
+  const mapState = useTabs(map.name);
+  const mapTabs = mapState?.tabs ?? [{ id: 0, path }];
+  const mapActive = mapState?.active ?? 0;
+  const titleOf = (p: string[]) => (p.length ? (map.nodeAt(p)?.title ?? map.RUN.repo) : map.RUN.repo);
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   // Hidden once it has slid away, so it takes no clicks and no focus.
   const [settled, setSettled] = useState(true);
@@ -703,7 +709,26 @@ export function Workspace() {
   };
 
   /** A tab in either strip, drawn as an editor draws one. */
-  const tabView = (t: Tab, selected: boolean) => (
+  // A tab in the window is drawn as an editor draws one; in the main view, as
+  // the map's own tabs are (components/tabs.tsx).
+  const tabView = (t: Tab, selected: boolean, inMain = false) =>
+    inMain ? (
+      <div
+        key={t.key}
+        role="tab"
+        aria-selected={selected}
+        onPointerDown={grab(t)}
+        title="Drag onto the window to put it back"
+        className={cn(tabLook(selected, true), "cursor-default", dragging?.key === t.key && "opacity-40")}
+      >
+        <button type="button" onClick={(c) => c.detail === 0 && select(t.key)} className="flex min-w-0 cursor-pointer items-center gap-1.5">
+          {iconOf(t)}
+          <TabLabel>{nameOf(t)}</TabLabel>
+          {t.status && <StatusDot status={t.status} />}
+        </button>
+        <TabClose label={nameOf(t)} active={selected} onClose={() => close(t.key)} />
+      </div>
+    ) : (
     <div
       key={t.key}
       role="tab"
@@ -849,28 +874,69 @@ export function Workspace() {
       style={{ top: desktop ? TITLEBAR : 0, bottom: STATUSBAR }}
       className="pointer-events-none fixed inset-x-0 z-30 flex flex-col"
     >
-      <header role="tablist" data-chrome className="pointer-events-auto flex h-7 shrink-0 items-stretch bg-surface-container">
-        <div
-          role="tab"
-          aria-selected={!upFront}
-          className={cn(
-            "flex shrink-0 items-center border-r border-border-gray px-3 text-[12px]",
-            upFront ? "border-b text-muted-slate hover:text-ink" : "bg-surface-container-low text-ink",
-          )}
+      {/* The map's own tabs, as its strip draws them (components/tabs.tsx),
+          then the tabs dragged here, drawn the same way: with a tab here the
+          strip reads as it does without one, just longer. */}
+      <header role="tablist" data-chrome className={cn(TAB_STRIP, "pointer-events-auto")}>
+        {mapTabs.map((m) => {
+          const label = titleOf(m.path);
+          const selected = !upFront && m.id === mapActive;
+          const closable = mapTabs.length > 1;
+          const toMap = () => {
+            setFront((f) => ({ ...f, [here]: null }));
+            const p = selectTab(map.name, m.id);
+            if (p) goTo(p);
+          };
+          const closeMap = () => {
+            const p = closeTab(map.name, m.id);
+            if (p) goTo(p);
+          };
+          return (
+            <div
+              key={`map-${m.id}`}
+              role="tab"
+              aria-selected={selected}
+              tabIndex={0}
+              title={label}
+              onClick={selected ? undefined : toMap}
+              onKeyDown={(e) => {
+                if (!selected && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  toMap();
+                }
+              }}
+              onAuxClick={(e) => {
+                if (e.button === 1 && closable) {
+                  e.preventDefault();
+                  closeMap();
+                }
+              }}
+              className={cn(tabLook(selected, closable), !selected && "cursor-pointer")}
+            >
+              <TabLabel>{label}</TabLabel>
+              {closable ? <TabClose label={label} active={selected} onClose={closeMap} /> : null}
+            </div>
+          );
+        })}
+        {docked.map((t) => tabView(t, t.key === upFront?.key, true))}
+        <button
+          type="button"
+          onClick={() => {
+            setFront((f) => ({ ...f, [here]: null }));
+            openInTab(map.name, []);
+          }}
+          aria-label="New tab"
+          title="New tab"
+          className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center self-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
         >
-          <button type="button" onClick={() => setFront((f) => ({ ...f, [here]: null }))} className="flex cursor-pointer items-center gap-1.5">
-            <MapIcon />
-            Map
-          </button>
-        </div>
-        <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
-          {docked.map((t) => tabView(t, t.key === upFront?.key))}
-        </div>
-        <div className="flex-1 border-b border-border-gray" />
+          <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M5 1.5v7M1.5 5h7" />
+          </svg>
+        </button>
       </header>
       <div
         ref={setMainSlot}
-        className={cn("relative min-h-0 flex-1 bg-surface-container-low", upFront ? "pointer-events-auto" : "invisible")}
+        className={cn("relative min-h-0 flex-1 bg-warm-cream", upFront ? "pointer-events-auto" : "invisible")}
       />
       {upFront?.pty !== undefined ? (
         <div data-chrome className="pointer-events-auto bg-surface-container-low">
@@ -1013,16 +1079,6 @@ function Held({ slot, children }: { slot: HTMLElement | null; children: React.Re
   }, [box, slot]);
   useEffect(() => () => box?.remove(), [box]);
   return box ? createPortal(children, box) : null;
-}
-
-/** The map, as the main view's first tab. */
-function MapIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-3 shrink-0">
-      <path d="M1.5 3.5 5.5 2l5 1.5 4-1.5v10.5l-4 1.5-5-1.5-4 1.5Z" />
-      <path d="M5.5 2v10.5M10.5 3.5V14" />
-    </svg>
-  );
 }
 
 /**

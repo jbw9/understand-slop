@@ -25,7 +25,7 @@ import { SectionTabs, openInTab } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
 import type { Exchange } from "@/lib/keep";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
-import { readSource } from "@/lib/source";
+import { STATIC_MAP, readSource } from "@/lib/source";
 import { useSettings, type Ground } from "@/lib/settings";
 import type { Anatomy, Edge, Node } from "@/lib/data";
 import { BLURB_LINES, type Shape } from "@/lib/view";
@@ -232,8 +232,8 @@ export function Canvas() {
 
   // Right-click offers Claude the nearest thing under the pointer: a card or
   // the open level's header (`data-path`, a whole section), else a row, box,
-  // block or line of code (`data-row`, `data-pick`). Desktop only: the browser
-  // keeps its own menu, and there is no Claude tab to hand anything to.
+  // block or line of code (`data-row`, `data-pick`). In the desktop app, and on
+  // a published map, whose Claude is its panel; a plain browser keeps its own menu.
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   const { ground } = useSettings();
   const [menu, setMenu] = useState<{ x: number; y: number; target: Target; opens: string[] | null } | null>(null);
@@ -262,7 +262,7 @@ export function Canvas() {
   return (
     <div
       className="flex h-full w-full flex-col overflow-hidden bg-warm-cream"
-      onContextMenu={desktop ? onContextMenu : undefined}
+      onContextMenu={desktop || STATIC_MAP ? onContextMenu : undefined}
       onClickCapture={(e) => (e.metaKey || e.ctrlKey ? toTab(e) : undefined)}
       onAuxClickCapture={(e) => (e.button === 1 ? toTab(e) : undefined)}
     >
@@ -421,7 +421,8 @@ function PickMenu({
  * Asks the default agent (Settings) about a section's problems, all of them,
  * straight away: Claude takes them as context with the question, and the
  * button follows them there; another agent gets them in its prompt with the
- * question, sent. Desktop only, where the agents run.
+ * question, sent. In the desktop app, where the agents run, and on a published
+ * map, to its Claude panel.
  */
 function HandProblems({ node, path }: { node: Node; path: string[] }) {
   const map = useMap();
@@ -435,7 +436,7 @@ function HandProblems({ node, path }: { node: Node; path: string[] }) {
     const timer = setTimeout(() => setPasted(false), 2500);
     return () => clearTimeout(timer);
   }, [pasted]);
-  if (!desktop) return null;
+  if (!desktop && !STATIC_MAP) return null;
   const claude = main.id === CLAUDE.id;
   const label = claude
     ? status === "queued"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { closeTab, follow, openTab, readTabs, selectTab, useTabs } from "@/lib/tabs";
@@ -78,7 +78,7 @@ export function SectionTabs({ path }: { path: string[] }) {
       role="tablist"
       data-chrome
       aria-label={`Open sections of ${name}`}
-      className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border-gray bg-surface-container-low px-1.5"
+      className={TAB_STRIP}
     >
       {tabs.map((t) => (
         <SectionTab
@@ -94,7 +94,7 @@ export function SectionTabs({ path }: { path: string[] }) {
         onClick={() => openInTab(name, [])}
         aria-label="New tab"
         title="New tab"
-        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
       >
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
           <path d="M5 1.5v7M1.5 5h7" />
@@ -135,33 +135,69 @@ function SectionTab({
           onClose();
         }
       }}
+      className={cn(tabLook(active, !!onClose), !active && "cursor-pointer")}
+    >
+      <TabLabel>{label}</TabLabel>
+      {onClose ? <TabClose label={label} active={active} onClose={onClose} /> : null}
+    </div>
+  );
+}
+
+/*
+ * The look of a strip of tabs over the main view, shared with the main view's
+ * strip when a workspace tab is dragged into it (components/workspace.tsx),
+ * so the map's tabs read the same with or without one there.
+ */
+
+/** The strip. Its bottom line is an inset shadow rather than a border, so the
+ * tab in front can paint over it and run on into what is below. */
+export const TAB_STRIP =
+  "flex h-8 shrink-0 items-end gap-0.5 overflow-x-auto bg-surface-container-low px-1.5 shadow-[inset_0_-1px_0_var(--color-border-gray)]";
+
+/** A tab. The one in front is the map's own ground, open at the bottom, so it
+ * reads as the top of the page beneath rather than a button on the strip. */
+export function tabLook(active: boolean, closable: boolean) {
+  return cn(
+    "group flex h-[29px] min-w-0 max-w-[200px] shrink-0 items-center gap-1 rounded-t-[4px] border border-b-0 pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+    closable ? "pr-1" : "pr-2.5",
+    active
+      ? "border-border-gray bg-warm-cream font-semibold text-ink"
+      : "border-transparent text-muted-slate hover:bg-surface-container hover:text-ink",
+  );
+}
+
+/** A tab's name. A hidden bold copy holds every tab at the width it has in
+ * front, so bringing one forward doesn't shift the others along. */
+export function TabLabel({ children }: { children: ReactNode }) {
+  return (
+    <span className="grid min-w-0">
+      <span className="truncate [grid-area:1/1]">{children}</span>
+      <span aria-hidden className="invisible truncate font-semibold [grid-area:1/1]">
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/** A tab's ×, shown on the tab in front and on hover. */
+export function TabClose({ label, active, onClose }: { label: string; active: boolean; onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      data-close
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      aria-label={`Close ${label}`}
       className={cn(
-        "group flex h-6 min-w-0 max-w-[200px] shrink-0 items-center gap-1 rounded-[2px] pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-deep-green",
-        onClose ? "pr-1" : "pr-2.5",
-        active
-          ? "border border-border-gray bg-warm-cream font-semibold text-ink"
-          : "cursor-pointer border border-transparent text-muted-slate hover:bg-surface-container hover:text-ink",
+        "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint hover:bg-border-gray hover:text-ink",
+        active ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
       )}
     >
-      <span className="min-w-0 truncate">{label}</span>
-      {onClose ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          aria-label={`Close ${label}`}
-          className={cn(
-            "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint hover:bg-border-gray hover:text-ink",
-            active ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
-          )}
-        >
-          <svg aria-hidden width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-            <path d="m1.5 1.5 5 5m0-5-5 5" />
-          </svg>
-        </button>
-      ) : null}
-    </div>
+      <svg aria-hidden width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+        <path d="m1.5 1.5 5 5m0-5-5 5" />
+      </svg>
+    </button>
   );
 }

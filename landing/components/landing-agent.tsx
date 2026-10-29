@@ -3,7 +3,7 @@ import s from "./landing.module.css";
 /**
  * The app beside the agent writing the code: a pick on the map goes into
  * Claude's next prompt, and after an edit the map redoes the sections it
- * touched. Drawn, not live: the frame above has no agent in it.
+ * touched. Drawn, not live: the frame above has Claude, not the agents.
  */
 export function LandingAgent({ name, sections, changed }: { name: string; sections: string[]; changed: string }) {
   return (

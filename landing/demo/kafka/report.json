@@ -1,6 +1,6 @@
 {
- "repo": "kafka",
- "commit": "d18f93f",
+ "repo": "kafka-controller-quorum",
+ "commit": "cfed4e4",
  "backend": "claude-code",
  "models": {
   "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -9,59 +9,69 @@
   "verify": "global.anthropic.claude-haiku-4-5-20251001-v1:0"
  },
  "elapsed": {
-  "summarize": 0,
-  "author": 1053,
-  "overview": 102,
-  "verify": 423,
-  "total": 1577
+  "summarize": 25,
+  "cut": 46,
+  "author": 439,
+  "overview": 61,
+  "verify": 52,
+  "total": 623
  },
- "usd": 19.98,
- "fullUsd": 21.59,
+ "usd": 5.27,
+ "fullUsd": 5.27,
  "bill": {
   "summarize": {
-   "calls": 37,
-   "cached": 37,
-   "input": 783940,
-   "output": 127300,
-   "cacheRead": 13014,
-   "usd": 0,
-   "fullUsd": 1.6176968999999999
+   "calls": 2,
+   "cached": 0,
+   "input": 69906,
+   "output": 6088,
+   "cacheRead": 0,
+   "usd": 0.11782100000000001,
+   "fullUsd": 0.11782100000000001
+  },
+  "cut": {
+   "calls": 2,
+   "cached": 0,
+   "input": 9596,
+   "output": 3177,
+   "cacheRead": 0,
+   "usd": 0.1393925,
+   "fullUsd": 0.1393925
   },
   "author": {
-   "calls": 9,
+   "calls": 4,
    "cached": 0,
-   "input": 817172,
-   "output": 252759,
-   "cacheRead": 6735216,
-   "usd": 14.793754250000001,
-   "fullUsd": 14.793754250000001
+   "input": 163218,
+   "output": 88155,
+   "cacheRead": 1646668,
+   "usd": 4.04726275,
+   "fullUsd": 4.04726275
   },
   "overview": {
    "calls": 1,
    "cached": 0,
-   "input": 22800,
-   "output": 7440,
-   "cacheRead": 251935,
-   "usd": 0.454455,
-   "fullUsd": 0.454455
+   "input": 13154,
+   "output": 3413,
+   "cacheRead": 247617,
+   "usd": 0.291331,
+   "fullUsd": 0.291331
   },
   "verify": {
-   "calls": 36,
+   "calls": 8,
    "cached": 0,
-   "input": 502217,
-   "output": 79789,
-   "cacheRead": 16034,
-   "usd": 1.0263539000000002,
-   "fullUsd": 1.0263539000000002
+   "input": 113260,
+   "output": 19448,
+   "cacheRead": 0,
+   "usd": 0.238809,
+   "fullUsd": 0.238809
   },
   "verify-review": {
-   "calls": 43,
+   "calls": 5,
    "cached": 0,
-   "input": 374780,
-   "output": 40588,
-   "cacheRead": 868044,
-   "usd": 3.7005495,
-   "fullUsd": 3.7005495
+   "input": 42615,
+   "output": 4859,
+   "cacheRead": 104798,
+   "usd": 0.43527525,
+   "fullUsd": 0.43527525
   }
  },
  "throttled": {
@@ -69,40 +79,44 @@
   "seconds": 0
  },
  "files": {
-  "listed": 7557,
-  "summarised": 290,
+  "listed": 13,
+  "summarised": 11,
   "unassigned": []
  },
  "excluded": [
   {
+   "path": "LICENSE",
+   "reason": "License file, not source code."
+  },
+  {
    "path": "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java",
-   "reason": "Categorized as 'Other files' by the scope definition; it is the monolithic Raft client implementation (>4k lines) whose behaviour is better understood through the interfaces (RaftClient) and state machines it drives, which are all in scope."
+   "reason": "Listed under 'other files (tests, config, docs, assets)' by the repository summary; large client implementation not scoped into the selected source files."
   }
  ],
  "overview": {
   "accepted": true,
-  "turns": 16,
-  "submits": 2,
+  "turns": 15,
+  "submits": 1,
   "lastProblems": []
  },
  "roots": [
   {
-   "id": "formatting-storage",
-   "title": "Formatting Storage",
+   "id": "starting-the-server",
+   "title": "Starting the Server",
    "accepted": true,
-   "turns": 25,
-   "reads": 19,
-   "submits": 4,
+   "turns": 18,
+   "reads": 15,
+   "submits": 1,
    "lastProblems": [],
    "verify": {
-    "nodes": 9,
-    "ok": 9,
+    "nodes": 10,
+    "ok": 10,
     "flagged": 1,
     "rewritten": [
      {
-      "id": "fs-features",
+      "id": "st-fault-handlers",
       "claims": [
-       "MetadataVersion and KRaftVersion define every cluster feature's version range, default levels, and cross-feature dependencies — not_shown: The detail mentions these define version ranges and dependencies. The Feature enum (lines 81-87) takes FeatureVersion[] featureVersions and FeatureVersion latestProduction. The FeatureVersion interface (lines 22-57 in the second file) defines featureLevel(), featureName(), bootstrapMetadataVersion(), and dependencies() returning Map<String, Short>. However, the cited code shows Feature and FeatureVersion interface, not MetadataVersion or KRaftVersion details about dependencies."
+       "There are seven fault handlers: Raft, loader, controller, publishing. — contradicted: Lines 194-266 define: raftManagerFaultHandler (194), metadataLoaderFaultHandler (203), controllerStartupFaultHandler (215), initialBrokerMetadataLoadFaultHandler (226), fatalQuorumControllerFaultHandler (238), nonFatalQuorumControllerFaultHandler (249), metadataPublishingFaultHandler (259). That is 7 fault handlers, but only 4 categories are named in the claim (Raft, loader, controller, publishing). The claim lists fewer categories than exist."
       ]
      }
     ],
@@ -110,163 +124,49 @@
    }
   },
   {
-   "id": "starting-a-node",
-   "title": "Starting a Node",
+   "id": "forming-the-quorum",
+   "title": "Forming the Quorum",
    "accepted": true,
-   "turns": 21,
-   "reads": 16,
-   "submits": 2,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 14,
-    "ok": 14,
-    "flagged": 3,
-    "rewritten": [
-     {
-      "id": "sn-entry",
-      "claims": [
-       "If a directory was never formatted, the code throws a RuntimeException saying 'have you run kafka-storage.sh' but does not name which directory is missing the file when multiple dirs are configured — contradicted: Line 163 throws `RuntimeException(s\"No `meta.properties` found in $logDir (have you run `kafka-storage.sh` ...` which includes the directory name in `$logDir`. The message does identify which specific directory is missing."
-      ]
-     },
-     {
-      "id": "sn-controller-apis",
-      "claims": [
-       "matches to ~35 handler methods"
-      ]
-     }
-    ],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "electing-a-leader",
-   "title": "Electing a Leader",
-   "accepted": true,
-   "turns": 28,
-   "reads": 22,
-   "submits": 4,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 18,
-    "ok": 18,
-    "flagged": 7,
-    "rewritten": [],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "raft-log-and-snapshots",
-   "title": "Raft Log and Snapshots",
-   "accepted": true,
-   "turns": 24,
-   "reads": 18,
-   "submits": 4,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 25,
-    "ok": 25,
-    "flagged": 6,
-    "rewritten": [
-     {
-      "id": "rl-mem-pool",
-      "claims": [
-       "BatchMemoryPool maintains a ConcurrentLinkedQueue of freed buffers — contradicted: Line 34 shows `private final Deque<ByteBuffer> free;` which is initialized on line 52 as `this.free = new ArrayDeque<>(maxRetainedBatches);`. This is an ArrayDeque, not a ConcurrentLinkedQueue."
-      ]
-     }
-    ],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "registering-nodes",
-   "title": "Registering Nodes",
-   "accepted": true,
-   "turns": 19,
-   "reads": 13,
-   "submits": 4,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 15,
-    "ok": 15,
-    "flagged": 2,
-    "rewritten": [],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "active-controller",
-   "title": "Active Controller",
-   "accepted": true,
-   "turns": 28,
-   "reads": 20,
+   "turns": 17,
+   "reads": 9,
    "submits": 6,
    "lastProblems": [],
    "verify": {
-    "nodes": 24,
-    "ok": 24,
-    "flagged": 10,
-    "rewritten": [
-     {
-      "id": "ac-eq-read",
-      "claims": [
-       "It reads from lastStableOffset to see only committed data — not_shown"
-      ]
-     }
-    ],
-    "downgraded": []
-   }
-  },
-  {
-   "id": "metadata-image",
-   "title": "The Metadata Image",
-   "accepted": true,
-   "turns": 31,
-   "reads": 25,
-   "submits": 4,
-   "lastProblems": [],
-   "verify": {
-    "nodes": 14,
-    "ok": 14,
-    "flagged": 6,
+    "nodes": 13,
+    "ok": 13,
+    "flagged": 3,
     "rewritten": [],
     "downgraded": []
    }
   },
   {
-   "id": "propagating-metadata",
-   "title": "Propagating Metadata",
+   "id": "running-the-controller",
+   "title": "Running the Controller",
    "accepted": true,
-   "turns": 24,
-   "reads": 19,
-   "submits": 3,
+   "turns": 7,
+   "reads": 3,
+   "submits": 2,
    "lastProblems": [],
    "verify": {
-    "nodes": 28,
-    "ok": 28,
-    "flagged": 3,
-    "rewritten": [
-     {
-      "id": "propagating-metadata",
-      "claims": [
-       "apply changes to the broker's caches, ACLs, quotas, and coordinators — not_shown"
-      ]
-     }
-    ],
+    "nodes": 12,
+    "ok": 12,
+    "flagged": 0,
+    "rewritten": [],
     "downgraded": []
    }
   },
   {
-   "id": "inspecting-the-cluster",
-   "title": "Inspecting the Cluster",
+   "id": "adding-a-voter",
+   "title": "Adding a Voter",
    "accepted": true,
-   "turns": 23,
-   "reads": 18,
+   "turns": 8,
+   "reads": 3,
    "submits": 3,
    "lastProblems": [],
    "verify": {
-    "nodes": 26,
-    "ok": 26,
-    "flagged": 4,
+    "nodes": 5,
+    "ok": 5,
+    "flagged": 0,
     "rewritten": [],
     "downgraded": []
    }
@@ -276,49 +176,24 @@
   "problems": [],
   "depth": [
    {
-    "id": "formatting-storage",
+    "id": "starting-the-server",
     "depth": 3,
-    "nodes": 9
+    "nodes": 10
    },
    {
-    "id": "starting-a-node",
+    "id": "forming-the-quorum",
     "depth": 3,
-    "nodes": 14
+    "nodes": 13
    },
    {
-    "id": "electing-a-leader",
-    "depth": 4,
-    "nodes": 18
-   },
-   {
-    "id": "raft-log-and-snapshots",
-    "depth": 4,
-    "nodes": 25
-   },
-   {
-    "id": "registering-nodes",
+    "id": "running-the-controller",
     "depth": 3,
-    "nodes": 15
+    "nodes": 12
    },
    {
-    "id": "active-controller",
-    "depth": 3,
-    "nodes": 24
-   },
-   {
-    "id": "metadata-image",
-    "depth": 3,
-    "nodes": 14
-   },
-   {
-    "id": "propagating-metadata",
-    "depth": 3,
-    "nodes": 28
-   },
-   {
-    "id": "inspecting-the-cluster",
-    "depth": 3,
-    "nodes": 26
+    "id": "adding-a-voter",
+    "depth": 2,
+    "nodes": 5
    }
   ]
  },

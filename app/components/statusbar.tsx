@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AgentIcon } from "@/components/agents";
 import { Kbd } from "@/components/button";
 import { useMap } from "@/components/map-context";
 import { openPalette } from "@/components/palette";
 import { openProjects } from "@/components/projects";
 import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
 import type { Node } from "@/lib/data";
+import { STATIC_MAP } from "@/lib/source";
 import { cn } from "@/lib/utils";
 
 /**
@@ -70,13 +72,20 @@ export function StatusBar() {
       <Item title="Go to a level, or run an action" onClick={() => openPalette()}>
         Go to <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl K</Kbd>
       </Item>
-      <Item title="Claude Code & terminal" onClick={toggleWorkspace}>
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
-          <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
-        </svg>
-        Workspace <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl `</Kbd>
-      </Item>
+      {STATIC_MAP ? (
+        <Item title="Ask Claude about this code" onClick={toggleWorkspace}>
+          <AgentIcon id="claude" />
+          Claude <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl `</Kbd>
+        </Item>
+      ) : (
+        <Item title="Claude Code & terminal" onClick={toggleWorkspace}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
+            <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
+          </svg>
+          Workspace <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl `</Kbd>
+        </Item>
+      )}
     </footer>
   );
 }

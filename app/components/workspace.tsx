@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
  * either place: it is moved, never started again.
  */
 
-const TOGGLE = "slop:workspace";
+export const TOGGLE = "slop:workspace";
 export const toggleWorkspace = () => window.dispatchEvent(new Event(TOGGLE));
 
 const WIDTH_KEY = "slop.workspace.width";

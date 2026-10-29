@@ -14,6 +14,7 @@ import { NoProject } from "@/components/welcome";
 import { Palette } from "@/components/palette";
 import { StatusBar } from "@/components/statusbar";
 import { listMaps, loadDemo, loadMap, remoteOf, rootOf } from "@/lib/maps";
+import { ClaudeWeb } from "@/components/claude-web";
 import { STATIC_MAP } from "@/lib/source";
 import type { Progress } from "@/lib/vault";
 
@@ -80,7 +81,7 @@ export default async function Home({
           </Suspense>
         </div>
         <Suspense>
-          <Workspace />
+          {STATIC_MAP ? <ClaudeWeb /> : <Workspace />}
         </Suspense>
         {embed ? null : <StatusBar />}
         <Suspense>

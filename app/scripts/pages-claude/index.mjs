@@ -12,7 +12,9 @@ const MODEL = "us.anthropic.claude-sonnet-4-5-20250929-v1:0";
 const MAX_TOKENS = 1500;
 /** Tool rounds per question: enough to open a few files, not to wander the repo. */
 const MAX_ROUNDS = 5;
-const MAX_CHARS = 4000;
+/** A question carries the section open and what was picked, so it can run long; the whole conversation cannot. */
+const MAX_CHARS = 16000;
+const MAX_TOTAL = 60000;
 const MAX_MESSAGES = 16;
 const MAX_LINES = 300;
 
@@ -37,7 +39,11 @@ function outline() {
 
 const SYSTEM = `You are Claude, in a terminal beside a map of the codebase ${map.RUN.repo} (commit ${map.RUN.commit}), on a public web page. Readers ask you about this code.
 
-Answer in plain text for a terminal: short paragraphs, \`code\` in backticks, no headings or tables. Be concise. Cite code as path:line. Read a file with read_file before saying what it does; never guess at code you have not read. You can only read the files listed below, and cannot run anything or change anything. If asked about something outside this codebase, say briefly that you are here to explain this code.
+The map shows the repository as a tree of sections (user journey, data flow, the code behind each). The reader can attach things they picked on the map: a whole section arrives as a block starting with \`[Map section:\`, one element of a section (a row, a diagram box, a step, a line of code) as one starting with \`[Map element:\`. Each names where it sits on the map, what it says, and the code behind it. Treat what is attached as what the reader is asking about, and read the listed code when it is relevant. Each message also opens with a \`[Reading now:\` line naming the section the reader has open, followed by that section when it has changed since the last message. When they ask what they are reading, or say "this" or "here" with nothing attached, they mean that section: summarize or answer from it and the code it lists. It is told to you, not shown to them, so never mention having been told where they are.
+
+Answer in Markdown, which the page renders: short paragraphs, lists, \`code\`, and fenced code blocks for code worth quoting; no headings above ###. Be concise. Cite code as path:line. Read a file with read_file before saying what it does; never guess at code you have not read. You can only read the files listed below, and cannot run anything or change anything. If asked about something outside this codebase, say briefly that you are here to explain this code.
+
+You also drive what the reader is looking at. When they ask how something works, call show_section with the map section it is about before you explain, naming it by its title exactly as the outline below spells it (the words before the dash), so they are looking at the thing you are explaining as you explain it. Show the most specific section that fits; show another as your answer moves to it. Never announce that you are showing them something — they can see it — though naming the section is fine where the prose wants it.
 
 Files: ${Object.keys(source).join(", ")}
 
@@ -61,6 +67,13 @@ const TOOLS = {
             required: ["path"],
           },
         },
+      },
+    },
+    {
+      toolSpec: {
+        name: "show_section",
+        description: "Open a section of the map for the reader, by its title as the outline spells it.",
+        inputSchema: { json: { type: "object", properties: { section: { type: "string" } }, required: ["section"] } },
       },
     },
   ],
@@ -90,9 +103,9 @@ function parse(event) {
     if (m?.role !== (i % 2 ? "assistant" : "user") || typeof m.text !== "string" || !m.text.trim()) return "messages alternate, user first, each with text";
     if (m.text.length > MAX_CHARS) return `each message at most ${MAX_CHARS} characters`;
   }
+  if (msgs.reduce((n, m) => n + m.text.length, 0) > MAX_TOTAL) return `at most ${MAX_TOTAL} characters in all`;
   if (msgs.length % 2 === 0) return "the last message is the reader's";
-  const at = typeof body.at === "string" ? body.at.slice(0, 300) : "";
-  return { at, messages: msgs.map((m) => ({ role: m.role, content: [{ text: m.text }] })) };
+  return { messages: msgs.map((m) => ({ role: m.role, content: [{ text: m.text }] })) };
 }
 
 export const handler = awslambda.streamifyResponse(async (event, stream) => {
@@ -106,9 +119,8 @@ export const handler = awslambda.streamifyResponse(async (event, stream) => {
     send("error", req);
     return stream.end();
   }
-  // The whole prompt is the same for every reader, so it is cached; where the reader is comes after.
+  // The whole prompt is the same for every reader, so it is cached; where the reader is comes in their message.
   const system = [{ text: SYSTEM }, { cachePoint: { type: "default" } }];
-  if (req.at) system.push({ text: `The reader has open: ${req.at}` });
   const messages = req.messages;
   try {
     for (let round = 0; round <= MAX_ROUNDS; round++) {
@@ -143,7 +155,13 @@ export const handler = awslambda.streamifyResponse(async (event, stream) => {
       if (stop !== "tool_use") break;
       const results = content
         .filter((b) => b.toolUse)
-        .map(({ toolUse: { toolUseId, input } }) => {
+        .map(({ toolUse: { toolUseId, name, input } }) => {
+          // The page resolves the name against its map and moves there (components/claude-web.tsx).
+          if (name === "show_section") {
+            // The outline writes "title — what it is"; a name copied whole is cut back to its title.
+            send("show", String(input.section ?? "").split(" — ")[0].trim());
+            return { toolResult: { toolUseId, content: [{ text: "Shown." }] } };
+          }
           const end = input.end ?? (input.start ?? 1) + MAX_LINES - 1;
           send("tool", `Read ${input.path}:${input.start ?? 1}-${end}`);
           return { toolResult: { toolUseId, content: [{ text: readFile(input) }] } };

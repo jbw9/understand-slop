@@ -35,6 +35,19 @@ interface State {
   picks: Record<number, Pick[]>;
 }
 
+/**
+ * A published map has no tabs: its one Claude is the panel (components/claude-web.tsx),
+ * which holds the queue itself and sends it with the reader's next question.
+ */
+const WEB = !!process.env.NEXT_PUBLIC_STATIC_MAP;
+export const WEB_TAB = 0;
+const PROMPT = "slop:web-prompt";
+export const onWebPrompt = (f: (text: string) => void) => {
+  const on = (e: Event) => f((e as CustomEvent<string>).detail);
+  window.addEventListener(PROMPT, on);
+  return () => window.removeEventListener(PROMPT, on);
+};
+
 let state: State = { target: null, picks: {} };
 const listeners = new Set<() => void>();
 const set = (next: State) => {
@@ -133,6 +146,7 @@ export function ask(t: Target, question: string) {
 
 /** Typed into a program's prompt as a paste, then Enter, a moment later so it is not part of the paste. */
 export function prompt(pty: number, text: string) {
+  if (WEB) return void window.dispatchEvent(new CustomEvent(PROMPT, { detail: text }));
   void invoke("pty_write", { id: pty, data: `\x1b[200~${text}\x1b[201~` });
   setTimeout(() => void invoke("pty_write", { id: pty, data: "\r" }), 150);
 }
@@ -151,11 +165,11 @@ async function whenUp(pty: number) {
 async function add(pty: number, t: Target) {
   const mine = state.picks[pty] ?? [];
   if (mine.some((p) => p.key === t.key && p.status === "queued")) return;
-  await invoke("context_add", { id: pty, text: t.text });
+  if (!WEB) await invoke("context_add", { id: pty, text: t.text });
   // A sent pick picked again goes again: it moves to the end, queued.
   const rest = (state.picks[pty] ?? []).filter((p) => p.key !== t.key);
   withPicks(pty, [...rest, { ...t, status: "queued" }]);
-  watch();
+  if (!WEB) watch();
 }
 
 /** Take back a pick that has not gone out yet. One already sent is only dropped from view. */
@@ -163,7 +177,7 @@ export async function unpick(pty: number, key: string) {
   const mine = state.picks[pty] ?? [];
   const gone = mine.find((p) => p.key === key);
   if (!gone) return;
-  if (gone.status === "queued" && (await invoke<boolean>("context_pending", { id: pty }))) {
+  if (gone.status === "queued" && !WEB && (await invoke<boolean>("context_pending", { id: pty }))) {
     const keep = mine.filter((p) => p.status === "queued" && p.key !== key);
     await invoke("context_set", { id: pty, text: keep.map((p) => p.text).join("\n\n") });
   }
@@ -171,8 +185,16 @@ export async function unpick(pty: number, key: string) {
 }
 
 export async function clearPicks(pty: number) {
-  await invoke("context_set", { id: pty, text: "" });
+  if (!WEB) await invoke("context_set", { id: pty, text: "" });
   withPicks(pty, []);
+}
+
+/** The web panel's prompt hook: what is queued, as text for this prompt, and marked sent. */
+export function takePicks(pty: number): string[] {
+  const mine = state.picks[pty] ?? [];
+  const queued = mine.filter((p) => p.status === "queued").map((p) => p.text);
+  if (queued.length) withPicks(pty, mine.map((p) => ({ ...p, status: "sent" as const })));
+  return queued;
 }
 
 /* ── handing to any agent ─────────────────────────────────────── */

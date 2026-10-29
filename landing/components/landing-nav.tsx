@@ -26,7 +26,15 @@ export function LandingNav({ github }: { github: string }) {
   return (
     <header ref={bar} className={s.nav} data-float={floating}>
       <div className={s.navBar}>
-        <a className={s.mark} href="#">
+        <a
+          className={s.mark}
+          href="#"
+          onClick={(e) => {
+            // "#" scrolls the window, and the window never scrolls here.
+            e.preventDefault();
+            bar.current!.parentElement!.scrollTo({ top: 0 });
+          }}
+        >
           Mira
         </a>
         <nav aria-label="Sections">

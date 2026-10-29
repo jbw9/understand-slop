@@ -39,7 +39,7 @@ export function LandingAgent({ name, sections, changed }: { name: string; sectio
               {sections.map((t, i) => (
                 <li key={t} data-changed={t === changed || undefined}>
                   <span className={s.n}>{i + 1}</span>
-                  {t}
+                  <span className={s.miniTitle}>{t}</span>
                   {t === changed ? <em>changed</em> : null}
                 </li>
               ))}

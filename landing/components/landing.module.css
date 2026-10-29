@@ -11,16 +11,13 @@
   --color-mint-success: #d5ebdb;
   --on-green: #fff;
 }
-:root[data-theme="dark"] .page,
-.page .dark {
+:root[data-theme="dark"] .page {
   --color-deep-green: #4ac777;
   --color-mint-success: #173020;
   --on-green: #0f1a12;
 }
-/* The landing page. Its palette is the app's own theme, renamed short, and
-   named again on the dark panel, whose [data-chrome] changes what they point at. */
-.page,
-.dark {
+/* The landing page. Its palette is the app's own theme, renamed short. */
+.page {
   --cream: var(--color-warm-cream);
   --white: var(--color-pure-white);
   --low: var(--color-surface-container-low);
@@ -701,7 +698,7 @@
   margin-top: var(--gap);
 }
 .how h2,
-.dark h2,
+.band h2,
 .section h2 {
   margin: 0;
   font-size: clamp(36px, 4.8vw, 68px);
@@ -1105,16 +1102,16 @@
 }
 
 /* ── beside your agent ───────────────────────────────── */
-/* The one dark panel, edge to edge but for a margin, to break the page's run of
+/* The one band, edge to edge but for a margin, to break the page's run of
    paper: lit green from above, with a little grain. */
-.dark {
+.band {
   margin: var(--gap) 12px 0;
   padding: clamp(80px, 9vw, 128px) 0;
   border: 1px solid var(--border);
   border-radius: var(--frame-r);
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E"),
     radial-gradient(ellipse 70% 55% at 50% 0%, color-mix(in srgb, var(--green) 18%, transparent), transparent 70%),
-    var(--color-surface);
+    var(--low);
   color: var(--ink);
 }
 .section {

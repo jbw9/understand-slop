@@ -1,2 +1,2 @@
-:HL["/understand-slop/kafka/_next/static/chunks/097sxslvs91u-.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"wrR_ftjLIwU5nBZ9avLh3"}
+:HL["/understand-slop/kafka/_next/static/chunks/3e2n8as6ujfcv.css","style"]
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"HRP3tu7JLSsO69COZMBOy"}

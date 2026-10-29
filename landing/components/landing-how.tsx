@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import s from "./landing.module.css";
 
-export interface HowProps {
+interface HowProps {
   /** The map the little windows show. */
   name: string;
   steps: string[];

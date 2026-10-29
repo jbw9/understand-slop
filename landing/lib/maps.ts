@@ -10,7 +10,7 @@ export interface DemoNode {
 
 /** What the page reads of a committed map: its run, and its tree's titles. */
 export interface DemoFile {
-  RUN: { files?: number; elapsed?: string; commit?: string };
+  RUN: { files?: number; commit?: string };
   AUTHORED: DemoNode[];
 }
 

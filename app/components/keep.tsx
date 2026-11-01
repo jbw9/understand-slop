@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/button";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AgentIcon, CLAUDE } from "@/components/agents";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
@@ -10,21 +10,14 @@ import { useMap } from "@/components/map-context";
 import { Prose } from "@/components/state";
 import { ask, section } from "@/lib/context";
 import { draftPrompt, parseBlock, revisePrompt, type Exchange } from "@/lib/keep";
-import { readSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import type { Anatomy, Origin } from "@/lib/data";
 
 /**
- * Keeping an answer, and correcting a section.
+ * Keeping an answer: it adds something the map never knew, marked as the
+ * reader's (lib/overlay.ts).
  *
- * Both are the same gesture from the reader's side — "the map should say this"
- * — and they differ in who is right about the code. Keeping an answer adds
- * something the map never knew, marked as the reader's (lib/overlay.ts).
- * Correcting says the map is wrong about code that is right there, so it goes
- * down the path an agent's `slop-map-fix` already takes (lib/vault.ts): the
- * section is re-authored against the real file, and stays code-derived.
- *
- * Desktop only. Both need a Claude tab, and the tabs are the desktop app's.
+ * Desktop only. It needs a Claude tab, and the tabs are the desktop app's.
  */
 
 const noSubscribe = () => () => {};
@@ -210,168 +203,19 @@ export function KeepAnswer({
   );
 }
 
-/* ── correct a section ────────────────────────────────────────── */
-
-/**
- * Two honest routes, and the difference matters.
- *
- * "Say what's wrong" hands a note to the updater, which re-reads the code and
- * rewrites the section — so the result is still derived from the repository and
- * keeps its state. "Write it myself" is the reader's own words, stored in the
- * overlay and marked as theirs. Blurring the two would put a person's sentence
- * where a compiler's finding is expected.
- */
-export function CorrectSection({ path, onClose }: { path: string[]; onClose: () => void }) {
-  const map = useMap();
-  const node = path.length ? map.nodeAt(path) : null;
-  const where = node?.title ?? map.RUN.repo;
-  const [route, setRoute] = useState<"tell" | "write">("tell");
-  const [note, setNote] = useState("");
-  const [detail, setDetail] = useState(node?.detail ?? "");
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-
-  async function tell() {
-    setBusy(true);
-    const found = await invoke<{ path: string } | null>("claude_detect", {
-      configured: readSettings().claudePath || null,
-    }).catch(() => null);
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "update",
-        root: map.RUN.root,
-        claude: found?.path,
-        turn: { corrections: [{ section: path.join(" › ") || where, note: note.trim() }] },
-      }),
-    })
-      .then((r) => r.json())
-      .catch(() => null);
-    setBusy(false);
-    // Only a project of the reader's own can be re-authored; an example
-    // describes some other copy of its code.
-    if (!res || res.error) {
-      setProblem(res?.error ?? "Could not send that.");
-      return;
-    }
-    if (res.skipped) {
-      setProblem("This map is an example, so it cannot be re-read. Import the checkout as a project to correct it.");
-      return;
-    }
-    onClose();
-  }
-
-  async function write() {
-    setBusy(true);
-    const res = await fetch("/api/overlay", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        action: "add",
-        map: map.name,
-        kind: "field",
-        path,
-        field: "detail",
-        value: detail.trim(),
-        origin: { by: "user", at: new Date().toISOString() },
-      }),
-    }).catch(() => null);
-    setBusy(false);
-    if (!res?.ok) {
-      setProblem("That could not be saved to this project.");
-      return;
-    }
-    onClose();
-    window.location.reload();
-  }
-
-  return (
-    <Overlay onClose={onClose}>
-      <div className={cn(DIALOG, "max-w-[620px]")}>
-        <header className="border-b border-border-gray px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-ink">Fix “{where}”</h2>
-          <div className="mt-2.5 flex gap-1">
-            {(
-              [
-                ["tell", "Say what's wrong"],
-                ["write", "Write it myself"],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => {
-                  setRoute(k);
-                  setProblem(null);
-                }}
-                className={cn(
-                  "cursor-pointer rounded-[2px] px-2.5 py-1 text-[12.5px]",
-                  route === k ? "bg-surface-container text-ink" : "text-muted-slate hover:text-ink",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        <div className="px-5 py-4">
-          {route === "tell" ? (
-            <Field
-              label="What does it get wrong, and what is true?"
-              hint="Claude re-reads the code for this section and rewrites it. The result stays read from the code."
-            >
-              <textarea
-                className={cn(INPUT, "min-h-[96px] resize-y")}
-                value={note}
-                placeholder="the capacity check is in the edge function too, not only the table"
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </Field>
-          ) : (
-            <Field label="What should it say?" hint="Your words, kept as yours and marked “Added by you”. No code is read.">
-              <textarea
-                className={cn(INPUT, "min-h-[96px] resize-y")}
-                value={detail}
-                onChange={(e) => setDetail(e.target.value)}
-              />
-            </Field>
-          )}
-          {problem ? <p className="mt-3 text-[12.5px] text-clay-ink">{problem}</p> : null}
-        </div>
-
-        <footer className="flex items-center justify-end gap-1.5 border-t border-border-gray px-5 py-3">
-          <button type="button" className={QUIET} onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={PRIMARY}
-            disabled={busy || (route === "tell" ? !note.trim() : !detail.trim() || detail.trim() === node?.detail)}
-            onClick={route === "tell" ? tell : write}
-          >
-            {busy ? "Sending…" : route === "tell" ? "Have Claude fix it" : "Save my words"}
-          </button>
-        </footer>
-      </div>
-    </Overlay>
-  );
-}
-
 /** The button on a level's header that keeps Claude's last answer. Desktop only, and only for a project. */
 export function FixAndKeep({ path, answer }: { path: string[]; answer: Exchange | null }) {
   const desktop = useDesktop();
-  const [open, setOpen] = useState<"keep" | null>(null);
+  const [open, setOpen] = useState(false);
   if (!desktop) return null;
   return (
     <>
       {answer ? (
-        <Button onClick={() => setOpen("keep")} icon={<AgentIcon id={CLAUDE.id} />} title="Turn Claude's last answer into a block on this level">
+        <Button onClick={() => setOpen(true)} icon={<AgentIcon id={CLAUDE.id} />} title="Turn Claude's last answer into a block on this level">
           Keep the answer
         </Button>
       ) : null}
-      {open === "keep" && answer ? <KeepAnswer exchange={answer} path={path} onClose={() => setOpen(null)} /> : null}
+      {open && answer ? <KeepAnswer exchange={answer} path={path} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }

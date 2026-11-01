@@ -508,7 +508,7 @@ export interface Run {
   url?: string;
 }
 
-/** Stable id for an anatomy row, so a wire can anchor to it. */
+/** Stable id for an anatomy row. */
 export function rowId(owner: string, key: string | number) {
   return `${owner}:${key}`;
 }

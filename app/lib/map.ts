@@ -36,9 +36,8 @@ export const TOP_ID = "";
 /* ── rows that go deeper ──────────────────────────────────────
    A row carrying `under` becomes a REAL child node, spliced in beside whatever
    children its owner already had. See the note in lib/data.ts: the synthesized
-   id is rowId(owner, key), the same id the row's anchor registers under, so the
-   row and the card it opens share an identity and connect without a special
-   case in the wire layer. */
+   id is rowId(owner, key), the row's own id, so the row and the card it opens
+   share an identity. */
 
 /** The rows of one anatomy block that carry `under`, as {key, label, blocks}. */
 function deepRows(blocks: Anatomy[]) {

@@ -10,10 +10,10 @@ import { readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
 import { check } from "./check";
 
-/** lib/data.ts from `State` to just before the old inline fixture. */
+/** lib/data.ts from `State` to its end. */
 export function typeReference(): string {
   const src = readFileSync("lib/data.ts", "utf8");
-  return src.slice(src.indexOf("export type State"), src.indexOf("export const RUN"));
+  return src.slice(src.indexOf("export type State"));
 }
 
 const STATES = ["derived", "partial", "inferred"];

@@ -21,7 +21,6 @@
 use portable_pty::CommandBuilder;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Every prompt first says where the user is on the map (`.where`, kept by the
 /// app as they move; see `place`): its first line always, so "what am I
@@ -30,6 +29,12 @@ use std::process::Command;
 /// Then it drains the queue: the `mv` is atomic, so a pick appended while
 /// Claude reads lands in a fresh file for the next prompt rather than being lost.
 const HOOK: &str = r#"f="$SLOP_CONTEXT"; w="$f.where"; if [ -s "$w" ]; then head -n 1 "$w"; cmp -s "$w" "$w.sent" || { tail -n +2 "$w"; cp "$w" "$w.sent"; }; fi; [ -s "$f" ] || exit 0; mv "$f" "$f.sent" && cat "$f.sent""#;
+
+/// The scripts beside the launcher, on the PATH of Claude's Bash tool. The
+/// tab's PATH has them, but Claude Code builds its Bash tool's environment
+/// from a shell of its own, which on Windows drops them; what a session-start
+/// hook writes to `$CLAUDE_ENV_FILE` is what every command there starts with.
+const ON_PATH: &str = r#"[ -n "$CLAUDE_ENV_FILE" ] && [ -n "$SLOP_BIN" ] || exit 0; d="$SLOP_BIN"; command -v cygpath >/dev/null 2>&1 && d=$(cygpath -u "$d"); printf 'export PATH="%s:$PATH"\n' "$d" >> "$CLAUDE_ENV_FILE""#;
 
 /// After a tool that can change files: this turn may have edited code.
 const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
@@ -202,9 +207,7 @@ pub struct Detected {
     version: Option<String>,
 }
 
-fn home() -> Option<PathBuf> {
-    std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(Into::into)
-}
+use crate::proc::home;
 
 fn expand(p: &str, home: Option<&Path>) -> PathBuf {
     match (p.strip_prefix("~/"), home) {
@@ -215,6 +218,7 @@ fn expand(p: &str, home: Option<&Path>) -> PathBuf {
 
 /// Where the installers put it. An app started from the desktop has no shell
 /// PATH, so these are checked before asking a login shell.
+#[cfg(not(windows))]
 fn candidates(home: Option<&Path>) -> Vec<PathBuf> {
     let mut out = Vec::new();
     if let Some(h) = home {
@@ -226,6 +230,50 @@ fn candidates(home: Option<&Path>) -> Vec<PathBuf> {
     out
 }
 
+/// The native installer's, then npm's.
+#[cfg(windows)]
+fn candidates(home: Option<&Path>) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if let Some(h) = home {
+        out.push(h.join(r".local\bin\claude.exe"));
+        out.push(h.join(r".claude\local\claude.exe"));
+    }
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        out.push(PathBuf::from(appdata).join(r"npm\claude.cmd"));
+    }
+    out
+}
+
+#[cfg(not(windows))]
+fn on_path() -> Option<PathBuf> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
+    let out = crate::proc::command(shell).args(["-lc", "command -v claude"]).output().ok()?;
+    let p = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
+    p.is_file().then_some(p)
+}
+
+#[cfg(windows)]
+fn on_path() -> Option<PathBuf> {
+    crate::proc::where_is("claude").into_iter().find(|p| p.is_file())
+}
+
+/// Git for Windows' bash, which runs the launcher and the scripts beside it
+/// on Windows, as it runs Claude Code's own hooks and Bash tool there: where
+/// Claude Code is told it is, else beside the `git` on PATH, else where its
+/// installer puts it.
+#[cfg(windows)]
+fn git_bash() -> Option<PathBuf> {
+    let told = std::env::var_os("CLAUDE_CODE_GIT_BASH_PATH").map(PathBuf::from);
+    let beside_git = crate::proc::where_is("git")
+        .into_iter()
+        .filter_map(|g| Some(g.parent()?.parent()?.join(r"bin\bash.exe")));
+    let installed = ["ProgramFiles", "ProgramW6432", "LOCALAPPDATA"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .map(|d| PathBuf::from(d).join(r"Git\bin\bash.exe"));
+    told.into_iter().chain(beside_git).chain(installed).find(|p| p.is_file())
+}
+
 fn find(configured: Option<&str>, home: Option<&Path>) -> Option<PathBuf> {
     if let Some(c) = configured.map(str::trim).filter(|c| !c.is_empty()) {
         let p = expand(c, home);
@@ -234,10 +282,7 @@ fn find(configured: Option<&str>, home: Option<&Path>) -> Option<PathBuf> {
     if let Some(p) = candidates(home).into_iter().find(|p| p.is_file()) {
         return Some(p);
     }
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-    let out = Command::new(shell).args(["-lc", "command -v claude"]).output().ok()?;
-    let p = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
-    p.is_file().then_some(p)
+    on_path()
 }
 
 /// The configured path if it exists, else wherever Claude Code is installed.
@@ -245,7 +290,7 @@ fn find(configured: Option<&str>, home: Option<&Path>) -> Option<PathBuf> {
 #[tauri::command]
 pub async fn claude_detect(configured: Option<String>) -> Option<Detected> {
     let path = find(configured.as_deref(), home().as_deref())?;
-    let version = Command::new(&path)
+    let version = crate::proc::command(&path)
         .arg("--version")
         .output()
         .ok()
@@ -413,8 +458,24 @@ fn launcher() -> std::io::Result<PathBuf> {
     install(&dir.join("slop-map-list"), LIST)?;
     let path = dir.join("slop-claude");
     install(&path, LAUNCHER)?;
+    #[cfg(windows)]
+    let path = {
+        let cmd = dir.join("slop-claude.cmd");
+        install(&cmd, LAUNCHER_CMD)?;
+        cmd
+    };
     Ok(path)
 }
+
+/// What cmd and PowerShell find as `slop-claude` on Windows: the launcher,
+/// run by Git for Windows' bash (`git_bash`).
+#[cfg(windows)]
+const LAUNCHER_CMD: &str = "@echo off\r\n\
+if not defined SLOP_BASH (\r\n\
+  echo Claude Code in Mira needs Git for Windows: https://git-scm.com/download/win 1>&2\r\n\
+  exit /b 1\r\n\
+)\r\n\
+\"%SLOP_BASH%\" \"%~dp0slop-claude\" %*\r\n";
 
 fn install(path: &Path, script: &str) -> std::io::Result<()> {
     if std::fs::read_to_string(path).ok().as_deref() != Some(script) {
@@ -447,6 +508,7 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     let hook = |c: &str| serde_json::json!({ "type": "command", "command": c });
     let settings = serde_json::json!({
         "hooks": {
+            "SessionStart": [{ "hooks": [hook(ON_PATH)] }],
             "UserPromptSubmit": [{ "hooks": [hook(HOOK), status("working")] }],
             "PreToolUse": [
                 { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] },
@@ -480,7 +542,12 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     if let Some(m) = launch.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
         cmd.env("SLOP_CLAUDE_MODEL", m);
     }
+    #[cfg(windows)]
+    if let Some(bash) = git_bash() {
+        cmd.env("SLOP_BASH", bash);
+    }
     if let Some(dir) = path.parent() {
+        cmd.env("SLOP_BIN", dir);
         let rest = std::env::var_os("PATH").unwrap_or_default();
         let joined = std::env::join_paths(std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&rest)))
             .map_err(std::io::Error::other)?;
@@ -530,6 +597,8 @@ pub fn pending(queue: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::process::Command;
 
     #[test]
     fn expands_home() {
@@ -543,14 +612,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join("claude");
         std::fs::write(&bin, "").unwrap();
-        let local = dir.path().join(".local/bin");
+        let local = dir.path().join(".local").join("bin");
+        let installed = local.join(if cfg!(windows) { "claude.exe" } else { "claude" });
         std::fs::create_dir_all(&local).unwrap();
-        std::fs::write(local.join("claude"), "").unwrap();
+        std::fs::write(&installed, "").unwrap();
 
         assert_eq!(find(Some(bin.to_str().unwrap()), Some(dir.path())), Some(bin));
         assert_eq!(find(Some("/nope/claude"), Some(dir.path())), None);
         // Blank means auto-detect, and the installer's spot comes first.
-        assert_eq!(find(Some("  "), Some(dir.path())), Some(local.join("claude")));
+        assert_eq!(find(Some("  "), Some(dir.path())), Some(installed));
     }
 
     /// Runs the hook the way Claude Code does, against `queue`.

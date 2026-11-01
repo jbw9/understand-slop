@@ -148,8 +148,14 @@ pub fn preview_external(url: String) -> Result<(), String> {
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err("Only a web address opens in the browser.".into());
     }
-    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
-    std::process::Command::new(opener).arg(&url).spawn().map(|_| ()).map_err(|e| e.to_string())
+    let mut opener = if cfg!(windows) {
+        let mut c = crate::proc::command("rundll32");
+        c.arg("url.dll,FileProtocolHandler");
+        c
+    } else {
+        crate::proc::command(if cfg!(target_os = "macos") { "open" } else { "xdg-open" })
+    };
+    opener.arg(&url).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 /* ── HTTP, as little of it as a proxy needs ───────────────────── */

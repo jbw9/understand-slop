@@ -12,16 +12,8 @@ import { readSource, SOURCE_URL } from "@/lib/source";
 import { highlight, langOf, TOKEN_COLOR } from "@/lib/highlight";
 
 /**
- * Level 2 renders in the SHAPE of the thing it describes, and every row is a
- * wire endpoint.
- *
- * The rows are the point. A foreign key wire lands on the exact column it
- * references, not on the card containing it — card-to-card edges say "Billing
- * relates to Database", which is true and nearly contentless. Row-to-row edges
- * answer an actual question.
- *
- * Selection follows the same model: clicking a row lights its chain and greys
- * everything else, so the eye lands on "this value here → that value there".
+ * Level 2 renders in the SHAPE of the thing it describes, and the rows are the
+ * point. Clicking a row lights it and greys everything else.
  */
 
 export interface RowCtx {

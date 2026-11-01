@@ -393,7 +393,6 @@ export async function update(args: string[]) {
           pic.boxes = pic.boxes.filter((x) => !gone.has(x.id));
           pic.arrows = pic.arrows.filter((x) => !gone.has(x.from) && !gone.has(x.to));
         }
-        map.LINKS = map.LINKS.filter((l) => !l.from.startsWith(`${t.node.id}:`) && !l.to.startsWith(`${t.node.id}:`));
       }
       say(`${t.node.id}: removed`);
     } else if (node) {

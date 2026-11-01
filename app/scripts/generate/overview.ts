@@ -107,7 +107,7 @@ export function overviewProblems(o: any, roots: Node[], repo: string): string[] 
   if (diagrams.length !== 1) return [`${OVERVIEW_ID}: anatomy needs exactly one diagram, has ${diagrams.length}`];
   const opened = diagrams[0].boxes.map((x: any) => x.opens).filter(Boolean);
   const out = roots.filter((r) => opened.filter((id: string) => id === r.id).length !== 1).map((r) => `${OVERVIEW_ID}: diagram needs exactly one box that opens root "${r.id}"`);
-  out.push(...check({ AUTHORED: roots, OVERVIEW: toOverview(as), LINKS: [] }, repo, { generated: true }).problems.filter((p) => p.includes(OVERVIEW_ID)));
+  out.push(...check({ AUTHORED: roots, OVERVIEW: toOverview(as) }, repo, { generated: true }).problems.filter((p) => p.includes(OVERVIEW_ID)));
   return out;
 }
 

@@ -197,7 +197,7 @@ export async function main(args: string[]) {
     });
     const top = overview && { ...overview };
     if (top && EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary", "walkthrough"] as const) delete top[k];
-    return { RUN: run, ...(top ? { OVERVIEW: top } : {}), AUTHORED, LINKS: [] };
+    return { RUN: run, ...(top ? { OVERVIEW: top } : {}), AUTHORED };
   };
 
   progress.stage = "author";

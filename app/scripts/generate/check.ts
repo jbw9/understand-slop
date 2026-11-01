@@ -49,7 +49,7 @@ export function fileReader(repo: string) {
  * three levels under every root.
  */
 export function check(
-  map: Pick<MapFile, "AUTHORED" | "OVERVIEW" | "LINKS"> & { RUN?: Pick<MapFile["RUN"], "explain"> },
+  map: Pick<MapFile, "AUTHORED" | "OVERVIEW"> & { RUN?: Pick<MapFile["RUN"], "explain"> },
   repo: string,
   opts: { generated?: boolean; only?: Set<string> } = {},
 ): CheckResult {
@@ -68,7 +68,7 @@ export function check(
   // screen actually reads, not the authored one.
   const built = new Map<string, Set<string>>();
   const index = (ns: any[]) => ns.forEach((n) => { built.set(n.id, new Set((n.children ?? []).map((c: any) => c.id))); index(n.children ?? []); });
-  const tree = buildMap({ RUN: {} as any, AUTHORED: map.AUTHORED, LINKS: [] }, "");
+  const tree = buildMap({ RUN: {} as any, AUTHORED: map.AUTHORED }, "");
   const L0 = tree.L0;
   index(L0);
   // The overview's boxes open the roots, as a node's open its children.
@@ -199,10 +199,6 @@ export function check(
     // The repository's own level (D60) is held to what any level is.
     if (map.OVERVIEW) walk({ ...map.OVERVIEW, id: OVERVIEW_ID, title: "Overview", sub: map.OVERVIEW.sub ?? "", children: [] }, 0);
     if (gen && map.OVERVIEW) problems.push(...startProblems(map.OVERVIEW, (p) => p.length > 0 && tree.nodeAt(p) !== null, level));
-    for (const l of map.LINKS ?? []) for (const k of [l.from, l.to]) {
-      const owner = k.slice(0, k.indexOf(":"));
-      if (!ids.has(owner)) problems.push(`LINK owner ${owner} unknown`);
-    }
   }
   return { problems, roots, refs, sources };
 }

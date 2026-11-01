@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 /**
  * Magnifying the open level: pinch, ⌘/Ctrl-scroll, or ⌘ +/−/0.
@@ -17,11 +17,6 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode,
 const MIN = 1;
 const MAX = 4;
 const STEPS = [1, 1.25, 1.5, 2, 2.5, 3, 4];
-
-const Scale = createContext(1);
-
-/** The magnification the level is drawn at, for anything that measures it. */
-export const useZoomScale = () => useContext(Scale);
 
 /** A pinch the desktop shell took from WebKitGTK (src-tauri/src/lib.rs). */
 const PINCH = "slop:pinch";
@@ -141,7 +136,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
   }, [scrollRef]);
 
   return (
-    <Scale.Provider value={zoom}>
+    <>
       <div ref={ref}>{children}</div>
       {zoom === 1 ? null : (
         <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center overflow-hidden rounded-[2px] border border-border-gray bg-pure-white text-[12.5px] text-ink shadow-lift">
@@ -171,7 +166,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
           </button>
         </div>
       )}
-    </Scale.Provider>
+    </>
   );
 }
 

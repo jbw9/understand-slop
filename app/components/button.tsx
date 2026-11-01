@@ -19,12 +19,10 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?: "alarm";
   /** Drawn before the label. */
   icon?: React.ReactNode;
-  /** A key that does the same thing, shown after the label. */
-  kbd?: string;
 };
 
 export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
-  { variant = "outline", size = "md", tone, icon, kbd, className, children, type = "button", ...rest },
+  { variant = "outline", size = "md", tone, icon, className, children, type = "button", ...rest },
   ref,
 ) {
   return (
@@ -51,7 +49,6 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
     >
       {icon}
       {children}
-      {kbd ? <Kbd className="ml-1">{kbd}</Kbd> : null}
     </button>
   );
 });

@@ -52,11 +52,11 @@ export function Building({ progress, onOpen }: { progress: Progress; onOpen: (pa
 }
 
 /** Where the run is, of the five things it does. */
-export function Stages({ progress, className }: { progress: Progress; className?: string }) {
+export function Stages({ progress }: { progress: Progress }) {
   const at = STAGES.findIndex(([k]) => k === progress.stage);
   const done = progress.stage === "done";
   return (
-    <ol className={cn("flex flex-wrap items-center gap-x-2 gap-y-2 text-[12.5px]", className)}>
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[12.5px]">
       {STAGES.map(([k, label], i) => {
         const past = done || (at >= 0 && i < at);
         const now = i === at;

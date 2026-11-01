@@ -159,11 +159,7 @@ export async function readImage(root: RepoRoot, file: string): Promise<{ body: B
  * `fixture` is what the MAP claims sits at these lines, which the repository
  * itself has no opinion about; undefined when the caller made no claim.
  */
-export const readSlice = async (
-  req: SliceRequest,
-  fixture: string | undefined,
-  root: RepoRoot,
-): Promise<Slice> => {
+export const readSlice: ReadSlice = async (req, fixture, root) => {
   const real = await contain(root, req.file);
   if (!real) throw new Refused("outside repo");
   if (!(await stat(real)).isFile()) throw new Refused("not a file");
@@ -184,10 +180,6 @@ export const readSlice = async (
     matchesFixture: fixture === undefined || quoteHolds(fixture, code),
   };
 };
-
-/** Conformance to the frozen contract, checked by the compiler. */
-const _readSliceConforms: ReadSlice = readSlice;
-void _readSliceConforms;
 
 /**
  * Does the fixture's quote still hold against what is on disk?

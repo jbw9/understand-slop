@@ -1,24 +1,15 @@
-import { cn } from "@/lib/utils";
-
 /** The header every settings-style panel opens with. */
 export function PanelHead({
   title,
   note,
   right,
-  className,
 }: {
   title: string;
   note?: string;
   right?: React.ReactNode;
-  className?: string;
 }) {
   return (
-    <header
-      className={cn(
-        "flex items-start gap-4 border-b border-border-gray bg-surface px-5 py-4",
-        className,
-      )}
-    >
+    <header className="flex items-start gap-4 border-b border-border-gray bg-surface px-5 py-4">
       <div className="min-w-0 flex-1">
         <h2 className="text-[15px] font-semibold leading-tight tracking-[-0.01em] text-ink">
           {title}

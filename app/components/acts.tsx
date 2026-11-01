@@ -40,6 +40,8 @@ export function Acts() {
           if (!path) return setMissed(a.section);
           return goTo(path);
         }
+        // The workspace opens these in the Preview; they never reach here.
+        if (a.verb === "web") return;
         // Empty `from` and null `to` are the defaults the diff API already
         // has for an absent parameter, so they pass straight through as
         // undefined. Resolving a phrase like "last commit by someone" is

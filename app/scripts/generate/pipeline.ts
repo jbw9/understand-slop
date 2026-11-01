@@ -109,7 +109,13 @@ export async function main(args: string[]) {
   // a line per root. A stale file from a previous run would be read as this
   // one's, so the first write happens before any work.
   const progress: Progress = { startedAt: new Date(t0).toISOString(), stage: "summarize", roots: [] };
-  const flush = () => atomic(`${out}/progress.json`, JSON.stringify(progress, null, 1) + "\n");
+  // When the stage last changed: the app's time-left guess needs it for the
+  // stages that report nothing until they end.
+  let stageNow = progress.stage;
+  const flush = () => {
+    if (progress.stage !== stageNow || !progress.stageAt) [stageNow, progress.stageAt] = [progress.stage, new Date().toISOString()];
+    atomic(`${out}/progress.json`, JSON.stringify(progress, null, 1) + "\n");
+  };
   // A root's latest submit while it is still being checked, which the app
   // shows dimmed (D69). Its own file, beside the map: it is not the map.
   const drafts: Record<string, Node> = {};

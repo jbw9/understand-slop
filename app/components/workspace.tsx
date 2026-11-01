@@ -303,7 +303,8 @@ export function Workspace() {
   // and so does a click or a key, to be real input (components/preview.tsx).
   const latest = useRef({ here, shown: false });
   const answer = async ({ id, tab, cmd }: { id: number; tab: number; cmd: Call }) => {
-    const reply = (ok: boolean, value: unknown) => void invoke("preview_reply", { id, ok, value });
+    // Id 0 is the app's own call (a `web` act), which nobody waits on.
+    const reply = (ok: boolean, value: unknown) => id && void invoke("preview_reply", { id, ok, value });
     try {
       const root = tabsNow.current.find((x) => x.pty === tab)?.cwd ?? latest.current.here;
       let handle = previewOf(root);
@@ -429,7 +430,9 @@ export function Workspace() {
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
-            acts?.forEach(announceAct);
+            acts?.forEach((a) =>
+              a.verb === "web" ? void answering.current({ id: 0, tab: pty, cmd: { op: "navigate", url: a.to } }) : announceAct(a),
+            );
             // Same array when nothing moved: a new one every tick would reset
             // the paste effect's timer below before it could ever fire.
             const statusOf = (x: Tab): Status | undefined =>

@@ -878,6 +878,7 @@ export function Preview({
               <>
                 <p className="text-[13px] text-ink">Nothing to preview yet</p>
                 <p className="text-[12px] text-muted-slate">Type an address above, like localhost:3000, or anything to search the web.</p>
+                <p className="text-[12px] text-muted-slate">Claude browses here too: ask it to look something up, and the page opens in this tab.</p>
               </>
             )}
           </div>

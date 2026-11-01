@@ -443,6 +443,8 @@ export function mapFileOf(id: string): string | undefined {
 export interface Progress {
   startedAt: string;
   stage: string;
+  /** When the run entered its current stage. */
+  stageAt?: string;
   roots: { id: string; title: string; sub?: string; status: "queued" | "drafting" | "done" | "failed"; detail?: string }[];
   /** While the code is read: every file to read, those read so far in the order they were, and what the last few are for. */
   reading?: { files: string[]; read: string[]; recent: { path: string; purpose: string }[] };

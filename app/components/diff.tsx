@@ -3,7 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { BOX_H, layoutDiagram } from "@/lib/diagram";
 import type { Anatomy } from "@/lib/data";
-import type { BlockDiff, MapDiff, PartDiff, RowDiff, Verdict } from "@/lib/diff";
+import type { BlockDiff, Commit, FileChange, MapDiff, PartDiff, RowDiff, Verdict } from "@/lib/diff";
+import { hunksOf, type HunkLines } from "@/lib/hunks";
+import { TOKEN_COLOR, highlight, langOf } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,7 +51,7 @@ export interface DiffState {
   error?: string;
   from?: string;
   to?: string;
-  commits: { commit: string; subject: string }[];
+  commits: Commit[];
   setRange: (from?: string, to?: string) => void;
   off: () => void;
 }
@@ -114,7 +116,7 @@ export function DiffMode({ map, children }: { map: string; children: React.React
 
 export function DiffProvider({ map, on, onOff, children }: { map: string; on: boolean; onOff: () => void; children: React.ReactNode }) {
   const [range, setR] = useState<{ from?: string; to?: string }>({});
-  const [commits, setCommits] = useState<{ commit: string; subject: string }[]>([]);
+  const [commits, setCommits] = useState<Commit[]>([]);
   /**
    * The answer and the question it answers, in one piece of state. `loading` is
    * then derived — whether the answer in hand is for the comparison being
@@ -177,18 +179,81 @@ export function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouch
   );
 }
 
-/** The changed files with their line counts — the file-level answer. */
+/** The changed files with their line counts, each opening onto its hunks. */
 export function FileList({ diff }: { diff: MapDiff }) {
-  if (!diff.files.length) return <span className="text-muted-slate">Nothing changed.</span>;
+  const [open, setOpen] = useState<string | null>(null);
+  if (!diff.files.length) return <p className="text-[13px] text-muted-slate">Nothing changed.</p>;
   return (
-    <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+    <ul className="mt-1.5 flex flex-col gap-1">
       {diff.files.map((f) => (
-        <span key={f.path} className="font-mono text-[11px]">
-          <span className="text-on-surface">{f.path}</span>{" "}
-          <span style={{ color: TINT.added.ink }}>+{f.added}</span> <span style={{ color: TINT.removed.ink }}>−{f.removed}</span>
-        </span>
+        <li key={f.path}>
+          <button
+            type="button"
+            aria-expanded={open === f.path}
+            onClick={() => setOpen(open === f.path ? null : f.path)}
+            className="flex w-full cursor-pointer items-baseline gap-2 rounded-[2px] px-1 py-0.5 text-left font-mono text-[11px] hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
+          >
+            <span className="w-2 shrink-0 text-faint">{open === f.path ? "▾" : "▸"}</span>
+            <span className="min-w-0 flex-1 truncate text-on-surface">{f.path}</span>
+            <span className="tnum shrink-0" style={{ color: TINT.added.ink }}>
+              +{f.added}
+            </span>
+            <span className="tnum shrink-0" style={{ color: TINT.removed.ink }}>
+              −{f.removed}
+            </span>
+          </button>
+          {open === f.path ? <Hunks file={f} /> : null}
+        </li>
       ))}
-    </span>
+    </ul>
+  );
+}
+
+/**
+ * A file's hunks as the code pane draws code (components/anatomy.tsx
+ * `SourceView`): real line numbers, old and new, and the code coloured by
+ * lib/highlight.ts. Each line is coloured on its own, so a block comment
+ * spanning a hunk boundary reads as code; that is the price of drawing only
+ * what changed.
+ */
+export function Hunks({ file, only }: { file: FileChange; only?: (h: HunkLines) => boolean }) {
+  const hunks = useMemo(() => hunksOf(file.diff).filter((h) => !only || only(h)), [file.diff, only]);
+  const lang = langOf(file.path);
+  if (!hunks.length) return <p className="px-1 py-1 text-[12px] text-muted-slate">No lines to show: the file is binary, or only its mode changed.</p>;
+  const BG = { "+": TINT.added.surface, "-": TINT.removed.surface, " ": undefined };
+  return (
+    <div className="mt-1 overflow-x-auto rounded-[2px] border border-border-gray bg-code">
+      <pre className="min-w-full font-mono text-[12px] leading-[1.6]">
+        {hunks.map((h, i) => (
+          <div key={i} className={cn(i > 0 && "border-t border-border-gray")}>
+            <div className="sticky left-0 px-3 py-0.5 text-[10.5px] text-faint">
+              line {h.newStart}
+            </div>
+            {h.lines.map((l, j) => (
+              <div key={j} className="flex" style={{ background: BG[l.kind] }}>
+                <span className="tnum w-9 shrink-0 select-none pr-1.5 text-right text-faint">{l.old ?? ""}</span>
+                <span className="tnum w-9 shrink-0 select-none border-r border-border-gray pr-1.5 text-right text-faint">{l.new ?? ""}</span>
+                <span
+                  className="w-4 shrink-0 select-none text-center"
+                  style={{ color: l.kind === "+" ? TINT.added.ink : l.kind === "-" ? TINT.removed.ink : undefined }}
+                >
+                  {l.kind === " " ? "" : l.kind === "+" ? "+" : "−"}
+                </span>
+                <code className="whitespace-pre pr-4 text-code-plain">
+                  {l.text
+                    ? highlight(l.text, lang)[0].map((t, k) => (
+                        <span key={k} style={{ color: TOKEN_COLOR[t.kind] }}>
+                          {t.text}
+                        </span>
+                      ))
+                    : " "}
+                </code>
+              </div>
+            ))}
+          </div>
+        ))}
+      </pre>
+    </div>
   );
 }
 

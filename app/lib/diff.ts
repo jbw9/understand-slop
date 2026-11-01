@@ -19,14 +19,16 @@
  *   - any two commits, for reviewing someone else's.
  *
  * Section verdicts need the map's line references to mean something on the
- * `from` side, which is true only when `from` IS the map's commit. Any other
- * pair gets `basis: "files"` and says so, rather than citing sections against
- * numbering they were never written for.
+ * `from` side. From the map's own commit they do as written; from any other,
+ * they are carried there first through the diff between the two (`mapDiff`).
+ * Only a map whose commit the checkout no longer has gets `basis: "files"`,
+ * and says so, rather than citing sections against numbering they were never
+ * written for.
  */
 
 import type { Anatomy, Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
-import { changes, diffOf, git, hasAt, refs, touches, type Change } from "@/scripts/generate/gitdiff";
+import { changes, diffOf, git, hasAt, moved, refs, touches, type Base, type Change } from "@/scripts/generate/gitdiff";
 
 export type Verdict = "added" | "removed" | "changed" | "untouched";
 
@@ -158,14 +160,17 @@ function walk(roots: Node[]): Placed[] {
  * `to` side has and the `from` side does not can only be seen by comparing two
  * trees, which `treeDiff` does.
  */
-function verdicts(map: MapFile, byPath: Map<string, Change>): SectionDiff[] {
+function verdicts(map: MapFile, byPath: Map<string, Change>, carry?: (file: string) => Change | undefined): SectionDiff[] {
   return walk(map.AUTHORED).map(({ node, path }) => {
     const files = new Map<string, { s: number; e: number }[]>();
     let gone = 0;
     let cited = 0;
-    for (const r of refs(node)) {
-      const c = byPath.get(r.file);
+    for (const ref of refs(node)) {
+      const c = byPath.get(ref.file);
       if (!c) continue;
+      // A ref numbered to the map's text, carried to the `from` side's.
+      const k = carry?.(ref.file);
+      const r = k ? { ...ref, s: moved(k, ref.s), e: moved(k, ref.e) } : ref;
       cited++;
       if (c.after === null) gone++;
       if (!touches(c, r.s, r.e)) continue;
@@ -431,44 +436,91 @@ export function resolveRef(root: string, phrase: string): Resolved | { error: st
  * `to` undefined is the working tree, uncommitted work included. `other` is the
  * `to` side's own map where one exists; without it there is one map, so the
  * answer is section verdicts off the code and no block diff.
+ *
+ * `seen` is the project's base.json: once an update has run, the map's lines
+ * are numbered to the code as that update saw it, not to its commit, so the
+ * working-tree diff starts from that text exactly as the updater's does.
  */
-export function mapDiff(root: string, from: string | undefined, to: string | undefined, map: MapFile, other?: MapFile): MapDiff {
+export function mapDiff(root: string, from: string | undefined, to: string | undefined, map: MapFile, seen: Base = {}, other?: MapFile): MapDiff {
   const base = resolve(root, from ?? map.RUN.commit);
   const head = to ? resolve(root, to) : null;
   if (!base) throw new RangeError(`no such commit: ${from ?? map.RUN.commit}`);
   if (to && !head) throw new RangeError(`no such commit: ${to}`);
 
-  const found = head ? between(root, base, head) : changes(root, base, {});
+  const mapped = resolve(root, map.RUN.commit);
+  // `seen` is the map's text, so it is the starting point only from the map's commit.
+  const found = head ? between(root, base, head) : changes(root, base, base === mapped ? seen : {});
   const files = found.map(counted);
   const byPath = new Map(found.map((c) => [c.path, c]));
 
-  // The map's line references are numbered at the map's commit. Checking them
-  // against a diff that starts anywhere else would cite real sections against
-  // lines they were never written for, which is worse than declining to.
-  const mapped = resolve(root, map.RUN.commit);
   if (other) {
     const { sections, blocks } = treeDiff(map, other);
     return { basis: "sections", from: base, to: head, files, sections, blocks };
   }
-  if (mapped && base === mapped) return { basis: "sections", from: base, to: head, files, sections: verdicts(map, byPath), blocks: [] };
-  return {
-    basis: "files",
-    from: base,
-    to: head,
-    why: `The map was made at ${mapped || map.RUN.commit}, and only one map exists, so its line references say nothing about ${base}. Comparing files instead.`,
-    files,
-    sections: [],
-    blocks: [],
+  if (!mapped)
+    return {
+      basis: "files",
+      from: base,
+      to: head,
+      why: `The map was made at ${map.RUN.commit}, which this checkout no longer has, so its line references cannot be carried to ${base}. Comparing files instead.`,
+      files,
+      sections: [],
+      blocks: [],
+    };
+
+  // The map's line references are numbered to the text it was made from: its
+  // commit, or base.json after an update. A diff starting anywhere else is
+  // checked against them only once they are carried through the change from
+  // that text to `from`, file by file, the same arithmetic the updater moves
+  // refs with. A ref whose own lines changed on the way lands near, not on.
+  const carried = new Map<string, Change | undefined>();
+  const start = (path: string) => (path in seen ? seen[path] : hasAt(root, mapped, path) ? git(root, "show", `${mapped}:${path}`) : null);
+  const carry = (path: string) => {
+    if (!carried.has(path)) {
+      const before = start(path);
+      const after = hasAt(root, base, path) ? git(root, "show", `${base}:${path}`) : null;
+      carried.set(path, before !== null && after !== null && before !== after ? { path, before, after, ...diffOf(path, before, after) } : undefined);
+    }
+    return carried.get(path);
   };
+  const exact = base === mapped && (!head || !Object.keys(seen).length);
+  return { basis: "sections", from: base, to: head, files, sections: verdicts(map, byPath, exact ? undefined : carry), blocks: [] };
 }
 
-/** The last `n` commits, newest first, for the two pickers. */
-export function commitList(root: string, n = 50): { commit: string; subject: string }[] {
-  return git(root, "log", `-n${n}`, "--format=%h\t%s")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => {
-      const at = l.indexOf("\t");
-      return { commit: l.slice(0, at), subject: l.slice(at + 1) };
-    });
+/** One commit, as the commit list and the timeline draw it. */
+export interface Commit {
+  sha: string;
+  short: string;
+  /** ISO 8601, the author's date. */
+  at: string;
+  author: string;
+  subject: string;
+  added: number;
+  removed: number;
+  /** Every path it touched; a rename is its new path. */
+  files: string[];
+}
+
+/**
+ * The last `n` commits, newest first, from one `git log`. A binary file counts
+ * no lines (numstat prints `-`), and a rename `a => b` or `dir/{a => b}` is
+ * the path it became.
+ */
+export function commitLog(root: string, n = 50): Commit[] {
+  const out: Commit[] = [];
+  for (const block of git(root, "log", `-n${n}`, "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s", "--numstat").split("\x1e")) {
+    const [head, ...rest] = block.split("\n");
+    const [sha, short, at, author, subject] = head.split("\x1f");
+    if (!sha || subject === undefined) continue;
+    const c: Commit = { sha, short, at, author, subject, added: 0, removed: 0, files: [] };
+    for (const line of rest) {
+      const [a, r, path] = line.split("\t");
+      if (path === undefined) continue;
+      c.added += Number(a) || 0;
+      c.removed += Number(r) || 0;
+      c.files.push(path.replace(/\{[^{}]* => ([^{}]*)\}/, "$1").replace(/^.* => /, "").replace(/\/\//g, "/"));
+    }
+    out.push(c);
+  }
+  return out;
 }

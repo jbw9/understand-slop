@@ -5,7 +5,8 @@ import { DIALOG, Overlay, QUIET } from "@/components/dialog";
 import { FileList, OPEN_DIFF, Pill, TINT, WORD, openDiff, useDiff } from "@/components/diff";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
-import type { SectionDiff, Verdict } from "@/lib/diff";
+import { cn } from "@/lib/utils";
+import type { Commit, SectionDiff, Verdict } from "@/lib/diff";
 
 /**
  * The list of what a commit changed, and a way to each one.
@@ -16,7 +17,13 @@ import type { SectionDiff, Verdict } from "@/lib/diff";
  * This is the changed-files list a diff is normally read through — every
  * section with a verdict, the files behind it, and a click that OPENS that
  * level. The panel routes; the level itself is still where the red and green
- * are (components/diff.tsx), which is why nothing here draws a hunk.
+ * are (components/diff.tsx). The one place lines are drawn is under a file
+ * the reader opens, which is the answer to "what did this commit actually do"
+ * that a section verdict cannot give.
+ *
+ * Above the list are the commits, newest first: picking one shows what that
+ * commit did (`<it>~1..<it>`), the question a reader of someone else's work
+ * starts with. Two arbitrary ends stay one click away.
  *
  * Mounted once beside the other dialogs and opened by the same event that
  * turns diff mode on, so there is one way in. Leaving is `off`, below.
@@ -37,6 +44,7 @@ export function DiffPanel() {
   const { nodeAt } = useMap();
   const [shown, setShown] = useState(false);
   const [only, setOnly] = useState<Kind | null>(null);
+  const [pairs, setPairs] = useState(false);
 
   useEffect(() => {
     const on = () => setShown(true);
@@ -68,7 +76,21 @@ export function DiffPanel() {
           <p className="mt-0.5 text-[12px] text-muted-slate">
             Pick one to open the level it is on — red is gone, green is new, there.
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Commits
+            commits={d.commits}
+            picked={d.to && d.from === `${d.to}~1` ? d.to : d.from || d.to ? "pair" : ""}
+            onPick={(c) => (c ? d.setRange(`${c.sha}~1`, c.sha) : d.setRange())}
+          />
+          <button
+            type="button"
+            aria-expanded={pairs}
+            onClick={() => setPairs(!pairs)}
+            className="mt-2 cursor-pointer text-[12px] text-deep-green hover:underline"
+          >
+            Compare two commits…
+          </button>
+          {pairs ? (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
             <label className="flex items-center gap-1.5">
               <span className="font-mono text-[10.5px] text-faint">from</span>
               <select
@@ -79,8 +101,8 @@ export function DiffPanel() {
               >
                 <option value="">the map&apos;s commit</option>
                 {d.commits.map((c) => (
-                  <option key={c.commit} value={c.commit}>
-                    {c.commit} {c.subject.slice(0, 60)}
+                  <option key={c.sha} value={c.short}>
+                    {c.short} {c.subject.slice(0, 60)}
                   </option>
                 ))}
               </select>
@@ -95,13 +117,14 @@ export function DiffPanel() {
               >
                 <option value="">your working tree</option>
                 {d.commits.map((c) => (
-                  <option key={c.commit} value={c.commit}>
-                    {c.commit} {c.subject.slice(0, 60)}
+                  <option key={c.sha} value={c.short}>
+                    {c.short} {c.subject.slice(0, 60)}
                   </option>
                 ))}
               </select>
             </label>
           </div>
+          ) : null}
           {/* The counts are the filter: there is no second row of controls
               saying the same numbers twice. */}
           {counts.some((c) => c.n) ? (
@@ -142,9 +165,10 @@ export function DiffPanel() {
               there are no sections to route to, so it says why and lists the
               files it can stand behind. */}
           {diff && !d.loading && diff.basis === "files" ? (
-            <p className="text-[12.5px] leading-snug text-on-surface-variant">
-              {diff.why} <FileList diff={diff} />
-            </p>
+            <>
+              <p className="text-[12.5px] leading-snug text-on-surface-variant">{diff.why}</p>
+              <FileList diff={diff} />
+            </>
           ) : null}
           {diff && !d.loading && diff.basis === "sections" && !moved.length ? (
             <p className="text-[13px] text-muted-slate">No section changed between these two.</p>
@@ -157,6 +181,12 @@ export function DiffPanel() {
                 </li>
               ))}
             </ul>
+          ) : null}
+          {diff && !d.loading && diff.basis === "sections" && diff.files.length ? (
+            <section className="mt-4">
+              <h3 className="text-[12px] font-medium text-muted-slate">Every file it changed — open one to read its lines</h3>
+              <FileList diff={diff} />
+            </section>
           ) : null}
         </div>
 
@@ -214,5 +244,54 @@ function Entry({ section, trail, onOpen }: { section: SectionDiff; trail: string
         </span>
       ) : null}
     </button>
+  );
+}
+
+const when = (iso: string) => {
+  const d = new Date(iso);
+  const thisYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: thisYear ? undefined : "numeric" });
+};
+
+/**
+ * The commits to pick from, newest first, under the comparison the map
+ * starts on. `picked` is the sha shown, "" for the map's own default, or
+ * "pair" when two ends were picked below and no one row is it.
+ */
+function Commits({ commits, picked, onPick }: { commits: Commit[]; picked: string; onPick: (c: Commit | null) => void }) {
+  const row =
+    "flex w-full cursor-pointer items-baseline gap-2 border-b border-border-gray px-2.5 py-1.5 text-left last:border-b-0 hover:bg-surface-container-low focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green";
+  const on = "bg-surface-container-low";
+  return (
+    <ul aria-label="Commits" className="mt-3 max-h-[208px] overflow-auto rounded-[3px] border border-border-gray">
+      <li>
+        <button type="button" aria-pressed={picked === ""} onClick={() => onPick(null)} className={cn(row, picked === "" && on)}>
+          <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink">Since the map was made, your uncommitted work included</span>
+        </button>
+      </li>
+      {commits.map((c) => (
+        <li key={c.sha}>
+          <button
+            type="button"
+            aria-pressed={picked === c.short || picked === c.sha}
+            onClick={() => onPick(c)}
+            className={cn(row, (picked === c.short || picked === c.sha) && on)}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px] text-ink">{c.subject}</span>
+              <span className="block truncate text-[11px] text-muted-slate">
+                {c.author} · {when(c.at)} · <span className="font-mono">{c.short}</span>
+              </span>
+            </span>
+            <span className="tnum shrink-0 font-mono text-[10.5px]" style={{ color: TINT.added.ink }}>
+              +{c.added}
+            </span>
+            <span className="tnum shrink-0 font-mono text-[10.5px]" style={{ color: TINT.removed.ink }}>
+              −{c.removed}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

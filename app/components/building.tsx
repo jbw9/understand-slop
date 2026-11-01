@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/state";
 import { useMap } from "@/components/map-context";
@@ -51,32 +51,113 @@ export function Building({ progress, onOpen }: { progress: Progress; onOpen: (pa
   );
 }
 
+/*
+ * How long each stage takes on a typical first map, in minutes, which is all
+ * the run's share of the bar and its time-left guess go on until a stage
+ * reports how far it has got.
+ */
+const TYPICAL: Record<string, number> = { summarize: 6, cut: 2, author: 10, overview: 3, verify: 4 };
+const TOTAL = Object.values(TYPICAL).reduce((a, b) => a + b, 0);
+
+/** How far through its own stage the run is, 0–1. */
+function within(progress: Progress, now: number) {
+  const { stage, reading, roots } = progress;
+  if (stage === "summarize" && reading?.files.length) return reading.read.length / reading.files.length;
+  if (stage === "author" && roots.length) {
+    const settled = roots.filter((r) => r.status === "done" || r.status === "failed").length;
+    const drafting = roots.filter((r) => r.status === "drafting").length;
+    return (settled + drafting / 3) / roots.length;
+  }
+  // A stage that says nothing until it ends: closer to done the longer it
+  // runs, never quite there.
+  const since = progress.stageAt ? (now - Date.parse(progress.stageAt)) / 60000 : 0;
+  return 0.95 * (1 - Math.exp(-since / (TYPICAL[stage] ?? 3)));
+}
+
+/** A clock that moves on its own between the run's reports. */
+function useNow(on: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [on]);
+  return now;
+}
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
 /** Where the run is, of the five things it does. */
 export function Stages({ progress }: { progress: Progress }) {
   const at = STAGES.findIndex(([k]) => k === progress.stage);
   const done = progress.stage === "done";
+  const live = at >= 0;
+  const tick = useNow(live);
+  const part = live ? Math.min(1, within(progress, tick)) : 0;
+  const share = (i: number) => (done || (at >= 0 && i < at) ? 1 : i === at ? part : 0);
+  const fraction = STAGES.reduce((a, [k], i) => a + share(i) * TYPICAL[k], 0) / TOTAL;
+  const started = progress.startedAt ? Date.parse(progress.startedAt) : NaN;
+  const elapsed = Number.isNaN(started) ? undefined : Math.max(0, (tick - started) / 1000);
+  // Too early, the pace says nothing; after that, the time so far scaled to
+  // what is left, rounded so it does not twitch every second.
+  const left = elapsed !== undefined && elapsed > 30 && fraction > 0.03 ? (elapsed * (1 - fraction)) / fraction : undefined;
+  const leftLabel =
+    left === undefined ? "estimating time left…" : left < 60 ? "under a minute left" : `about ${Math.ceil(left / 60)} min left`;
   return (
-    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[12.5px]">
-      {STAGES.map(([k, label], i) => {
-        const past = done || (at >= 0 && i < at);
-        const now = i === at;
-        return (
-          <li key={k} className="flex items-center gap-2">
-            {i ? <span aria-hidden className="h-px w-5 bg-border-strong" /> : null}
-            <span
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-2.5 py-1",
-                now ? "border-mint-line bg-mint-success text-deep-green" : past ? "border-border-gray text-on-surface-variant" : "border-dashed border-border-gray text-faint",
-              )}
-              aria-current={now ? "step" : undefined}
-            >
-              <span aria-hidden className={cn("size-1.5 rounded-full", now ? "animate-pulse bg-deep-green" : past ? "bg-mint-line" : "bg-border-strong")} />
-              {past ? `${label} ✓` : label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="flex flex-col gap-4">
+      {live ? (
+        <div className="max-w-[1100px]">
+          <div className="flex items-baseline gap-3 font-mono text-[11.5px]">
+            <span className="text-[13px] font-semibold text-deep-green tabular-nums">{Math.floor(fraction * 100)}%</span>
+            {elapsed !== undefined ? <span className="text-faint tabular-nums">{clock(elapsed)} elapsed</span> : null}
+            <span className="ml-auto text-on-surface-variant">{leftLabel}</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.floor(fraction * 100)}
+            aria-valuetext={leftLabel}
+            className="mt-2 flex gap-[3px]"
+          >
+            {STAGES.map(([k, label], i) => (
+              <div
+                key={k}
+                title={label}
+                style={{ flexGrow: TYPICAL[k] }}
+                className={cn("relative h-1.5 basis-0 overflow-hidden rounded-full bg-border-gray", i === at && "shimmer")}
+              >
+                <div
+                  className={cn("h-full rounded-full transition-[width] duration-700 ease-out", i < at ? "bg-mint-line" : "bg-deep-green")}
+                  style={{ width: `${share(i) * 100}%` }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[12.5px]">
+        {STAGES.map(([k, label], i) => {
+          const past = done || (at >= 0 && i < at);
+          const now = i === at;
+          return (
+            <li key={k} className="flex items-center gap-2">
+              {i ? <span aria-hidden className="h-px w-5 bg-border-strong" /> : null}
+              <span
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-2.5 py-1",
+                  now ? "border-mint-line bg-mint-success text-deep-green" : past ? "border-border-gray text-on-surface-variant" : "border-dashed border-border-gray text-faint",
+                )}
+                aria-current={now ? "step" : undefined}
+              >
+                <span aria-hidden className={cn("size-1.5 rounded-full", now ? "animate-pulse bg-deep-green" : past ? "bg-mint-line" : "bg-border-strong")} />
+                {past ? `${label} ✓` : label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

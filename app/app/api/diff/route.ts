@@ -1,12 +1,15 @@
-import { commitList, mapDiff, resolveRef, type Resolved } from "@/lib/diff";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { commitLog, mapDiff, resolveRef, type Resolved } from "@/lib/diff";
 import { loadMap, rootOf } from "@/lib/maps";
+import { projectDir } from "@/lib/vault";
 
 /**
  * What a commit did to the map the reader has open.
  *
  * `GET ?map=&from=&to=` — `from` defaults to the commit the map was made at and
  * `to` to the working tree, which is the comparison that answers "what have I
- * changed since". `GET ?map=&commits=1` is the list the two pickers offer.
+ * changed since". `GET ?map=&commits=1` is the commit list the panel offers.
  *
  * `from` and `to` may also be English, because an agent passes a reader's words
  * through unaltered: "last commit by hindra2" is resolved by `resolveRef` and
@@ -32,7 +35,7 @@ export async function GET(request: Request) {
   if (!open) return bad("No such map.", 404);
   const root = rootOf(open.file.RUN);
 
-  if (q.get("commits")) return Response.json({ commits: commitList(root), at: open.file.RUN.commit });
+  if (q.get("commits")) return Response.json({ commits: commitLog(root), at: open.file.RUN.commit });
 
   const rev = (k: string) => {
     const v = q.get(k);
@@ -72,7 +75,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const diff = mapDiff(root, from, to, open.file);
+    const seen = join(projectDir(open.name), "base.json");
+    const diff = mapDiff(root, from, to, open.file, existsSync(seen) ? JSON.parse(readFileSync(seen, "utf8")) : {});
     return Response.json(read.from || read.to ? { ...diff, read } : diff);
   } catch (e) {
     return bad(e instanceof RangeError ? e.message : "Could not read the checkout.", e instanceof RangeError ? 400 : 500);

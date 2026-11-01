@@ -121,7 +121,8 @@ running as a web app beside you, exactly as the user sees it, and any page on th
 to check that what you built works: take a screenshot, then click, type and read the page, as \
 you would in a browser. They are your browser here: to look something up or read a page on \
 the web, navigate the preview there (an address, or words to search for) instead of opening \
-another browser, so the user sees it beside you. `device` does the same on an iOS Simulator or \
+another browser, so the user sees it beside you. WebFetch and WebSearch are fine for reading \
+docs as text; what they read opens in the preview as well. `device` does the same on an iOS Simulator or \
 Android emulator running in the app.";
 
 /// One JSON-RPC message; nothing back for a notification.

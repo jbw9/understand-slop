@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { auditOf } from "@/lib/maps";
 import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
 
@@ -22,7 +22,7 @@ const bad = (message: string, status = 400) => Response.json({ error: message },
 function turnOf(v: unknown): Turn | undefined {
   if (!v || typeof v !== "object") return undefined;
   const t = v as { transcript?: unknown; corrections?: unknown };
-  const sessions = join(homedir(), ".claude", "projects") + "/";
+  const sessions = join(homedir(), ".claude", "projects") + sep;
   const transcript =
     typeof t.transcript === "string" && t.transcript.endsWith(".jsonl") && resolve(t.transcript).startsWith(sessions) ? resolve(t.transcript) : undefined;
   const corrections = (Array.isArray(t.corrections) ? t.corrections : [])

@@ -141,6 +141,8 @@ const git = (root: string, ...args: string[]) => {
 /** Where the checkout's code is now, to tell a map that has fallen behind. */
 export const headOf = (root: string) => git(root, "rev-parse", "--short", "HEAD");
 
+const TSX = join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
@@ -220,7 +222,7 @@ export class ImportError extends Error {}
 export type Explain = NonNullable<Run["explain"]>;
 
 export function importProject(rootIn: string, nameIn: string | undefined, claude?: string, explain?: Explain): Project {
-  const root = resolve(rootIn.replace(/^~(?=$|\/)/, homedir()));
+  const root = resolve(rootIn.replace(/^~(?=$|[\\/])/, homedir()));
   if (!existsSync(root) || !statSync(root).isDirectory()) throw new ImportError("That is not a directory.");
   const v = readVault();
   const same = v.projects.find((p) => p.root === root);
@@ -250,7 +252,7 @@ export function importProject(rootIn: string, nameIn: string | undefined, claude
 export function createProject(parentIn: string, nameIn: string): Project {
   const name = nameIn.trim();
   if (!name || /[\\/]/.test(name) || name === "." || name === "..") throw new ImportError("Give it a folder name, without slashes.");
-  const parent = resolve(parentIn.replace(/^~(?=$|\/)/, homedir()));
+  const parent = resolve(parentIn.replace(/^~(?=$|[\\/])/, homedir()));
   const root = join(parent, name);
   if (existsSync(root) && (!statSync(root).isDirectory() || readdirSync(root).length))
     throw new ImportError(`${root} already exists. Use an existing folder instead.`);
@@ -295,11 +297,12 @@ export function generate(id: string, claude?: string, explain?: Explain): Projec
   rmSync(join(dir, "drafts.json"), { force: true });
   const log = openSync(join(dir, "generate.log"), "w");
   const child = spawn(
-    "npx",
-    ["-y", "tsx", "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--name", id, "--out", dir],
+    process.execPath,
+    [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--name", id, "--out", dir],
     {
       cwd: process.cwd(),
       detached: true,
+      windowsHide: true,
       stdio: ["ignore", log, log],
       env: { ...process.env, SLOP_BACKEND: "claude-code", SLOP_EXPLAIN: p.explain ?? "full", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
     },
@@ -327,7 +330,8 @@ export function cancel(id: string) {
   if (!p?.map.pid) return;
   update(id, (q) => (q.map.status = "cancelled"));
   try {
-    process.kill(-p.map.pid, "SIGTERM");
+    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(p.map.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+    else process.kill(-p.map.pid, "SIGTERM");
   } catch {
     /* already gone */
   }
@@ -400,11 +404,12 @@ export function updateMap(root: string, claude?: string, turn?: Turn): Project |
   const dir = projectDir(p.id);
   const log = openSync(join(dir, "update.log"), "w");
   const child = spawn(
-    "npx",
-    ["-y", "tsx", "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--update", "--out", dir],
+    process.execPath,
+    [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--update", "--out", dir],
     {
       cwd: process.cwd(),
       detached: true,
+      windowsHide: true,
       stdio: ["ignore", log, log],
       env: { ...process.env, SLOP_BACKEND: "claude-code", SLOP_EXPLAIN: p.explain ?? "full", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
     },

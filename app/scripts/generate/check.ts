@@ -35,7 +35,7 @@ export function fileReader(repo: string) {
   const cache = new Map<string, string[] | null>();
   return (file: string) => {
     if (!cache.has(file)) {
-      try { cache.set(file, readFileSync(join(repo, file), "utf8").split("\n")); }
+      try { cache.set(file, readFileSync(join(repo, file), "utf8").split(/\r?\n/)); }
       catch { cache.set(file, null); }
     }
     return cache.get(file)!;

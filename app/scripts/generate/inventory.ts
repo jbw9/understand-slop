@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, extname, join, normalize } from "node:path";
+import { basename, extname, join, posix } from "node:path";
 import ts from "typescript";
 import { MARK_IDS } from "@/components/shapes";
 
@@ -130,17 +130,17 @@ function aliases(repo: string, files: string[]): [string, string][] {
   const out: [string, string][] = [];
   for (const f of files.filter((x) => /(^|\/)tsconfig[^/]*\.json$/.test(x))) {
     const cfg = ts.readConfigFile(join(repo, f), ts.sys.readFile).config;
-    const base = join(dirname(f), cfg?.compilerOptions?.baseUrl ?? ".");
+    const base = posix.join(posix.dirname(f), cfg?.compilerOptions?.baseUrl ?? ".");
     for (const [k, v] of Object.entries<string[]>(cfg?.compilerOptions?.paths ?? {}))
-      if (k.endsWith("/*") && v[0]?.endsWith("/*")) out.push([k.slice(0, -1), normalize(join(base, v[0].slice(0, -1))) + "/"]);
+      if (k.endsWith("/*") && v[0]?.endsWith("/*")) out.push([k.slice(0, -1), posix.normalize(posix.join(base, v[0].slice(0, -1))) + "/"]);
   }
   return out;
 }
 
 function resolveImport(from: string, spec: string, known: Set<string>, alias: [string, string][]): string | null {
   let base: string | null = null;
-  if (spec.startsWith(".")) base = normalize(join(dirname(from), spec));
-  else for (const [prefix, dir] of alias) if (spec.startsWith(prefix)) { base = normalize(dir + spec.slice(prefix.length)); break; }
+  if (spec.startsWith(".")) base = posix.normalize(posix.join(posix.dirname(from), spec));
+  else for (const [prefix, dir] of alias) if (spec.startsWith(prefix)) { base = posix.normalize(dir + spec.slice(prefix.length)); break; }
   if (base === null) return null;
   base = base.replace(/^\.\//, "");
   const tries = [base, ...[".ts", ".tsx", ".js", ".jsx", ".mjs", ".vue", ".svelte"].flatMap((e) => [base + e, `${base}/index${e}`])];
@@ -199,7 +199,7 @@ export function inventory(repo: string): Inventory {
   const deps = manifests(repo, listed);
   return {
     repo,
-    name: repo.replace(/\/+$/, "").split("/").pop()!,
+    name: basename(repo),
     commit: git(repo, "rev-parse", "--short", "HEAD"),
     dirty: [...git(repo, "diff", "HEAD", "--name-only", "--relative").split("\n").filter(Boolean), ...untracked],
     files,
@@ -215,7 +215,7 @@ export function inventory(repo: string): Inventory {
 
 /** A file's text with 1-indexed line numbers, the only form a model ever reads. */
 export function numbered(repo: string, path: string, start = 1, end = Infinity): string {
-  const lines = readFileSync(join(repo, path), "utf8").split("\n");
+  const lines = readFileSync(join(repo, path), "utf8").split(/\r?\n/);
   const s = Math.max(1, start);
   const e = Math.min(lines.length, end);
   return lines.slice(s - 1, e).map((l, i) => `${String(s + i).padStart(5)}  ${l}`).join("\n");

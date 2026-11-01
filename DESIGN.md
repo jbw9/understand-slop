@@ -149,9 +149,8 @@ which moves your view while the answer is still arriving (D59).
 
 **Keep or correct what the map says.** After Claude answers, a level offers to
 keep the answer as a block marked as yours (`KeepAnswer`). History lists all of
-it and can revert. The "Fix this" button is gone from the level header (D62);
-its dialog (`CorrectSection`, D55) is still in `components/keep.tsx` but has no
-way in.
+it and can revert. The "Fix this" button is gone from the level header (D62),
+and its dialog (D55) with it.
 
 **Review a change.** Diff button → the panel lists changed sections → click
 one → the same level, decorated: tinted sections, removed things in red beside

@@ -8,7 +8,7 @@ import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
 import { DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
 import { Building, DraftNote, Stages, isBuilding, useDrawIn } from "@/components/building";
 import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, type CodeFocus } from "@/components/explain";
-import { InlineMarks, ShapeView } from "@/components/shapes";
+import { InlineMarks } from "@/components/shapes";
 import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
 import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
 import { Zoom, useZoomScale } from "@/components/zoom";
@@ -523,7 +523,6 @@ function Level({
   const top = path.length === 0;
   const note = setNote(node);
   const sequence = node.group?.ordering === "sequence";
-  const figure = node.shape?.kind === "figure" ? node.shape : undefined;
   const blocks = node.anatomy ?? [];
   // Which parts a box on this level's diagram already opens — those drive the
   // list below down to a quiet index (D40).
@@ -610,7 +609,7 @@ function Level({
               : node.evidence
         }
         link={top && RUN.url && RUN.commit ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
-        shape={figure ? undefined : node.shape}
+        shape={node.shape}
         onCode={code.length ? () => setCodeFocus({ heading: `The code behind ${node.title}`, refs: code }) : undefined}
         actions={
           <>
@@ -638,16 +637,6 @@ function Level({
         {/* For a reader new to all of this: the level in plain words, before
             any of the terse parts. */}
         {explainOn && node.explain ? <Explainer owner={node.id} explain={node.explain} ctx={levelCtx} /> : null}
-
-        {/* The picture is the main thing on the level, not a thumbnail in
-            the header's corner. */}
-        {figure && !run ? (
-          <div data-pick="The picture">
-            <div className="max-w-[540px]">
-              <ShapeView shape={figure} />
-            </div>
-          </div>
-        ) : null}
 
         {(run ? [] : blocks).map((b, i) =>
           grouped && shapes.includes(i) ? (

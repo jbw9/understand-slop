@@ -162,8 +162,6 @@ export const SIBLING_PROSE_LINES = 0;
  *  - `marks`  brand glyphs for the real technologies involved (Bedrock, S3,
  *             Supabase, OpenAI). These are FACTS — every one is a dependency in
  *             the mapped repo's package.json, not decoration.
- *  - `figure` a small purpose-built diagram where the arrangement IS the
- *             finding: a fan-out to three models, a pipeline, a gate.
  *  - `count`  a single number with a unit, where magnitude is the point.
  *
  * A card with nothing true to draw gets none. An invented diagram is the same
@@ -171,7 +169,6 @@ export const SIBLING_PROSE_LINES = 0;
  */
 export type Shape =
   | { kind: "marks"; ids: string[]; note?: string }
-  | { kind: "figure"; id: string; note?: string }
   | { kind: "count"; value: string; unit: string };
 
 /* ────────────────────────────────────────────────────────────────────

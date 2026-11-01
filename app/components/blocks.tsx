@@ -513,44 +513,20 @@ function Sequence({
  * What the user sees, top to bottom, in the frame of what it runs on — a
  * phone, or a browser window for a web page — with what each thing does
  * written beside it rather than on top of it, a line running from the thing
- * to its note. A real capture has no coordinates for where each item landed,
- * and a narrow page puts the notes under the screen; both fall back to numbers.
+ * to its note. A narrow page puts the notes under the screen, and falls back to
+ * numbers.
  */
 function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
   const noted = block.items.map((it, i) => ({ ...it, i })).filter((it) => it.note);
   const num = new Map(noted.map((it, k) => [it.i, k + 1]));
-  const [box, paths] = useCallouts(!block.shot && noted.length > 0);
+  const [box, paths] = useCallouts(noted.length > 0);
   // Numbers until the lines are measured, and wherever they cannot be drawn.
   const n = (i: number) => (paths ? undefined : num.get(i));
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
       <div ref={box} className="relative flex flex-wrap items-start gap-6">
-        {block.shot ? (
-          // The real screen, captured from the app's own web build with
-          // sample data (D37). Numbered callouts sit beside it, not on it:
-          // the capture has no coordinates for where each item landed.
-          <figure className="w-[300px] shrink-0">
-            {/* A bezel, and a blank strip above and below the capture: the web
-                build has no status bar, so without them the rounded corners
-                cut into the app's own title and tab bar. */}
-            <div className="rounded-[44px] bg-bezel p-[9px] shadow-panel">
-              <div className="overflow-hidden rounded-[36px] bg-white">
-                <div className="flex h-8 items-center justify-center">
-                  <div className="h-[18px] w-[84px] rounded-full bg-night" />
-                </div>
-                {/* eslint-disable-next-line @next/next/no-img-element -- a static capture at its own size; next/image adds nothing here */}
-                <img src={block.shot} alt={block.title} className="block h-auto w-full" />
-                <div className="flex h-6 items-center justify-center">
-                  <div className="h-[4px] w-24 rounded-full bg-night/80" />
-                </div>
-              </div>
-            </div>
-            <figcaption className="mt-2 text-center font-mono text-[10.5px] text-faint">
-              the real screen · sample data
-            </figcaption>
-          </figure>
-        ) : block.device !== "phone" ? (
+        {block.device !== "phone" ? (
           // A web page: a browser window, its address bar showing the route.
           <div className="w-[440px] max-w-full shrink-0 overflow-hidden rounded-[4px] border-[1.5px] border-border-strong bg-pure-white shadow-panel">
             <div className="flex items-center gap-3 border-b border-border-gray bg-surface-container px-3 py-2">

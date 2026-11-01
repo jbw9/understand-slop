@@ -322,15 +322,13 @@ export type Anatomy =
   | { kind: "table"; caption?: string; columns: string[]; rows: string[][]; state: State }
   // Who talks to whom, in order — phone, Supabase, email, a table.
   | { kind: "sequence"; caption?: string; actors: string[]; rows: Message[] }
-  // What the user sees on one screen. `shot` is a real capture of the app
-  // (scripts/capture/phone.mjs, sample data), served from app/public — e.g.
-  // "/shots/explorify/ce-home.png". With a shot, `items` that carry a `note`
-  // become the callouts beside it; without one, `items` are drawn (D37).
+  // What the user sees on one screen: `items` top to bottom, and those that
+  // carry a `note` get a callout beside the screen (D37).
   // `device` is what the screen runs on, from the app's own framework: a
   // mobile app's (React Native, Expo, Flutter) is `phone`, a page in a
   // browser is `web`; absent reads as `web`. `route` is the URL path a web
   // screen lives at ("/settings/billing"), never a file path.
-  | { kind: "screen"; title: string; caption?: string; shot?: string; device?: "phone" | "web"; route?: string; items: ScreenItem[] }
+  | { kind: "screen"; title: string; caption?: string; device?: "phone" | "web"; route?: string; items: ScreenItem[] }
   // What a stored value looks like. Synthesized and labelled as an example.
   | { kind: "example"; caption: string; value: string; notes?: Pair[] }
   | { kind: "schema"; table: string; rows: Column[]; rel?: string[] }

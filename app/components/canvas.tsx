@@ -10,8 +10,7 @@ import { Building, DraftNote, Stages, isBuilding, useDrawIn } from "@/components
 import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, type CodeFocus } from "@/components/explain";
 import { InlineMarks } from "@/components/shapes";
 import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
-import { WireLayer, wireKind, useWireAnchors, type Wire } from "@/components/wires";
-import { Zoom, useZoomScale } from "@/components/zoom";
+import { Zoom } from "@/components/zoom";
 import { Crumbs, goTo, useLocation } from "@/components/chrome";
 import { Button, CodeIcon } from "@/components/button";
 import { Menu } from "@/components/menu";
@@ -98,10 +97,9 @@ function setNote(node: Node): string | null {
 
 export function Canvas() {
   const map = useMap();
-  const { LINKS, RUN, levelAt, nodeAt, name, maps } = map;
+  const { RUN, nodeAt, name, maps } = map;
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const { nodes, anchor, version } = useWireAnchors();
   // A rewrite of the map lights what it changed (components/flash.tsx).
   useFlash(contentRef);
 
@@ -138,49 +136,6 @@ export function Canvas() {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [key]);
 
-  /* ── tracing a row-level chain ────────────────────────────── */
-
-  // Depth-capped walk of LINKS outward from the clicked row, so a click on a
-  // foreign key lights what it references AND what reads that, not one hop.
-  const lit = useMemo(() => {
-    if (!traced) return new Set<string>();
-    const seen = new Set<string>([traced]);
-    let frontier = [traced];
-    for (let hop = 0; hop < 6 && frontier.length; hop++) {
-      const next: string[] = [];
-      for (const id of frontier) {
-        for (const l of LINKS) {
-          if (l.from === id && !seen.has(l.to)) { seen.add(l.to); next.push(l.to); }
-          if (l.to === id && !seen.has(l.from)) { seen.add(l.from); next.push(l.from); }
-        }
-      }
-      frontier = next;
-    }
-    return seen;
-  }, [traced, LINKS]);
-
-  // Only row-to-row wires remain: sibling order is drawn by `Sequence` itself,
-  // where a wrapping layout can't send a wire across a card. Foreign keys show
-  // when both ends are on screen; a trace replaces them while it is active.
-  const wires = useMemo<Wire[]>(() => {
-    const kind = (l: (typeof LINKS)[number]) => wireKind(l.state, l.alarm);
-    if (traced) {
-      return LINKS.filter((l) => lit.has(l.from) && lit.has(l.to)).map((l) => ({
-        from: l.from,
-        to: l.to,
-        kind: kind(l),
-        depth: l.from === traced || l.to === traced ? 0 : 1,
-        relation: l.label === "FK",
-      }));
-    }
-    if (!focus) return [];
-    const shown = new Set([focus.id, ...levelAt(path).map((n) => n.id)]);
-    const owner = (rowKey: string) => rowKey.slice(0, rowKey.lastIndexOf(":"));
-    return LINKS.filter(
-      (l) => l.label === "FK" && shown.has(owner(l.from)) && shown.has(owner(l.to)),
-    ).map((l) => ({ from: l.from, to: l.to, kind: kind(l), depth: 0, relation: true }));
-  }, [traced, lit, focus, path, LINKS, levelAt]);
-
   /* ── rows that open their own level ───────────────────────── */
 
   const onOpenRow = useCallback(
@@ -199,14 +154,12 @@ export function Canvas() {
 
   const ctx = useMemo<RowCtx>(
     () => ({
-      anchor,
-      lit,
-      tracing: Boolean(traced),
+      traced,
       onTrace: (rid) => setTraced(traced === rid ? null : rid),
       open: path[path.length - 1] ?? null,
       onOpenRow,
     }),
-    [anchor, lit, traced, setTraced, path, onOpenRow],
+    [traced, setTraced, path, onOpenRow],
   );
 
   /* ── keyboard ─────────────────────────────────────────────── */
@@ -282,13 +235,6 @@ export function Canvas() {
         )}
         <Zoom scrollRef={scrollRef}>
         <div ref={contentRef} className="relative mx-auto max-w-[1680px] px-10 pb-28 pt-5">
-          <ZoomedWires
-            canvasRef={contentRef}
-            nodes={nodes}
-            wires={wires}
-            version={version}
-            reflowKey={key}
-          />
           <AnimatePresence mode="wait" initial={false} custom={dir}>
             <motion.div
               key={key}
@@ -315,12 +261,6 @@ export function Canvas() {
       </main>
     </div>
   );
-}
-
-
-/** The wires measure in screen pixels, so they need the magnification they are drawn under. */
-function ZoomedWires(props: Omit<Parameters<typeof WireLayer>[0], "scale">) {
-  return <WireLayer {...props} scale={useZoomScale()} />;
 }
 
 const GROUND: Record<Ground, string> = { dots: "dotfield", squares: "gridfield", plain: "" };

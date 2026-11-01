@@ -486,22 +486,6 @@ export interface Group {
   note?: string;
 }
 
-/* ── row-level links ──────────────────────────────────────────
-   The edges developers actually want to trace. Endpoints are ROWS, not cards:
-   a foreign key points at the exact column it references, a route points at
-   the step that serves it. Card-to-card edges ("Billing relates to Database")
-   are nearly contentless; these are the ones that answer a question.
-
-   Row id = `${capabilityId}:${rowKey}` — see rowId() below. */
-
-export interface Link {
-  from: string;
-  to: string;
-  state: State;
-  alarm?: boolean;
-  label?: string;
-}
-
 /** One mapping run: which repository, at which commit, and how it is cut. */
 export interface Run {
   command: string;

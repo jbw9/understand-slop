@@ -2,13 +2,13 @@
  * The map on screen, whichever repository it describes.
  *
  * A map file states facts — `RUN`, the `OVERVIEW` of the repository, the
- * authored tree, and row-to-row `LINKS` — as `maps/<name>/map.json`,
+ * and the authored tree — as `maps/<name>/map.json`,
  * hand-exported or generated.
  * Everything derived from those lives here, so a second repository is a second
  * file, not a copy of the tree plumbing.
  */
 
-import type { Anatomy, CodeRef, Link, Node, Run, Term, Walkthrough } from "@/lib/data";
+import type { Anatomy, CodeRef, Node, Run, Term, Walkthrough } from "@/lib/data";
 import { rowId } from "@/lib/data";
 import { share } from "@/lib/share";
 
@@ -28,7 +28,6 @@ export interface MapFile {
   RUN: Run;
   OVERVIEW?: Overview;
   AUTHORED: Node[];
-  LINKS: Link[];
 }
 
 /** The top level's id: the empty path, which is the repository itself. */
@@ -120,10 +119,9 @@ function withRowChildren(nodes: Node[]): Node[] {
  * it replaces, every part the new file left alone keeps its old identity
  * (lib/share.ts), so a rewrite re-renders only what it changed.
  */
-export function buildMap(file: MapFile, name: string, prev?: { RUN: Run; OVERVIEW?: Overview; LINKS: Link[]; TOP: Node }) {
+export function buildMap(file: MapFile, name: string, prev?: { RUN: Run; OVERVIEW?: Overview; TOP: Node }) {
   const RUN = prev ? share(prev.RUN, file.RUN) : file.RUN;
   const OVERVIEW = prev ? share(prev.OVERVIEW, file.OVERVIEW) : file.OVERVIEW;
-  const LINKS = prev ? share(prev.LINKS, file.LINKS) : file.LINKS;
 
   /** The repository as a node: the level the empty path opens, its parts the roots. */
   const built: Node = {
@@ -157,7 +155,7 @@ export function buildMap(file: MapFile, name: string, prev?: { RUN: Run; OVERVIE
     return nodeAt(path)?.children ?? [];
   }
 
-  return { name, RUN, OVERVIEW, LINKS, L0, TOP, nodeAt, levelAt };
+  return { name, RUN, OVERVIEW, L0, TOP, nodeAt, levelAt };
 }
 
 export type BuiltMap = ReturnType<typeof buildMap>;

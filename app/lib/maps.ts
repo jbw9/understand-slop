@@ -84,7 +84,7 @@ function readMap(p: Project, progress: Progress | undefined): MapFile {
   // progress is the whole page, over an empty map.
   const map: MapFile = file
     ? JSON.parse(readFileSync(file, "utf8"))
-    : { RUN: { command: `mira map ${p.name}`, repo: p.name, commit: "", files: 0, elapsed: "" }, AUTHORED: [], LINKS: [] };
+    : { RUN: { command: `mira map ${p.name}`, repo: p.name, commit: "", files: 0, elapsed: "" }, AUTHORED: [] };
   map.RUN.root = p.root;
   if (progress) withDrafts(map, p.id, progress);
   // What the reader added, composed in here so every consumer sees it.

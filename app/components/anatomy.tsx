@@ -25,12 +25,8 @@ import { highlight, langOf, TOKEN_COLOR } from "@/lib/highlight";
  */
 
 export interface RowCtx {
-  /** Registers a row element as a wire endpoint. */
-  anchor: (id: string) => (el: HTMLElement | null) => void;
-  /** Rows in the currently traced chain. Empty set = nothing traced. */
-  lit: Set<string>;
-  /** True while any trace is active, so unlit rows can recede. */
-  tracing: boolean;
+  /** The row clicked last, which stays lit while the others recede. */
+  traced: string | null;
   onTrace: (id: string) => void;
   /**
    * The row on the open path, if the level below came from a row. Lights the
@@ -169,12 +165,12 @@ const PAIR_VALUE = "w-full min-w-0 text-left @min-[267px]:w-auto @min-[267px]:fl
 
 /** Shared row chrome: lit fill, dimmed-when-others-are-lit, click to trace. */
 function rowClass(id: string, ctx: RowCtx, extra?: string) {
-  const isLit = ctx.lit.has(id);
+  const isLit = ctx.traced === id;
   return cn(
     "w-full text-left transition-all duration-200",
     isLit && "bg-mint-success",
-    ctx.tracing && !isLit && "opacity-55",
-    !ctx.tracing && "hover:bg-surface-container-low",
+    ctx.traced !== null && !isLit && "opacity-55",
+    ctx.traced === null && "hover:bg-surface-container-low",
     extra,
   );
 }
@@ -206,11 +202,10 @@ function Block({
         <div>
           {block.rows.map((c) => {
             const id = rowId(owner, c.name);
-            const isLit = ctx.lit.has(id);
+            const isLit = ctx.traced === id;
             return (
               <button
                 key={c.name}
-                ref={ctx.anchor(id)}
                 data-row={id}
                 onClick={() => ctx.onTrace(id)}
                 className={rowClass(
@@ -280,11 +275,10 @@ function Block({
       <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
         {block.rows.map((r) => {
           const id = rowId(owner, `${r.method} ${r.path}`);
-          const isLit = ctx.lit.has(id);
+          const isLit = ctx.traced === id;
           return (
             <button
               key={r.method + r.path}
-              ref={ctx.anchor(id)}
               data-row={id}
               onClick={() => ctx.onTrace(id)}
               className={rowClass(
@@ -350,17 +344,16 @@ function Block({
         <div className="flex flex-wrap gap-1.5">
           {block.rows.map((c) => {
             const id = rowId(owner, c.label);
-            const isLit = ctx.lit.has(id);
+            const isLit = ctx.traced === id;
             return (
               <button
                 key={c.label}
-                ref={ctx.anchor(id)}
                 data-row={id}
                 onClick={() => ctx.onTrace(id)}
                 title={c.note}
                 className={cn(
                   "rounded-[2px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
-                  ctx.tracing && !isLit && "opacity-55",
+                  ctx.traced !== null && !isLit && "opacity-55",
                   isLit
                     ? "border-deep-green bg-deep-green text-white"
                     : c.state === "derived"
@@ -398,11 +391,10 @@ function Block({
           <div className="flex h-[22px] w-full overflow-hidden rounded-[2px]">
             {block.rows.map((p, at) => {
               const id = rowId(owner, p.label);
-              const isLit = ctx.lit.has(id);
+              const isLit = ctx.traced === id;
               return (
                 <button
                   key={p.label}
-                  ref={ctx.anchor(id)}
                   data-row={id}
                   onClick={() => ctx.onTrace(id)}
                   title={`${p.label} — ${p.display}`}
@@ -413,7 +405,7 @@ function Block({
                   style={{ width: `${Math.max((p.weight / total) * 100, 6)}%` }}
                   className={cn(
                     "h-full border-r border-pure-white transition-all duration-200 last:border-r-0",
-                    ctx.tracing && !isLit && "opacity-45",
+                    ctx.traced !== null && !isLit && "opacity-45",
                     isLit
                       ? "bg-deep-green"
                       : p.tone === "vary"
@@ -435,7 +427,7 @@ function Block({
           <ul className="mt-2 flex flex-col gap-1">
             {block.rows.map((p, at) => {
               const id = rowId(owner, p.label);
-              const isLit = ctx.lit.has(id);
+              const isLit = ctx.traced === id;
               return (
                 <li key={p.label} className="flex items-center gap-2">
                   <span
@@ -490,11 +482,10 @@ function Block({
         <div className="flex flex-col gap-1.5 px-3 py-2.5">
           {block.rows.map((b) => {
             const id = rowId(owner, b.label);
-            const isLit = ctx.lit.has(id);
+            const isLit = ctx.traced === id;
             return (
               <button
                 key={b.label}
-                ref={ctx.anchor(id)}
                 data-row={id}
                 onClick={() => ctx.onTrace(id)}
                 className={rowClass(id, ctx, cn(PAIR_SCOPE, "rounded-[2px]"))}
@@ -549,7 +540,7 @@ function Block({
       <ol className="flex flex-col">
         {block.rows.map((s, i) => {
           const id = rowId(owner, s.n);
-          const isLit = ctx.lit.has(id);
+          const isLit = ctx.traced === id;
           return (
             <li key={s.n} className="flex gap-2.5">
               {/* The rail: a numbered dot with a line to the next step, so the
@@ -572,7 +563,6 @@ function Block({
                 ) : null}
               </div>
               <button
-                ref={ctx.anchor(id)}
                 data-row={id}
                 data-code-step={s.at && ctx.onStepCode ? "" : undefined}
                 // See the map row above: the click must not reach the card.
@@ -654,11 +644,10 @@ function Facts({
     <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
       {block.rows.map((p) => {
         const id = rowId(owner, p.label);
-        const isLit = ctx.lit.has(id);
+        const isLit = ctx.traced === id;
         return (
           <button
             key={p.label}
-            ref={ctx.anchor(id)}
             data-row={id}
             onClick={() => ctx.onTrace(id)}
             className={rowClass(
@@ -723,7 +712,7 @@ export function SourceView({
   ctx: RowCtx;
 }) {
   const id = rowId(owner, "source");
-  const isLit = ctx.lit.has(id);
+  const isLit = ctx.traced === id;
 
   const quoted = block.code.replace(/\n$/, "");
   const end = block.start + quoted.split("\n").length - 1;
@@ -819,7 +808,6 @@ export function SourceView({
         )}
       >
         <button
-          ref={ctx.anchor(id)}
           data-row={id}
           onClick={() => ctx.onTrace(id)}
           className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2 rounded-[2px]")}
@@ -1105,14 +1093,13 @@ function MapRows({ owner, block, ctx }: { owner: string; block: Extract<Anatomy,
       ) : null}
       {block.rows.map((m) => {
         const id = rowId(owner, m.from);
-        const isLit = ctx.lit.has(id);
+        const isLit = ctx.traced === id;
         const isOpen = ctx.open === id;
         // A row with a level of its own shows its detail while that level is open.
         const expanded = shown.has(m.from) || isOpen;
         return (
           <div key={m.from} className="border-b border-border-gray last:border-b-0">
             <button
-              ref={ctx.anchor(id)}
               data-row={id}
               aria-expanded={expanded}
               // The card wrapping these rows is itself clickable, and a real

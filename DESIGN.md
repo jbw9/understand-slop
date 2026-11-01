@@ -4,7 +4,7 @@ How the app works and how it looks. Part one covers what is on screen and how
 you move through it. Part two covers the look: paper, cards, the one green, and
 motion. The reasons behind each choice are in [DECISIONS.md](DECISIONS.md),
 cited as `Dn`. This records what the code does now, not an aspiration;
-anything not yet true is in §18.
+anything not yet true is in §17.
 
 Code paths are relative to `app/`.
 
@@ -37,7 +37,6 @@ Two readers, one screen:
 | **Level** | One node of the map, open. The repository itself is the top level (D60) | `Level` in `components/canvas.tsx` |
 | **Part** | A child of the open level. Named and peeked at, never opened in place (D31) | `Steps` / `Grid` / `List` in `canvas.tsx` |
 | **Block** | One piece of explanation on a level: diagram, table, sequence, screen, example (D34) | `components/blocks.tsx`, `components/anatomy.tsx` |
-| **Wire** | A row-to-row line, e.g. a foreign key, drawn in its state's style | `components/wires.tsx` |
 | **State** | How sure the map is: `derived`, `partial`, `inferred` (D3) | `components/state.tsx` |
 | **Origin** | Where a thing came from when not the code: the reader. A second axis, never a fourth state (D53) | `OriginMark` in `state.tsx` |
 | **Overlay** | What the reader added or corrected, kept beside the map, never in it (D54) | `lib/overlay.ts` |
@@ -428,43 +427,7 @@ in `globals.css`. Don't add per-component guards; the blanket rule covers it.
 
 ---
 
-## 14. Connector lines
-
-Full implementation in `components/wires.tsx`.
-
-**Dashing is load-bearing, not decorative.** Solid = the compiler proved this
-edge. Dashed = it did not. That distinction is the entire product thesis, so it
-must survive a glance:
-
-```
-derived   solid,  #1f5c4d,  2px at depth 0 / 1.5px beyond
-partial   5 4,    #8a6416
-alarm     5 4,    #8e3320
-inferred  2 4,    #6b7280
-```
-
-Depth fade: `max(0.2, 0.92 - depth * 0.24)` on the whole `<g>`, so edges
-touching the focused node stay loudest.
-
-Three implementation rules that are easy to get wrong:
-
-1. **Endpoints are measured, never assumed.** `getBoundingClientRect` on the
-   live DOM, because cards move (pan, zoom, expand).
-2. **Ref callbacks must be referentially stable** — one cached callback per id.
-   An inline `ref={(el) => …}` re-registers every render and, with a re-measure
-   hung off registration, loops forever.
-3. **Inside a scaled world, divide by the scale.** `getBoundingClientRect`
-   returns post-transform screen pixels. The SVG lives inside the transformed
-   element, so every measured delta is divided by `scale` to get back to world
-   coordinates — otherwise wires are scaled twice and drift off the nodes as
-   you zoom.
-
-Re-measure is rAF-coalesced and listens for `scroll` in the **capture** phase
-(scroll doesn't bubble) plus `resize` and a `ResizeObserver`.
-
----
-
-## 15. Card anatomy
+## 14. Card anatomy
 
 ```
 ┌─────────────────────────────────────────┐
@@ -487,7 +450,7 @@ Re-measure is rAF-coalesced and listens for `scroll` in the **capture** phase
 
 ---
 
-## 16. Light mode only
+## 15. Light mode only
 
 There is no dark palette and no `@custom-variant dark`. The paper metaphor is
 the design; a dark inversion would need a different one, not inverted tokens.
@@ -495,7 +458,7 @@ If dark mode is ever wanted, it's a redesign, not a token swap.
 
 ---
 
-## 17. Reuse checklist
+## 16. Reuse checklist
 
 1. Copy the `@theme` block from `app/globals.css`, plus `.tnum` and `.dotfield`.
 2. Load Inter as `--font-sans` and a real mono as `--font-mono` via `next/font`.
@@ -508,10 +471,10 @@ If dark mode is ever wanted, it's a redesign, not a token swap.
 
 ---
 
-## 18. Open questions
+## 17. Open questions
 
 - **Theme.** Settings offers system / light / dark (`lib/settings.ts`), but
-  §16 still says light mode only. One of them is stale.
+  §15 still says light mode only. One of them is stale.
 - **The camera is gone.** §12 and parts of §13 (springs, `drillInto`, a dot
   field bound to pan) describe the pan/zoom canvas that D28 replaced with one
   level at a time. The level transition now is a 180 ms fade-and-slide (§6).

@@ -36,7 +36,7 @@ interface Live {
 function adopt(live: Live, file: MapFile): Live {
   const map = buildMap(file, live.map.name, live.map);
   const paths = changedPaths(live.map.TOP, map.TOP);
-  if (!paths.length && map.LINKS === live.map.LINKS && map.RUN === live.map.RUN) return live;
+  if (!paths.length && map.RUN === live.map.RUN) return live;
   return { ...live, map, fresh: paths.length ? { at: Date.now(), paths: new Set(paths) } : live.fresh };
 }
 

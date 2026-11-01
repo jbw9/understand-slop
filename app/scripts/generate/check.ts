@@ -4,7 +4,7 @@
  * problems go back to the model that wrote the node.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- walks map JSON, typed or not */
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildMap, type MapFile } from "@/lib/map";
 import { MARK_IDS } from "@/components/shapes";
@@ -99,10 +99,7 @@ export function check(
         b.rows.forEach((r: string[], i: number) => {
           if (r.length !== b.columns.length) problems.push(`TABLE ${owner} row ${i} has ${r.length} cells, ${b.columns.length} columns`);
         });
-      if (b.kind === "screen" && b.shot) {
-        if (gen) problems.push(`SHOT ${owner} — generated maps have no screenshots; describe the screen with items`);
-        else if (!existsSync(join(process.cwd(), "public", b.shot))) problems.push(`SHOT ${owner} ${b.shot} does not exist under app/public`);
-      }
+      if (b.kind === "screen" && "shot" in b) problems.push(`SHOT ${owner} — maps have no screenshots; describe the screen with items`);
       if (b.kind === "diagram") {
         const cells = new Set<string>();
         for (const x of b.boxes) {
@@ -168,7 +165,7 @@ export function check(
       if (w > 40) problems.push(`DETAIL ${n.id} — ${w} words (max 40)`);
       if (ss > 2) problems.push(`DETAIL ${n.id} — ${ss} sentences (max 2)`);
       if (n.state !== "derived" && !n.unsure) problems.push(`UNSURE ${n.id} is ${n.state} but gives no reason`);
-      if (gen && n.shape?.kind === "figure") problems.push(`SHAPE ${n.id} — figures are hand-drawn; use marks, count, or none`);
+      if ((n.shape?.kind as string) === "figure") problems.push(`SHAPE ${n.id} — figures are hand-drawn; use marks, count, or none`);
       if (n.shape?.kind === "marks")
         for (const m of n.shape.ids) if (!MARK_IDS.includes(m)) problems.push(`SHAPE ${n.id} mark "${m}" has no drawing (have: ${MARK_IDS.join(", ")})`);
       if (!n.code?.length) problems.push(`CODE ${n.id} has no code refs`);

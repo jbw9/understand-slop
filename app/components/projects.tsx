@@ -236,12 +236,11 @@ export function ProjectsDialog() {
 const STEPS = ["Start", "Folder", "Name", "You", "Review"] as const;
 
 /**
- * How much the map explains (D70), from what the reader knows: someone who
- * wrote the code, or knows the field and has used it, gets the map alone; one
- * new to both gets every level explained; anyone between, a sentence or two.
+ * How much the map explains (D70), from how well the reader says they
+ * understand the repo, 0–100: the low third gets every level explained, the
+ * top third the map alone, anyone between a sentence or two.
  */
-const levelOf = (code: number, field: number): Explain =>
-  code === 2 || (code === 1 && field === 2) ? "none" : code === 0 && field === 0 ? "full" : "brief";
+const levelOf = (understand: number): Explain => (understand < 34 ? "full" : understand < 67 ? "brief" : "none");
 
 export const EXPLAINS: Record<Explain, { label: string; note: string }> = {
   none: { label: "No explanations", note: "The map alone: parts, pictures and the code behind each step." },
@@ -249,10 +248,6 @@ export const EXPLAINS: Record<Explain, { label: string; note: string }> = {
   full: { label: "Full explanations", note: "Every level said again in plain words, with pictures, a glossary and a walkthrough." },
 };
 
-const KNOW = [
-  { q: "How well do you know this codebase?", a: ["Never opened it", "Used it or read some", "Wrote parts of it"] },
-  { q: "How well do you know what this kind of software does?", a: ["New to it", "Some", "Expert"] },
-] as const;
 const folderName = (root: string) => root.trim().replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
 const joinPath = (parent: string, name: string) => `${parent.trim().replace(/[\\/]+$/, "")}/${name}`;
 
@@ -293,8 +288,8 @@ function NewProject({
   // A new folder has no code to explain, so it skips "You".
   const steps = fresh ? STEPS.filter((s) => s !== "You") : STEPS;
   const at = steps[step];
-  const [know, setKnow] = useState<[number | null, number | null]>([null, null]);
-  const explain = know[0] !== null && know[1] !== null ? levelOf(know[0], know[1]) : undefined;
+  const [understand, setUnderstand] = useState(50);
+  const explain = levelOf(understand);
   const name = label.trim() || (fresh ? "" : folderName(root));
   const canNext = { Start: fresh !== null, Folder: Boolean(root.trim()), Name: !fresh || Boolean(label.trim()), You: Boolean(explain), Review: true }[at];
   const last = step === steps.length - 1;
@@ -363,31 +358,24 @@ function NewProject({
         </Field>
       ) : at === "You" ? (
         <div className="flex flex-col gap-4">
-          {KNOW.map((k, qi) => (
-            <Field key={k.q} label={k.q} hint={qi ? "Its field: what a web store, a message queue or a compiler is for." : "So the map says as much as you need, and no more."}>
-              <div className="grid grid-cols-3 gap-2">
-                {k.a.map((a, ai) => (
-                  <button
-                    key={a}
-                    type="button"
-                    aria-pressed={know[qi] === ai}
-                    onClick={() => setKnow((k) => (qi ? [k[0], ai] : [ai, k[1]]))}
-                    className={cn(
-                      "cursor-pointer rounded-[2px] border bg-pure-white px-3 py-2 text-left text-[12.5px] text-ink transition-colors hover:border-deep-green",
-                      know[qi] === ai ? "border-deep-green" : "border-border-gray",
-                    )}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          ))}
-          {explain ? (
-            <p className="text-[12px] text-muted-slate">
-              <span className="font-semibold text-ink">{EXPLAINS[explain].label}.</span> {EXPLAINS[explain].note}
-            </p>
-          ) : null}
+          <Field label="How well do you understand this repo?" hint="So the map says as much as you need, and no more.">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={understand}
+              onChange={(e) => setUnderstand(Number(e.target.value))}
+              aria-valuetext={EXPLAINS[explain].label}
+              className="w-full cursor-pointer accent-deep-green"
+            />
+            <div className="flex justify-between text-[11.5px] text-muted-slate">
+              <span>Not at all</span>
+              <span>Inside out</span>
+            </div>
+          </Field>
+          <p className="text-[12px] text-muted-slate">
+            <span className="font-semibold text-ink">{EXPLAINS[explain].label}.</span> {EXPLAINS[explain].note}
+          </p>
         </div>
       ) : at === "Name" ? (
         <Field label="What should it be called?" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>

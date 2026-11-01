@@ -613,7 +613,7 @@ function Block({
 
                     A step with no `under` keeps its line, because for that row
                     there is no deeper level to defer to and the sentence is the
-                    whole fact. See LEVEL_WORD_BUDGET in lib/view.ts. */}
+                    whole fact. */}
                 {s.under ? null : (
                   <span className="mt-0.5 block text-[10px] leading-relaxed text-on-surface-variant">
                     {s.detail}

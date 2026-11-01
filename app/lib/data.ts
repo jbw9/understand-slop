@@ -359,7 +359,7 @@ export interface Node {
    * The board shipped with prose here — "Agreeing to be read", "Where it all
    * lands" — and a reader cannot tell from those what part of the product they
    * name, so the first level read as ten riddles. The sentence belongs in
-   * `sub`. See `lib/view.ts`.
+   * `sub`.
    */
   title: string;
   /** One line, plain English. What this IS — never a file path. */
@@ -372,7 +372,7 @@ export interface Node {
    */
   footprint?: { dirs: string[]; files: number };
   /**
-   * Set on cards holding more rows than `CARD_ROWS_SOFT`: the shape of what is
+   * Set on cards holding more than 8 rows: the shape of what is
    * inside, so the reader knows what they are scrolling before they scroll it.
    * e.g. "13 formulas, one per 1040-NR line".
    */

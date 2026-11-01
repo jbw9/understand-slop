@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) ?? {};
   const { action, id, root, name, claude, turn, explain } = body as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
-  const level = (["none", "brief", "full"] as const).find((l) => l === explain);
+  const level = (["none", "minimal", "brief", "detailed", "full"] as const).find((l) => l === explain);
   try {
     switch (action) {
       case "import":

@@ -498,10 +498,11 @@ export interface Run {
   root?: string;
   /**
    * How much the map explains for a newcomer, chosen when the project was
-   * imported (D70): no plain-words layer, a sentence or two per level, or the
-   * full layer. Absent means full, or a map made before the choice existed.
+   * imported (D70): no plain-words layer, one sentence per level, a sentence
+   * or two, a paragraph or two, or the full layer. Absent means full, or a
+   * map made before the choice existed.
    */
-  explain?: "none" | "brief" | "full";
+  explain?: "none" | "minimal" | "brief" | "detailed" | "full";
   /** Which model ran each generator stage. Absent on hand-authored maps. */
   models?: Record<string, string>;
   /** Web address of the repository, read from the checkout's git remote when the page is built. */

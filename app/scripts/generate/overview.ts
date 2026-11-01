@@ -89,10 +89,20 @@ const WAY_IN = {
 - \`glossary\`: 4-12 terms the map's titles and details lean on, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words. Terms of the field ("quorum", "webhook") and of this project ("metadata image") alike; skip words everyone knows. It is never listed — each term is defined on hover where the map uses it, so use the exact word the text uses.
 - \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system from start to end ("A new broker joins the cluster", "A visitor pays for a plan"), 3-8 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one or two plain sentences, and \`path\` the ids from a root down to the part where it happens (from the list above), as deep as the step is specific.
 `,
+  detailed: `Then the way in for a reader who knows a little of this kind of software and none of this project — shown under an Explain toggle:
+- \`explain\`: \`body\` is one or two short paragraphs (blank line between, at most 120 words): what this system is for and who uses it, and the idea behind how it works, defining each word of its field the first time. \`blocks\` holds at most one picture, only where it teaches more than the prose — usually a \`diagram\` of the system in its world, its boxes opening nothing and its arrows needing no \`at\`.
+- \`glossary\`: 4-10 terms the map's titles and details lean on, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words. Terms of the field and of this project alike; skip words everyone knows. It is never listed — each term is defined on hover where the map uses it, so use the exact word the text uses.
+- \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system from start to end, 3-6 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one or two plain sentences, and \`path\` the ids from a root down to the part where it happens (from the list above), as deep as the step is specific.
+`,
   brief: `Then a short way in for a reader who knows this kind of software but not this project — shown under an Explain toggle:
 - \`explain\`: \`body\` is one to three sentences, at most 60 words: what this system is for and the idea behind how it is built. No \`blocks\`.
 - \`glossary\`: 3-8 terms, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words — only this project's own words, or words a developer outside this field would not know. It is never listed — each term is defined on hover where the map uses it, so use the exact word the text uses.
 - \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system, 3-5 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one plain sentence, and \`path\` the ids from a root down to the part where it happens (from the list above).
+`,
+  minimal: `Then a one-line way in for a reader who knows this kind of software and has used this project — shown under an Explain toggle:
+- \`explain\`: \`body\` is one sentence, at most 30 words: what this system is for. No \`blocks\`.
+- \`glossary\`: 2-5 terms, as \`{term, meaning}\`, each meaning one plain sentence of at most 25 words — only words this project uses in its own sense. It is never listed — each term is defined on hover where the map uses it, so use the exact word the text uses.
+- \`walkthrough\`: \`{title, steps}\` — one concrete thing followed through the system, 3-4 steps in the order they happen. Each step: \`title\` a few words, \`detail\` one plain sentence, and \`path\` the ids from a root down to the part where it happens (from the list above).
 `,
   none: "",
 };

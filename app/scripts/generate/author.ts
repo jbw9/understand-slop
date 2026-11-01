@@ -87,16 +87,23 @@ function exemplar(): string {
   const text = readFileSync("scripts/generate/prompts/exemplar.json", "utf8").trimEnd();
   if (EXPLAIN_LEVEL === "full") return text;
   // At a lesser level the example's explainers would teach the wrong length:
-  // brief keeps each one's first sentence, none drops them.
+  // detailed keeps each one's first paragraph and picture, brief its first
+  // sentence, minimal that sentence only if it is one line, none drops them.
   const cut = (n: any): any => {
     const { explain, children, ...rest } = n;
     const first = explain?.body?.split(/(?<=[.!?])\s+/)[0];
-    return { ...rest, ...(EXPLAIN_LEVEL === "brief" && first ? { explain: { body: first } } : {}), ...(children ? { children: children.map(cut) } : {}) };
+    const kept =
+      EXPLAIN_LEVEL === "detailed" && explain
+        ? { body: explain.body.split(/\n\s*\n/)[0], ...(explain.blocks?.length ? { blocks: explain.blocks.slice(0, 1) } : {}) }
+        : first && (EXPLAIN_LEVEL === "brief" || (EXPLAIN_LEVEL === "minimal" && first.split(/\s+/).length <= 30))
+          ? { body: first }
+          : undefined;
+    return { ...rest, ...(kept ? { explain: kept } : {}), ...(children ? { children: children.map(cut) } : {}) };
   };
   return JSON.stringify(cut(JSON.parse(text)), null, 2);
 }
 
-/** The rules at the map's explain level (D70): the plain-words section as written, shortened, or gone. */
+/** The rules at the map's explain level (D70): the plain-words section as written, rewritten shorter, or gone. */
 const BRIEF_RULES = `## The plain-words layer: \`explain\`
 
 The reader of this map knows the field; what they lack is this project. Every node has a short \`explain\`, shown under an Explain toggle:
@@ -105,12 +112,31 @@ The reader of this map knows the field; what they lack is this project. Every no
 - No \`blocks\`.
 
 `;
+const MINIMAL_RULES = `## The plain-words layer: \`explain\`
+
+The reader of this map knows the field and has used this project; what they lack is its vocabulary. Every node has a one-line \`explain\`, shown under an Explain toggle:
+
+- \`body\`: one sentence, at most 30 words: what this project means by this part where the title alone would not say ("a *job* here is one queued email, not a cron task"). Don't restate \`detail\`, and don't explain the field.
+- No \`blocks\`.
+
+`;
+const DETAILED_RULES = `## The plain-words layer: \`explain\`
+
+The reader of this map knows a little of the field and nothing of this project. Every node has an \`explain\`, shown under an Explain toggle:
+
+- \`body\`: one or two short paragraphs, a blank line between them, at most 120 words (a leaf's is often 20–60).
+  - Start from what this part is for, then how it works, in everyday words.
+  - Define each word of the project or its field the first time it appears, in the sentence that uses it. Don't assume the parent's explainer was read.
+  - Don't restate \`detail\`; say what someone needs before \`detail\` makes sense.
+- \`blocks\`: at most one picture, only where it shows what the prose cannot — usually a \`diagram\` of how things relate, its boxes opening nothing and its arrows needing no \`at\`. Most leaves need none; a leaf's explain picture is never the same kind as one of its own blocks.
+
+`;
 function rules(): string {
   const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
   if (EXPLAIN_LEVEL === "full") return all;
   const from = all.indexOf("## The plain-words layer");
   const to = all.indexOf("## ", from + 3);
-  return all.slice(0, from) + (EXPLAIN_LEVEL === "brief" ? BRIEF_RULES : "") + all.slice(to);
+  return all.slice(0, from) + { none: "", minimal: MINIMAL_RULES, brief: BRIEF_RULES, detailed: DETAILED_RULES }[EXPLAIN_LEVEL] + all.slice(to);
 }
 
 let systemCache: Block[] | null = null;
@@ -167,7 +193,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
     `## Task
 Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
-Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
+Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", detailed: "Every level also has a one- or two-paragraph `explain` for a reader who knows a little of the field and none of this project. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", minimal: "Every level also has a one-sentence `explain` for a reader who knows the field and has used this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
 ${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
 Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");

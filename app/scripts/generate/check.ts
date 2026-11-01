@@ -247,17 +247,21 @@ function levelProblems(n: any): string[] {
 export const STEP_LINES = 40;
 /**
  * How much a map explains for a newcomer (D70), asked when the project is
- * imported: `none` is the map without the plain-words layer, `brief` a
- * sentence or two per level for a reader who knows the field, `full` the
- * layer as D68 made it. A finished map records its level in `RUN.explain`.
+ * imported: `none` is the map without the plain-words layer, `minimal` one
+ * sentence per level for a reader who has used the project, `brief` a
+ * sentence or two for one who knows the field, `detailed` a paragraph or two
+ * for one who knows a little of it, `full` the layer as D68 made it. A
+ * finished map records its level in `RUN.explain`.
  */
-export type ExplainLevel = "none" | "brief" | "full";
-export const EXPLAIN_LEVEL: ExplainLevel = (["none", "brief", "full"] as const).find((l) => l === process.env.SLOP_EXPLAIN) ?? "full";
+export type ExplainLevel = "none" | "minimal" | "brief" | "detailed" | "full";
+export const EXPLAIN_LEVEL: ExplainLevel = (["none", "minimal", "brief", "detailed", "full"] as const).find((l) => l === process.env.SLOP_EXPLAIN) ?? "full";
 
 /** An explainer's body: enough to define the words a level leans on, short enough to read. */
 const BOUNDS = {
-  full: { min: 25, max: 200, blocks: 2, terms: [4, 12], steps: [3, 8] },
-  brief: { min: 8, max: 60, blocks: 0, terms: [3, 8], steps: [3, 5] },
+  full: { min: 25, max: 200, blocks: 2, terms: [4, 12], steps: [3, 8], say: "a few short paragraphs, and a picture where it says more", words: "a newcomer must know to read this map" },
+  detailed: { min: 15, max: 120, blocks: 1, terms: [4, 10], steps: [3, 6], say: "one or two short paragraphs", words: "a newcomer must know to read this map" },
+  brief: { min: 8, max: 60, blocks: 0, terms: [3, 8], steps: [3, 5], say: "a sentence or two", words: "a developer outside this field would not know" },
+  minimal: { min: 4, max: 30, blocks: 0, terms: [2, 5], steps: [3, 4], say: "one sentence", words: "this project uses in its own sense" },
 } as const;
 
 /**
@@ -275,7 +279,7 @@ function explainProblems(n: any, level: ExplainLevel): string[] {
   else {
     const w = words(e.body);
     if (w < EXPLAIN.min) out.push(`EXPLAIN ${n.id} — ${w} words (min ${EXPLAIN.min}); say what problem this solves and how, defining its terms`);
-    if (w > EXPLAIN.max) out.push(`EXPLAIN ${n.id} — ${w} words (max ${EXPLAIN.max}); ${level === "brief" ? "a sentence or two" : "a few short paragraphs, and a picture where it says more"}`);
+    if (w > EXPLAIN.max) out.push(`EXPLAIN ${n.id} — ${w} words (max ${EXPLAIN.max}); ${EXPLAIN.say}`);
   }
   if ((e?.blocks ?? []).length > EXPLAIN.blocks) out.push(`EXPLAIN ${n.id} has ${e.blocks.length} pictures (max ${EXPLAIN.blocks})`);
   if (!n.children?.length) {
@@ -302,9 +306,9 @@ function stepProblems(n: any): string[] {
 function startProblems(o: any, resolves: (path: string[]) => boolean, level: ExplainLevel): string[] {
   const out: string[] = [];
   if (level === "none") return out;
-  const { terms, steps } = BOUNDS[level];
+  const { terms, steps, words: who } = BOUNDS[level];
   const g: any[] = o.glossary ?? [];
-  if (g.length < terms[0] || g.length > terms[1]) out.push(`GLOSSARY ${OVERVIEW_ID} has ${g.length} terms (want ${terms[0]}-${terms[1]}) — the words ${level === "brief" ? "a developer outside this field would not know" : "a newcomer must know to read this map"}`);
+  if (g.length < terms[0] || g.length > terms[1]) out.push(`GLOSSARY ${OVERVIEW_ID} has ${g.length} terms (want ${terms[0]}-${terms[1]}) — the words ${who}`);
   for (const t of g)
     if (typeof t?.term !== "string" || typeof t?.meaning !== "string" || !t.meaning.trim()) out.push(`GLOSSARY ${OVERVIEW_ID} term needs term and meaning`);
     else if (words(t.meaning) > 25) out.push(`GLOSSARY ${OVERVIEW_ID} "${t.term}" — ${words(t.meaning)} words (max 25)`);

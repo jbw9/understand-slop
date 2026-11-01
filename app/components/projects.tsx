@@ -237,14 +237,22 @@ const STEPS = ["Start", "Folder", "Name", "You", "Review"] as const;
 
 /**
  * How much the map explains (D70), from how well the reader says they
- * understand the repo, 0–100: the low third gets every level explained, the
- * top third the map alone, anyone between a sentence or two.
+ * understand the repo: each stop of the slider is one level, the less they
+ * know the more it says.
  */
-const levelOf = (understand: number): Explain => (understand < 34 ? "full" : understand < 67 ? "brief" : "none");
+const UNDERSTAND: { label: string; explain: Explain }[] = [
+  { label: "New to it", explain: "full" },
+  { label: "Read some", explain: "detailed" },
+  { label: "Used it", explain: "brief" },
+  { label: "Worked in it", explain: "minimal" },
+  { label: "Wrote it", explain: "none" },
+];
 
 export const EXPLAINS: Record<Explain, { label: string; note: string }> = {
   none: { label: "No explanations", note: "The map alone: parts, pictures and the code behind each step." },
+  minimal: { label: "Minimal explanations", note: "One line per level on what this project calls it, a few of its own words defined, a short walkthrough." },
   brief: { label: "Brief explanations", note: "A sentence or two per level on what it is for, a short glossary and walkthrough." },
+  detailed: { label: "Detailed explanations", note: "A paragraph or two per level in plain words, the odd picture, a glossary and a walkthrough." },
   full: { label: "Full explanations", note: "Every level said again in plain words, with pictures, a glossary and a walkthrough." },
 };
 
@@ -288,8 +296,8 @@ function NewProject({
   // A new folder has no code to explain, so it skips "You".
   const steps = fresh ? STEPS.filter((s) => s !== "You") : STEPS;
   const at = steps[step];
-  const [understand, setUnderstand] = useState(50);
-  const explain = levelOf(understand);
+  const [understand, setUnderstand] = useState(2);
+  const explain = UNDERSTAND[understand].explain;
   const name = label.trim() || (fresh ? "" : folderName(root));
   const canNext = { Start: fresh !== null, Folder: Boolean(root.trim()), Name: !fresh || Boolean(label.trim()), You: Boolean(explain), Review: true }[at];
   const last = step === steps.length - 1;
@@ -359,18 +367,57 @@ function NewProject({
       ) : at === "You" ? (
         <div className="flex flex-col gap-4">
           <Field label="How well do you understand this repo?" hint="So the map says as much as you need, and no more.">
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={understand}
-              onChange={(e) => setUnderstand(Number(e.target.value))}
-              aria-valuetext={EXPLAINS[explain].label}
-              className="w-full cursor-pointer accent-deep-green"
-            />
-            <div className="flex justify-between text-[11.5px] text-muted-slate">
-              <span>Not at all</span>
-              <span>Inside out</span>
+            <div className="flex flex-col gap-2 rounded-[2px] border border-border-gray bg-pure-white px-4 pb-2.5 pt-3.5">
+              <div className="relative h-3.5">
+                {/* The native range keeps keys and focus; it sits invisible over the drawn track, a thumb's half-width past each end so its stops land on the dots. */}
+                <input
+                  type="range"
+                  min={0}
+                  max={UNDERSTAND.length - 1}
+                  step={1}
+                  value={understand}
+                  onChange={(e) => setUnderstand(Number(e.target.value))}
+                  aria-valuetext={`${UNDERSTAND[understand].label}: ${EXPLAINS[explain].label}`}
+                  className="peer absolute -inset-x-2 inset-y-0 z-10 cursor-pointer opacity-0"
+                />
+                <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border-strong" />
+                <div
+                  className="absolute left-0 top-1/2 h-0.5 -translate-y-1/2 bg-deep-green transition-[width] duration-150"
+                  style={{ width: `${(understand / (UNDERSTAND.length - 1)) * 100}%` }}
+                />
+                {UNDERSTAND.map((u, i) => (
+                  <span
+                    key={u.label}
+                    className={cn(
+                      "absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
+                      i <= understand ? "bg-deep-green" : "bg-border-strong",
+                    )}
+                    style={{ left: `${(i / (UNDERSTAND.length - 1)) * 100}%` }}
+                  />
+                ))}
+                <span
+                  className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border-[1.5px] border-deep-green bg-pure-white transition-[left,box-shadow] duration-150 peer-focus-visible:shadow-[0_0_0_3px_var(--color-mint-success)]"
+                  style={{ left: `${(understand / (UNDERSTAND.length - 1)) * 100}%` }}
+                />
+              </div>
+              <div className="relative h-4 font-mono text-[10.5px] uppercase tracking-[0.06em]">
+                {UNDERSTAND.map((u, i) => (
+                  <button
+                    key={u.label}
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setUnderstand(i)}
+                    className={cn(
+                      "absolute top-0 cursor-pointer whitespace-nowrap transition-colors hover:text-ink",
+                      i === 0 ? "left-0" : i === UNDERSTAND.length - 1 ? "right-0" : "-translate-x-1/2",
+                      i === understand ? "text-deep-green" : "text-faint",
+                    )}
+                    style={i > 0 && i < UNDERSTAND.length - 1 ? { left: `${(i / (UNDERSTAND.length - 1)) * 100}%` } : undefined}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </Field>
           <p className="text-[12px] text-muted-slate">

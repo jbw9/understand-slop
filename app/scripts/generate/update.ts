@@ -32,7 +32,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import type { Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { parseArgs } from "./args";
@@ -300,7 +300,7 @@ function spliced(root: Node, t: Placed, node: Node): Node {
 export async function update(args: string[]) {
   const { opt, has, repo: dir } = parseArgs(args);
   const repo = resolve(dir!);
-  const out = opt("--out") ?? `maps/${opt("--name") ?? repo.split("/").pop()!.toLowerCase()}`;
+  const out = opt("--out") ?? `maps/${opt("--name") ?? basename(repo).toLowerCase()}`;
   const t0 = Date.now();
   const result = (r: Record<string, unknown>) =>
     writeFileSync(`${out}/update.json`, JSON.stringify({ finishedAt: new Date().toISOString(), seconds: Math.round((Date.now() - t0) / 1000), ...r }, null, 1) + "\n");

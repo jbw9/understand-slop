@@ -15,7 +15,8 @@
  * bills compare. Replies are cached on disk like the API's.
  */
 
-import { spawn } from "node:child_process";
+import spawn from "cross-spawn";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -84,7 +85,7 @@ async function claude(args: string[], prompt: string, stage: string, effort?: st
         delete env.CLAUDECODE;
         delete env.CLAUDE_CODE_ENTRYPOINT;
         env.MAX_THINKING_TOKENS = effort ? "16000" : "0";
-        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...flags], { cwd: cwd(), env });
+        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...flags], { cwd: cwd(), env, windowsHide: true }) as ChildProcessWithoutNullStreams;
         let stdout = "", stderr = "";
         p.stdout.on("data", (d) => (stdout += d));
         p.stderr.on("data", (d) => (stderr += d));

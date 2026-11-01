@@ -164,7 +164,7 @@ export const readSlice: ReadSlice = async (req, fixture, root) => {
   if (!real) throw new Refused("outside repo");
   if (!(await stat(real)).isFile()) throw new Refused("not a file");
 
-  const lines = (await readFile(real, "utf8")).split("\n");
+  const lines = (await readFile(real, "utf8")).split(/\r?\n/);
   const start = Math.max(1, req.start);
   const end = Math.min(lines.length, Math.max(start, req.end));
   const code = lines.slice(start - 1, end).join("\n");
@@ -211,7 +211,9 @@ export const writeSlice: WriteSlice = async (req, root) => {
     return { ok: false, diff: "", refused: "not a file" };
   }
 
-  const lines = (await readFile(real, "utf8")).split("\n");
+  const text = await readFile(real, "utf8");
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
   if (req.start < 1 || req.end > lines.length || req.end < req.start) {
     return { ok: false, diff: "", refused: "stale" };
   }
@@ -225,13 +227,13 @@ export const writeSlice: WriteSlice = async (req, root) => {
     return { ok: false, diff: "", refused: "stale" };
   }
 
-  const replacement = req.code.replace(/\n$/, "").split("\n");
+  const replacement = req.code.replace(/\r?\n$/, "").split(/\r?\n/);
   const next = [
     ...lines.slice(0, req.start - 1),
     ...replacement,
     ...lines.slice(req.end),
   ];
-  await writeFile(real, next.join("\n"), "utf8");
+  await writeFile(real, next.join(eol), "utf8");
 
   return { ok: true, diff: unified(req.file, req.start, onDisk, req.code) };
 };

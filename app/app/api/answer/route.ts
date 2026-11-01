@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { lastExchange } from "@/lib/keep";
 
 /**
@@ -17,7 +17,7 @@ import { lastExchange } from "@/lib/keep";
 export async function GET(request: Request) {
   const asked = new URL(request.url).searchParams.get("transcript");
   if (!asked?.endsWith(".jsonl")) return Response.json({ error: "bad request" }, { status: 400 });
-  const sessions = join(homedir(), ".claude", "projects") + "/";
+  const sessions = join(homedir(), ".claude", "projects") + sep;
   const path = resolve(asked);
   if (!path.startsWith(sessions)) return Response.json({ error: "bad request" }, { status: 400 });
   const exchange = lastExchange(path, (f) => readFileSync(f, "utf8"));

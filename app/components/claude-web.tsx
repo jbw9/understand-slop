@@ -80,10 +80,9 @@ export function ClaudeWeb() {
     };
   }, []);
 
+  if (open && !seen) setSeen(true);
   useEffect(() => {
-    if (!open) return;
-    setSeen(true);
-    input.current?.focus();
+    if (open) input.current?.focus();
   }, [open]);
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [lines]);
 

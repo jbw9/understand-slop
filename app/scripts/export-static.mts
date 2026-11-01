@@ -37,8 +37,9 @@ rmSync(out, { recursive: true, force: true });
 renameSync("app/api", ".api-aside");
 let status: number | null;
 try {
-  status = spawnSync("npx", ["next", "build"], {
+  const build = spawnSync("npx next build", {
     stdio: "inherit",
+    shell: true,
     env: {
       ...process.env,
       NEXT_PUBLIC_STATIC_MAP: name,
@@ -46,7 +47,9 @@ try {
       NEXT_PUBLIC_SOURCE_URL: opt("--source-url") ?? "",
       SLOP_EXPORT_DIR: `out/${name}`,
     },
-  }).status;
+  });
+  if (build.error) throw build.error;
+  status = build.status;
 } finally {
   renameSync(".api-aside", "app/api");
 }

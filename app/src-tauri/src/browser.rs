@@ -99,6 +99,7 @@ pub async fn browser_close(app: AppHandle, label: String) {
 /// One thing a person does with a mouse or keyboard. `x` and `y` are points
 /// from the top left of the webview it is done in.
 #[derive(Deserialize)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub struct Act {
     kind: String,
     #[serde(default)]
@@ -281,6 +282,7 @@ mod macos {
 }
 
 /// The key code and characters AppKit gives a key, by its name or its character.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn key_of(name: &str) -> Option<(u16, String)> {
     let named = match name.to_ascii_lowercase().as_str() {
         "enter" | "return" => Some((36, "\r")),
@@ -309,6 +311,7 @@ fn key_of(name: &str) -> Option<(u16, String)> {
 
 /// The key a character is on, on a US keyboard, by its position in this
 /// string; 0 for one it has no key of its own for, which pages rarely read.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn code_of(c: char) -> u16 {
     const KEYS: &str = "asdfhgzxcv\0bqweryt123465=97-80]ou[ip\rlj'k;\\,/nm.\t `";
     KEYS.chars().position(|k| k == c.to_ascii_lowercase()).map_or(0, |i| i as u16)

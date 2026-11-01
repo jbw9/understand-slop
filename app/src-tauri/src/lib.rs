@@ -3,6 +3,7 @@ mod claude;
 mod devices;
 mod mcp;
 mod preview;
+mod proc;
 mod pty;
 
 use tauri::Manager;

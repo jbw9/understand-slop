@@ -91,14 +91,20 @@ pub fn pty_spawn(
     // first and the user's ordinary interactive shell takes over when it exits.
     if let Some(launch) = &launch {
         claude::prepare(&mut cmd, launch, &context, outline.as_deref(), id).map_err(|e| e.to_string())?;
-        if start_claude && cfg!(unix) {
-            cmd.args(["-c", r#""$SLOP_LAUNCHER"; exec "$SHELL""#]);
-            cmd.env("SHELL", &program);
+        if start_claude {
+            if cfg!(unix) {
+                cmd.args(["-c", r#""$SLOP_LAUNCHER"; exec "$SHELL""#]);
+                cmd.env("SHELL", &program);
+            } else if name.eq_ignore_ascii_case("cmd") {
+                cmd.args(["/k", "slop-claude"]);
+            } else {
+                cmd.args(["-NoExit", "-Command", "slop-claude"]);
+            }
         }
     }
     // The checkout the page named, if it is really there; home otherwise.
     let dir = cwd.map(PathBuf::from).filter(|d| d.is_dir());
-    if let Some(dir) = dir.or_else(|| std::env::var_os("HOME").map(Into::into)) {
+    if let Some(dir) = dir.or_else(crate::proc::home) {
         cmd.cwd(dir);
     }
     cmd.env("TERM", "xterm-256color");
@@ -175,9 +181,20 @@ fn which(names: Vec<String>) -> Vec<String> {
         .into_iter()
         .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
         .collect();
-    if names.is_empty() || cfg!(windows) {
+    if names.is_empty() {
         return Vec::new();
     }
+    runnable(names)
+}
+
+/// Windows' own lookup: PATH and PATHEXT, as cmd and PowerShell use them.
+#[cfg(windows)]
+fn runnable(names: Vec<String>) -> Vec<String> {
+    names.into_iter().filter(|n| !crate::proc::where_is(n).is_empty()).collect()
+}
+
+#[cfg(not(windows))]
+fn runnable(names: Vec<String>) -> Vec<String> {
     let script = names
         .iter()
         .map(|n| format!("command -v {n} >/dev/null 2>&1 && echo {n}"))
@@ -280,6 +297,7 @@ pub fn context_pending(id: u32, ptys: tauri::State<Ptys>) -> Result<bool, String
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
     use super::*;
 
     #[cfg(unix)]

@@ -129,7 +129,12 @@ pub fn project_detect(root: String) -> Project {
 /* ── where things go ──────────────────────────────────────────── */
 
 fn home() -> PathBuf {
-    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default()
+    crate::proc::home().unwrap_or_default()
+}
+
+/// A folder Windows names in the environment, `APPDATA` or `LOCALAPPDATA`.
+fn windows_dir(var: &str, under_home: &str) -> PathBuf {
+    std::env::var_os(var).map(PathBuf::from).unwrap_or_else(|| home().join(under_home))
 }
 
 /// The app's data folder, where Tauri keeps it.
@@ -137,13 +142,21 @@ fn data() -> PathBuf {
     let id = "dev.mira.app";
     if cfg!(target_os = "macos") {
         home().join("Library/Application Support").join(id)
+    } else if cfg!(windows) {
+        windows_dir("APPDATA", r"AppData\Roaming").join(id)
     } else {
         std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|| home().join(".local/share")).join(id)
     }
 }
 
+/// A path as one word of the tab's shell: cmd on Windows, where a path cannot
+/// hold a double quote; sh elsewhere.
 fn q(s: &Path) -> String {
-    format!("'{}'", s.to_string_lossy().replace('\'', r"'\''"))
+    if cfg!(windows) {
+        format!("\"{}\"", s.to_string_lossy())
+    } else {
+        format!("'{}'", s.to_string_lossy().replace('\'', r"'\''"))
+    }
 }
 
 fn ok(cmd: &mut Command) -> Option<String> {
@@ -157,14 +170,20 @@ fn ok(cmd: &mut Command) -> Option<String> {
 /// environment), else the app's own.
 fn sdk() -> PathBuf {
     let env = ["ANDROID_HOME", "ANDROID_SDK_ROOT"].iter().filter_map(std::env::var_os).map(PathBuf::from);
-    let studio = if cfg!(target_os = "macos") { home().join("Library/Android/sdk") } else { home().join("Android/Sdk") };
+    let studio = if cfg!(target_os = "macos") {
+        home().join("Library/Android/sdk")
+    } else if cfg!(windows) {
+        windows_dir("LOCALAPPDATA", r"AppData\Local").join(r"Android\Sdk")
+    } else {
+        home().join("Android/Sdk")
+    };
     env.chain([studio])
         .find(|p| p.join("platform-tools").is_dir() || p.join("cmdline-tools").is_dir())
         .unwrap_or_else(|| data().join("android/sdk"))
 }
 
 fn java_home() -> Option<PathBuf> {
-    let has = |p: &Path| p.join("bin/java").is_file();
+    let has = |p: &Path| p.join("bin").join(exe("java")).is_file();
     let own = data().join("android/jdk");
     if has(&own) {
         return Some(own);
@@ -172,14 +191,18 @@ fn java_home() -> Option<PathBuf> {
     if let Some(p) = std::env::var_os("JAVA_HOME").map(PathBuf::from).filter(|p| has(p)) {
         return Some(p);
     }
-    let studio = PathBuf::from("/Applications/Android Studio.app/Contents/jbr/Contents/Home");
+    let studio = if cfg!(windows) {
+        windows_dir("ProgramFiles", "").join(r"Android\Android Studio\jbr")
+    } else {
+        PathBuf::from("/Applications/Android Studio.app/Contents/jbr/Contents/Home")
+    };
     if has(&studio) {
         return Some(studio);
     }
     // Android's Gradle plugin runs on 17 or 21, not on whatever is newest.
     #[cfg(target_os = "macos")]
     for v in ["17", "21"] {
-        if let Some(p) = ok(Command::new("/usr/libexec/java_home").args(["-v", v])).map(|s| PathBuf::from(s.trim())) {
+        if let Some(p) = ok(crate::proc::command("/usr/libexec/java_home").args(["-v", v])).map(|s| PathBuf::from(s.trim())) {
             if has(&p) {
                 return Some(p);
             }
@@ -188,16 +211,21 @@ fn java_home() -> Option<PathBuf> {
     None
 }
 
+/// A program's file name: `adb.exe` on Windows.
+fn exe(name: &str) -> String {
+    format!("{name}{}", std::env::consts::EXE_SUFFIX)
+}
+
 fn adb(sdk: &Path) -> PathBuf {
-    sdk.join("platform-tools/adb")
+    sdk.join("platform-tools").join(exe("adb"))
 }
 
 fn emulator(sdk: &Path) -> PathBuf {
-    sdk.join("emulator/emulator")
+    sdk.join("emulator").join(exe("emulator"))
 }
 
 fn avds(sdk: &Path) -> Vec<String> {
-    let Some(out) = ok(Command::new(emulator(sdk)).arg("-list-avds").env("ANDROID_HOME", sdk)) else { return Vec::new() };
+    let Some(out) = ok(crate::proc::command(emulator(sdk)).arg("-list-avds").env("ANDROID_HOME", sdk)) else { return Vec::new() };
     let mut all: Vec<String> = out
         .lines()
         .map(str::trim)
@@ -211,7 +239,7 @@ fn avds(sdk: &Path) -> Vec<String> {
 
 /// An emulator adb can already talk to.
 fn emulator_serial(sdk: &Path) -> Option<String> {
-    ok(Command::new(adb(sdk)).arg("devices"))?
+    ok(crate::proc::command(adb(sdk)).arg("devices"))?
         .lines()
         .filter_map(|l| l.split_once('\t'))
         .find(|(s, state)| s.starts_with("emulator-") && state.trim() == "device")
@@ -219,7 +247,7 @@ fn emulator_serial(sdk: &Path) -> Option<String> {
 }
 
 fn booted(sdk: &Path, serial: &str) -> bool {
-    ok(Command::new(adb(sdk)).args(["-s", serial, "shell", "getprop", "sys.boot_completed"])).is_some_and(|s| s.trim() == "1")
+    ok(crate::proc::command(adb(sdk)).args(["-s", serial, "shell", "getprop", "sys.boot_completed"])).is_some_and(|s| s.trim() == "1")
 }
 
 const ANDROID_SETUP: &str = r#"#!/bin/sh
@@ -279,14 +307,14 @@ echo "Done. Back in the Android tab, press Start."
 /* ── iOS ──────────────────────────────────────────────────────── */
 
 fn simctl_ok() -> bool {
-    cfg!(target_os = "macos") && ok(Command::new("xcrun").args(["simctl", "help"])).is_some()
+    cfg!(target_os = "macos") && ok(crate::proc::command("xcrun").args(["simctl", "help"])).is_some()
 }
 
 fn idb() -> Option<PathBuf> {
     let candidates = [home().join(".local/bin/idb"), "/opt/homebrew/bin/idb".into(), "/usr/local/bin/idb".into()];
     candidates.into_iter().find(|p| p.is_file()).or_else(|| {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-        let p = PathBuf::from(ok(Command::new(shell).args(["-lc", "command -v idb"]))?.trim());
+        let p = PathBuf::from(ok(crate::proc::command(shell).args(["-lc", "command -v idb"]))?.trim());
         p.is_file().then_some(p)
     })
 }
@@ -344,7 +372,7 @@ struct Sim {
 
 /// A booted iPhone, else the newest runtime's first iPhone.
 fn pick_sim() -> Result<Sim, String> {
-    let out = ok(Command::new("xcrun").args(["simctl", "list", "devices", "available", "-j"])).ok_or("simctl could not list simulators.")?;
+    let out = ok(crate::proc::command("xcrun").args(["simctl", "list", "devices", "available", "-j"])).ok_or("simctl could not list simulators.")?;
     let list: SimList = serde_json::from_str(&out).map_err(|e| e.to_string())?;
     let mut runtimes: Vec<(&String, &Vec<Sim>)> = list.devices.iter().filter(|(r, _)| r.contains("iOS")).collect();
     // `…SimRuntime.iOS-18-2`: newest last, by version.
@@ -397,13 +425,13 @@ fn slot<'a>(p: &'a mut Phones, platform: &str) -> Result<&'a mut Option<Running>
 pub fn stop_all() {
     let mut p = phones().lock().unwrap();
     if let Some(mut a) = p.android.take() {
-        let _ = Command::new(adb(&sdk())).args(["-s", &a.id, "emu", "kill"]).status();
+        let _ = crate::proc::command(adb(&sdk())).args(["-s", &a.id, "emu", "kill"]).status();
         if let Some(c) = a.child.as_mut() {
             let _ = c.kill();
         }
     }
     if let Some(i) = p.ios.take().filter(|i| i.ours) {
-        let _ = Command::new("xcrun").args(["simctl", "shutdown", &i.id]).status();
+        let _ = crate::proc::command("xcrun").args(["simctl", "shutdown", &i.id]).status();
     }
 }
 
@@ -535,7 +563,7 @@ fn start_android() -> Result<Running, String> {
     // cannot hide their window, so the second try has none at all.
     for flags in [&["-qt-hide-window"][..], &["-no-window", "-gpu", "swiftshader_indirect"][..]] {
         let out = std::fs::File::create(&log).map_err(|e| e.to_string())?;
-        let mut child = Command::new(emulator(&sdk))
+        let mut child = crate::proc::command(emulator(&sdk))
             .args(["-avd", &avd, "-no-audio", "-no-boot-anim"])
             .args(flags)
             .env("ANDROID_HOME", &sdk)
@@ -574,9 +602,9 @@ fn start_ios() -> Result<Running, String> {
     let ours = sim.state != "Booted";
     if ours {
         // Booted with simctl alone, the simulator has no window; Simulator.app is never opened.
-        ok(Command::new("xcrun").args(["simctl", "boot", &sim.udid])).ok_or("simctl could not boot the simulator.")?;
+        ok(crate::proc::command("xcrun").args(["simctl", "boot", &sim.udid])).ok_or("simctl could not boot the simulator.")?;
     }
-    ok(Command::new("xcrun").args(["simctl", "bootstatus", &sim.udid, "-b"])).ok_or("The simulator did not finish booting.")?;
+    ok(crate::proc::command("xcrun").args(["simctl", "bootstatus", &sim.udid, "-b"])).ok_or("The simulator did not finish booting.")?;
     Ok(Running { id: sim.udid, name: sim.name, child: None, ours, size: None, density: None })
 }
 
@@ -596,14 +624,14 @@ fn running_id(platform: &str) -> Result<String, String> {
 fn frame(platform: &str) -> Result<Vec<u8>, String> {
     let id = running_id(platform)?;
     let png = if platform == "android" {
-        let out = Command::new(adb(&sdk())).args(["-s", &id, "exec-out", "screencap", "-p"]).stderr(Stdio::null()).output().map_err(|e| e.to_string())?;
+        let out = crate::proc::command(adb(&sdk())).args(["-s", &id, "exec-out", "screencap", "-p"]).stderr(Stdio::null()).output().map_err(|e| e.to_string())?;
         if !out.status.success() || out.stdout.len() < 24 {
             return Err("The emulator did not send its screen.".into());
         }
         out.stdout
     } else {
         let file = std::env::temp_dir().join(format!("slop-sim-{}.png", std::process::id()));
-        ok(Command::new("xcrun").args(["simctl", "io", &id, "screenshot", "--type=png"]).arg(&file)).ok_or("The simulator did not send its screen.")?;
+        ok(crate::proc::command("xcrun").args(["simctl", "io", &id, "screenshot", "--type=png"]).arg(&file)).ok_or("The simulator did not send its screen.")?;
         std::fs::read(&file).map_err(|e| e.to_string())?
     };
     if let Some(r) = slot(&mut phones().lock().unwrap(), platform)?.as_mut() {
@@ -673,7 +701,7 @@ fn input(platform: &str, i: &Input) -> Result<(), String> {
     if platform == "android" {
         let px = |f: f64, of: u32| ((f.clamp(0.0, 1.0) * of as f64) as u32).to_string();
         let adb = adb(&sdk());
-        let shell = |args: &[&str]| run(Command::new(&adb).args(["-s", &id, "shell", "input"]).args(args));
+        let shell = |args: &[&str]| run(crate::proc::command(&adb).args(["-s", &id, "shell", "input"]).args(args));
         return match i.kind.as_str() {
             "tap" => shell(&["tap", &px(i.x, w), &px(i.y, h)]),
             "swipe" => shell(&["swipe", &px(i.x, w), &px(i.y, h), &px(i.x2, w), &px(i.y2, h), &i.ms.max(100).to_string()]),
@@ -711,7 +739,7 @@ fn input(platform: &str, i: &Input) -> Result<(), String> {
     let density = match density {
         Some(d) => d,
         None => {
-            let d = ok(Command::new(&idb).args(["describe", "--udid", &id, "--json"]))
+            let d = ok(crate::proc::command(&idb).args(["describe", "--udid", &id, "--json"]))
                 .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
                 .and_then(|v| v.get("screen_dimensions")?.get("density")?.as_f64())
                 .unwrap_or(3.0);
@@ -722,7 +750,7 @@ fn input(platform: &str, i: &Input) -> Result<(), String> {
         }
     };
     let pt = |f: f64, of: u32| ((f.clamp(0.0, 1.0) * of as f64 / density) as u32).to_string();
-    let ui = |args: &[&str]| run(Command::new(&idb).arg("ui").args(args).args(["--udid", &id]));
+    let ui = |args: &[&str]| run(crate::proc::command(&idb).arg("ui").args(args).args(["--udid", &id]));
     match i.kind.as_str() {
         "tap" => ui(&["tap", &pt(i.x, w), &pt(i.y, h)]),
         "swipe" => ui(&["swipe", &pt(i.x, w), &pt(i.y, h), &pt(i.x2, w), &pt(i.y2, h), "--duration", &format!("{:.2}", i.ms.max(100) as f64 / 1000.0)]),
@@ -753,14 +781,25 @@ pub fn device_run(platform: String, root: String) -> Result<String, String> {
     if platform == "android" {
         let sdk = sdk();
         let java = java_home().ok_or("Java 17 is missing: run Set up.")?;
-        let env = format!(
-            "export ANDROID_HOME={sdk} ANDROID_SDK_ROOT={sdk} JAVA_HOME={java} PATH={tools}:{emu}:{bin}:\"$PATH\"; ",
-            sdk = q(&sdk),
-            java = q(&java),
-            tools = q(&sdk.join("platform-tools")),
-            emu = q(&sdk.join("emulator")),
-            bin = q(&java.join("bin")),
-        );
+        let env = if cfg!(windows) {
+            format!(
+                "set \"ANDROID_HOME={sdk}\" && set \"ANDROID_SDK_ROOT={sdk}\" && set \"JAVA_HOME={java}\" && set \"PATH={tools};{emu};{bin};%PATH%\" && ",
+                sdk = sdk.display(),
+                java = java.display(),
+                tools = sdk.join("platform-tools").display(),
+                emu = sdk.join("emulator").display(),
+                bin = java.join("bin").display(),
+            )
+        } else {
+            format!(
+                "export ANDROID_HOME={sdk} ANDROID_SDK_ROOT={sdk} JAVA_HOME={java} PATH={tools}:{emu}:{bin}:\"$PATH\"; ",
+                sdk = q(&sdk),
+                java = q(&java),
+                tools = q(&sdk.join("platform-tools")),
+                emu = q(&sdk.join("emulator")),
+                bin = q(&java.join("bin")),
+            )
+        };
         let run = match kind {
             Kind::Expo => "npx expo run:android".to_string(),
             Kind::ReactNative => "npx react-native run-android".to_string(),
@@ -770,7 +809,11 @@ pub fn device_run(platform: String, root: String) -> Result<String, String> {
                 let launch = application_id(&dir)
                     .map(|app| format!(" && adb -s {id} shell monkey -p {app} -c android.intent.category.LAUNCHER 1"))
                     .unwrap_or_default();
-                format!("(cd {} && ./gradlew installDebug){launch}", q(&dir))
+                if cfg!(windows) {
+                    format!("{} -p {} installDebug{launch}", q(&dir.join("gradlew.bat")), q(&dir))
+                } else {
+                    format!("(cd {} && ./gradlew installDebug){launch}", q(&dir))
+                }
             }
         };
         return Ok(env + &run);
@@ -837,7 +880,7 @@ fn shrink(png: &[u8], w: u32, h: u32) -> (Vec<u8>, u32) {
     let tmp = std::env::temp_dir();
     let (from, to) = (tmp.join(format!("slop-shot-{}-{n}.png", std::process::id())), tmp.join(format!("slop-shot-{}-{n}-small.png", std::process::id())));
     let small = std::fs::write(&from, png).ok().and_then(|_| {
-        ok(Command::new("sips").args(["--resampleWidth", &(w / d).to_string()]).arg(&from).arg("--out").arg(&to))?;
+        ok(crate::proc::command("sips").args(["--resampleWidth", &(w / d).to_string()]).arg(&from).arg("--out").arg(&to))?;
         std::fs::read(&to).ok()
     });
     let _ = (std::fs::remove_file(&from), std::fs::remove_file(&to));
@@ -926,6 +969,11 @@ mod tests {
         dir
     }
 
+    /// Not on Windows, whose cmd has no `VAR=value command`.
+    fn browser_none() -> &'static str {
+        if cfg!(windows) { "" } else { "BROWSER=none " }
+    }
+
     fn detect(dir: &tempfile::TempDir) -> Project {
         project_detect(dir.path().to_string_lossy().into_owned())
     }
@@ -934,14 +982,14 @@ mod tests {
     fn a_vite_app_is_served_with_its_own_manager() {
         let d = project(&[("package.json", r#"{"scripts":{"dev":"vite"}}"#), ("pnpm-lock.yaml", ""), ("node_modules/.keep", "")]);
         let p = detect(&d);
-        assert_eq!(p.web.as_deref(), Some("BROWSER=none pnpm run dev"));
+        assert_eq!(p.web.as_deref(), Some(format!("{}pnpm run dev", browser_none()).as_str()));
         assert!(!p.android && !p.ios);
     }
 
     #[test]
     fn dependencies_are_installed_first_when_missing() {
         let d = project(&[("package.json", r#"{"scripts":{"start":"react-scripts start"}}"#)]);
-        assert_eq!(detect(&d).web.as_deref(), Some("npm install && BROWSER=none npm run start"));
+        assert_eq!(detect(&d).web.as_deref(), Some(format!("npm install && {}npm run start", browser_none()).as_str()));
     }
 
     #[test]
@@ -952,7 +1000,7 @@ mod tests {
         assert!(p.web.is_none() && p.android && p.ios);
         let webby = r#"{"scripts":{"start":"expo start","web":"expo start --web"},"dependencies":{"expo":"~51.0.0","react-native-web":"~0.19.10"}}"#;
         let d = project(&[("package.json", webby), ("node_modules/.keep", "")]);
-        assert_eq!(detect(&d).web.as_deref(), Some("BROWSER=none npm run web"));
+        assert_eq!(detect(&d).web.as_deref(), Some(format!("{}npm run web", browser_none()).as_str()));
     }
 
     #[test]

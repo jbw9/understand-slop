@@ -256,6 +256,97 @@ export const EXPLAINS: Record<Explain, { label: string; note: string }> = {
   full: { label: "Full explanations", note: "Every level said again in plain words, with pictures, a glossary and a walkthrough." },
 };
 
+/**
+ * How well the reader understands the repo, as a slider of UNDERSTAND's
+ * stops. Drawn rather than a native range, which the webviews style each
+ * their own way; it drags, clicks to a stop, and takes the arrow keys.
+ */
+function Understanding({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const track = useRef<HTMLDivElement>(null);
+  const last = UNDERSTAND.length - 1;
+  const at = (x: number) => {
+    const r = track.current!.getBoundingClientRect();
+    return Math.round(Math.min(1, Math.max(0, (x - r.left) / r.width)) * last);
+  };
+  const left = (i: number) => `${(i / last) * 100}%`;
+  const explain = UNDERSTAND[value].explain;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <span id="understand-q" className="text-[13px] font-semibold text-ink">
+          How well do you understand this repo?
+        </span>
+        <span className="mt-0.5 block text-[12px] text-muted-slate">So the map says as much as you need, and no more.</span>
+      </div>
+      <div className="px-8">
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-labelledby="understand-q"
+          aria-valuemin={0}
+          aria-valuemax={last}
+          aria-valuenow={value}
+          aria-valuetext={`${UNDERSTAND[value].label}: ${EXPLAINS[explain].label}`}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            e.currentTarget.focus();
+            onChange(at(e.clientX));
+          }}
+          onPointerMove={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) onChange(at(e.clientX));
+          }}
+          onKeyDown={(e) => {
+            const step = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+            const next = e.key === "Home" ? 0 : e.key === "End" ? last : step === undefined ? null : Math.min(last, Math.max(0, value + step));
+            if (next === null) return;
+            e.preventDefault();
+            onChange(next);
+          }}
+          className="group relative h-7 cursor-pointer touch-none select-none outline-none"
+        >
+          <div ref={track} className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border-gray">
+            <div className="h-full rounded-full bg-deep-green transition-[width] duration-200 ease-out" style={{ width: left(value) }} />
+          </div>
+          {UNDERSTAND.map((u, i) => (
+            <span
+              key={u.label}
+              className={cn(
+                "absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200",
+                i <= value ? "bg-deep-green" : "bg-border-strong",
+              )}
+              style={{ left: left(i) }}
+            />
+          ))}
+          <span
+            className="absolute top-1/2 size-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-deep-green bg-pure-white shadow-panel transition-[left,box-shadow,transform] duration-200 ease-out group-focus-visible:shadow-[0_0_0_4px_var(--color-mint-success)] group-active:scale-110"
+            style={{ left: left(value) }}
+          />
+        </div>
+        <div className="relative h-4 select-none">
+          {UNDERSTAND.map((u, i) => (
+            <span
+              key={u.label}
+              onClick={() => onChange(i)}
+              className={cn(
+                "absolute top-0 -translate-x-1/2 cursor-pointer whitespace-nowrap text-[11.5px] transition-colors",
+                i === value ? "font-semibold text-ink" : "text-faint hover:text-muted-slate",
+              )}
+              style={{ left: left(i) }}
+            >
+              {u.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-[2px] border border-border-gray bg-pure-white px-3 py-2.5">
+        <span className="block font-mono text-[10.5px] uppercase tracking-[0.09em] text-deep-green">{EXPLAINS[explain].label}</span>
+        <span className="mt-1 block text-[12px] text-muted-slate">{EXPLAINS[explain].note}</span>
+      </div>
+    </div>
+  );
+}
+
 const folderName = (root: string) => root.trim().replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
 const joinPath = (parent: string, name: string) => `${parent.trim().replace(/[\\/]+$/, "")}/${name}`;
 
@@ -366,63 +457,7 @@ function NewProject({
         </Field>
       ) : at === "You" ? (
         <div className="flex flex-col gap-4">
-          <Field label="How well do you understand this repo?" hint="So the map says as much as you need, and no more.">
-            <div className="flex flex-col gap-2 rounded-[2px] border border-border-gray bg-pure-white px-4 pb-2.5 pt-3.5">
-              <div className="relative h-3.5">
-                {/* The native range keeps keys and focus; it sits invisible over the drawn track, a thumb's half-width past each end so its stops land on the dots. */}
-                <input
-                  type="range"
-                  min={0}
-                  max={UNDERSTAND.length - 1}
-                  step={1}
-                  value={understand}
-                  onChange={(e) => setUnderstand(Number(e.target.value))}
-                  aria-valuetext={`${UNDERSTAND[understand].label}: ${EXPLAINS[explain].label}`}
-                  className="peer absolute -inset-x-2 inset-y-0 z-10 cursor-pointer opacity-0"
-                />
-                <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border-strong" />
-                <div
-                  className="absolute left-0 top-1/2 h-0.5 -translate-y-1/2 bg-deep-green transition-[width] duration-150"
-                  style={{ width: `${(understand / (UNDERSTAND.length - 1)) * 100}%` }}
-                />
-                {UNDERSTAND.map((u, i) => (
-                  <span
-                    key={u.label}
-                    className={cn(
-                      "absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
-                      i <= understand ? "bg-deep-green" : "bg-border-strong",
-                    )}
-                    style={{ left: `${(i / (UNDERSTAND.length - 1)) * 100}%` }}
-                  />
-                ))}
-                <span
-                  className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border-[1.5px] border-deep-green bg-pure-white transition-[left,box-shadow] duration-150 peer-focus-visible:shadow-[0_0_0_3px_var(--color-mint-success)]"
-                  style={{ left: `${(understand / (UNDERSTAND.length - 1)) * 100}%` }}
-                />
-              </div>
-              <div className="relative h-4 font-mono text-[10.5px] uppercase tracking-[0.06em]">
-                {UNDERSTAND.map((u, i) => (
-                  <button
-                    key={u.label}
-                    type="button"
-                    tabIndex={-1}
-                    onClick={() => setUnderstand(i)}
-                    className={cn(
-                      "absolute top-0 cursor-pointer whitespace-nowrap transition-colors hover:text-ink",
-                      i === 0 ? "left-0" : i === UNDERSTAND.length - 1 ? "right-0" : "-translate-x-1/2",
-                      i === understand ? "text-deep-green" : "text-faint",
-                    )}
-                    style={i > 0 && i < UNDERSTAND.length - 1 ? { left: `${(i / (UNDERSTAND.length - 1)) * 100}%` } : undefined}
-                  >
-                    {u.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </Field>
-          <p className="text-[12px] text-muted-slate">
-            <span className="font-semibold text-ink">{EXPLAINS[explain].label}.</span> {EXPLAINS[explain].note}
-          </p>
+          <Understanding value={understand} onChange={setUnderstand} />
         </div>
       ) : at === "Name" ? (
         <Field label="What should it be called?" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>

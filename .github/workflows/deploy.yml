@@ -37,6 +37,7 @@ jobs:
       - name: Check app
         working-directory: app
         run: |
+          npx next typegen
           npx tsc --noEmit
           npx eslint .
           npm run build
@@ -44,6 +45,7 @@ jobs:
       - name: Check landing
         working-directory: landing
         run: |
+          npx next typegen
           npx tsc --noEmit
           npx eslint .
 

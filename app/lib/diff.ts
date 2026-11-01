@@ -39,6 +39,8 @@ export interface FileChange {
   verdict: Exclude<Verdict, "untouched">;
   /** A unified diff with context, as `git diff` prints it. */
   diff: string;
+  /** The path the map knows this file by, where a rename since makes it another. */
+  mapped?: string;
   added: number;
   removed: number;
 }
@@ -49,8 +51,12 @@ export interface SectionDiff {
   /** Root first, this section last, as ids — the path the canvas navigates by. */
   path: string[];
   verdict: Verdict;
-  /** The files behind the verdict, and the lines in each this section cites. */
-  files: { path: string; lines: { s: number; e: number }[] }[];
+  /**
+   * The files behind the verdict, and the lines in each this section cites,
+   * as the map numbers them; `at` is where they were on the `from` side, where
+   * that is not the map's own text.
+   */
+  files: { path: string; lines: { s: number; e: number; at?: { s: number; e: number } }[] }[];
 }
 
 /** One row of a `schema`, `table` or `facts` block, matched across the two maps by its key. */
@@ -174,7 +180,7 @@ function verdicts(map: MapFile, byPath: Map<string, Change>, carry?: (file: stri
       cited++;
       if (c.after === null) gone++;
       if (!touches(c, r.s, r.e)) continue;
-      files.set(r.file, [...(files.get(r.file) ?? []), { s: r.s, e: r.e }]);
+      files.set(r.file, [...(files.get(r.file) ?? []), { s: ref.s, e: ref.e, ...(k ? { at: { s: r.s, e: r.e } } : {}) }]);
     }
     return {
       id: node.id,
@@ -450,14 +456,13 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
   const mapped = resolve(root, map.RUN.commit);
   // `seen` is the map's text, so it is the starting point only from the map's commit.
   const found = head ? between(root, base, head) : changes(root, base, base === mapped ? seen : {});
-  const files = found.map(counted);
-  const byPath = new Map(found.map((c) => [c.path, c]));
-
   if (other) {
+    const files = found.map(counted);
     const { sections, blocks } = treeDiff(map, other);
     return { basis: "sections", from: base, to: head, files, sections, blocks };
   }
-  if (!mapped)
+  if (!mapped) {
+    const files = found.map(counted);
     return {
       basis: "files",
       from: base,
@@ -467,23 +472,38 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
       sections: [],
       blocks: [],
     };
+  }
 
   // The map's line references are numbered to the text it was made from: its
   // commit, or base.json after an update. A diff starting anywhere else is
   // checked against them only once they are carried through the change from
   // that text to `from`, file by file, the same arithmetic the updater moves
   // refs with. A ref whose own lines changed on the way lands near, not on.
+  //
+  // A file may also have moved between `from` and the map's commit, so a
+  // commit made under its old path is still held to the sections citing it.
+  const exact = base === mapped && (!head || !Object.keys(seen).length);
+  const renamed = new Map<string, string>();
+  if (!exact)
+    for (const l of git(root, "diff", "--name-status", "-M", base, mapped).split("\n")) {
+      const [status, was, now] = l.split("\t");
+      if (status?.startsWith("R") && now) renamed.set(was, now);
+    }
+  const back = new Map([...renamed].map(([was, now]) => [now, was]));
+  const files = found.map((c) => ({ ...counted(c), ...(renamed.has(c.path) ? { mapped: renamed.get(c.path) } : {}) }));
+  const byPath = new Map(found.map((c) => [renamed.get(c.path) ?? c.path, c]));
+
   const carried = new Map<string, Change | undefined>();
   const start = (path: string) => (path in seen ? seen[path] : hasAt(root, mapped, path) ? git(root, "show", `${mapped}:${path}`) : null);
   const carry = (path: string) => {
     if (!carried.has(path)) {
       const before = start(path);
-      const after = hasAt(root, base, path) ? git(root, "show", `${base}:${path}`) : null;
+      const there = back.get(path) ?? path;
+      const after = hasAt(root, base, there) ? git(root, "show", `${base}:${there}`) : null;
       carried.set(path, before !== null && after !== null && before !== after ? { path, before, after, ...diffOf(path, before, after) } : undefined);
     }
     return carried.get(path);
   };
-  const exact = base === mapped && (!head || !Object.keys(seen).length);
   return { basis: "sections", from: base, to: head, files, sections: verdicts(map, byPath, exact ? undefined : carry), blocks: [] };
 }
 
@@ -499,12 +519,25 @@ export interface Commit {
   removed: number;
   /** Every path it touched; a rename is its new path. */
   files: string[];
+  /** Its renames, `[was, became]`, so older paths can be followed to today's. */
+  moves?: [string, string][];
+}
+
+/** A numstat path, `a => b` or `dir/{a => b}/x`, as the path it was and the one it became. */
+function sides(spec: string): [string, string] {
+  const brace = /^(.*)\{(.*) => (.*)\}(.*)$/.exec(spec);
+  if (brace) {
+    const [, pre, a, b, post] = brace;
+    const join = (m: string) => `${pre}${m}${post}`.replace(/\/\//g, "/").replace(/^\//, "");
+    return [join(a), join(b)];
+  }
+  const plain = /^(.*) => (.*)$/.exec(spec);
+  return plain ? [plain[1], plain[2]] : [spec, spec];
 }
 
 /**
  * The last `n` commits, newest first, from one `git log`. A binary file counts
- * no lines (numstat prints `-`), and a rename `a => b` or `dir/{a => b}` is
- * the path it became.
+ * no lines (numstat prints `-`), and a rename is listed as the path it became.
  */
 export function commitLog(root: string, n = 50): Commit[] {
   const out: Commit[] = [];
@@ -518,7 +551,9 @@ export function commitLog(root: string, n = 50): Commit[] {
       if (path === undefined) continue;
       c.added += Number(a) || 0;
       c.removed += Number(r) || 0;
-      c.files.push(path.replace(/\{[^{}]* => ([^{}]*)\}/, "$1").replace(/^.* => /, "").replace(/\/\//g, "/"));
+      const [was, now] = sides(path);
+      c.files.push(now);
+      if (was !== now) (c.moves ??= []).push([was, now]);
     }
     out.push(c);
   }

@@ -10,6 +10,7 @@ import { openProjects } from "@/components/projects";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
+import { openTimeline } from "@/components/timeline";
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon } from "@/components/docs";
 import { LOGOS } from "@/components/agents";
@@ -162,6 +163,13 @@ function MapTools() {
         {/* Two states side by side: the old and the new. */}
         <path d="M5.5 13V5.5a2 2 0 0 1 2-2h3M10.5 3l2 2.5-2 2.5" />
         <circle cx="5.5" cy="13" r="1.4" />
+      </Control>
+      <Control label="How the code got here — its commits over the map's sections" onClick={openTimeline}>
+        {/* A line through time with three commits on it. */}
+        <path d="M1.5 8h13" />
+        <circle cx="4" cy="8" r="1.6" />
+        <circle cx="8.5" cy="8" r="2.2" />
+        <circle cx="12.5" cy="8" r="1.2" />
       </Control>
       <Control label="How this map was made — what the agent read and decided" onClick={() => openAudit(name)}>
         {/* A page with a check: the run's record, read back. */}

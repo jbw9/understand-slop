@@ -41,7 +41,7 @@ async function post(body: Record<string, unknown>) {
 }
 
 /** The reader's Claude Code, as the terminal finds it; none outside the desktop app. */
-async function claudePath(): Promise<string | undefined> {
+export async function claudePath(): Promise<string | undefined> {
   if (!isTauri()) return undefined;
   const found = await invoke<{ path: string } | null>("claude_detect", {
     configured: readSettings().claudePath || null,

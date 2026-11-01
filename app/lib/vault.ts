@@ -13,6 +13,8 @@
  *   <vault>/projects/<id>/update.json what the last update did
  *   <vault>/projects/<id>/update.log  its output
  *   <vault>/projects/<id>/turns.json  agents' turns waiting for the next update to take them
+ *   <vault>/projects/<id>/timeline.json the history drawn over the map's roots, cached by HEAD (lib/history.ts)
+ *   <vault>/projects/<id>/story.json  that history told in chapters, and story.log, story.pid while it is told
  *
  * The directory is the one Tauri names for this app (`app_data_dir`: the OS
  * data directory plus the bundle identifier), so the desktop app and this
@@ -431,6 +433,39 @@ export function updateMap(root: string, claude?: string, turn?: Turn): Project |
     }),
   );
   return getProject(p.id);
+}
+
+/**
+ * Tell the project's history in chapters (scripts/generate/story.ts), once,
+ * in the background. A run already telling it is left to finish; its pid
+ * beside the story is how a reload of the page still knows.
+ */
+export function tellStory(id: string, claude?: string): boolean {
+  const p = getProject(id);
+  if (!p || !mapFileOf(id) || telling(id)) return false;
+  const dir = projectDir(id);
+  const log = openSync(join(dir, "story.log"), "w");
+  const child = spawn(process.execPath, [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--story", "--out", dir], {
+    cwd: process.cwd(),
+    detached: true,
+    windowsHide: true,
+    stdio: ["ignore", log, log],
+    env: { ...process.env, SLOP_BACKEND: "claude-code", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
+  });
+  closeSync(log);
+  child.unref();
+  if (child.pid) writeFileSync(join(dir, "story.pid"), String(child.pid));
+  child.on("exit", () => rmSync(join(dir, "story.pid"), { force: true }));
+  return true;
+}
+
+/** Whether a story run is still going. */
+export function telling(id: string): boolean {
+  try {
+    return alive(Number(readFileSync(join(projectDir(id), "story.pid"), "utf8")));
+  } catch {
+    return false;
+  }
 }
 
 /** The project's map file, if one has been made. */

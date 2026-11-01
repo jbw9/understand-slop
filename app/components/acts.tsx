@@ -5,6 +5,7 @@ import { goTo } from "@/components/chrome";
 import { useDiff } from "@/components/diff";
 import { openDiffPanel } from "@/components/diff-panel";
 import { useMap } from "@/components/map-context";
+import { openTimeline } from "@/components/timeline";
 import { findSection, onAct } from "@/lib/act";
 
 /**
@@ -42,6 +43,7 @@ export function Acts() {
         }
         // The workspace opens these in the Preview; they never reach here.
         if (a.verb === "web") return;
+        if (a.verb === "timeline") return openTimeline();
         // Empty `from` and null `to` are the defaults the diff API already
         // has for an absent parameter, so they pass straight through as
         // undefined. Resolving a phrase like "last commit by someone" is

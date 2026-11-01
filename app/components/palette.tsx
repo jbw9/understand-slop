@@ -10,6 +10,7 @@ import { openProjects } from "@/components/projects";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
+import { openTimeline } from "@/components/timeline";
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon, openDoc, useDocList } from "@/components/docs";
 import { openSettings, readSettings, saveSettings } from "@/lib/settings";
@@ -149,6 +150,7 @@ export function Palette() {
       { key: "a:back", label: "Go back a level", kind: "action", kbd: "Esc", run: () => path.length && goTo(path.slice(0, -1)) },
       { key: "a:workspace", label: "Toggle Claude Code & terminal", kind: "action", kbd: "Ctrl+`", run: toggleWorkspace },
       { key: "a:diff", label: "What changed in the code", hint: "Diff two commits over the map", kind: "action", run: openDiff },
+      { key: "a:timeline", label: "How the code got here", hint: "Its commits over time, on the map's sections", kind: "action", run: openTimeline },
       { key: "a:audit", label: "How this map was made", hint: "What the agent read and decided", kind: "action", run: () => openAudit(map.name) },
       { key: "a:history", label: "What you added to this map", kind: "action", run: openHistory },
       { key: "a:docs", label: "Read the docs…", hint: "The project's Markdown: design notes, decisions", kind: "action", run: () => setTimeout(() => openPalette("docs")) },

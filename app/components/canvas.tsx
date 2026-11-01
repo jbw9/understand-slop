@@ -17,6 +17,7 @@ import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
 import { useFlash } from "@/components/flash";
 import { DocView, closeDoc, useOpenDoc } from "@/components/docs";
+import { TimelineView, closeTimeline, useTimelineOpen } from "@/components/timeline";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { FixAndKeep, onAnswer } from "@/components/keep";
@@ -112,7 +113,9 @@ export function Canvas() {
   const { path, crumbs } = useLocation();
   // A doc opened over the level (components/docs.tsx) takes its place until closed.
   const doc = useOpenDoc();
-  const key = doc ? `doc:${doc.file}` : path.join("/");
+  // So does the history (components/timeline.tsx).
+  const timeline = useTimelineOpen();
+  const key = doc ? `doc:${doc.file}` : timeline ? "timeline" : path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
   // Which way the level slides: deeper or back. Derived when the depth
@@ -168,8 +171,9 @@ export function Canvas() {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && e.target.closest("textarea, input")) return;
       if (e.key === "Escape") {
-        // Unwind one layer at a time: an open doc, the trace, then one level.
+        // Unwind one layer at a time: an open doc or the history, the trace, then one level.
         if (doc) closeDoc();
+        else if (timeline) closeTimeline();
         else if (traced) setTraced(null);
         else if (path.length) goTo(path.slice(0, -1));
       } else if (e.key === "0" && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -179,7 +183,7 @@ export function Canvas() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [traced, setTraced, path, doc]);
+  }, [traced, setTraced, path, doc, timeline]);
 
   /* ── handing a section to Claude ──────────────────────────── */
 
@@ -251,6 +255,8 @@ export function Canvas() {
             >
               {doc ? (
                 <DocView file={doc.file} line={doc.line} />
+              ) : timeline ? (
+                <TimelineView />
               ) : (
                 <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
               )}

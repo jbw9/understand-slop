@@ -100,7 +100,7 @@ echo "Noted. The map's \"$1\" will be corrected after this turn."
 /// the turn. Refs are written as the user said them and resolved by the app.
 /// Allowed without asking.
 const SHOW: &str = r#"#!/bin/sh
-# Drives Mira's map: shows a section, or a diff (src-tauri/src/claude.rs).
+# Drives Mira's map: shows a section, a diff, or the history (src-tauri/src/claude.rs).
 [ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; nothing to show." >&2; exit 1; }
 clean() { printf '%s' "$1" | tr '\t\n' '  '; }
 case "$1" in
@@ -114,8 +114,12 @@ diff)
   printf 'diff\t%s\t%s\n' "$(clean "$2")" "$(clean "$3")" >> "$SLOP_CONTEXT.act"
   echo "Showing the diff${2:+ from \"$2\"}${3:+ to \"$3\"} on the map."
   ;;
+timeline)
+  printf 'timeline\t\t\n' >> "$SLOP_CONTEXT.act"
+  echo "Showing the history of the code over the map."
+  ;;
 *)
-  echo 'usage: slop-map-show section "<section title or id>" | slop-map-show diff "<from>" ["<to>"]' >&2
+  echo 'usage: slop-map-show section "<section title or id>" | slop-map-show diff "<from>" ["<to>"] | slop-map-show timeline' >&2
   exit 2
   ;;
 esac
@@ -160,7 +164,9 @@ immediately, not at the end of your turn. When they ask to see what changed, run
 `slop-map-show diff \"<from>\" \"<to>\"` — `<to>` may be left off, meaning the working tree, \
 and an empty `<from>` means the commit the map was built from. Pass the refs through as the \
 user said them, `HEAD~1`, a sha, a branch, or a phrase like \"last commit by hindra2\": the \
-app resolves them against the repository, so do not run git to work one out first. \
+app resolves them against the repository, so do not run git to work one out first. When they \
+ask how the code got here or how it changed over time, run `slop-map-show timeline`: it draws \
+every commit on the map's sections, and they can click through it while you tell the history. \
 Keeping the map right is background upkeep, not part of the answer: never tell the user \
 whether you edited files, whether the map is accurate, or that there is nothing to correct, \
 and mention a correction only in passing when you ran slop-map-fix. What you show is \
@@ -369,6 +375,8 @@ pub enum Act {
     /// An address or a search, for the Preview to open: what WebFetch or
     /// WebSearch just read.
     Web { to: String },
+    /// The history of the code, drawn over the map's sections.
+    Timeline,
 }
 
 /// What Claude has asked to show since this was last asked. Taking it clears
@@ -391,6 +399,7 @@ pub fn take_acts(queue: &Path) -> Vec<Act> {
                     from: from.to_string(),
                     to: (!to.is_empty()).then(|| to.to_string()),
                 }),
+                ("timeline", _, _) => Some(Act::Timeline),
                 ("web", hook, _) => {
                     let input = serde_json::from_str::<serde_json::Value>(hook).ok()?;
                     let input = input.get("tool_input")?;
@@ -767,6 +776,7 @@ mod tests {
         assert!(String::from_utf8_lossy(&out.stdout).contains("Showing"));
         assert!(run(&["diff", "last commit by hindra2"]).status.success());
         assert!(run(&["diff", "", "HEAD"]).status.success());
+        assert!(run(&["timeline"]).status.success());
         // No stop hook has fired, and the acts are already there.
         assert_eq!(
             take_acts(&q),
@@ -774,6 +784,7 @@ mod tests {
                 Act::Section { section: "Sign ups and in".into() },
                 Act::Diff { from: "last commit by hindra2".into(), to: None },
                 Act::Diff { from: String::new(), to: Some("HEAD".into()) },
+                Act::Timeline,
             ]
         );
         // Taken once, and nothing left behind.

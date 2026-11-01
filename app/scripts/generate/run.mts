@@ -3,6 +3,7 @@
 //   maps/ is local output, never committed; the app's Import writes to its own vault with --out instead.
 //   SLOP_CLAUDE names the `claude` binary for SLOP_BACKEND=claude-code (default: `claude` on PATH).
 // --overview redraws only the map's top level from the code, keeping its roots (D60).
+// --story tells the project's history in chapters from its commits (story.ts, D73); needs --out.
 // --update redoes only the sections the code changed since the map last looked (see update.ts); SLOP_UPDATE picks its model.
 //   SLOP_CUT / SLOP_AUTHOR = haiku|sonnet|opus pick the model for those stages (default opus).
 //   AWS credentials come from app/.env.local when it exists (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
@@ -13,4 +14,5 @@ import { existsSync } from "node:fs";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const args = process.argv.slice(2);
 if (args.includes("--update")) await (await import("./update")).update(args);
+else if (args.includes("--story")) await (await import("./story")).story(args);
 else await (await import("./pipeline")).main(args);

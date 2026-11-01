@@ -71,7 +71,7 @@ export function DiffPanel() {
   return (
     <Overlay onClose={() => setShown(false)}>
       <div className={DIALOG + " max-w-[640px]"}>
-        <header className="border-b border-border-gray px-5 py-3.5">
+        <header className="shrink-0 border-b border-border-gray px-5 py-3.5">
           <h2 className="text-[15px] font-semibold text-ink">What changed</h2>
           <p className="mt-0.5 text-[12px] text-muted-slate">
             Pick one to open the level it is on — red is gone, green is new, there.

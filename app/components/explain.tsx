@@ -7,7 +7,9 @@ import { Button } from "@/components/button";
 import { Overlay, DIALOG } from "@/components/dialog";
 import { AnatomyView, SourceView, type RowCtx } from "@/components/anatomy";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
+import { Hunks, useDiff } from "@/components/diff";
 import { useMap } from "@/components/map-context";
+import { hunksOf, type HunkLines } from "@/lib/hunks";
 import { readSource } from "@/lib/source";
 import type { Slice } from "@/lib/repo";
 import type { Anatomy, Explainer as ExplainerData, Walkthrough } from "@/lib/data";
@@ -228,12 +230,38 @@ export function CodePopup({
                   {r.file}:{r.start === r.end ? r.start : `${r.start}–${r.end}`}
                 </span>
               </p>
+              <ChangedHere file={r.file} start={r.start} end={r.end} />
               <CodeSlice owner={owner} file={r.file} start={r.start} end={r.end} ctx={ctx} />
             </div>
           ))}
         </div>
       </div>
     </Overlay>
+  );
+}
+
+/**
+ * In diff mode, the hunks that landed on these lines, above the code as it is
+ * now: the answer to "what did that commit do here". Lines are matched where
+ * the diff starts, so a ref the server carried to another commit
+ * (lib/diff.ts `mapDiff`) is matched where it was carried to.
+ */
+function ChangedHere({ file, start, end }: { file: string; start: number; end: number }) {
+  const diff = useDiff()?.diff;
+  const change = diff?.files.find((f) => (f.mapped ?? f.path) === file);
+  if (!diff || !change) return null;
+  const cited = diff.sections.flatMap((s) => s.files.filter((f) => f.path === file).flatMap((f) => f.lines));
+  const span = cited.find((l) => l.s === start && l.e === end)?.at ?? { s: start, e: end };
+  const near = (h: HunkLines) => {
+    const old = h.lines.map((l) => l.old ?? h.oldStart);
+    return Math.min(...old) <= span.e && Math.max(...old) >= span.s;
+  };
+  if (!hunksOf(change.diff).some(near)) return null;
+  return (
+    <div className="mb-3">
+      <p className="mb-1 text-[12px] font-medium text-muted-slate">What changed here — red is gone, green is new</p>
+      <Hunks file={change} only={near} />
+    </div>
   );
 }
 

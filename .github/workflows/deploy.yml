@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            landing/package-lock.json
+
+      - name: Install app
+        working-directory: app
+        run: npm ci
+
+      - name: Install landing
+        working-directory: landing
+        run: npm ci
+
+      - name: Check app
+        working-directory: app
+        run: |
+          npx tsc --noEmit
+          npx eslint .
+          npm run build
+
+      - name: Check landing
+        working-directory: landing
+        run: |
+          npx tsc --noEmit
+          npx eslint .
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Build site
+        working-directory: app
+        run: sh scripts/build-pages.sh ../site
+
+      - name: Publish
+        working-directory: site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+            exit 0
+          fi
+          git commit -q -m "Deploy ${GITHUB_SHA::7}: $(git -C .. log -1 --format=%s)"
+          git push -q origin gh-pages

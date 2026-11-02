@@ -12,15 +12,42 @@ import { cn } from "@/lib/utils";
 
 /**
  * The project list: the reader's own projects, imported from this machine and
- * kept in the app's vault (lib/vault.ts). Starting one (a short wizard) either makes a new empty folder, or maps
- * an existing one straight away through the reader's Claude Code;
- * the list follows the run, and the map opens from here or the picker once
- * it is made.
+ * kept in the app's vault (lib/vault.ts). Starting one works as VS Code's Open
+ * Folder does: the system's folder picker first, then one screen to confirm
+ * before the map is made through the reader's Claude Code. New Project makes
+ * an empty folder instead. The list follows the run, and the map opens from
+ * here or the picker once it is made.
  */
 
 const OPEN = "slop:projects";
+type Mode = "open" | "new";
+interface Asked {
+  mode?: Mode;
+  root?: string;
+}
+const show = (detail: Asked) => window.dispatchEvent(new CustomEvent<Asked>(OPEN, { detail }));
 /** Opens the list; with a folder, ready to import it. */
-export const openProjects = (root?: string) => window.dispatchEvent(new CustomEvent<string | undefined>(OPEN, { detail: root }));
+export const openProjects = (root?: string) => show(root ? { mode: "open", root } : {});
+
+/** The system's folder picker; undefined outside the desktop app, or when the reader cancels. */
+async function pickFolder(title: string): Promise<string | undefined> {
+  if (!isTauri()) return undefined;
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const dir = await open({ directory: true, title });
+  return typeof dir === "string" ? dir : undefined;
+}
+
+/**
+ * Open Folder…: the picker straight away, then the confirm screen. Outside the
+ * desktop app there is no picker, so the screen asks for the path instead.
+ */
+export async function openFolder() {
+  if (!isTauri()) return show({ mode: "open" });
+  const root = await pickFolder("Open a folder to map");
+  if (root) show({ mode: "open", root });
+}
+
+export const newProject = () => show({ mode: "new" });
 
 type Listed = Project & { hasMap: boolean; stale: boolean; progress?: Progress };
 interface List {
@@ -58,9 +85,8 @@ export function ProjectsDialog() {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [wizard, setWizard] = useState(false);
-  // Whether the wizard makes a new folder or maps an existing one; unasked yet when null.
-  const [fresh, setFresh] = useState<boolean | null>(null);
+  // Confirming an Open Folder or New Project; the list alone when null.
+  const [mode, setMode] = useState<Mode | null>(null);
   const close = useCallback(() => setOpen(false), []);
 
   // Which maps were ready last time, so a run finishing refreshes the picker.
@@ -75,10 +101,10 @@ export function ProjectsDialog() {
 
   useEffect(() => {
     const show = (e: Event) => {
-      const asked = (e as CustomEvent<string | undefined>).detail;
-      if (typeof asked === "string") setRoot(asked);
-      setWizard(typeof asked === "string");
-      setFresh(typeof asked === "string" ? false : null);
+      const asked = (e as CustomEvent<Asked>).detail;
+      setRoot(asked.root ?? "");
+      setLabel("");
+      setMode(asked.mode ?? null);
       setOpen(true);
       setError(null);
       void refresh();
@@ -114,21 +140,21 @@ export function ProjectsDialog() {
   };
 
   const browse = async () => {
-    const { open: pick } = await import("@tauri-apps/plugin-dialog");
-    const dir = await pick({ directory: true, title: fresh ? "Choose where the new folder goes" : "Choose a project folder" });
-    if (typeof dir === "string") setRoot(dir);
+    const dir = await pickFolder(mode === "new" ? "Choose where the new folder goes" : "Open a folder to map");
+    if (dir) setRoot(dir);
   };
 
-  const importIt = async (explain?: Explain) => {
+  const start = async (explain?: Explain) => {
     try {
-      const body = fresh
-        ? { action: "create", root: root.trim(), name: label.trim() }
-        : { action: "import", root: root.trim(), name: label.trim(), claude: await claudePath(), explain };
+      const body =
+        mode === "new"
+          ? { action: "create", root: root.trim(), name: label.trim() }
+          : { action: "import", root: root.trim(), name: label.trim(), claude: await claudePath(), explain };
       const made = await act(body);
       if (made) {
         setRoot("");
         setLabel("");
-        setWizard(false);
+        setMode(null);
         // A map is being made: watch it build (D69).
         if (made.id && made.map?.status === "generating") openMap(made.id);
       }
@@ -168,10 +194,9 @@ export function ProjectsDialog() {
           note={list ? `Your projects stay on this machine, in ${list.vault}` : "Loading…"}
         />
         <div className="flex min-h-0 flex-col gap-6 overflow-y-auto px-5 py-5">
-          {wizard ? (
-            <NewProject
-              fresh={fresh}
-              setFresh={setFresh}
+          {mode ? (
+            <StartProject
+              mode={mode}
               root={root}
               setRoot={setRoot}
               label={label}
@@ -179,19 +204,23 @@ export function ProjectsDialog() {
               busy={busy}
               error={error}
               onBrowse={isTauri() ? () => void browse() : undefined}
-              onStart={(explain) => void importIt(explain)}
+              onStart={(explain) => void start(explain)}
               onCancel={() => {
-                setWizard(false);
-                setFresh(null);
+                setMode(null);
+                setRoot("");
+                setLabel("");
                 setError(null);
               }}
             />
           ) : (
-            <div className="flex items-center justify-between gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-3">
-              <p className="text-[12.5px] text-muted-slate">Start a project from scratch, or map a folder on this machine.</p>
-              <button type="button" onClick={() => setWizard(true)} className={cn(PRIMARY, "shrink-0")}>
-                New project…
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => void openFolder()} className={PRIMARY}>
+                Open Folder…
               </button>
+              <button type="button" onClick={newProject} className={cn(QUIET, "border border-border-gray bg-pure-white")}>
+                New Project…
+              </button>
+              <p className="ml-auto text-[12px] text-faint">Map code on this machine, or start an empty folder.</p>
             </div>
           )}
 
@@ -213,7 +242,7 @@ export function ProjectsDialog() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] text-faint">{list ? "None yet. Start one above." : "Loading…"}</p>
+              <p className="text-[12.5px] text-faint">{list ? "None yet. Open a folder above." : "Loading…"}</p>
             )}
           </section>
 
@@ -227,8 +256,6 @@ export function ProjectsDialog() {
     </Overlay>
   );
 }
-
-const STEPS = ["Start", "Folder", "Name", "You", "Review"] as const;
 
 /**
  * How much the map explains (D70), from how well the reader says they
@@ -346,15 +373,13 @@ const folderName = (root: string) => root.trim().replace(/[\\/]+$/, "").split(/[
 const joinPath = (parent: string, name: string) => `${parent.trim().replace(/[\\/]+$/, "")}/${name}`;
 
 /**
- * Starting a project, one question at a time: from scratch or from a folder
- * already here, where, what to call it, then what happens before anything
- * does. A new project is just an empty folder made for it; an existing one
- * is mapped, so the last step says what that costs. Folders are checked by
- * the server, so a bad one comes back on the last step with Back to fix it.
+ * Confirming a project, on one screen: the folder (already picked when the
+ * picker was there to pick it), its name, and for an existing one how much
+ * the map explains and what making it costs. Folders are checked by the
+ * server, so a bad one comes back here to fix.
  */
-function NewProject({
-  fresh,
-  setFresh,
+function StartProject({
+  mode,
   root,
   setRoot,
   label,
@@ -365,8 +390,7 @@ function NewProject({
   onStart,
   onCancel,
 }: {
-  fresh: boolean | null;
-  setFresh: (v: boolean) => void;
+  mode: Mode;
   root: string;
   setRoot: (v: string) => void;
   label: string;
@@ -377,125 +401,69 @@ function NewProject({
   onStart: (explain?: Explain) => void;
   onCancel: () => void;
 }) {
-  // Opened on a folder already chosen (the titlebar's import), it starts at the folder.
-  const [step, setStep] = useState(fresh === false ? 1 : 0);
-  // A new folder has no code to explain, so it skips "You".
-  const steps = fresh ? STEPS.filter((s) => s !== "You") : STEPS;
-  const at = steps[step];
+  const fresh = mode === "new";
   const [understand, setUnderstand] = useState(2);
   const explain = UNDERSTAND[understand].explain;
   const name = label.trim() || (fresh ? "" : folderName(root));
-  const canNext = { Start: fresh !== null, Folder: Boolean(root.trim()), Name: !fresh || Boolean(label.trim()), You: Boolean(explain), Review: true }[at];
-  const last = step === steps.length - 1;
-  const choose = (v: boolean) => {
-    setFresh(v);
-    setStep(1);
-  };
+  const ready = Boolean(root.trim()) && (!fresh || Boolean(label.trim()));
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (last) onStart(fresh ? undefined : explain);
-        else if (canNext) setStep(step + 1);
+        if (ready) onStart(fresh ? undefined : explain);
       }}
       className="flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4"
     >
-      <ol className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.09em]">
-        {steps.map((s, i) => (
-          <li key={s} className={i === step ? "text-deep-green" : i < step ? "text-on-surface-variant" : "text-faint"}>
-            {i < step ? "✓" : i + 1} {s}
-          </li>
-        ))}
-      </ol>
+      <h3 className="text-[13px] font-semibold text-ink">{fresh ? "New project" : `Map ${name || "a folder"}`}</h3>
 
-      {at === "Start" ? (
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { v: true, title: "Start from scratch", note: "Make a new, empty folder for it." },
-            { v: false, title: "Use an existing folder", note: "Map code already on this machine." },
-          ].map((o) => (
-            <button
-              key={o.title}
-              type="button"
-              onClick={() => choose(o.v)}
-              className={cn(
-                "flex cursor-pointer flex-col gap-1 rounded-[2px] border bg-pure-white px-3 py-3 text-left transition-colors hover:border-deep-green",
-                fresh === o.v ? "border-deep-green" : "border-border-gray",
-              )}
-            >
-              <span className="text-[13px] font-semibold text-ink">{o.title}</span>
-              <span className="text-[12px] text-muted-slate">{o.note}</span>
-            </button>
-          ))}
-        </div>
-      ) : at === "Folder" ? (
-        <Field
-          label={fresh ? "Where should it go?" : "Which folder?"}
-          hint={fresh ? "The folder the new project is made inside." : "A project on this machine, usually a git checkout."}
-        >
-          <div className="flex gap-2">
-            <input
-              autoFocus
-              value={root}
-              onChange={(e) => setRoot(e.target.value)}
-              placeholder={fresh ? "~/code" : "~/code/my-app"}
-              spellCheck={false}
-              className={INPUT}
-            />
-            {onBrowse ? (
-              <button type="button" onClick={onBrowse} className={cn(QUIET, "shrink-0 border border-border-gray bg-pure-white")}>
-                Browse…
-              </button>
-            ) : null}
-          </div>
-        </Field>
-      ) : at === "You" ? (
-        <div className="flex flex-col gap-4">
-          <Understanding value={understand} onChange={setUnderstand} />
-        </div>
-      ) : at === "Name" ? (
-        <Field label="What should it be called?" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>
+      <Field
+        label={fresh ? "Location" : "Folder"}
+        hint={fresh ? `The new folder is made inside it${name ? `: ${joinPath(root || "…", name)}` : "."}` : "A project on this machine, usually a git checkout."}
+      >
+        <div className="flex gap-2">
           <input
-            autoFocus
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder={(!fresh && folderName(root)) || "my-app"}
+            autoFocus={!root}
+            value={root}
+            onChange={(e) => setRoot(e.target.value)}
+            placeholder={fresh ? "~/code" : "~/code/my-app"}
             spellCheck={false}
             className={INPUT}
           />
-        </Field>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12.5px]">
-            <dt className="text-muted-slate">Folder</dt>
-            <dd className="truncate font-mono text-ink" title={root}>
-              {fresh ? joinPath(root, name) : root.trim()}
-            </dd>
-            <dt className="text-muted-slate">Name</dt>
-            <dd className="truncate font-mono text-ink">{name}</dd>
-            {explain && !fresh ? (
-              <>
-                <dt className="text-muted-slate">Explains</dt>
-                <dd className="text-ink">{EXPLAINS[explain].label}</dd>
-              </>
-            ) : null}
-          </dl>
-          <p className="text-[12px] text-muted-slate">
-            {fresh
-              ? "A new empty folder is made there, as a git checkout. There's nothing to map yet: once it has code, map it from the list below."
-              : "Its map is made right away with your Claude Code — about 20 minutes for a mid-sized repo, counted against your plan's usage. You can follow it below and open each part as it finishes."}
-          </p>
+          {onBrowse ? (
+            <button type="button" onClick={onBrowse} className={cn(QUIET, "shrink-0 border border-border-gray bg-pure-white")}>
+              {root ? "Change…" : "Browse…"}
+            </button>
+          ) : null}
         </div>
-      )}
+      </Field>
+
+      <Field label="Name" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>
+        <input
+          autoFocus={Boolean(root) && fresh}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder={(!fresh && folderName(root)) || "my-app"}
+          spellCheck={false}
+          className={INPUT}
+        />
+      </Field>
+
+      {fresh ? null : <Understanding value={understand} onChange={setUnderstand} />}
+
+      <p className="text-[12px] text-muted-slate">
+        {fresh
+          ? "An empty folder is made there, as a git checkout. Map it from the list once it has code."
+          : "The map is made right away with your Claude Code — about 20 minutes for a mid-sized repo, counted against your plan's usage. You can open each part as it finishes."}
+      </p>
 
       <div className="flex items-center justify-end gap-3">
-        {error && last ? <p className="mr-auto text-[12.5px] text-clay-ink">{error}</p> : null}
-        <button type="button" onClick={step ? () => setStep(step - 1) : onCancel} className={QUIET}>
-          {step ? "Back" : "Cancel"}
+        {error ? <p className="mr-auto text-[12.5px] text-clay-ink">{error}</p> : null}
+        <button type="button" onClick={onCancel} className={QUIET}>
+          Cancel
         </button>
-        <button type="submit" disabled={busy || !canNext} className={PRIMARY}>
-          {last ? (fresh ? "Create project" : "Start mapping") : "Next"}
+        <button type="submit" disabled={busy || !ready} className={PRIMARY}>
+          {fresh ? "Create project" : "Start mapping"}
         </button>
       </div>
     </form>

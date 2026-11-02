@@ -6,7 +6,7 @@ import { goTo, useLocation } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { Kbd } from "@/components/button";
 import { StateChip } from "@/components/state";
-import { openProjects } from "@/components/projects";
+import { newProject, openFolder, openProjects } from "@/components/projects";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
@@ -193,7 +193,9 @@ export function Palette() {
       { key: "a:audit", label: "How sure is this map", hint: "What was checked, and what to double-check", kind: "action", run: () => openAudit(map.name) },
       { key: "a:history", label: "What you added to this map", kind: "action", run: openHistory },
       { key: "a:docs", label: "Read the docs…", hint: "The project's Markdown: design notes, decisions", kind: "action", run: () => setTimeout(() => openPalette("docs")) },
-      { key: "a:projects", label: "Projects", hint: "Start a new map, or import one", kind: "action", run: () => openProjects() },
+      { key: "a:open", label: "Open Folder…", hint: "Map a folder on this machine", kind: "action", run: () => void openFolder() },
+      { key: "a:new", label: "New Project…", hint: "Start an empty folder", kind: "action", run: newProject },
+      { key: "a:projects", label: "Projects", hint: "Your maps: open, regenerate, remove", kind: "action", run: () => openProjects() },
       { key: "a:maps", label: "Switch map…", kind: "action", run: () => setTimeout(() => openPalette("maps")) },
       { key: "a:settings", label: "Settings", kind: "action", run: openSettings },
       { key: "a:light", label: "Theme: light", kind: "action", run: theme("light") },

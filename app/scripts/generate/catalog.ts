@@ -13,7 +13,11 @@ import type { FileSummary } from "./summarize";
 export function catalogOf(inv: Inventory, sums: Record<string, FileSummary>, cut: Cut): MapIndex {
   const files: Record<string, IndexFile> = {};
   for (const f of inv.files) {
-    if (f.outside) continue;
+    // Listed, so the app never takes a file outside a scoped map for one added since.
+    if (f.outside) {
+      files[f.path] = { roots: [], status: "excluded", reason: "Outside the part of the repository this map covers", kind: f.test ? "test" : "other", lines: f.lines, symbols: [] };
+      continue;
+    }
     const s = sums[f.path];
     const left = cut.excluded.find((e) => e.path === f.path || (e.path.endsWith("/") && f.path.startsWith(e.path)));
     files[f.path] = {

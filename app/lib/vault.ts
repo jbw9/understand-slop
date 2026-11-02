@@ -23,7 +23,7 @@
  */
 
 import { execFileSync, spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
@@ -295,6 +295,8 @@ export function generate(id: string, claude?: string, explain?: Explain): Projec
   rmSync(join(dir, "base.json"), { force: true });
   rmSync(join(dir, "map.base.json"), { force: true });
   rmSync(join(dir, "update.json"), { force: true });
+  // Turns and reviews are diffs against the old map, which would read as nonsense against the new one.
+  for (const f of ["changes.json", "snapshots", "reviews"]) rmSync(join(dir, f), { recursive: true, force: true });
   // The last run's progress would otherwise read as this one's until the
   // first stage overwrites it.
   rmSync(join(dir, "progress.json"), { force: true });
@@ -462,6 +464,83 @@ export function tellStory(id: string, claude?: string): boolean {
 }
 
 /** Whether a story run is still going. */
+/**
+ * The map as it would be after a branch or pull request: a copy of the
+ * project's map, updated against a checkout of the head commit, kept under
+ * `reviews/<commit>/` for the diff to draw against (app/api/diff). The
+ * checkout is a detached `git worktree` in the vault, removed when the run
+ * ends, so the reader's own checkout and branches are never touched.
+ *
+ * Costs an update run, so only when the reader asks for it.
+ */
+export function mapReview(id: string, commit: string, claude?: string): ReviewMap {
+  const p = getProject(id);
+  if (!p || !/^[0-9a-f]{40}$/.test(commit) || !mapFileOf(id)) return { status: "failed", error: "This map cannot be updated." };
+  const now = reviewMap(id, commit);
+  if (now.status === "running" || now.status === "done") return now;
+  const out = join(projectDir(id), "reviews", commit);
+  const tree = join(projectDir(id), "worktrees", commit);
+  const drop = () => {
+    try {
+      execFileSync("git", ["-C", p.root, "worktree", "remove", "--force", tree], { stdio: "ignore" });
+    } catch {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  };
+  // A run cut off by a restart leaves its checkout behind.
+  if (existsSync(tree)) drop();
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(out, { recursive: true });
+  try {
+    execFileSync("git", ["-C", p.root, "worktree", "add", "--detach", tree, commit], { stdio: "ignore", timeout: 120_000 });
+  } catch {
+    return { status: "failed", error: "Could not check out that commit." };
+  }
+  // What the updater starts from: the map, the cut and summaries it reuses,
+  // and the code as the map last saw it.
+  for (const f of ["map.json", "base.json", "index.json", ".cache"])
+    if (existsSync(join(projectDir(id), f))) cpSync(join(projectDir(id), f), join(out, f), { recursive: true });
+  // The worktree is the whole repository; the project may be a folder in it.
+  const sub = execFileSync("git", ["-C", p.root, "rev-parse", "--show-prefix"], { encoding: "utf8" }).trim();
+  const log = openSync(join(out, "update.log"), "w");
+  const child = spawn(process.execPath, [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", join(tree, sub), "--update", "--out", out], {
+    cwd: process.cwd(),
+    detached: true,
+    windowsHide: true,
+    stdio: ["ignore", log, log],
+    env: { ...process.env, SLOP_BACKEND: "claude-code", SLOP_EXPLAIN: p.explain ?? "full", ...(claude ? { SLOP_CLAUDE: claude } : {}) },
+  });
+  closeSync(log);
+  child.unref();
+  writeFileSync(join(out, "review.pid"), String(child.pid));
+  child.on("exit", drop);
+  child.on("error", drop);
+  return { status: "running" };
+}
+
+export interface ReviewMap {
+  status: "none" | "running" | "done" | "failed";
+  error?: string;
+}
+
+/** Whether the map after `commit` exists, is being made, or failed. */
+export function reviewMap(id: string, commit: string): ReviewMap {
+  if (!/^[0-9a-f]{40}$/.test(commit)) return { status: "none" };
+  const out = join(projectDir(id), "reviews", commit);
+  try {
+    const r = JSON.parse(readFileSync(join(out, "update.json"), "utf8")) as { ok?: boolean; error?: string };
+    return r.ok === false ? { status: "failed", error: r.error } : { status: "done" };
+  } catch {
+    /* not finished */
+  }
+  try {
+    if (alive(Number(readFileSync(join(out, "review.pid"), "utf8")))) return { status: "running" };
+  } catch {
+    return { status: "none" };
+  }
+  return { status: "failed", error: "The run stopped before it finished." };
+}
+
 export function telling(id: string): boolean {
   try {
     return alive(Number(readFileSync(join(projectDir(id), "story.pid"), "utf8")));

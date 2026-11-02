@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { commitLog, mapDiff, resolveRef, turnDiff, type Resolved } from "@/lib/diff";
 import { loadMap, rootOf } from "@/lib/maps";
 import { apply, readOverlay } from "@/lib/overlay";
-import { projectDir } from "@/lib/vault";
+import { projectDir, reviewMap } from "@/lib/vault";
+import { summariesOf, summarize } from "@/lib/history";
 import { branches, defaultBase, pulls, reviewRange, type Review } from "@/lib/review";
 
 /**
@@ -41,6 +42,9 @@ export async function GET(request: Request) {
   const root = rootOf(open.file.RUN);
 
   if (q.get("commits")) return Response.json({ commits: commitLog(root, 200), at: open.file.RUN.commit });
+  // A commit's summary, if one was asked for before (POST below makes one).
+  const sha = q.get("summary");
+  if (sha) return Response.json({ summary: /^[0-9a-f]{40}$/.test(sha) ? summariesOf(projectDir(open.name))[sha] : undefined });
   if (q.get("branches")) return Response.json({ branches: branches(root), base: defaultBase(root), ...pulls(root) });
   // The agent turns the map has followed, newest first (scripts/generate/update.ts).
   const dir = projectDir(open.name);
@@ -64,7 +68,14 @@ export async function GET(request: Request) {
     const file = join(dir, "snapshots", `${entry?.id}.json`);
     if (!entry || !existsSync(file)) return bad("That turn's before-and-after is no longer kept.", 404);
     const snap = JSON.parse(readFileSync(file, "utf8"));
-    const diff = turnDiff({ ...snap.map, RUN: { ...snap.map.RUN, root } }, open.file, snap.files);
+    // The map right after this turn is the one the next turn started from; the
+    // reader's additions go on both sides, so they never read as the turn's.
+    const all = changes();
+    const next = all[all.findIndex((c) => c.id === entry.id) + 1];
+    const nextFile = next && join(dir, "snapshots", `${next.id}.json`);
+    const after = nextFile && existsSync(nextFile) ? apply(JSON.parse(readFileSync(nextFile, "utf8")).map, readOverlay(open.name)).file : open.file;
+    const before = apply(snap.map, readOverlay(open.name)).file;
+    const diff = turnDiff({ ...before, RUN: { ...before.RUN, root } }, { ...after, RUN: { ...after.RUN, root } }, snap.files);
     return Response.json({ ...diff, review: { kind: "turn", base: "", head: "", from: entry.at, to: entry.at, title: entry.prompt } satisfies Review });
   }
   if (spec) {
@@ -121,13 +132,41 @@ export async function GET(request: Request) {
         .filter((o) => !index || (index.files[o.path] ? index.files[o.path].status === "source" : code.has(ext(o.path))))
         .map((o) => (o.near || !index?.files[o.path]?.roots[0] ? o : { ...o, near: [index.files[o.path].roots[0]] }));
     const before = snapshot && { ...apply(snapshot, readOverlay(open.name)).file, RUN: { ...snapshot.RUN, root } };
+    // A review whose map after was made: the reader's additions go on it too,
+    // so they never read as removed.
+    const after = review && reviewMap(open.name, review.to).status === "done" ? json(`reviews/${review.to}/map.json`) : undefined;
     const diff = before
       ? mapDiff(root, from, to, before, {}, open.file)
-      : mapDiff(root, from, to, open.file, json("base.json") ?? {});
+      : after
+        ? mapDiff(root, from, to, open.file, {}, { ...apply(after, readOverlay(open.name)).file, RUN: { ...after.RUN, root } })
+        : mapDiff(root, from, to, open.file, json("base.json") ?? {});
     // A review's ends are the commits it resolved to, so they need no reading back.
     if (review) return Response.json({ ...diff, review, outside: rooted(diff.outside) });
     return Response.json(read.from || read.to ? { ...diff, read, outside: rooted(diff.outside) } : { ...diff, outside: rooted(diff.outside) });
   } catch (e) {
     return bad(e instanceof RangeError ? e.message : "Could not read the checkout.", e instanceof RangeError ? 400 : 500);
+  }
+}
+
+/**
+ * `POST ?map=` with `{sha, claude}`: what that commit did, in a few sentences
+ * (lib/history.ts `summarize`). A paid model run, so only on the reader's
+ * click; kept by sha, so each commit is told once.
+ */
+export async function POST(request: Request) {
+  let open;
+  try {
+    open = loadMap(new URL(request.url).searchParams.get("map") ?? undefined);
+  } catch {
+    open = null;
+  }
+  if (!open) return bad("No such map.", 404);
+  const { sha, claude } = (await request.json().catch(() => ({}))) as { sha?: unknown; claude?: unknown };
+  if (typeof sha !== "string" || !/^[0-9a-f]{7,40}$/.test(sha)) return bad("No such commit.");
+  try {
+    const summary = await summarize(rootOf(open.file.RUN), projectDir(open.name), sha, typeof claude === "string" && claude ? claude : undefined);
+    return Response.json({ summary });
+  } catch (e) {
+    return bad(e instanceof RangeError ? e.message : `Could not summarize: ${e instanceof Error ? e.message.slice(0, 300) : "the model run failed"}`, e instanceof RangeError ? 400 : 500);
   }
 }

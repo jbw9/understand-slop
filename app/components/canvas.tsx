@@ -24,6 +24,7 @@ import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target }
 import { FixAndKeep, onAnswer } from "@/components/keep";
 import { SectionTabs, openInTab } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
+import { DiffBar } from "@/components/diagram-diff";
 import type { Exchange } from "@/lib/keep";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
 import { STATIC_MAP, readSource } from "@/lib/source";
@@ -241,6 +242,7 @@ export function Canvas() {
         {desktop ? null : (
           <Crumbs repo={RUN.repo} map={name} maps={maps} crumbs={crumbs} onJump={(d) => goTo(path.slice(0, d))} />
         )}
+        {doc || file || timeline ? null : <DiffBar path={path} />}
         <Zoom scrollRef={scrollRef}>
         <div ref={contentRef} className="relative mx-auto max-w-[1680px] px-10 pb-28 pt-5">
           <AnimatePresence mode="wait" initial={false} custom={dir}>

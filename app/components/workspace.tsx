@@ -438,7 +438,7 @@ export function Workspace() {
             if (turn && cwd) void updateMap(cwd, turn);
             if (plan) planning.current(key, cwd, plan);
             if (approved)
-              setTabs((all) => all.map((x) => (x.of === key && x.plan ? { ...x, plan: { ...x.plan, state: "approved" } } : x)));
+              setTabs((all) => all.map((x) => (x.of === key && x.plan ? { ...x, plan: { ...x.plan, state: "approved", approvedAt: Date.now() } } : x)));
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
@@ -1023,9 +1023,10 @@ export function Workspace() {
                 status={claude?.status}
                 pty={claude?.pty}
                 read={() => (t.of === undefined ? [] : (screens.current[t.of]?.() ?? []))}
-                onAnswered={(next) =>
-                  setTabs((all) => all.map((x) => (x.key === t.key && x.plan ? { ...x, plan: { ...x.plan, ...next } } : x)))
-                }
+                onAnswered={(next) => {
+                  const at = next.state === "approved" ? { approvedAt: Date.now() } : {};
+                  setTabs((all) => all.map((x) => (x.key === t.key && x.plan ? { ...x, plan: { ...x.plan, ...next, ...at } } : x)));
+                }}
                 onShowClaude={claude ? () => bring(claude.key) : undefined}
                 // The window floats over the main view's right; the plan keeps clear of it.
                 inset={t.main ? inset : undefined}

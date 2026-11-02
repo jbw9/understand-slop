@@ -452,8 +452,11 @@ export async function update(args: string[]) {
   const prompt = (asked ?? corrections.map((c) => c.note).join("; ")).split("\n")[0].slice(0, 200);
   const log = existsSync(`${out}/changes.json`) ? JSON.parse(readFileSync(`${out}/changes.json`, "utf8")) : [];
   log.push({ id: turnId, at: new Date().toISOString(), prompt, files: found.map((c) => c.path), sections, usd, seconds: Math.round((Date.now() - t0) / 1000) });
-  writeFileSync(`${out}/changes.json`, JSON.stringify(log.slice(-SNAPSHOTS), null, 1) + "\n");
-  for (const f of readdirSync(`${out}/snapshots`).sort().slice(0, -SNAPSHOTS)) rmSync(`${out}/snapshots/${f}`);
+  const kept = log.slice(-SNAPSHOTS);
+  writeFileSync(`${out}/changes.json`, JSON.stringify(kept, null, 1) + "\n");
+  // By the log, not by count: a run that died after its snapshot leaves one no turn names.
+  const listed = new Set(kept.map((c: { id: string }) => `${c.id}.json`));
+  for (const f of readdirSync(`${out}/snapshots`)) if (!listed.has(f)) rmSync(`${out}/snapshots/${f}`);
   console.log(`\n${out}/map.json — ${sections.length - failed.length}/${sections.length} sections updated, ${final.problems.length} check problems, $${usd}`);
   await ccClose();
 }

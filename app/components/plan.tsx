@@ -36,6 +36,8 @@ export interface Plan {
   version: number;
   /** Waiting on the user, accepted, or sent back with what to change. */
   state: "open" | "approved" | "revising";
+  /** When it was approved (ms), so what was built after it can be told from what came before. */
+  approvedAt?: number;
   /** What the user asked to change, while Claude revises. */
   asked?: string;
   /** What the user asked for that this revision answers. */
@@ -170,7 +172,7 @@ export function PlanView({
             );
           })}
         </div>
-        <OnTheMap text={plan.text} approved={plan.state === "approved"} done={status === "done"} />
+        <OnTheMap text={plan.text} since={plan.state === "approved" ? plan.approvedAt : undefined} done={status === "done"} />
         {plan.file ? (
           <p className="mt-10 font-mono text-[11px] text-faint" title={plan.file}>
             {plan.file.replace(/^\/(Users|home)\/[^/]+/, "~")}
@@ -260,27 +262,25 @@ function plannedSections(text: string): { label: string; section: string; change
  * plan said it would touch, so a plan that quietly grew, or missed a part,
  * is visible without reading the diff.
  */
-function OnTheMap({ text, approved, done }: { text: string; approved: boolean; done: boolean }) {
+function OnTheMap({ text, since, done }: { text: string; since?: number; done: boolean }) {
   const map = useMaybeMap();
   const planned = useMemo(() => plannedSections(text), [text]);
-  const since = useRef<number | null>(null);
-  if (approved && since.current === null) since.current = Date.now();
   const [touched, setTouched] = useState<{ id: string; title: string }[] | null>(null);
   useEffect(() => {
-    if (!map || !done || since.current === null) return;
+    if (!map || !done || since === undefined) return;
     let live = true;
     fetch(`/api/diff?map=${encodeURIComponent(map.name)}&turns=1`)
       .then((r) => r.json())
       .then((j: { turns?: { at: string; sections?: { id: string; title: string }[] }[] }) => {
         if (!live) return;
-        const after = (j.turns ?? []).filter((t) => Date.parse(t.at) >= since.current!);
+        const after = (j.turns ?? []).filter((t) => Date.parse(t.at) >= since);
         setTouched(after.length ? [...new Map(after.flatMap((t) => t.sections ?? []).map((s) => [s.id, s])).values()] : null);
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [map, done]);
+  }, [map, done, since]);
   if (!map || !planned.length) return null;
   const pathOf = (section: string) => (map.nodeAt(section.split("/")) ? section.split("/") : findSection(map, section));
   const trail = (path: string[]) => path.map((_, i) => map.nodeAt(path.slice(0, i + 1))?.title ?? path[i]).join(" › ");

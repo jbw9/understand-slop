@@ -5,10 +5,12 @@ import { DIALOG, Overlay } from "@/components/dialog";
 import { OPEN_DIFF, TINT, WORD, openDiff, useDiff } from "@/components/diff";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
+import { claudePath } from "@/components/projects";
 import { hunksOf, type HunkLines } from "@/lib/hunks";
 import { TOKEN_COLOR, highlight, langOf } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 import type { Commit, FileChange, MapDiff, SectionDiff, Verdict } from "@/lib/diff";
+import type { Summary } from "@/lib/history";
 import type { Branch, Pull, Review } from "@/lib/review";
 
 /**
@@ -90,12 +92,6 @@ export function DiffPanel() {
   const active = items.findIndex((it) =>
     open ? it.k === "file" && it.path === open.path : it.k === "commit" && it.c === (picked ?? pair?.with),
   );
-  const newest = all[0];
-  // Nothing asked for: the newest commit, as a history view opens.
-  const idle = !!d && !d.from && !d.to && !d.review;
-  useEffect(() => {
-    if (shown && idle && newest) d!.setRange(`${newest.sha}~1`, newest.sha);
-  }, [shown, idle, newest, d]);
 
   useEffect(() => {
     if (shown) list.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
@@ -309,7 +305,7 @@ export function DiffPanel() {
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                 {picked ? (
-                  <Details commit={picked} all={all} onPick={(c) => pick({ k: "commit", c })} />
+                  <Details key={picked.sha} map={map} commit={picked} all={all} onPick={(c) => pick({ k: "commit", c })} />
                 ) : pair?.base && pair.with ? (
                   <Comparing
                     base={pair.base}
@@ -321,7 +317,7 @@ export function DiffPanel() {
                 ) : (
                   <h3 className="text-[17px] font-semibold leading-snug text-ink">{caption}</h3>
                 )}
-                {diff?.review ? <ReviewCard r={diff.review} /> : null}
+                {diff?.review ? <ReviewCard r={diff.review} map={map} spec={d.review} onMapped={d.reload} /> : null}
                 {d.loading ? <p className="mt-4 text-[13px] text-muted-slate">Reading what changed…</p> : null}
                 {d.error ? (
                   <p className="mt-4 text-[13px]" style={{ color: TINT.removed.ink }}>
@@ -422,9 +418,10 @@ function ReviewPicker({ map, value, onPick }: { map: string; value?: string; onP
 }
 
 /** What is under review: the pull request as its author described it, the branch and its base, or the turn's prompt. */
-function ReviewCard({ r }: { r: Review }) {
+function ReviewCard({ r, map, spec, onMapped }: { r: Review; map: string; spec?: string; onMapped: () => void }) {
   return (
     <div className="mt-3 rounded-[3px] border border-border-gray px-3 py-2">
+      {r.kind !== "turn" && spec ? <MapAfter key={spec} map={map} spec={spec} commit={r.to} pr={r.kind === "pr"} onMapped={onMapped} /> : null}
       {r.kind === "pr" ? (
         <>
           <p className="text-[13px] font-semibold text-ink">
@@ -458,6 +455,65 @@ function ReviewCard({ r }: { r: Review }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The map as it would be after the review (app/api/review): until it is made
+ * the diff shows which levels the change reaches; once it is, their boxes,
+ * arrows and rows diff too. Made only when asked, since it is a paid run.
+ */
+function MapAfter({ map, spec, commit, pr, onMapped }: { map: string; spec: string; commit: string; pr: boolean; onMapped: () => void }) {
+  const [s, setS] = useState<{ status: "none" | "running" | "done" | "failed"; error?: string }>();
+  const q = `map=${encodeURIComponent(map)}&commit=${commit}`;
+  useEffect(() => {
+    if (s && s.status !== "running") return;
+    let live = true;
+    const t = setTimeout(
+      () =>
+        fetch(`/api/review?${q}`)
+          .then((r) => r.json())
+          .then((j) => {
+            if (!live) return;
+            if (s?.status === "running" && j.status === "done") onMapped();
+            setS(j);
+          })
+          .catch(() => {}),
+      s ? 4000 : 0,
+    );
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [q, s, onMapped]);
+  const start = async () => {
+    setS({ status: "running" });
+    const j = await fetch("/api/review", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ map, review: spec, claude: await claudePath() }),
+    })
+      .then((r) => r.json())
+      .catch(() => ({ status: "failed", error: "Could not start it." }));
+    setS(j);
+  };
+  if (!s) return null;
+  return (
+    <p className="mb-1.5 flex items-center gap-2 text-[11.5px] text-muted-slate">
+      {s.status === "done" ? (
+        <span className="text-deep-green">The map after {pr ? "this PR" : "this branch"} is drawn: its levels diff box by box.</span>
+      ) : s.status === "running" ? (
+        <span className="text-amber-ink">Mapping {pr ? "this PR" : "this branch"}… a few minutes</span>
+      ) : (
+        <>
+          <button type="button" onClick={() => void start()} className="cursor-pointer text-deep-green underline">
+            Map {pr ? "this PR" : "this branch"}
+          </button>
+          <span>to see its new and changed boxes, not only which levels it reaches (an update run)</span>
+          {s.error ? <span className="text-clay-ink">{s.error}</span> : null}
+        </>
+      )}
+    </p>
   );
 }
 
@@ -656,7 +712,13 @@ function Sha({ sha }: { sha: string }) {
 const longDate = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 /** One commit as an editor's commit details give it: who, when, where it sits, and the whole message. */
-function Details({ commit, all, onPick }: { commit: Commit; all: Commit[]; onPick: (c: Commit) => void }) {
+function Details({ map, commit, all, onPick }: { map: string; commit: Commit; all: Commit[]; onPick: (c: Commit) => void }) {
+  // A checkpoint hook writes the commit's paths into its message; the files are listed below already.
+  const body = commit.body
+    ?.split("\n")
+    .filter((l) => !commit.files.includes(l.trim()))
+    .join("\n")
+    .trim();
   const byOther = commit.committer && (commit.committer !== commit.author || commit.committerEmail !== commit.email);
   const row = "grid grid-cols-[88px_1fr] gap-x-3 py-1 text-[12px]";
   return (
@@ -679,7 +741,8 @@ function Details({ commit, all, onPick }: { commit: Commit; all: Commit[]; onPic
         </div>
       ) : null}
       <h3 className="mt-3 text-[17px] font-semibold leading-snug text-ink">{commit.subject}</h3>
-      {commit.body ? <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-on-surface-variant">{commit.body}</p> : null}
+      {body ? <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-on-surface-variant">{body}</p> : null}
+      <InShort map={map} sha={commit.sha} />
       <div className="mt-4 border-t border-border-gray pt-2">
         <div className={row}>
           <span className="text-muted-slate">Commit</span>
@@ -719,6 +782,65 @@ function Details({ commit, all, onPick }: { commit: Commit; all: Commit[]; onPic
         ) : null}
       </div>
     </>
+  );
+}
+
+/**
+ * What the commit did, in a few sentences from Claude, who reads its diff —
+ * the answer a "wip: checkpoint" message does not give. Paid, so asked for
+ * with a click; kept by sha, so a commit already told shows at once.
+ */
+function InShort({ map, sha }: { map: string; sha: string }) {
+  const [got, setGot] = useState<{ summary?: Summary; error?: string; asking?: boolean } | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/diff?map=${encodeURIComponent(map)}&summary=${sha}`)
+      .then((r) => r.json())
+      .then((j: { summary?: Summary }) => live && setGot({ summary: j.summary }))
+      .catch(() => live && setGot({}));
+    return () => {
+      live = false;
+    };
+  }, [map, sha]);
+
+  async function ask() {
+    setGot({ asking: true });
+    const r = await fetch(`/api/diff?map=${encodeURIComponent(map)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sha, claude: await claudePath() }),
+    })
+      .then((r) => r.json() as Promise<{ summary?: Summary; error?: string }>)
+      .catch(() => ({ error: "Could not reach the app's server." }));
+    setGot(r);
+  }
+
+  if (!got) return null;
+  if (got.summary) {
+    return (
+      <div className="mt-3 rounded-[3px] border-l-2 border-deep-green bg-deep-green/[0.07] px-3 py-2">
+        <p className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-deep-green">In short</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-ink">{got.summary.text}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        disabled={got.asking}
+        onClick={() => void ask()}
+        className="cursor-pointer rounded-[2px] border border-deep-green px-2.5 py-1 text-[12px] text-deep-green hover:bg-deep-green/10 disabled:cursor-default disabled:opacity-60"
+      >
+        {got.asking ? "Claude is reading the diff…" : "✦ Summarize this commit"}
+      </button>
+      {got.asking ? null : <span className="text-[11.5px] text-faint">Claude reads the diff and says what it did — a small paid run, kept after.</span>}
+      {got.error ? (
+        <span className="w-full text-[12px]" style={{ color: TINT.removed.ink }}>
+          {got.error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

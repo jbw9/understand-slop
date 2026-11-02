@@ -171,3 +171,86 @@ export function chapterProblems(chapters: Chapter[], t: Timeline): string[] {
   });
   return out;
 }
+
+/* ── one commit, in brief ────────────────────────────────────── */
+
+/** A commit told in a few sentences, kept by its full sha: a commit never changes, so neither does this. */
+export interface Summary {
+  text: string;
+  at: string;
+  usd: number;
+}
+
+const SUMMARIES = "summaries.json";
+/** The diff a summary reads, at most: a commit of build output says what it is long before its end. */
+const PATCH_MAX = 40_000;
+
+export function summariesOf(dir: string): Record<string, Summary> {
+  try {
+    return JSON.parse(readFileSync(join(dir, SUMMARIES), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+const SUMMARY_TOOL = {
+  name: "summary",
+  description: "What one commit did, in brief.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["summary"],
+    properties: {
+      summary: {
+        type: "string",
+        description: "At most two plain sentences and 40 words: the change that matters most first, then why if the diff shows it. For someone who knows the project. No file lists, no line counts, no lists of everything touched.",
+      },
+    },
+  },
+};
+
+const asking = new Map<string, Promise<Summary>>();
+
+/**
+ * What a commit did, read from its message and diff by one model call (the
+ * Claude Code backend, as the story uses) — only ever on the reader's click,
+ * since it is paid. Two clicks on one commit share the one run.
+ */
+export function summarize(root: string, dir: string, sha: string, claude?: string): Promise<Summary> {
+  const full = git(root, "rev-parse", "--verify", "--quiet", `${sha}^{commit}`).trim();
+  if (!full) return Promise.reject(new RangeError("No such commit."));
+  const kept = summariesOf(dir)[full];
+  if (kept) return Promise.resolve(kept);
+  const key = `${dir}\0${full}`;
+  const running = asking.get(key);
+  if (running) return running;
+  const run = (async () => {
+    const big = ["-c", "core.bigFileThreshold=1m"];
+    const message = git(root, "show", "-s", "--format=%an <%ae>, %aI%n%n%B", full).trim();
+    const stat = git(root, ...big, "show", "--format=", "--stat=120", "-M", full).trim();
+    const patch = git(root, ...big, "show", "--format=", "--patch", "-M", full);
+    const prompt = [
+      `## Commit ${full.slice(0, 7)}\n${message}`,
+      `## Files\n${stat}`,
+      `## Diff${patch.length > PATCH_MAX ? ` (the first ${PATCH_MAX} of ${patch.length} characters)` : ""}\n${patch.slice(0, PATCH_MAX)}`,
+      "## Task\nSay what this commit did. A message like \"wip: checkpoint\" says nothing: read the diff instead.",
+    ].join("\n\n");
+    // The backend finds the binary by this name; the app knows where it is.
+    if (claude) process.env.SLOP_CLAUDE = claude;
+    const { ccAsk } = await import("@/scripts/generate/claude-code");
+    const { bill, MODELS } = await import("@/scripts/generate/bedrock");
+    const before = bill.summary?.usd ?? 0;
+    const r = await ccAsk<{ summary: string }>({
+      model: MODELS[(process.env.SLOP_SUMMARY ?? "sonnet") as keyof typeof MODELS] ?? MODELS.sonnet,
+      system: "You read one git commit and say plainly what it did.",
+      messages: [{ role: "user", content: prompt }],
+      tool: SUMMARY_TOOL,
+      stage: "summary",
+    });
+    const s: Summary = { text: r.summary.trim(), at: new Date().toISOString(), usd: (bill.summary?.usd ?? 0) - before };
+    writeFileSync(join(dir, SUMMARIES), JSON.stringify({ ...summariesOf(dir), [full]: s }, null, 2));
+    return s;
+  })().finally(() => asking.delete(key));
+  asking.set(key, run);
+  return run;
+}

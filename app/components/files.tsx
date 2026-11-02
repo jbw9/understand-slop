@@ -41,7 +41,8 @@ const fetched = new Map<string, Files>();
 /** The open map's file index (app/api/files), fetched again whenever the map is rewritten. Null until it arrives, or on a map with no checkout. */
 export function useFiles(): Files | null {
   const map = useMap();
-  const [files, setFiles] = useState<Files | null>(() => fetched.get(map.name) ?? null);
+  // Tagged with its map, so a switch never shows the last map's files while (or if) the new one's fail to load.
+  const [got, setFiles] = useState<{ name: string; files: Files } | null>(null);
   useEffect(() => {
     let live = true;
     fetch(`/api/files?map=${encodeURIComponent(map.name)}`)
@@ -49,14 +50,14 @@ export function useFiles(): Files | null {
       .then((r: Files | null) => {
         if (!live || !r) return;
         fetched.set(map.name, r);
-        setFiles(r);
+        setFiles({ name: map.name, files: r });
       })
       .catch(() => {});
     return () => {
       live = false;
     };
   }, [map.name, map.RUN]);
-  return files;
+  return got?.name === map.name ? got.files : (fetched.get(map.name) ?? null);
 }
 
 /** Every span the reader can open on the open map, by file. */

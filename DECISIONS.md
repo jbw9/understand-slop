@@ -1783,3 +1783,10 @@ another level redoes the roots; the summaries and the cut replay from cache.
 **Beat:** comparing through two `<select>`s, and a details line holding only author and date.
 **Cost accepted:** a merge's changes are shown against its first parent, and the history is one line with no branch lanes. Refs are read with the log, so a new branch or tag shows after the next commit.
 **At scale:** same as D75: the last 200 commits.
+
+## D77 — A commit, in short, from its diff
+
+**Chose:** a commit's details carry "✦ Summarize this commit". One structured Claude Code call (Sonnet; `SLOP_SUMMARY` picks another) reads the commit's message, its `--stat` and up to 40,000 characters of its diff, and says in about two sentences what it did. The answer is kept by full sha in `<vault>/projects/<id>/summaries.json` and shows at once on every later visit. Two clicks on one commit share the one run. A message's lines that only repeat the commit's own paths, which the checkpoint hook writes, are not shown, since the files are listed below them.
+**Beat:** summarizing on every pick, which would make walking the history with ↓ a paid run per row; and a summary built only from the message, which a "wip: checkpoint" commit leaves empty.
+**Measured:** the 14-file checkpoint `eeaed23`: 6.4 s, $0.06.
+**Cost accepted:** the model is asked for 40 words and wrote about 60; nothing enforces it. A diff past 40,000 characters is told from its start.

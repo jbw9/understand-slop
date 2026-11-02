@@ -56,6 +56,8 @@ export interface DiffState {
   commits: Commit[];
   setRange: (from?: string, to?: string) => void;
   setReview: (spec?: string) => void;
+  /** Asks again for the same diff, when something it is drawn from was made since (a review's map after). */
+  reload: () => void;
   off: () => void;
 }
 
@@ -127,6 +129,12 @@ export function DiffMode({ map, children }: { map: string; children: React.React
 export function DiffProvider({ map, on, onOff, children }: { map: string; on: boolean; onOff: () => void; children: React.ReactNode }) {
   const [range, setR] = useState<{ from?: string; to?: string; review?: string }>({});
   const [commits, setCommits] = useState<Commit[]>([]);
+  const [listed, setListed] = useState(false);
+  // Nothing asked for is the newest commit, as a history opens (D76) — read
+  // here, so the panel, the bar and the map all mean the same change.
+  const idle = !range.from && !range.to && !range.review;
+  const newest = commits[0];
+  const shown = idle && newest ? { from: `${newest.sha}~1`, to: newest.sha } : range;
   /**
    * The answer and the question it answers, in one piece of state. `loading` is
    * then derived — whether the answer in hand is for the comparison being
@@ -136,16 +144,18 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
    */
   const [got, setGot] = useState<{ q: string; diff?: MapDiff; error?: string }>();
   const q = new URLSearchParams({ map });
-  if (range.from) q.set("from", range.from);
-  if (range.to) q.set("to", range.to);
+  if (shown.from) q.set("from", shown.from);
+  if (shown.to) q.set("to", shown.to);
   if (range.review) q.set("review", range.review);
   const asked = q.toString();
+  const [again, setAgain] = useState(0);
 
   useEffect(() => {
     // Nothing is cleared on the way out: `value` below hands out null while
     // off, so the last answer is simply not read, and turning the mode back on
     // re-fetches over it.
-    if (!on) return;
+    // Idle, it waits for the list that names the newest commit.
+    if (!on || (idle && !listed)) return;
     let live = true;
     fetch(`/api/diff?${asked}`)
       .then((r) => r.json())
@@ -154,22 +164,24 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
     return () => {
       live = false;
     };
-  }, [on, asked]);
+  }, [on, asked, again, idle, listed]);
 
   useEffect(() => {
-    if (!on || commits.length) return;
+    if (!on || listed) return;
     let live = true;
     fetch(`/api/diff?map=${encodeURIComponent(map)}&commits=1`)
       .then((r) => r.json())
       .then((j) => live && setCommits(j.commits ?? []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => live && setListed(true));
     return () => {
       live = false;
     };
-  }, [map, on, commits.length]);
+  }, [map, on, listed]);
 
   const setRange = useCallback((from?: string, to?: string) => setR({ from, to }), []);
   const setReview = useCallback((review?: string) => setR({ review }), []);
+  const reload = useCallback(() => setAgain((n) => n + 1), []);
   useEffect(() => {
     const on = (e: Event) => setR({ review: (e as CustomEvent<string>).detail });
     window.addEventListener(OPEN_REVIEW, on);
@@ -177,8 +189,8 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
   }, []);
   const here = got?.q === asked ? got : undefined;
   const value = useMemo<DiffState>(
-    () => ({ diff: on ? (here?.diff ?? null) : null, loading: on && !here, error: here?.error, ...range, commits, setRange, setReview, off: onOff }),
-    [on, here, range, commits, setRange, setReview, onOff],
+    () => ({ diff: on ? (here?.diff ?? null) : null, loading: on && !here, error: here?.error, ...range, from: shown.from, to: shown.to, commits, setRange, setReview, reload, off: onOff }),
+    [on, here, range, shown.from, shown.to, commits, setRange, setReview, reload, onOff],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

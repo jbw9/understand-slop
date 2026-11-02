@@ -27,6 +27,8 @@ export interface RepoFile {
 
 /** What a model summarises and a root must own: source, not tests. */
 export const isSource = (f: RepoFile) => f.code && !f.test;
+/** `isSource` by path alone, for a file not inventoried yet (app/api/files): what an update would take as code. */
+export const sourcePath = (path: string) => !SKIP.some((r) => r.test(path)) && CODE.has(extname(path).toLowerCase()) && !TEST.test(path);
 
 export interface Inventory {
   repo: string;

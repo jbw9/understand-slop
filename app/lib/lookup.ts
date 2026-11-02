@@ -65,17 +65,21 @@ export function mapSection(m: BuiltMap, name: string): string {
 
 /** The sections that open a file, or a line of it, deepest first; or why none does. */
 export function mapWhere(m: BuiltMap, index: MapIndex | null, file: string, line?: number): string {
-  const path = file.replace(/^\.?\//, "");
+  // Claude often names a file by its absolute path.
+  const root = m.RUN.root?.replace(/\/$/, "");
+  const path = (root && file.startsWith(`${root}/`) ? file.slice(root.length + 1) : file).replace(/^\.?\//, "");
   const cited = citations(m.L0);
   const hits = line ? nodesAt(cited, path, line) : (cited.get(path) ?? []).slice().sort((a, b) => b.path.length - a.path.length);
   const seen = new Set<string>();
   const levels = hits.filter((c) => !seen.has(c.path.join("/")) && seen.add(c.path.join("/")));
   if (levels.length) return `${path}${line ? `:${line}` : ""} is explained by:\n${levels.slice(0, 8).map((c) => `- ${named(m, c.path)} (cites ${c.start}-${c.end})`).join("\n")}`;
   const f = index?.files[path];
+  const inFile = cited.get(path) ?? [];
+  const near = line ? inFile.slice().sort((a, b) => Math.min(Math.abs(a.start - line), Math.abs(a.end - line)) - Math.min(Math.abs(b.start - line), Math.abs(b.end - line)))[0] : inFile[0];
+  if (!f && near) return `No section opens ${path}:${line}. Nearest in this file: ${named(m, near.path)} (cites ${near.start}-${near.end}).`;
   if (!f) return `${path} is not on the map: it is not in the checkout the map was made from (new since, or not a file).`;
   if (f.status === "excluded") return `${path} was left out of the map: ${(f.reason ?? "no reason recorded").replace(/\.$/, "")}.`;
   if (f.status === "other") return `${path} is ${f.kind ?? "not source"}, which the map does not explain.`;
-  const near = cited.get(path)?.[0];
   const roots = f.roots.map((r) => m.L0.find((n) => n.id === r)?.title ?? r).join(", ");
   return `No section opens ${path}${line ? `:${line}` : ""}.${near ? ` Nearest in this file: ${named(m, near.path)}.` : ""}${roots ? ` It belongs to ${roots}.` : ""}`;
 }

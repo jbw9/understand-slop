@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow, OriginMark, Prose } from "@/components/state";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
@@ -10,7 +10,8 @@ import { useMayBeStale } from "@/components/chrome";
 import { readSource } from "@/lib/source";
 import { openDoc } from "@/components/docs";
 import { BOX_H, layoutDiagram } from "@/lib/diagram";
-import { TINT, useDiff } from "@/components/diff";
+import { TINT, WORD as WORD_OF, useDiff } from "@/components/diff";
+import { DiagramChanges, changesUnder } from "@/components/diagram-diff";
 
 /**
  * The blocks a reader learns from without opening code (round 3, D34): the
@@ -156,6 +157,19 @@ function Diagram({
   // its own code held, but what it relies on did not.
   const boxVerdict = (id: string) => verdictOf(block.boxes.find((b) => b.id === id)?.opens);
   const affected = new Set(block.arrows.filter((a) => boxVerdict(a.to) && !boxVerdict(a.from)).map((a) => a.from));
+  // Each changed box's size, and the lines behind it, as a pull request lists
+  // a file (components/diagram-diff.tsx).
+  const changes = useMemo(
+    () =>
+      diff
+        ? block.boxes.flatMap((b) => {
+            const ch = b.opens ? changesUnder(diff, b.opens) : null;
+            return ch ? [{ box: b.id, label: b.label, opens: b.opens!, ch }] : [];
+          })
+        : [],
+    [diff, block.boxes],
+  );
+  const [lit, setLit] = useState<string | null>(null);
 
   return (
     <figure className="min-w-0">
@@ -184,7 +198,8 @@ function Diagram({
           role="img"
           aria-label={block.caption}
           className={navigable ? "dg-nav block h-auto" : "block h-auto"}
-          style={{ width: "100%", maxWidth: W * DIAGRAM_MAX_SCALE, minWidth: W * 0.7 }}
+          // Visible: a change's tag rides the top edge of a box in the first row.
+          style={{ width: "100%", maxWidth: W * DIAGRAM_MAX_SCALE, minWidth: W * 0.7, overflow: "visible" }}
         >
           <defs>
             {(["plain", "good", "warn"] as const).map((t) => (
@@ -239,6 +254,9 @@ function Diagram({
             const t = TONE[b.tone ?? "plain"];
             const v = verdictOf(b.opens);
             const near = !v && affected.has(b.id);
+            const ch = changes.find((c) => c.box === b.id)?.ch;
+            const tag = ch ? (ch.added || ch.removed ? `+${ch.added} −${ch.removed}` : WORD_OF[ch.verdict]) : "";
+            const tagW = tag.length * 6.6 + 14;
             const fill = v ? TINT[v].surface : sec >= 0 ? sectionTone(sec).surface : t.fill;
             const stroke = v ? TINT[v].line : near ? TINT.changed.line : sec >= 0 ? sectionTone(sec).ink : t.stroke;
             const ink = v ? TINT[v].ink : sec >= 0 ? sectionTone(sec).ink : t.ink;
@@ -262,7 +280,7 @@ function Diagram({
                   // A hairline, like every other container on the page: the
                   // tint already says which section it is, and a heavy edge
                   // made the picture louder than the tables beside it.
-                  strokeWidth={v ? 2 : 1}
+                  strokeWidth={lit === b.id ? 3.5 : v ? 2 : 1}
                   strokeOpacity={v ? 1 : sec >= 0 ? 0.55 : 1}
                   strokeDasharray={b.tone === "warn" || v === "removed" ? "5 4" : near ? "3 3" : undefined}
                   opacity={moved && !v && !near ? 0.45 : 1}
@@ -284,6 +302,22 @@ function Diagram({
                     {TINT[v].mark}
                   </text>
                 ) : null}
+                {/* The change's size, on the box's top edge where a label never sits. */}
+                {tag && v ? (
+                  <g>
+                    <rect x={x + 8} y={y - 9} width={tagW} height={18} rx="9" fill={TINT[v].surface} stroke={TINT[v].line} />
+                    {ch!.added || ch!.removed ? (
+                      <text x={x + 15} y={y + 4} fontSize="11" fontWeight="600" fontFamily="var(--font-mono)">
+                        <tspan fill={TINT.added.ink}>+{ch!.added}</tspan>
+                        <tspan fill={TINT.removed.ink}> −{ch!.removed}</tspan>
+                      </text>
+                    ) : (
+                      <text x={x + 15} y={y + 4} fontSize="11" fontWeight="600" fill={TINT[v].ink}>
+                        {tag}
+                      </text>
+                    )}
+                  </g>
+                ) : null}
                 {b.sub ? (
                   <text x={x + w / 2} y={y + 43} textAnchor="middle" fontSize="12" fill="var(--color-faint)">
                     {b.sub}
@@ -294,6 +328,7 @@ function Diagram({
           })}
         </svg>
       </div>
+      <DiagramChanges items={changes} onHover={setLit} onOpen={onOpen} />
     </figure>
   );
 }

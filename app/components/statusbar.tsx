@@ -146,6 +146,9 @@ function Sep() {
   return <span aria-hidden className="mx-1 h-3 w-px bg-border-strong" />;
 }
 
+/** How long the changed files must stay as they are before the map follows them by itself. */
+const SETTLE = 120_000;
+
 interface Update {
   status: "running" | "done" | "failed";
   finishedAt?: string;
@@ -164,7 +167,10 @@ interface Update {
  *
  * Edits made outside a Mira tab (another editor, a pull) never ask for an
  * update, so between updates this says how far the code has moved from what
- * the map describes and offers one. Never by itself: an update costs a run.
+ * the map describes, and updates it once those files have stopped changing
+ * for SETTLE: long enough that an agent mid-turn (whose turn updates the map
+ * when it ends) is not raced. The same change is never retried after it
+ * failed, since each try is a paid run.
  */
 function MapUpdates({ id, root, local }: { id: string; root?: string; local: boolean }) {
   const [u, setU] = useState<Update | null>(null);
@@ -200,16 +206,36 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
   }, [id, local]);
 
   const [behind, setBehind] = useState<string[]>([]);
+  // The change last updated for, so a failed one is not paid for again.
+  const [tried, setTried] = useState("");
+  const quiet = useRef({ sig: "", since: 0, tried: "", running: false });
+  const running = u?.status === "running";
+  useEffect(() => {
+    quiet.current.running = running;
+  }, [running]);
+  const follow = (sig: string) => {
+    quiet.current.tried = sig;
+    setTried(sig);
+    if (root) void updateMap(root, { transcript: null, corrections: [] });
+  };
   useEffect(() => {
     if (!local) return;
     const tick = () =>
       fetch(`/api/files?map=${encodeURIComponent(id)}&behind=1`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((r: { behind: string[] } | null) => r && setBehind(r.behind))
+        .then((r: { behind: string[] } | null) => {
+          if (!r) return;
+          setBehind(r.behind);
+          const q = quiet.current;
+          const sig = r.behind.join("\n");
+          if (sig !== q.sig) Object.assign(q, { sig, since: Date.now() });
+          else if (sig && !q.running && q.tried !== sig && Date.now() - q.since >= SETTLE) follow(sig);
+        })
         .catch(() => {});
     void tick();
     const timer = setInterval(tick, 15000);
     return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follow reads only refs and root, which `id` pins
   }, [id, local, u?.finishedAt]);
 
   useEffect(() => {
@@ -245,9 +271,14 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
       <span className="mr-2 flex min-w-0 items-center gap-2 text-amber-ink">
         <span className="truncate" title={behind.join("\n")}>
           Map is behind: {behind.length} {behind.length === 1 ? "file" : "files"} changed
+          {tried === behind.join("\n") ? "" : " · updates when edits settle"}
         </span>
-        <button type="button" onClick={() => void updateMap(root, { transcript: null, corrections: [] })} className="shrink-0 cursor-pointer text-deep-green underline">
-          Update
+        <button
+          type="button"
+          onClick={() => follow(behind.join("\n"))}
+          className="shrink-0 cursor-pointer text-deep-green underline"
+        >
+          Update now
         </button>
       </span>
     ) : null;

@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadMap, rootOf } from "@/lib/maps";
-import { git, readText, type Base } from "@/scripts/generate/gitdiff";
+import type { Node } from "@/lib/data";
+import { git, readText, refs, type Base } from "@/scripts/generate/gitdiff";
+import { sourcePath } from "@/scripts/generate/inventory";
 import { projectDir } from "@/lib/vault";
 import type { MapIndex } from "@/lib/coverage";
 
@@ -36,21 +38,30 @@ export async function GET(request: Request) {
   } catch {
     // Not a git checkout: the index alone is what there is.
   }
-  // New files of a kind the map explains here (by extension), and files it
-  // explains that are gone: a lockfile or an image appearing is not news.
-  const ext = (p: string) => p.slice(p.lastIndexOf("."));
+  // New code files and explained files now gone, judged as an update judges
+  // them (scripts/generate/inventory.ts): a lockfile, a test or a type stub
+  // appearing is not something the map would add.
+  const root = rootOf(open.file.RUN);
   const files = index?.files ?? {};
-  const kinds = new Set(Object.entries(files).filter(([, x]) => x.status === "source").map(([p]) => ext(p)));
-  const now = new Set(present);
-  const added = present.filter((p) => !files[p] && kinds.has(ext(p)));
-  const gone = present.length ? Object.keys(files).filter((p) => files[p].status === "source" && !now.has(p)) : [];
+  const added = present.filter((p) => !files[p] && sourcePath(p));
+  const gone = present.length ? Object.keys(files).filter((p) => files[p].status === "source" && !existsSync(join(root, p))) : [];
   if (q.get("behind")) {
-    const root = rootOf(open.file.RUN);
     const b = join(projectDir(open.name), "base.json");
     const base: Base = existsSync(b) ? JSON.parse(readFileSync(b, "utf8")) : {};
-    const touched = new Set([...git(root, "diff", "--name-only", "--relative", open.file.RUN.commit).split("\n"), ...added, ...gone, ...Object.keys(base)]);
-    // A file an update already followed differs from the commit but not from base.json.
-    const behind = [...touched].filter((p) => (files[p]?.status === "source" || added.includes(p)) && (!(p in base) || base[p] !== readText(join(root, p))));
+    const cited = new Set<string>();
+    const walk = (nodes: Node[]) => nodes.forEach((n) => (refs(n).forEach((r) => cited.add(r.file)), walk(n.children ?? [])));
+    walk(open.file.AUTHORED);
+    const untracked = git(root, "ls-files", "--others", "--exclude-standard").split("\n");
+    const touched = new Set([...git(root, "diff", "--name-only", "--relative", open.file.RUN.commit).split("\n"), ...untracked, ...Object.keys(base)]);
+    touched.delete("");
+    // Exactly what an update would take (update.ts `found`), so one always
+    // clears it: code or a cited file, and a deletion only of a cited one. A
+    // file an update already followed differs from the commit but not from base.json.
+    const behind = [...touched].filter((p) => {
+      const text = readText(join(root, p));
+      const takes = text === null ? cited.has(p) : sourcePath(p) || cited.has(p);
+      return takes && (p in base ? base[p] !== text : true);
+    });
     return Response.json({ behind });
   }
   return Response.json({ index, added, gone });

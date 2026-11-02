@@ -236,3 +236,58 @@ export function DiffBar({ path }: { path: string[] }) {
     </div>
   );
 }
+
+/**
+ * On a level whose own lines changed: the change itself, first, as a pull
+ * request shows a file — how much, then the red and green lines. A level the
+ * reader was sent to by "Next" opens onto what it was sent to see.
+ */
+export function HereChanges({ path }: { path: string[] }) {
+  const diff = useDiff()?.diff;
+  const [open, setOpen] = useState(true);
+  const own = diff?.sections.find((s) => s.path.join("/") === path.join("/"));
+  if (!diff || !own || own.verdict === "untouched") return null;
+  const ch = changesUnder(diff, own.id);
+  if (!ch) return null;
+  const t = TINT[ch.verdict];
+  return (
+    <section className="mb-6 max-w-[1100px] overflow-hidden rounded-[3px] border" style={{ borderColor: t.line }}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"
+        style={{ background: t.surface }}
+      >
+        <span className="w-2.5 text-[11px]" style={{ color: t.ink }}>
+          {open ? "▾" : "▸"}
+        </span>
+        <span className="text-[13px] font-semibold" style={{ color: t.ink }}>
+          {ch.verdict === "added" ? "This part is new" : ch.verdict === "removed" ? "This part is gone" : "This part changed"}
+        </span>
+        {ch.files.length ? (
+          <span className="text-[12px] text-muted-slate">
+            in {ch.files.length} {ch.files.length === 1 ? "file" : "files"}
+          </span>
+        ) : null}
+        {ch.added || ch.removed ? (
+          <span className="tnum ml-auto flex items-center gap-2 font-mono text-[11.5px]">
+            <span style={{ color: TINT.added.ink }}>+{ch.added}</span>
+            <span style={{ color: TINT.removed.ink }}>−{ch.removed}</span>
+            <StatBlocks added={ch.added} removed={ch.removed} />
+          </span>
+        ) : null}
+      </button>
+      {open && ch.files.length ? (
+        <div className="space-y-3 px-3 py-3">
+          {ch.files.map((f) => (
+            <div key={f.change.path}>
+              <p className="font-mono text-[11.5px] text-on-surface">{f.change.path}</p>
+              <Hunks file={f.change} only={f.only} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}

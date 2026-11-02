@@ -9,7 +9,7 @@ import { useMap } from "@/components/map-context";
 import { openProjects } from "@/components/projects";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
-import { openDiff } from "@/components/diff";
+import { openDiff, useDiff } from "@/components/diff";
 import { openTimeline } from "@/components/timeline";
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon } from "@/components/docs";
@@ -157,12 +157,21 @@ function Where() {
 /** The tools that act on the open map. */
 function MapTools() {
   const { name } = useMap();
+  const diff = useDiff();
   return (
     <>
-      <Control label="What changed in the code — red is gone, green is new" onClick={openDiff}>
-        {/* Two states side by side: the old and the new. */}
-        <path d="M5.5 13V5.5a2 2 0 0 1 2-2h3M10.5 3l2 2.5-2 2.5" />
-        <circle cx="5.5" cy="13" r="1.4" />
+      <Control
+        label={diff?.diff || diff?.loading ? "Version control — showing changes on the map. Open the history" : "Version control — the commit history, and what each changed"}
+        onClick={openDiff}
+        active={Boolean(diff?.diff || diff?.loading)}
+      >
+        {/* Lucide's git-branch, the glyph editors give source control. */}
+        <g transform="scale(0.6667)" strokeWidth="1.875">
+          <path d="M6 3v12" />
+          <circle cx="18" cy="6" r="3" />
+          <circle cx="6" cy="18" r="3" />
+          <path d="M18 9a9 9 0 0 1-9 9" />
+        </g>
       </Control>
       <Control label="How the code got here — its commits over the map's sections" onClick={openTimeline}>
         {/* A line through time with three commits on it. */}
@@ -194,11 +203,14 @@ function Control({
   danger,
   win,
   className,
+  active,
   children,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** On: the mode this button turns on is showing. */
+  active?: boolean;
   /** One of the window's own buttons: minimize, maximize, close. */
   win?: boolean;
   className?: string;
@@ -209,6 +221,7 @@ function Control({
       type="button"
       onClick={onClick}
       aria-label={label}
+      aria-pressed={active}
       title={label}
       className={cn(
         "flex cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
@@ -216,6 +229,7 @@ function Control({
         // are small square targets, as in an editor's title bar.
         win ? "h-full w-11" : "mx-px h-7 w-7 rounded-[2px]",
         danger ? "hover:bg-clay-ink hover:text-white" : "hover:bg-surface-container hover:text-ink",
+        active && "bg-deep-green/15 text-deep-green hover:text-deep-green",
         className,
       )}
     >

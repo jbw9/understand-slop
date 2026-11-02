@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import s from "./landing.module.css";
+import { Drawn, type Drawing } from "./landing-features";
 import { onTheme, readTheme } from "./landing-theme";
 
 export interface DemoMap {
@@ -16,19 +17,69 @@ export interface DemoMap {
 const src = (id: string) => (process.env.NODE_ENV === "production" ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/${id}/` : `/?map=${id}&embed`);
 
 /**
- * The real canvas, framed. Each tab points the frame at another committed
- * map, so what a visitor explores is the product itself, not a recording. The
- * page is static and has no server to read maps, so each tab opens that map's
- * own export, published beside it. The button under the frame starts a
- * guided tour that points at the real cards inside it.
+ * What the app does, a tab each. The first is the app itself; the rest need
+ * the desktop app, so they are drawn (landing-features.tsx). `project` names
+ * the drawing's map in the window's bar.
+ */
+const FEATURES: { id: "explore" | Drawing; label: string; project?: string; cap?: string }[] = [
+  { id: "explore", label: "Explore a codebase" },
+  {
+    id: "claude",
+    label: "Ask Claude Code",
+    project: "flask",
+    cap: "In the desktop app, Claude Code runs in a tab beside the map. Right-click a part to hand it to Claude, and Claude moves your view to what it’s talking about.",
+  },
+  {
+    id: "plan",
+    label: "Read the plan",
+    project: "flask",
+    cap: "In the desktop app, a plan from Claude’s plan mode opens as a short doc, with what it will change drawn on the map before a line is written. Accept it right there.",
+  },
+  {
+    id: "review",
+    label: "Review diffs",
+    project: "flask",
+    cap: "In the desktop app, a commit, branch or pull request is drawn on the map you already know: the parts it touched, by how much, and the lines under each.",
+  },
+  {
+    id: "run",
+    label: "Preview your app",
+    project: "habits",
+    cap: "In the desktop app, your web app runs in a Preview tab and your phone app on the iOS Simulator or Android emulator. Claude can see both, and tap through them too.",
+  },
+];
+
+/** Arrow keys, Home and End walk a tab list, as the ARIA tabs pattern has them. */
+function walk(e: React.KeyboardEvent<HTMLElement>, ids: string[], at: string, go: (id: string) => void) {
+  const i = ids.indexOf(at);
+  const keys: Record<string, number> = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: ids.length - 1 };
+  const next = keys[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  const id = ids[(next + ids.length) % ids.length];
+  go(id);
+  e.currentTarget.querySelector<HTMLElement>(`[data-id="${id}"]`)!.focus();
+}
+
+/**
+ * The app, one tab per thing it does. Exploring is the real canvas, framed:
+ * the window's own tabs point the frame at another committed map, so what a
+ * visitor explores is the product itself, not a recording. The page is static
+ * and has no server to read maps, so each opens that map's own export,
+ * published beside it, and the button under the frame starts a guided tour
+ * that points at the real cards inside it. The other tabs are drawn.
  */
 export function LandingDemo({ maps }: { maps: DemoMap[] }) {
+  const [feature, setFeature] = useState(FEATURES[0].id);
   const [open, setOpen] = useState(maps[0].id);
   const [loaded, setLoaded] = useState<string | null>(null);
   const current = maps.find((m) => m.id === open)!;
+  const shown = FEATURES.find((x) => x.id === feature)!;
+  const exploring = shown.id === "explore";
   const frame = useRef<HTMLIFrameElement>(null);
   const stage = useRef<HTMLDivElement>(null);
-  const tabs = useRef<HTMLDivElement>(null);
+  const features = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLSpanElement>(null);
   const replay = useRef<HTMLButtonElement>(null);
   const guide = useRef<Tour>(null);
   const shownMap = useRef(open);
@@ -51,16 +102,17 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
     if (doc?.readyState === "complete" && doc.URL !== "about:blank") setLoaded(open);
   }, [open]);
 
-  // Another repository ends the tour, whether picked by click or by arrow key.
+  // Another repository, whether picked by click or by arrow key, or another of the app's tools, ends the tour.
   useEffect(() => {
-    if (shownMap.current === open) return;
+    if (shownMap.current === open && exploring) return;
     shownMap.current = open;
     guide.current?.away();
-  }, [open]);
+  }, [open, exploring]);
 
   // Keys go only to the focused document, so Esc pressed on the page around
   // the demo never reached the map. Hand it on while the demo is on screen.
   useEffect(() => {
+    if (!exploring) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (e.target instanceof Element && e.target.closest("input, textarea, [contenteditable]")) return;
@@ -73,7 +125,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [exploring]);
 
   useEffect(() => {
     const t = tour(frame.current!, stage.current!, replay.current!);
@@ -81,49 +133,98 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
     return t.dispose;
   }, []);
 
-  const onKey = (e: React.KeyboardEvent) => {
-    const i = maps.findIndex((m) => m.id === open);
-    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: maps.length - 1 }[e.key];
-    if (next === undefined) return;
-    e.preventDefault();
-    const id = maps[(next + maps.length) % maps.length].id;
-    setOpen(id);
-    tabs.current!.querySelector<HTMLElement>(`[data-id="${id}"]`)!.focus();
-  };
+  // The open tab's background is one pill that slides to the tab picked. It
+  // starts sliding only once placed, so it never sweeps in from the left.
+  useLayoutEffect(() => {
+    const list = features.current!;
+    const place = () => {
+      const b = list.querySelector<HTMLElement>(`[data-id="${feature}"]`)!;
+      pill.current!.style.setProperty("--x", `${b.offsetLeft}px`);
+      pill.current!.style.setProperty("--w", `${b.offsetWidth}px`);
+      if (!("pill" in list.dataset)) requestAnimationFrame(() => (list.dataset.pill = ""));
+    };
+    place();
+    const watch = new ResizeObserver(place);
+    watch.observe(list);
+    return () => watch.disconnect();
+  }, [feature]);
 
   return (
     <>
       <div className={`${s.switcher} ${s.rise}`} style={{ "--i": 3 } as React.CSSProperties}>
-        <div ref={tabs} role="tablist" aria-label="Repository" className={s.tabs} onKeyDown={onKey}>
-          {maps.map((m) => (
+        <div
+          ref={features}
+          role="tablist"
+          aria-label="What Mira does"
+          className={s.tabs}
+          onKeyDown={(e) => walk(e, FEATURES.map((x) => x.id), feature, (id) => setFeature(id as typeof feature))}
+        >
+          <span ref={pill} aria-hidden className={s.pill} />
+          {FEATURES.map((x) => (
             <button
-              key={m.id}
+              key={x.id}
               role="tab"
-              data-id={m.id}
-              aria-selected={m.id === open}
-              tabIndex={m.id === open ? 0 : -1}
-              onClick={() => setOpen(m.id)}
+              id={`feature-${x.id}`}
+              aria-controls="demo-panel"
+              data-id={x.id}
+              aria-selected={x.id === feature}
+              tabIndex={x.id === feature ? 0 : -1}
+              onClick={() => setFeature(x.id)}
             >
-              {m.label}
+              {x.label}
             </button>
           ))}
         </div>
       </div>
-      <div className={s.rise} style={{ "--i": 4 } as React.CSSProperties}>
-        <div className={s.canvas}>
+      <div
+        id="demo-panel"
+        role="tabpanel"
+        aria-labelledby={`feature-${feature}`}
+        className={s.rise}
+        style={{ "--i": 4 } as React.CSSProperties}
+      >
+        <div className={s.canvas} data-drawn={!exploring}>
           <div className={s.bar}>
             <div aria-hidden className={s.lights}>
               <span />
               <span />
               <span />
             </div>
-            <span className={s.meta}>
-              {current.files.toLocaleString("en-US")} files · {current.commit}
-            </span>
+            {exploring ? (
+              // The app's own tabs, one per project: which map the frame shows.
+              <div role="tablist" aria-label="Repository" className={s.repos} onKeyDown={(e) => walk(e, maps.map((m) => m.id), open, setOpen)}>
+                {maps.map((m) => (
+                  <button
+                    key={m.id}
+                    role="tab"
+                    data-id={m.id}
+                    aria-selected={m.id === open}
+                    tabIndex={m.id === open ? 0 : -1}
+                    onClick={() => setOpen(m.id)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className={s.project}>{shown.project}</span>
+            )}
+            {exploring ? (
+              <span className={s.meta}>
+                {current.files.toLocaleString("en-US")} files · {current.commit}
+              </span>
+            ) : null}
           </div>
           <div ref={stage} className={s.stage} data-ready={loaded === open}>
-            {loaded !== open ? <p className={s.loading}>loading {current.id}…</p> : null}
-            <iframe ref={frame} src={src(open)} title={`${current.label}, explored`} onLoad={() => setLoaded(open)} />
+            {exploring && loaded !== open ? <p className={s.loading}>loading {current.id}…</p> : null}
+            {/* Kept while another tab is open, so coming back finds the map where it was left. */}
+            <iframe
+              ref={frame}
+              src={src(open)}
+              title={`${current.label}, explored`}
+              hidden={!exploring}
+              onLoad={() => setLoaded(open)}
+            />
             <div className={s.tour} data-tour hidden>
               <div className={s.ring} data-ring aria-hidden hidden />
               <div className={s.tip} data-tip role="status" aria-live="polite" hidden>
@@ -134,19 +235,26 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
                 </div>
               </div>
             </div>
+            {shown.id === "explore" ? null : <Drawn key={shown.id} drawing={shown.id} />}
           </div>
         </div>
       </div>
       <div className={s.under}>
-        <div className={s.controls}>
+        <div className={s.controls} hidden={!exploring}>
           {/* The tour shows and hides this, and the bubble in the frame, itself. */}
           <button ref={replay} className={`${s.btn} ${s.ghost} ${s.replay}`}>
             Give me a tour
           </button>
         </div>
         <p className={s.cap}>
-          This is the app, running on maps of real repositories. Click a step to open it, and press <kbd>Esc</kbd> to go
-          back.
+          {exploring ? (
+            <>
+              This is the app, running on maps of real repositories. Click a step to open it, and press <kbd>Esc</kbd> to
+              go back.
+            </>
+          ) : (
+            shown.cap
+          )}
         </p>
       </div>
     </>

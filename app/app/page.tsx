@@ -65,23 +65,25 @@ export default async function Home({
   return (
     <MapProvider name={name} file={file} version={version} progress={progress} maps={STATIC_MAP || embed ? [{ id: name, label: name, local: false }] : listMaps()}>
       <div className="flex h-full flex-col">
-        {/* The title bar reads the open level from the URL, as the map does. */}
-        <Suspense>
-          <Titlebar />
-        </Suspense>
-        <div className="relative min-h-0 flex-1">
+        {/* Keyed by map: a switch starts fresh, never mid-transition from the
+            old tree. Around the title bar too, whose version-control button
+            shows when a change is on. */}
+        <DiffMode key={name} map={name}>
+          {/* The title bar reads the open level from the URL, as the map does. */}
           <Suspense>
-            {/* Keyed by map: a switch starts fresh, never mid-transition from the old tree. */}
-            <DiffMode key={name} map={name}>
+            <Titlebar />
+          </Suspense>
+          <div className="relative min-h-0 flex-1">
+            <Suspense>
               <Canvas key={name} />
               {/* Inside the provider: the panel is the diff's own list, and
                   what Claude shows needs both the map and the diff's range. */}
               <DiffPanel />
               <FilesPanel />
               <Acts />
-            </DiffMode>
-          </Suspense>
-        </div>
+            </Suspense>
+          </div>
+        </DiffMode>
         <Suspense>
           {STATIC_MAP ? <ClaudeWeb /> : <Workspace />}
         </Suspense>

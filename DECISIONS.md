@@ -1790,3 +1790,9 @@ another level redoes the roots; the summaries and the cut replay from cache.
 **Beat:** summarizing on every pick, which would make walking the history with ↓ a paid run per row; and a summary built only from the message, which a "wip: checkpoint" commit leaves empty.
 **Measured:** the 14-file checkpoint `eeaed23`: 6.4 s, $0.06.
 **Cost accepted:** the model is asked for 40 words and wrote about 60; nothing enforces it. A diff past 40,000 characters is told from its start.
+
+## D78 — A change is found on the map the way a pull request is read
+
+**Chose:** while a change is shown, a bar across the top of every level names it (the commit, review or range), gives the legend (+ new, ~ changed, − gone) and steps through every changed part with ‹ Prev / Next ›, each opening that part's level. Each changed diagram box wears a "+N −M" tag on its top edge, counting the hunks that touch the lines it and everything under it cite. Under the picture, its changed boxes are listed with GitHub's five squares, each row opening onto those red and green lines, and hovering a row lights its box. A level whose own lines changed opens with "This part changed", showing its hunks first. The title bar's version-control button uses the branch glyph editors give source control and shows as pressed while a change is on. The diff state, not the panel, makes "nothing picked" mean the newest commit, so bar, panel and map agree.
+**Beat:** tints alone, which the user could not find; and a separate diff screen (D56 holds: the lines sit on the picture and the level they belong to).
+**Cost accepted:** a hunk counts toward a box when its old side meets a cited span, so one hunk shared by two parts counts in both. A part whose verdict comes only from what is under it lists no lines of its own and says so.

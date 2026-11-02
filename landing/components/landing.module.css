@@ -306,6 +306,7 @@
   margin-bottom: 16px;
 }
 .tabs {
+  position: relative;
   display: flex;
   gap: 2px;
   max-width: 100%;
@@ -317,6 +318,7 @@
   scrollbar-width: none;
 }
 .tabs button {
+  position: relative;
   flex-shrink: 0;
   padding: 7px 16px;
   border: 0;
@@ -332,10 +334,30 @@
   color: var(--ink);
 }
 .tabs button[aria-selected="true"] {
-  background: var(--white);
   color: var(--ink);
   font-weight: 500;
+}
+/* The open tab's background, one pill that slides between tabs. Until it is
+   placed, the open tab carries its own. */
+.pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--w, 0);
+  translate: var(--x, 0) 0;
+  border-radius: 9px;
+}
+.tabs:not([data-pill]) .pill {
+  visibility: hidden;
+}
+.tabs:not([data-pill]) button[aria-selected="true"],
+.pill {
+  background: var(--white);
   box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgba(26, 26, 46, 0.08);
+}
+.tabs[data-pill] .pill {
+  transition: translate 0.32s var(--ease), width 0.32s var(--ease);
 }
 .page .tabs button:focus-visible {
   outline-offset: -2px;
@@ -396,6 +418,41 @@
 .lights span,
 .dots i {
   box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+}
+/* The app's own tabs, one per project, in the window's bar. */
+.repos {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.repos button {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease-out, color 0.2s ease-out;
+}
+.repos button:hover {
+  color: var(--ink);
+}
+.repos button[aria-selected="true"] {
+  background: var(--low);
+  color: var(--ink);
+  font-weight: 500;
+}
+.page .repos button:focus-visible {
+  outline-offset: -2px;
+}
+.project {
+  font: 12px var(--font-mono);
+  color: var(--muted);
 }
 .meta {
   margin-left: auto;
@@ -1501,6 +1558,18 @@
     height: 18px;
   }
 }
+/* Below desktop widths a drawing would be scaled into a frame taller than it,
+   so the frame takes the drawing's shape instead (WIDE / TALL in landing-features.tsx). */
+@media (max-width: 1180px) {
+  .canvas[data-drawn="true"] {
+    height: auto;
+    min-height: 0;
+  }
+  .canvas[data-drawn="true"] .stage {
+    flex: none;
+    aspect-ratio: 1100 / 680;
+  }
+}
 @media (max-width: 600px) {
   .page {
     --frame-r: 18px;
@@ -1520,6 +1589,10 @@
   }
   .canvas {
     height: 600px;
+  }
+  /* The repositories' tabs need the room. */
+  .meta {
+    display: none;
   }
   .bar {
     gap: 10px;
@@ -1579,6 +1652,7 @@
     transform: scaleX(1);
   }
   .stage[data-ready="true"] iframe,
+  .tabs[data-pill] .pill,
   .ring,
   .tip,
   .slide,

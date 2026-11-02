@@ -24,7 +24,7 @@ import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target }
 import { FixAndKeep, onAnswer } from "@/components/keep";
 import { SectionTabs, openInTab } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
-import { DiffBar } from "@/components/diagram-diff";
+import { DiffBar, HereChanges } from "@/components/diagram-diff";
 import type { Exchange } from "@/lib/keep";
 import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap } from "@/lib/map";
 import { STATIC_MAP, readSource } from "@/lib/source";
@@ -266,7 +266,10 @@ export function Canvas() {
               ) : timeline ? (
                 <TimelineView />
               ) : (
-                <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
+                <>
+                  <HereChanges path={path} />
+                  <Level node={focus ?? map.TOP} path={path} ctx={ctx} onOpen={goTo} />
+                </>
               )}
             </motion.div>
           </AnimatePresence>

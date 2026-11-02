@@ -1,0 +1,1245 @@
+/* The desktop app's tools, drawn (landing-features.tsx). Colours are the
+   app's own tokens: the chrome is [data-chrome], dark in either theme, as in
+   the app, and the paper is the app's, not this page's brighter one, so a
+   drawing reads as the same window as the live frame beside it. */
+:root:not([data-theme="dark"]) .fit {
+  --color-warm-cream: #e4e2dc;
+  --color-pure-white: #f1f0ec;
+  --color-surface-container-low: #dbd8d1;
+  --color-border-gray: #cecbc4;
+  --color-deep-green: #3f6640;
+  --color-mint-success: #dfe0cb;
+}
+:root[data-theme="dark"] .fit {
+  --color-deep-green: #5e8f5e;
+  --color-mint-success: #1f2a1f;
+}
+.fit {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-warm-cream);
+  pointer-events: none;
+  user-select: none;
+}
+.app {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: var(--color-warm-cream);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+/* No weight, so every class below sets its own margins. */
+:where(.app) :where(p, h3, h4, ul, ol) {
+  margin: 0;
+}
+:where(.app) :where(ul, ol) {
+  padding: 0;
+  list-style: none;
+}
+.app code {
+  font: 0.92em var(--font-mono);
+}
+
+/* ── timing ──────────────────────────────────────────── */
+/* A scene plays once, from when its tab opens. `--t` is when a piece arrives,
+   `--u` when a passing one leaves. The resting style is the end of the
+   scene, so with motion reduced the finished picture is what shows. */
+.in {
+  animation: rise 0.45s var(--ease) var(--t, 0s) backwards;
+}
+.blip {
+  opacity: 0;
+  visibility: hidden;
+  animation: on 0.18s ease-out var(--t) forwards, off 0.22s ease-in var(--u) forwards;
+}
+.out {
+  opacity: 0;
+  visibility: hidden;
+  animation: off 0.3s ease-in var(--u) backwards;
+}
+.swap {
+  display: inline-grid;
+}
+.swap > * {
+  grid-area: 1 / 1;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+@keyframes on {
+  to {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+@keyframes off {
+  from {
+    opacity: 1;
+    visibility: visible;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app *,
+  .app *::before {
+    animation: none !important;
+  }
+}
+
+/* ── the map's tabs ──────────────────────────────────── */
+.strip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 2px;
+  height: 32px;
+  padding: 0 6px;
+  background: var(--color-surface-container-low);
+  box-shadow: inset 0 -1px 0 var(--color-border-gray);
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 29px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  font-size: 12px;
+  color: var(--color-muted-slate);
+  white-space: nowrap;
+}
+.tab[data-on] {
+  border-color: var(--color-border-gray);
+  background: var(--color-warm-cream);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.tab svg {
+  width: 12px;
+  height: 12px;
+}
+.add {
+  align-self: center;
+  width: 24px;
+  font-size: 15px;
+  text-align: center;
+  color: var(--color-faint);
+}
+
+/* ── a level ─────────────────────────────────────────── */
+.main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+/* Clear of the workspace, as the app keeps a level clear of it. */
+.page {
+  position: absolute;
+  inset: 0;
+  padding: 22px calc(var(--ws, 0px) + 48px) 0 48px;
+  overflow: hidden;
+}
+.crumbs {
+  margin-bottom: 18px;
+  font: 11.5px var(--font-mono);
+  white-space: pre;
+  color: var(--color-muted-slate);
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-muted-slate);
+}
+.title {
+  margin-top: 6px;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.sub {
+  max-width: 40em;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--color-on-surface-variant);
+}
+.cap {
+  margin: 26px 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+}
+.cap span {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-faint);
+}
+.detail {
+  max-width: 44em;
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-on-surface);
+}
+.pic {
+  position: relative;
+}
+.pic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+}
+.flow {
+  display: grid;
+  gap: 10px;
+  max-width: 620px;
+  margin-top: 22px;
+}
+.flow li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 2px 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 3px;
+  background: var(--color-pure-white);
+}
+.flow i {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-sec-4-surface);
+  color: var(--color-sec-4-ink);
+  font: normal 600 11px var(--font-mono);
+}
+.flow b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.flow span {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-on-surface-variant);
+}
+
+/* A right click: the pointer, and the menu it opens. */
+.pic .mouse {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  animation: arrive 0.9s var(--ease) 0.4s both, press 0.16s ease-in-out 1.3s, off 0.2s ease-in 2.5s forwards;
+}
+.mouse path {
+  fill: var(--color-ink);
+  stroke: var(--color-warm-cream);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    translate: 120px 90px;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes press {
+  50% {
+    scale: 0.82;
+  }
+}
+.menu {
+  position: absolute;
+  z-index: 2;
+  min-width: 196px;
+  padding: 4px;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 4px;
+  background: var(--color-surface-container-low);
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.45);
+  font-size: 12.5px;
+  color: var(--color-ink);
+}
+.menu span {
+  display: block;
+  padding: 4px 10px;
+  border-radius: 2px;
+}
+.hot {
+  background: var(--color-surface-container);
+  animation: hot 0.15s ease-out var(--t) backwards;
+}
+@keyframes hot {
+  from {
+    background: transparent;
+  }
+}
+
+/* ── the workspace ───────────────────────────────────── */
+.ws {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  width: var(--ws);
+  overflow: hidden;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 4px;
+  background: var(--color-surface-container-low);
+  box-shadow: 0 8px 28px -8px rgba(0, 0, 0, 0.35);
+  color: var(--color-ink);
+}
+.wsTabs {
+  display: flex;
+  flex-shrink: 0;
+  height: 28px;
+  background: var(--color-surface-container);
+}
+.wsTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-right: 1px solid var(--color-border-gray);
+  border-bottom: 1px solid var(--color-border-gray);
+  font-size: 12px;
+  color: var(--color-muted-slate);
+  white-space: nowrap;
+}
+.wsTab[data-on] {
+  border-bottom-color: transparent;
+  background: var(--color-surface-container-low);
+  color: var(--color-ink);
+}
+.wsTab svg {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+.stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wsBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  border-bottom: 1px solid var(--color-border-gray);
+  font-size: 13px;
+  color: var(--color-muted-slate);
+}
+.wsRest {
+  flex: 1;
+  border-bottom: 1px solid var(--color-border-gray);
+}
+.wsBody {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+/* What goes with Claude's next prompt, under the terminal. */
+.wsStrip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--color-border-gray);
+  font: 11px var(--font-mono);
+  color: var(--color-faint);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 2px;
+  color: var(--color-faint);
+}
+.chip[data-queued] {
+  border-color: color-mix(in srgb, var(--color-deep-green) 50%, transparent);
+  color: var(--color-ink);
+}
+.chip i,
+.chip em {
+  font-style: normal;
+}
+.chip[data-queued] i {
+  color: var(--color-deep-green);
+}
+.clear {
+  margin-left: 4px;
+}
+
+/* Claude Code, in its terminal. */
+.term {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 14px 8px;
+  overflow: hidden;
+  font: 12px/1.6 var(--font-mono);
+  color: var(--color-on-surface);
+}
+.hello {
+  padding: 8px 12px;
+  border: 1px solid #d97757;
+  border-radius: 6px;
+}
+.hello b {
+  color: #d97757;
+}
+.you {
+  color: var(--color-muted-slate);
+}
+.msg {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 1fr);
+}
+.msg b,
+.term b {
+  font-weight: 600;
+}
+.ok {
+  color: #4caf50;
+}
+.res {
+  color: var(--color-faint);
+}
+.hello .res {
+  padding-left: 2ch;
+}
+.grow {
+  flex: 1;
+}
+.prompt {
+  padding: 5px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.typed {
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  vertical-align: bottom;
+  animation: type 1.3s steps(var(--n)) var(--t) forwards, clear 0s var(--u) forwards;
+}
+@keyframes type {
+  to {
+    width: calc(var(--n) * 1ch);
+  }
+}
+@keyframes clear {
+  to {
+    width: 0;
+  }
+}
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  vertical-align: -2px;
+  background: var(--color-ink);
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.hint {
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--color-faint);
+}
+.planMode {
+  color: #5aa6a0;
+}
+.choices p:first-child {
+  margin-bottom: 4px;
+}
+.choices b {
+  color: #b6a1f0;
+}
+
+/* ── a plan ──────────────────────────────────────────── */
+.doc {
+  position: absolute;
+  inset: 0;
+  padding: 26px calc(var(--ws) + 48px) 0 44px;
+  overflow: hidden;
+}
+.doc article {
+  max-width: 760px;
+}
+.doc section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border-gray);
+}
+.doc .eyebrow {
+  display: block;
+  margin-bottom: 10px;
+}
+.planMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font: 11px var(--font-mono);
+  color: var(--color-faint);
+}
+.planMeta .eyebrow {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-deep-green);
+}
+.app [data-v="changed"] {
+  color: var(--color-amber-ink);
+}
+.app [data-v="added"] {
+  color: var(--color-diff-add-ink);
+}
+.app [data-v="removed"] {
+  color: var(--color-diff-remove-ink);
+}
+.planTitle {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.lede {
+  max-width: 36em;
+  margin-top: 8px;
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--color-on-surface-variant);
+}
+.files {
+  display: grid;
+  gap: 4px;
+}
+.files li {
+  display: grid;
+  grid-template-columns: 14px max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--color-on-surface-variant);
+}
+.files b {
+  font: 600 12px var(--font-mono);
+}
+.files > li > code {
+  color: var(--color-ink);
+}
+.onMap {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--color-muted-slate);
+}
+/* Small enough to clear the question at the foot. */
+.doc .pic {
+  max-width: 500px;
+}
+/* The question, at the foot of the doc it is about. */
+.ask {
+  position: absolute;
+  left: 0;
+  right: calc(var(--ws) + 16px);
+  bottom: 0;
+  display: grid;
+  gap: 10px;
+  padding: 14px 44px;
+  border-top: 1px solid var(--color-border-gray);
+  background: color-mix(in srgb, var(--color-warm-cream) 95%, transparent);
+}
+.ask > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 760px;
+}
+.askQ {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 500;
+}
+.askQ i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cf3e3e;
+}
+.btn {
+  padding: 5px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 2px;
+  background: var(--color-pure-white);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.btn[data-off] {
+  opacity: 0.5;
+}
+.primary {
+  border-color: var(--color-deep-green);
+  background: var(--color-deep-green);
+  color: #fff;
+}
+.field {
+  flex: 1;
+  padding: 5px 12px;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 2px;
+  background: var(--color-pure-white);
+  font-size: 13px;
+  color: var(--color-faint);
+}
+
+/* ── a change ────────────────────────────────────────── */
+.diffBar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 16px;
+  height: 38px;
+  padding: 0 48px;
+  border-bottom: 1px solid var(--color-border-gray);
+  background: var(--color-pure-white);
+  font-size: 12.5px;
+}
+.showing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.showing i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-amber-ink);
+}
+.showing span {
+  color: var(--color-muted-slate);
+}
+.legend {
+  display: flex;
+  gap: 6px;
+}
+.legend span {
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 2px;
+  font: 11px/17px var(--font-mono);
+}
+.legend [data-v="added"] {
+  border-color: var(--color-diff-add-line);
+  background: var(--color-diff-add-surface);
+}
+.legend [data-v="changed"] {
+  border-color: var(--color-amber-line);
+  background: var(--color-amber-surface);
+}
+.legend [data-v="removed"] {
+  border-color: var(--color-diff-remove-line);
+  background: var(--color-diff-remove-surface);
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 12px;
+}
+.stepper > span {
+  padding: 2px 8px;
+}
+.stepper i {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--color-border-gray);
+}
+.count,
+.quiet {
+  color: var(--color-muted-slate);
+}
+.review .crumbs {
+  display: none;
+}
+.review .cap {
+  margin-top: 16px;
+}
+.narrow {
+  max-width: 760px;
+}
+.changes {
+  max-width: 900px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 3px;
+}
+.changes > p {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border-gray);
+  background: var(--color-surface-container-low);
+  font-size: 12px;
+  color: var(--color-muted-slate);
+}
+.change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.caret {
+  width: 10px;
+  font-size: 11px;
+  color: var(--color-faint);
+}
+.mark {
+  font: 700 12px var(--font-mono);
+  color: var(--color-amber-ink);
+}
+.word {
+  font: 10px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-amber-ink);
+}
+.faint {
+  font-size: 11.5px;
+  color: var(--color-faint);
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font: 11px var(--font-mono);
+}
+.blocks {
+  display: inline-flex;
+  gap: 2px;
+}
+.blocks i {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+}
+.blocks [data-v="added"] {
+  background: var(--color-diff-add-ink);
+}
+.blocks [data-v="removed"] {
+  background: var(--color-diff-remove-ink);
+}
+.openLink {
+  font-size: 12px;
+  color: var(--color-deep-green);
+}
+.hunkWrap {
+  padding: 0 12px 12px;
+}
+.path {
+  font: 11.5px var(--font-mono);
+  color: var(--color-on-surface);
+}
+.hunk {
+  margin: 4px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 2px;
+  background: var(--color-code);
+  font: 12px/1.55 var(--font-mono);
+}
+.hunkHead {
+  display: block;
+  padding: 2px 12px;
+  font-size: 10.5px;
+  color: var(--color-faint);
+}
+.line {
+  display: grid;
+  grid-template-columns: 36px 36px 16px minmax(0, 1fr);
+}
+.line > span:nth-child(-n + 2) {
+  padding-right: 6px;
+  text-align: right;
+  color: var(--color-faint);
+}
+.line > span:nth-child(2) {
+  border-right: 1px solid var(--color-border-gray);
+}
+.line > span:nth-child(3) {
+  text-align: center;
+}
+.line code {
+  font: inherit;
+  white-space: pre;
+  color: var(--color-code-plain);
+}
+.line[data-k="+"] {
+  background: var(--color-diff-add-surface);
+}
+.line[data-k="-"] {
+  background: var(--color-diff-remove-surface);
+}
+.line[data-k="+"] > span:nth-child(3) {
+  color: var(--color-diff-add-ink);
+}
+.line[data-k="-"] > span:nth-child(3) {
+  color: var(--color-diff-remove-ink);
+}
+.app [data-tok="string"] {
+  color: var(--color-code-string);
+}
+.app [data-tok="comment"] {
+  color: var(--color-code-comment);
+}
+.app [data-tok="keyword"] {
+  color: var(--color-code-keyword);
+}
+
+/* ── the running app ─────────────────────────────────── */
+.preview {
+  position: absolute;
+  inset: 0;
+  right: calc(var(--ws) + 16px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-container);
+}
+.toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--color-border-gray);
+  background: var(--color-surface-container-low);
+  color: var(--color-muted-slate);
+}
+.glyph {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 22px;
+  border-radius: 2px;
+}
+.glyph svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.glyph[data-on] {
+  background: var(--color-pure-white);
+  color: var(--color-ink);
+  box-shadow: 0 0 0 1px var(--color-border-gray);
+}
+.address {
+  flex: 1;
+  margin: 0 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-gray);
+  border-radius: 2px;
+  background: var(--color-pure-white);
+  font: 11.5px var(--font-mono);
+  color: var(--color-ink);
+}
+.sizes {
+  display: flex;
+  margin-right: 4px;
+  padding: 2px;
+  border-radius: 3px;
+  background: var(--color-surface-container);
+}
+.sizes .glyph {
+  width: 24px;
+  height: 20px;
+}
+
+/* The project's own app: its colours, not the map's. */
+.site {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #fbfaf7;
+  color: #1c1c1a;
+}
+.site nav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  height: 56px;
+  padding: 0 40px;
+  border-bottom: 1px solid #ebe8e1;
+  font-size: 13.5px;
+  color: #6f6c66;
+}
+.site nav b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 15px;
+  color: #1c1c1a;
+}
+.site nav b i {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ff8a5b, #f0517a);
+}
+.site nav [data-on] {
+  color: #1c1c1a;
+  font-weight: 600;
+}
+.siteBody {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 40px;
+}
+.date {
+  font-size: 13px;
+  color: #8a867e;
+}
+.siteHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 2px 0 20px;
+}
+.siteHead h4 {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #6f6c66;
+}
+.bar {
+  width: 96px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #ebe8e1;
+}
+.bar i {
+  display: block;
+  width: 80%;
+  height: 100%;
+  border-radius: inherit;
+  background: #2fa36b;
+  animation: progress 4.4s linear both;
+}
+/* Two of five done, then a tap at 2 s and another at 4 s. */
+@keyframes progress {
+  0%,
+  45% {
+    width: 40%;
+  }
+  48%,
+  91% {
+    width: 60%;
+  }
+  94%,
+  100% {
+    width: 80%;
+  }
+}
+.habits {
+  overflow: hidden;
+  border: 1px solid #ebe8e1;
+  border-radius: 14px;
+  background: #fff;
+}
+.habits li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 60px;
+  padding: 0 18px;
+  border-bottom: 1px solid #f0ede7;
+}
+.habits li:last-child {
+  border-bottom: 0;
+}
+.check {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #d6d2c9;
+  border-radius: 50%;
+}
+.check[data-done],
+.pop {
+  border-color: #2fa36b;
+  background: #2fa36b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5 6.8 11 12 5.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+.pop {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  animation: pop 0.3s var(--ease) var(--t) backwards;
+}
+/* Unchecked until the tap: the plain circle shows through. */
+.check[data-done]:has(.pop) {
+  border-color: #d6d2c9;
+  background: none;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+.habit {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.habit b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.habit > span {
+  font-size: 12px;
+  color: #8a867e;
+}
+
+/* The workspace's phone: the iOS Simulator, its screen drawn in the tab. */
+.device {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--color-border-gray);
+  font-size: 12px;
+}
+.deviceName {
+  margin-right: auto;
+  padding: 0 4px;
+  color: var(--color-muted-slate);
+}
+.small {
+  padding: 2px 8px;
+  color: var(--color-muted-slate);
+}
+.runApp {
+  margin-left: 4px;
+  padding: 2px 10px;
+  border-radius: 2px;
+  background: var(--color-deep-green);
+  color: #fff;
+}
+.dock {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  background: var(--color-surface-container);
+}
+/* Fixed in size, so Claude's taps land on the rows: the list starts 138px down, a row is 52px. */
+.phone {
+  position: relative;
+  width: 240px;
+  height: 500px;
+  overflow: hidden;
+  border: 5px solid var(--color-bezel);
+  border-radius: 22px;
+  background: #fbfaf7;
+  color: #1c1c1a;
+}
+.status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  padding: 0 18px 0 22px;
+  font-size: 12px;
+}
+.status i {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: 64px;
+  height: 18px;
+  margin-left: -32px;
+  border-radius: 10px;
+  background: #0b0b0b;
+}
+.status .glyph {
+  width: auto;
+  height: auto;
+  color: #1c1c1a;
+}
+.status .glyph svg {
+  stroke-width: 1.8;
+}
+.phoneHead {
+  height: 72px;
+  padding: 6px 16px 0;
+}
+.phoneHead p {
+  font-size: 11px;
+  color: #8a867e;
+}
+.phoneHead h4 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.phone .done {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 11px;
+}
+.phone .bar {
+  width: 64px;
+}
+.phoneList {
+  border: 0;
+  border-top: 1px solid #f0ede7;
+  border-radius: 0;
+  background: none;
+}
+.phoneList li {
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px;
+}
+.phoneList .habit b {
+  font-size: 13px;
+}
+.phoneList .habit > span {
+  font-size: 11px;
+}
+/* Claude's pointer, as the app draws it on a phone, and the ring of a tap. */
+.hand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  animation: hand 5.4s var(--ease) 0.5s both;
+}
+.hand path {
+  fill: #d97757;
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.hand span {
+  position: absolute;
+  left: 18px;
+  top: 20px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: #d97757;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+/* The arrow's tip sits 2px in and down: each stop puts it on a row's check. */
+@keyframes hand {
+  0% {
+    opacity: 0;
+    translate: 200px 470px;
+  }
+  8% {
+    opacity: 1;
+  }
+  24%,
+  50% {
+    translate: 25px 214px;
+  }
+  62%,
+  90% {
+    opacity: 1;
+    translate: 25px 318px;
+  }
+  100% {
+    opacity: 0;
+    translate: 25px 318px;
+  }
+}
+.tap {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid #d97757;
+  border-radius: 50%;
+  opacity: 0;
+  animation: tap 0.5s ease-out var(--t) forwards;
+}
+@keyframes tap {
+  from {
+    opacity: 0.9;
+    scale: 0.5;
+  }
+  to {
+    opacity: 0;
+    scale: 1.6;
+  }
+}

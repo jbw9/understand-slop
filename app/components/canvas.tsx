@@ -11,7 +11,7 @@ import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, ty
 import { InlineMarks } from "@/components/shapes";
 import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
 import { Zoom } from "@/components/zoom";
-import { Crumbs, goTo, useLocation } from "@/components/chrome";
+import { Crumbs, goTo, useLocation, useMayBeStale } from "@/components/chrome";
 import { Button, CodeIcon } from "@/components/button";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
@@ -985,6 +985,7 @@ function Header({
   /** What the reader can do to this level itself: keep an answer, fix it. */
   actions?: React.ReactNode;
 }) {
+  const stale = useMayBeStale(origin);
   return (
     <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
       {/* One toolbar row: the way back on the left, what you can do to this
@@ -1025,7 +1026,7 @@ function Header({
           {state ? <StateChip state={state} alarm={alarm} /> : null}
           {/* Beside the state mark, never instead of it: the two answer
               different questions (see `Origin` in lib/data.ts). */}
-          {origin ? <OriginMark origin={origin} /> : null}
+          {origin ? <OriginMark origin={origin} stale={stale} /> : null}
           {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
           {shape?.kind === "count" ? (
             <span className="rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">

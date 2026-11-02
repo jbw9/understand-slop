@@ -94,6 +94,13 @@ export const OPEN_DIFF = "slop:diff";
  */
 export const openDiff = () => window.dispatchEvent(new Event(OPEN_DIFF));
 
+const OPEN_REVIEW = "slop:review";
+/** Diff mode on one review (`pr:<n>`, `<base>...<branch>`, `turn:<id>` or `turn:latest`), from outside the provider, as the status bar is. */
+export const openReview = (spec: string) => {
+  window.dispatchEvent(new CustomEvent<string>(OPEN_REVIEW, { detail: spec }));
+  openDiff();
+};
+
 /**
  * Diff mode, owned here and asked for from anywhere — the same event-bus shape
  * Settings and Projects use, so the title bar does not have to hold state the
@@ -163,6 +170,11 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
 
   const setRange = useCallback((from?: string, to?: string) => setR({ from, to }), []);
   const setReview = useCallback((review?: string) => setR({ review }), []);
+  useEffect(() => {
+    const on = (e: Event) => setR({ review: (e as CustomEvent<string>).detail });
+    window.addEventListener(OPEN_REVIEW, on);
+    return () => window.removeEventListener(OPEN_REVIEW, on);
+  }, []);
   const here = got?.q === asked ? got : undefined;
   const value = useMemo<DiffState>(
     () => ({ diff: on ? (here?.diff ?? null) : null, loading: on && !here, error: here?.error, ...range, commits, setRange, setReview, off: onOff }),

@@ -144,7 +144,7 @@ function TermMark({ term, children }: { term: Term; children: string }) {
  * shape it would read as a fourth state, which is the one thing that axis
  * exists to avoid. Never green: green is `derived` everywhere else.
  */
-export function OriginMark({ origin, className }: { origin: Origin; className?: string }) {
+export function OriginMark({ origin, stale, className }: { origin: Origin; stale?: boolean; className?: string }) {
   const when = new Date(origin.at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
   return (
     <span
@@ -154,6 +154,11 @@ export function OriginMark({ origin, className }: { origin: Origin; className?: 
       className={cn("font-mono text-[10px] leading-none text-faint", className)}
     >
       {origin.by === "user" ? "Added by you" : "From Claude, kept by you"} · {when}
+      {stale ? (
+        <span title="The map has redone this section from changed code since this was kept: check it still holds." className="text-amber-ink">
+          {" "}· may be stale
+        </span>
+      ) : null}
     </span>
   );
 }

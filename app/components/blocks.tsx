@@ -6,6 +6,7 @@ import { Eyebrow, OriginMark, Prose } from "@/components/state";
 import type { Anatomy, CodeRef, Issue } from "@/lib/data";
 import type { Slice as RepoSlice } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
+import { useMayBeStale } from "@/components/chrome";
 import { readSource } from "@/lib/source";
 import { openDoc } from "@/components/docs";
 import { BOX_H, layoutDiagram } from "@/lib/diagram";
@@ -779,13 +780,14 @@ export function Example({ block, bare }: { block: Extract<Anatomy, { kind: "exam
  * would quietly claim the code's authority for a sentence a person wrote.
  */
 function Note({ block }: { block: Extract<Anatomy, { kind: "note" }> }) {
+  const stale = useMayBeStale(block.origin);
   return (
     <div className="min-w-0 border-l-2 border-border-strong bg-surface-container-low/60 py-2 pl-4">
       <Caption>{block.title}</Caption>
       <p className="text-[13.5px] leading-relaxed text-on-surface">
         <Prose text={block.body} />
       </p>
-      <OriginMark origin={block.origin} className="mt-2.5 block" />
+      <OriginMark origin={block.origin} stale={stale} className="mt-2.5 block" />
     </div>
   );
 }

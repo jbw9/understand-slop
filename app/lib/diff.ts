@@ -621,15 +621,44 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
   const arrows = arrowsChanged(map, byPath, exact ? undefined : carry);
   const outside = outsideOf(map, byPath, sections);
   if (!other) return { basis: "sections", from: base, to: head, files, sections, blocks: [], arrows, outside };
-  // Two maps: what the pictures say changed, over what the code says did,
-  // keeping the files the code verdict found behind each section.
-  const tree = treeDiff(map, other);
-  const byId = new Map(sections.map((s) => [s.id, s]));
+  const both = overTree(sections, map, other);
+  return { basis: "sections", from: base, to: head, files, ...both, arrows, outside };
+}
+
+/**
+ * Two maps: what the pictures say changed, over what the code says did,
+ * keeping the files the code verdict found behind each section.
+ */
+function overTree(code: SectionDiff[], a: MapFile, b: MapFile): Pick<MapDiff, "sections" | "blocks"> {
+  const tree = treeDiff(a, b);
+  const byId = new Map(code.map((s) => [s.id, s]));
   const merged = tree.sections.map((t) => {
-    const code = byId.get(t.id);
-    return { ...t, verdict: t.verdict === "untouched" ? (code?.verdict ?? "untouched") : t.verdict, files: code?.files ?? [] };
+    const c = byId.get(t.id);
+    return { ...t, verdict: t.verdict === "untouched" ? (c?.verdict ?? "untouched") : t.verdict, files: c?.files ?? [] };
   });
-  return { basis: "sections", from: base, to: head, files, sections: rollUp(merged), blocks: tree.blocks, arrows, outside };
+  return { sections: rollUp(merged), blocks: tree.blocks };
+}
+
+/**
+ * What one agent turn did, from the snapshot the updater kept before it ran
+ * (scripts/generate/update.ts): the code as that update read it, and the map
+ * before and after. No git is involved, so a turn's diff stays exact however
+ * far the checkout has moved on since.
+ */
+export function turnDiff(before: MapFile, after: MapFile, texts: { path: string; before: string | null; after: string | null }[]): MapDiff {
+  const found: Change[] = texts.filter((t) => t.before !== t.after).map((t) => ({ ...t, ...diffOf(t.path, t.before, t.after) }));
+  const byPath = new Map(found.map((c) => [c.path, c]));
+  const code = verdicts(before, byPath);
+  const both = overTree(code, before, after);
+  return {
+    basis: "sections",
+    from: before.RUN.commit,
+    to: null,
+    files: found.map(counted),
+    ...both,
+    arrows: arrowsChanged(before, byPath),
+    outside: outsideOf(before, byPath, both.sections),
+  };
 }
 
 /** One commit, as the commit list and the timeline draw it. */
@@ -640,6 +669,17 @@ export interface Commit {
   at: string;
   author: string;
   subject: string;
+  email?: string;
+  /** Who made the commit, where that is not the author (a rebase, a merge on a host). */
+  committer?: string;
+  committerEmail?: string;
+  /** ISO 8601, the committer's date. */
+  committed?: string;
+  parents?: string[];
+  /** Branches and tags pointing here, as `git log --decorate` names them: `HEAD -> main`, `tag: v1`. */
+  refs?: string[];
+  /** The message after its first line. */
+  body?: string;
   added: number;
   removed: number;
   /** Every path it touched; a rename is its new path. */
@@ -674,13 +714,40 @@ export function commitLog(root: string, n = 50): Commit[] {
   const out: Commit[] = [];
   // Files over 1 MB count as binary, unread: one commit of build output
   // otherwise costs seconds of numstat for lines nobody reads.
-  const log = git(root, "-c", "core.bigFileThreshold=1m", "log", `-n${n}`, "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s", "--numstat");
+  // The message body runs over lines of its own, so \x1d closes the header
+  // before numstat's lines begin.
+  const log = git(
+    root,
+    "-c",
+    "core.bigFileThreshold=1m",
+    "log",
+    `-n${n}`,
+    "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s%x1f%ae%x1f%cn%x1f%ce%x1f%cI%x1f%P%x1f%D%x1f%b%x1d",
+    "--numstat",
+  );
   for (const block of log.split("\x1e")) {
-    const [head, ...rest] = block.split("\n");
-    const [sha, short, at, author, subject] = head.split("\x1f");
+    const cut = block.indexOf("\x1d");
+    if (cut < 0) continue;
+    const [sha, short, at, author, subject, email, committer, committerEmail, committed, parents, refs, body] = block.slice(0, cut).split("\x1f");
     if (!sha || subject === undefined) continue;
-    const c: Commit = { sha, short, at, author, subject, added: 0, removed: 0, files: [] };
-    for (const line of rest) {
+    const c: Commit = {
+      sha,
+      short,
+      at,
+      author,
+      subject,
+      email,
+      committer,
+      committerEmail,
+      committed,
+      parents: parents ? parents.split(" ") : [],
+      refs: refs ? refs.split(", ") : [],
+      body: body?.trim() || undefined,
+      added: 0,
+      removed: 0,
+      files: [],
+    };
+    for (const line of block.slice(cut + 1).split("\n")) {
       const [a, r, path] = line.split("\t");
       if (path === undefined) continue;
       c.added += Number(a) || 0;

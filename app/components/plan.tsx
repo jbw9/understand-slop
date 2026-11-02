@@ -6,6 +6,9 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ExplainedBlock, type Explained } from "@/components/blocks";
 import { Button } from "@/components/button";
+import { goTo } from "@/components/chrome";
+import { useMaybeMap } from "@/components/map-context";
+import { findSection } from "@/lib/act";
 import { DiagramDiff, TINT, WORD } from "@/components/diff";
 import { Eyebrow } from "@/components/state";
 import type { Anatomy, DiagramArrow, DiagramBox } from "@/lib/data";
@@ -167,6 +170,7 @@ export function PlanView({
             );
           })}
         </div>
+        <OnTheMap text={plan.text} approved={plan.state === "approved"} done={status === "done"} />
         {plan.file ? (
           <p className="mt-10 font-mono text-[11px] text-faint" title={plan.file}>
             {plan.file.replace(/^\/(Users|home)\/[^/]+/, "~")}
@@ -234,6 +238,90 @@ export function PlanView({
         </div>
       </footer>
     </div>
+  );
+}
+
+/** Every diagram box the plan tied to a map section (its `section`, an id path), with what the plan does to it. */
+function plannedSections(text: string): { label: string; section: string; change?: string }[] {
+  return pieces(text).flatMap((p) => {
+    if (p.kind !== "figure" || p.lang !== "diagram") return [];
+    try {
+      const v = JSON.parse(p.body) as { boxes?: Loose[] };
+      return (v.boxes ?? []).filter((b) => str(b.section)).map((b) => ({ label: str(b.label) ?? str(b.id) ?? "", section: str(b.section)!, change: str(b.change) }));
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * Where the plan lands on the map, each part a way to its level; and once
+ * the plan is built, what the map's updates actually redid beside what the
+ * plan said it would touch, so a plan that quietly grew, or missed a part,
+ * is visible without reading the diff.
+ */
+function OnTheMap({ text, approved, done }: { text: string; approved: boolean; done: boolean }) {
+  const map = useMaybeMap();
+  const planned = useMemo(() => plannedSections(text), [text]);
+  const since = useRef<number | null>(null);
+  if (approved && since.current === null) since.current = Date.now();
+  const [touched, setTouched] = useState<{ id: string; title: string }[] | null>(null);
+  useEffect(() => {
+    if (!map || !done || since.current === null) return;
+    let live = true;
+    fetch(`/api/diff?map=${encodeURIComponent(map.name)}&turns=1`)
+      .then((r) => r.json())
+      .then((j: { turns?: { at: string; sections?: { id: string; title: string }[] }[] }) => {
+        if (!live) return;
+        const after = (j.turns ?? []).filter((t) => Date.parse(t.at) >= since.current!);
+        setTouched(after.length ? [...new Map(after.flatMap((t) => t.sections ?? []).map((s) => [s.id, s])).values()] : null);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [map, done]);
+  if (!map || !planned.length) return null;
+  const pathOf = (section: string) => (map.nodeAt(section.split("/")) ? section.split("/") : findSection(map, section));
+  const trail = (path: string[]) => path.map((_, i) => map.nodeAt(path.slice(0, i + 1))?.title ?? path[i]).join(" › ");
+  const resolved = planned.map((p) => ({ ...p, path: pathOf(p.section) }));
+  // A planned section counts as touched when it, or a section inside it, was redone.
+  const hit = (path: string[]) => touched?.some((t) => path.includes(t.id) || map.nodeAt(path)?.children?.some(function inside(c): boolean { return c.id === t.id || (c.children ?? []).some(inside); }));
+  const changing = resolved.filter((p) => p.path && p.change);
+  const unplanned = touched?.filter((t) => !resolved.some((p) => p.path?.includes(t.id))) ?? [];
+  return (
+    <section className="mt-9 border-t border-border-gray pt-8">
+      <Eyebrow className="mb-3.5 block">On the map</Eyebrow>
+      <ul className="flex flex-col gap-1 text-[13px]">
+        {resolved.map((p) => (
+          <li key={p.label + p.section} className="flex items-baseline gap-2">
+            <span className="w-[140px] shrink-0 truncate text-ink">{p.label}</span>
+            {p.path ? (
+              <button type="button" onClick={() => goTo(p.path!)} className="min-w-0 cursor-pointer truncate text-deep-green hover:underline">
+                {trail(p.path)}
+              </button>
+            ) : (
+              <span className="text-faint">no section {p.section}</span>
+            )}
+            {touched && p.path && p.change ? (
+              <span className={cn("ml-auto shrink-0 text-[12px]", hit(p.path) ? "text-deep-green" : "text-amber-ink")}>{hit(p.path) ? "touched" : "planned, not touched"}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {touched && unplanned.length ? (
+        <p className="mt-3 text-[12.5px] text-amber-ink">
+          Also changed, not in the plan:{" "}
+          {unplanned.map((t, i) => (
+            <span key={t.id}>
+              {i ? ", " : ""}
+              {t.title}
+            </span>
+          ))}
+        </p>
+      ) : null}
+      {touched && changing.length && changing.every((p) => hit(p.path!)) && !unplanned.length ? <p className="mt-3 text-[12.5px] text-deep-green">Built as planned: every part it named changed, and nothing else.</p> : null}
+    </section>
   );
 }
 

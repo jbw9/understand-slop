@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadMap, rootOf } from "@/lib/maps";
+import { git, readText, type Base } from "@/scripts/generate/gitdiff";
 import { projectDir } from "@/lib/vault";
 import type { MapIndex } from "@/lib/coverage";
 
@@ -11,13 +12,18 @@ import type { MapIndex } from "@/lib/coverage";
  * so a file added since the map was made shows as not on it yet rather than
  * not at all.
  *
+ * `?behind=1` answers only which of those files changed since the map last
+ * saw them (its commit, then base.json after updates: what an update would
+ * start from), for the status bar to poll without the whole index.
+ *
  * As app/api/diff/route.ts: a caller names a map, never a path, and the
  * checkout is the project's own.
  */
 export async function GET(request: Request) {
+  const q = new URL(request.url).searchParams;
   let open: ReturnType<typeof loadMap> = null;
   try {
-    open = loadMap(new URL(request.url).searchParams.get("map") ?? undefined);
+    open = loadMap(q.get("map") ?? undefined);
   } catch {}
   if (!open) return Response.json({ error: "No such map." }, { status: 404 });
   const f = join(projectDir(open.name), "index.json");
@@ -38,5 +44,14 @@ export async function GET(request: Request) {
   const now = new Set(present);
   const added = present.filter((p) => !files[p] && kinds.has(ext(p)));
   const gone = present.length ? Object.keys(files).filter((p) => files[p].status === "source" && !now.has(p)) : [];
+  if (q.get("behind")) {
+    const root = rootOf(open.file.RUN);
+    const b = join(projectDir(open.name), "base.json");
+    const base: Base = existsSync(b) ? JSON.parse(readFileSync(b, "utf8")) : {};
+    const touched = new Set([...git(root, "diff", "--name-only", "--relative", open.file.RUN.commit).split("\n"), ...added, ...gone, ...Object.keys(base)]);
+    // A file an update already followed differs from the commit but not from base.json.
+    const behind = [...touched].filter((p) => (files[p]?.status === "source" || added.includes(p)) && (!(p in base) || base[p] !== readText(join(root, p))));
+    return Response.json({ behind });
+  }
   return Response.json({ index, added, gone });
 }

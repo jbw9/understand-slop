@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { commitLog, mapDiff, resolveRef, type Resolved } from "@/lib/diff";
+import { commitLog, mapDiff, resolveRef, turnDiff, type Resolved } from "@/lib/diff";
 import { loadMap, rootOf } from "@/lib/maps";
 import { apply, readOverlay } from "@/lib/overlay";
 import { projectDir } from "@/lib/vault";
@@ -42,6 +42,10 @@ export async function GET(request: Request) {
 
   if (q.get("commits")) return Response.json({ commits: commitLog(root, 200), at: open.file.RUN.commit });
   if (q.get("branches")) return Response.json({ branches: branches(root), base: defaultBase(root), ...pulls(root) });
+  // The agent turns the map has followed, newest first (scripts/generate/update.ts).
+  const dir = projectDir(open.name);
+  const changes = () => (existsSync(join(dir, "changes.json")) ? (JSON.parse(readFileSync(join(dir, "changes.json"), "utf8")) as { id: string; prompt: string; at: string }[]) : []);
+  if (q.get("turns")) return Response.json({ turns: changes().reverse() });
 
   const rev = (k: string) => {
     const v = q.get(k);
@@ -53,6 +57,16 @@ export async function GET(request: Request) {
 
   let review: Review | undefined;
   const spec = rev("review");
+  const turn = spec?.startsWith("turn:") ? spec.slice(5) : null;
+  if (turn !== null) {
+    // An id, never a path: it names one of this map's own snapshots.
+    const entry = turn === "latest" ? changes().at(-1) : /^[\w-]{1,64}$/.test(turn) ? changes().find((c) => c.id === turn) : undefined;
+    const file = join(dir, "snapshots", `${entry?.id}.json`);
+    if (!entry || !existsSync(file)) return bad("That turn's before-and-after is no longer kept.", 404);
+    const snap = JSON.parse(readFileSync(file, "utf8"));
+    const diff = turnDiff({ ...snap.map, RUN: { ...snap.map.RUN, root } }, open.file, snap.files);
+    return Response.json({ ...diff, review: { kind: "turn", base: "", head: "", from: entry.at, to: entry.at, title: entry.prompt } satisfies Review });
+  }
   if (spec) {
     const r = reviewRange(root, spec);
     if ("error" in r) return bad(r.error);
@@ -91,7 +105,6 @@ export async function GET(request: Request) {
   }
 
   try {
-    const dir = projectDir(open.name);
     const json = (f: string) => (existsSync(join(dir, f)) ? JSON.parse(readFileSync(join(dir, f), "utf8")) : undefined);
     // Since the map was made, and it has been updated since: the map as it was
     // then is the other picture, so its diagrams and tables diff box by box.

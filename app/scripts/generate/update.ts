@@ -31,9 +31,10 @@
  * did, read by the app) and adds the run to <out>/report.json's `updates`.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Node } from "@/lib/data";
+import { lastExchange } from "@/lib/keep";
 import type { MapFile } from "@/lib/map";
 import { parseArgs } from "./args";
 import { converse, runTool } from "./author";
@@ -298,6 +299,9 @@ function spliced(root: Node, t: Placed, node: Node): Node {
 
 /* ── the run ─────────────────────────────────────────────────── */
 
+/** How many turns keep their before-and-after: each snapshot is the whole map. */
+const SNAPSHOTS = 30;
+
 export async function update(args: string[]) {
   const { opt, has, repo: dir } = parseArgs(args);
   const repo = resolve(dir!);
@@ -353,6 +357,14 @@ export async function update(args: string[]) {
     return;
   }
   const byPath = new Map(found.map((c) => [c.path, c]));
+
+  // The map and the code as they stand before this update, so what one turn
+  // changed can be shown afterwards as a before and after (changes.json).
+  const turnId = new Date().toISOString().replace(/[:.]/g, "-");
+  if (!has("--dry-run")) {
+    mkdirSync(`${out}/snapshots`, { recursive: true });
+    writeFileSync(`${out}/snapshots/${turnId}.json`, JSON.stringify({ map: JSON.parse(readFileSync(`${out}/map.json`, "utf8")), files: found.map(({ path, before, after }) => ({ path, before, after })) }));
+  }
 
   // Which sections, read off the references as they were; then every
   // reference moves to where its code is now.
@@ -434,6 +446,14 @@ export async function update(args: string[]) {
     report.updates = [...(report.updates ?? []), { at: new Date().toISOString(), changed: found.map((c) => c.path), sections: sections.map((s) => s.id), failed, seconds: Math.round((Date.now() - t0) / 1000), usd }];
     writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1) + "\n");
   }
+  // What asked for it, in the user's words where a prompt did: the line the turns list shows.
+  const last = [...turns].reverse().find((t) => t.transcript)?.transcript;
+  const asked = last ? lastExchange(last, (f) => readFileSync(f, "utf8"))?.asked : undefined;
+  const prompt = (asked ?? corrections.map((c) => c.note).join("; ")).split("\n")[0].slice(0, 200);
+  const log = existsSync(`${out}/changes.json`) ? JSON.parse(readFileSync(`${out}/changes.json`, "utf8")) : [];
+  log.push({ id: turnId, at: new Date().toISOString(), prompt, files: found.map((c) => c.path), sections, usd, seconds: Math.round((Date.now() - t0) / 1000) });
+  writeFileSync(`${out}/changes.json`, JSON.stringify(log.slice(-SNAPSHOTS), null, 1) + "\n");
+  for (const f of readdirSync(`${out}/snapshots`).sort().slice(0, -SNAPSHOTS)) rmSync(`${out}/snapshots/${f}`);
   console.log(`\n${out}/map.json — ${sections.length - failed.length}/${sections.length} sections updated, ${final.problems.length} check problems, $${usd}`);
   await ccClose();
 }

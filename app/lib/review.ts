@@ -12,8 +12,8 @@ import { execFileSync } from "node:child_process";
 import { git } from "@/scripts/generate/gitdiff";
 
 export interface Review {
-  /** `pr` names a pull request; `branch` a local or remote branch against its base. */
-  kind: "pr" | "branch";
+  /** `pr` names a pull request; `branch` a local or remote branch against its base; `turn` one agent turn the map followed. */
+  kind: "pr" | "branch" | "turn";
   base: string;
   head: string;
   /** The merge-base the diff starts from, and the head commit it ends at. */

@@ -1,10 +1,10 @@
 "use client";
 
 import { isTauri } from "@tauri-apps/api/core";
-import { Fragment, useMemo, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMap } from "@/components/map-context";
-import type { Node } from "@/lib/data";
+import type { Node, Origin } from "@/lib/data";
 import type { MapEntry } from "@/lib/maps";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +55,35 @@ export function useLocation(): { path: string[]; crumbs: Crumb[] } {
     [path, nodeAt],
   );
   return { path, crumbs };
+}
+
+type Redone = { at: string; sections?: { id: string; ok: boolean }[] }[];
+
+/**
+ * Whether an update redid the open level, or a section it is inside, after
+ * this was kept. An update rewrites the generator's words from the code, never
+ * the reader's (lib/overlay.ts), so what they kept can now describe code that
+ * is no longer there; it is marked, not removed, because it may still be true.
+ */
+export function useMayBeStale(origin?: Origin): boolean {
+  const { name, L0 } = useMap();
+  const { path } = useLocation();
+  const [turns, setTurns] = useState<Redone>([]);
+  useEffect(() => {
+    if (!origin) return;
+    let live = true;
+    fetch(`/api/diff?map=${encodeURIComponent(name)}&turns=1`)
+      .then((r) => r.json())
+      .then((j: { turns?: Redone }) => live && setTurns(j.turns ?? []))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [name, L0, origin]);
+  return useMemo(
+    () => Boolean(origin) && turns.some((t) => t.at > origin!.at && t.sections?.some((s) => s.ok && path.includes(s.id))),
+    [turns, origin, path],
+  );
 }
 
 /**

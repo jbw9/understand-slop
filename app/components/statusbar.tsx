@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentIcon } from "@/components/agents";
 import { Kbd } from "@/components/button";
 import { useMap } from "@/components/map-context";
+import { openReview } from "@/components/diff";
 import { openFiles, useFiles } from "@/components/files";
 import { openPalette } from "@/components/palette";
 import { openProjects } from "@/components/projects";
-import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
+import { UNFOLLOWED, toggleWorkspace, updateMap } from "@/components/workspace";
 import { coverage } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { STATIC_MAP } from "@/lib/source";
@@ -160,6 +161,10 @@ interface Update {
  * says what is happening. Only the user's own projects update; an
  * example describes some other copy of its code, so when an agent edits its
  * checkout this says so and offers to import it.
+ *
+ * Edits made outside a Mira tab (another editor, a pull) never ask for an
+ * update, so between updates this says how far the code has moved from what
+ * the map describes and offers one. Never by itself: an update costs a run.
  */
 function MapUpdates({ id, root, local }: { id: string; root?: string; local: boolean }) {
   const [u, setU] = useState<Update | null>(null);
@@ -194,9 +199,22 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
     return () => clearInterval(timer);
   }, [id, local]);
 
+  const [behind, setBehind] = useState<string[]>([]);
+  useEffect(() => {
+    if (!local) return;
+    const tick = () =>
+      fetch(`/api/files?map=${encodeURIComponent(id)}&behind=1`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((r: { behind: string[] } | null) => r && setBehind(r.behind))
+        .catch(() => {});
+    void tick();
+    const timer = setInterval(tick, 15000);
+    return () => clearInterval(timer);
+  }, [id, local, u?.finishedAt]);
+
   useEffect(() => {
     if (!fresh) return;
-    const t = setTimeout(() => setFresh(false), 6000);
+    const t = setTimeout(() => setFresh(false), 15000);
     return () => clearTimeout(t);
   }, [fresh]);
 
@@ -222,7 +240,17 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
       </span>
     );
   // A turn that changed nothing the map covers passes silently.
-  if (!u || (u.status === "done" && (!fresh || !u.sections?.length))) return null;
+  if (!u || (u.status === "done" && (!fresh || !u.sections?.length)))
+    return behind.length && root ? (
+      <span className="mr-2 flex min-w-0 items-center gap-2 text-amber-ink">
+        <span className="truncate" title={behind.join("\n")}>
+          Map is behind: {behind.length} {behind.length === 1 ? "file" : "files"} changed
+        </span>
+        <button type="button" onClick={() => void updateMap(root, { transcript: null, corrections: [] })} className="shrink-0 cursor-pointer text-deep-green underline">
+          Update
+        </button>
+      </span>
+    ) : null;
   const what = u.sections?.length ? u.sections.join(", ") : u.changed?.join(", ");
   return (
     <span
@@ -240,6 +268,11 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
             ? "✗ Map update failed"
             : `✓ Map updated: ${u.sections!.join(", ")}`}
       </span>
+      {u.status === "done" ? (
+        <button type="button" onClick={() => (setFresh(false), openReview("turn:latest"))} className="shrink-0 cursor-pointer underline">
+          see what changed
+        </button>
+      ) : null}
     </span>
   );
 }

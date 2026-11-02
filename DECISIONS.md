@@ -1776,3 +1776,10 @@ another level redoes the roots; the summaries and the cut replay from cache.
 **Fixed with it:** the commit log took 6–11 s on this repository, because one commit of build output made `--numstat` read 4,000 blobs. Files over 1 MB now count as binary (`core.bigFileThreshold=1m`), and the log is kept until HEAD moves: 2.0 s first, 24 ms after. Totals moved by 4 lines in 317,000.
 **Cost accepted:** the last 200 commits only; no word-level highlights inside a changed line; an older commit's diff still takes seconds while renames are followed, and its paths from the log show meanwhile.
 **At scale:** a commit with thousands of files lists every row; past a few thousand, the file list wants windowing.
+
+## D76 — History opens on the newest commit and compares any two
+
+**Chose:** the panel is titled History and starts on the newest commit. The "Since the map was made" row is gone, because the map keeps itself current and the question it answered is no longer one a reader asks. A row's "⇄ Compare with <selected>" button on hover, or ⇧/⌘-click, compares two commits, older as base. Base and compare are tagged on their rows, the commits between are shaded, the right side shows both as cards with a swap, and the files changed between them list under the compare row as a single commit's do. A single commit shows what an editor's commit details do: author and email, an initials avatar, when, branch and tag chips, the whole message, the sha to copy, parents to click, the committer where it differs, and merges marked.
+**Beat:** comparing through two `<select>`s, and a details line holding only author and date.
+**Cost accepted:** a merge's changes are shown against its first parent, and the history is one line with no branch lanes. Refs are read with the log, so a new branch or tag shows after the next commit.
+**At scale:** same as D75: the last 200 commits.

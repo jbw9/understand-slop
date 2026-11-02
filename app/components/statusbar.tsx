@@ -8,7 +8,7 @@ import { openReview } from "@/components/diff";
 import { openFiles, useFiles } from "@/components/files";
 import { openPalette } from "@/components/palette";
 import { openProjects } from "@/components/projects";
-import { UNFOLLOWED, toggleWorkspace, updateMap } from "@/components/workspace";
+import { UNFOLLOWED, toggleWorkspace, followTurn } from "@/components/workspace";
 import { coverage } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { STATIC_MAP } from "@/lib/source";
@@ -216,7 +216,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
   const follow = (sig: string) => {
     quiet.current.tried = sig;
     setTried(sig);
-    if (root) void updateMap(root, { transcript: null, corrections: [] });
+    if (root) void followTurn(root, { transcript: null, corrections: [] });
   };
   useEffect(() => {
     if (!local) return;

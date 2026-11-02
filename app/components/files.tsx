@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DIALOG, INPUT, Overlay, QUIET } from "@/components/dialog";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
-import { updateMap } from "@/components/workspace";
+import { followTurn } from "@/components/workspace";
 import { citations, required, symbolsOf, type Citation, type IndexFile, type MapIndex } from "@/lib/coverage";
 import { cn } from "@/lib/utils";
 
@@ -125,7 +125,7 @@ export function FilesPanel() {
     const gaps = gapsOf(r);
     // The section nearest the file already, else the root that owns it: where the updater starts.
     const near = (cited.get(r.path) ?? [])[0]?.path.at(-1) ?? r.file?.roots[0];
-    void updateMap(root, {
+    void followTurn(root, {
       transcript: null,
       corrections:
         gaps.length && near

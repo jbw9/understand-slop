@@ -5,6 +5,7 @@ import { buildMap, type BuiltMap, type MapFile } from "@/lib/map";
 import type { MapEntry } from "@/lib/maps";
 import type { Progress } from "@/lib/vault";
 import { changedPaths } from "@/lib/share";
+import { updateMap } from "@/lib/update-map";
 
 /**
  * What the last rewrite of the map changed: the paths of every node it added
@@ -17,6 +18,9 @@ export interface Fresh {
 }
 
 const NONE: Fresh = { at: 0, paths: new Set() };
+
+/** The maps this page load has asked to catch up with their code. */
+const asked = new Set<string>();
 
 /** `progress`: the run making this map, while there is one (D69). */
 const MapContext = createContext<(BuiltMap & { maps: MapEntry[]; fresh: Fresh; progress?: Progress }) | null>(null);
@@ -69,6 +73,17 @@ export function MapProvider({
     const next = live.map.name === name ? adopt(live, file) : { map: buildMap(file, name), fresh: NONE };
     setLive({ ...next, prop: file, progress });
   }
+
+  // Opened, a project's map catches up with code that moved while it was
+  // closed: a pull, an editor, a terminal outside the app. Only the sections
+  // whose cited code changed are redone, and the poll below brings them in.
+  // Once per map a page load, so a remount does not ask again.
+  const root = file.RUN.root;
+  useEffect(() => {
+    if (version === undefined || !root || asked.has(name)) return;
+    asked.add(name);
+    void updateMap(root);
+  }, [name, version, root]);
 
   const since = useRef(version);
   useEffect(() => {

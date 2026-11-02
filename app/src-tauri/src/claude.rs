@@ -125,6 +125,18 @@ timeline)
 esac
 "#;
 
+/// A terminal's output, for any agent in a tab: Claude has `read_terminal`
+/// (mcp.rs), and this reaches the same tool for the agents that have no MCP
+/// config. Allowed without asking.
+const TERMINAL: &str = r#"#!/bin/sh
+# Prints what a Mira terminal printed, the dev server's by default (src-tauri/src/mcp.rs).
+[ -n "$SLOP_MCP_URL" ] || { echo "Not in a Mira tab; no terminals to read." >&2; exit 1; }
+case "$2" in ''|*[!0-9]*) lines=200 ;; *) lines=$2 ;; esac
+name=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\t\n' '  ')
+curl -sS --fail-with-body "$SLOP_MCP_URL/text" -H 'Content-Type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"read_terminal\",\"arguments\":{\"name\":\"$name\",\"lines\":$lines}}}"
+"#;
+
 /// The map's own table of contents, for naming a section that was not picked.
 ///
 /// The user asks "how do sign ups work?" with nothing attached, so the only
@@ -178,7 +190,8 @@ them somewhere, though naming the section you are explaining is fine where the p
 it. The app also runs the project: its web app in a Preview tab, and its phone app on an iOS \
 Simulator or Android emulator when the user has started one. The slop-preview tools use them \
 as a person would (screenshot, click, type, read the page, navigate, resize); use them to check \
-that a change you made works, or when the user asks about what the app shows. They are also \
+that a change you made works, or when the user asks about what the app shows; `read_terminal` \
+reads the dev server's logs (and the project's other terminals) when something fails. They are also \
 your browser: to search the web or read a page as the user would see it, navigate the preview \
 there, never another browser. WebSearch and WebFetch are fine for reading docs: what they read \
 opens in the preview too, so the user sees it beside you. \
@@ -484,6 +497,7 @@ fn launcher() -> std::io::Result<PathBuf> {
     install(&dir.join("slop-map-fix"), FIX)?;
     install(&dir.join("slop-map-show"), SHOW)?;
     install(&dir.join("slop-map-list"), LIST)?;
+    install(&dir.join("slop-terminal"), TERMINAL)?;
     let path = dir.join("slop-claude");
     install(&path, LAUNCHER)?;
     #[cfg(windows)]
@@ -555,7 +569,7 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             "SessionEnd": [{ "hooks": [hook(RESTORE)] }]
         },
         "permissions": {
-            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "mcp__slop-preview", "WebSearch", "WebFetch"],
+            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "Bash(slop-terminal:*)", "mcp__slop-preview", "WebSearch", "WebFetch"],
             // The preview is the browser here: Chrome would open beside the app, out of the user's sight.
             "deny": ["mcp__claude-in-chrome"]
         }
@@ -567,6 +581,9 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     cmd.env("SLOP_CLAUDE_SYSTEM", SYSTEM);
     if let Some(mcp) = crate::mcp::config(tab) {
         cmd.env("SLOP_CLAUDE_MCP", mcp);
+    }
+    if let Some(url) = crate::mcp::url(tab) {
+        cmd.env("SLOP_MCP_URL", url);
     }
     if let Some(m) = launch.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
         cmd.env("SLOP_CLAUDE_MODEL", m);

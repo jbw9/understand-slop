@@ -45,8 +45,9 @@ import { cn } from "@/lib/utils";
  * Besides terminals, a tab can be the project running: a Preview of its web
  * app (components/preview.tsx), or its phone app on the Android emulator or
  * the iOS Simulator (components/device.tsx). When a project with a web dev
- * server opens, its server starts in a tab of its own and the Preview opens
- * beside it, showing the page once the server prints its address. A project
+ * server opens, its server starts and the Preview opens, showing the page once
+ * the server prints its address. The server's terminal has no tab of its own:
+ * it is drawn in the Preview's, which switches between the page and it. A project
  * with a phone app is offered its simulator, once; nothing is installed for
  * one until the user asks. Claude reaches the preview through the app's MCP
  * server (src-tauri/src/mcp.rs), and this is where its calls find the right
@@ -98,7 +99,8 @@ interface Tab {
   run?: string;
   /** What it is called instead of its shell's name, when the app opened it for something. */
   label?: string;
-  /** It runs the dev server: its output is watched for the server's address. */
+  /** It runs the dev server: its output is watched for the server's address,
+   * and it is drawn in the project's Preview tab rather than in a tab of its own. */
   dev?: boolean;
   /** Moved out of the window, into the main view in front of the map. */
   main?: boolean;
@@ -179,8 +181,8 @@ export function Workspace() {
   // The tab in the main view, per project; none, or one moved away, is the map.
   const [front, setFront] = useState<Record<string, number | null>>({});
   const mine = tabs.filter((t) => t.cwd === here);
-  const panel = mine.filter((t) => !t.main);
-  const docked = mine.filter((t) => t.main);
+  const panel = mine.filter((t) => !t.main && !t.dev);
+  const docked = mine.filter((t) => t.main && !t.dev);
   const current = panel.find((t) => t.key === active[here]) ?? panel.at(-1);
   const upFront = docked.find((t) => t.key === front[here]);
   // Where tab bodies are drawn: the window's and the main view's.
@@ -218,6 +220,8 @@ export function Workspace() {
   // Each project's dev server address, once it has printed one; and how each
   // project is run, read when it is first opened.
   const [servers, setServers] = useState<Record<string, string>>({});
+  // The projects whose Preview shows the dev server's terminal, not the page.
+  const [serverShown, setServerShown] = useState<Record<string, boolean>>({});
   const [projects, setProjects] = useState<Record<string, Project>>({});
   const [offers, setOffers] = useState<Record<string, boolean>>({});
   const tabsNow = useRef(tabs);
@@ -229,6 +233,7 @@ export function Workspace() {
   const preview = useCallback(
     (root: string) => {
       const open = tabsNow.current.find((x) => x.kind === "preview" && x.cwd === root);
+      setServerShown((s) => ({ ...s, [root]: false }));
       if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
       if (open.main) setFront((f) => ({ ...f, [root]: open.key }));
       else {
@@ -320,6 +325,7 @@ export function Workspace() {
         const r = (await fetch(`/api/lookup?${q}`).then((x) => x.json())) as { text: string };
         return reply(true, r.text);
       }
+      if (cmd.op === "terminal") return reply(true, terminal(root, tab, cmd.args));
       let handle = previewOf(root);
       if (!handle) {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
@@ -350,6 +356,19 @@ export function Workspace() {
       reply(false, e instanceof Error ? e.message : String(e));
     }
   };
+  /** A terminal's output, for an agent in tab `asker`: named, or the dev server's;
+   * with the project's terminals listed, so it can ask for another. */
+  const terminal = (root: string, asker: number, { name, lines = 200 }: { name?: string; lines?: number }) => {
+    const all = tabsNow.current.filter((x) => x.cwd === root && x.kind === "shell" && x.pty !== undefined);
+    const called = (x: Tab) => (x.dev ? "dev server" : nameOf(x));
+    const listed = all.map((x) => `${called(x)}${x.pty === asker ? " (you)" : ""}`).join(", ");
+    const want = name?.trim().toLowerCase();
+    const t = want ? all.find((x) => called(x).toLowerCase() === want) : all.find((x) => x.dev);
+    if (!t) throw new Error(`${want ? `No terminal called "${name}".` : "No dev server is running for this project."} Terminals: ${listed || "none"}.`);
+    const out = (screens.current[t.key]?.(true) ?? []).join("\n").trimEnd().split("\n").slice(-Math.max(1, lines));
+    return `Terminals: ${listed}.\n--- ${called(t)}, last ${out.length} lines ---\n${out.join("\n")}`;
+  };
+
   // The latest of everything above, for a call that arrives between renders.
   const answering = useRef(answer);
   useEffect(() => {
@@ -387,7 +406,7 @@ export function Workspace() {
   );
 
   // Each terminal's screen, for a plan's tab to read Claude Code's question off.
-  const screens = useRef<Record<number, () => string[]>>({});
+  const screens = useRef<Record<number, (all?: boolean) => string[]>>({});
 
   // A plan opens beside the Claude that wrote it: in the main view while
   // Claude is in the window, in the window while Claude is in the main view.
@@ -529,12 +548,15 @@ export function Workspace() {
     (key: number) => {
       const gone = tabs.find((x) => x.key === key);
       if (!gone) return;
-      const rest = tabs.filter((x) => x.key !== key);
+      // A Preview's dev server goes with it.
+      const dev = gone.kind === "preview" ? tabs.find((x) => x.dev && x.cwd === gone.cwd) : undefined;
+      const rest = tabs.filter((x) => x.key !== key && x !== dev);
       setTabs(rest);
       if (gone.pty !== undefined) tabEnded(gone.pty);
+      if (dev?.pty !== undefined) tabEnded(dev.pty);
       // The neighbour in the same place takes over: in the window, whose last
       // one closing hides it; in the main view, where none left is the map.
-      const near = (x: Tab) => x.cwd === gone.cwd && !x.main === !gone.main;
+      const near = (x: Tab) => x.cwd === gone.cwd && !x.main === !gone.main && !x.dev;
       const group = tabs.filter(near);
       const left = rest.filter(near);
       const i = group.findIndex((x) => x.key === key);
@@ -996,8 +1018,11 @@ export function Workspace() {
       </>
     ) : null}
     {tabs.map((t) => {
-          const visible = t.main ? t.cwd === here && t.key === upFront?.key : shown && t.key === current?.key;
-          const slot = t.main ? mainSlot : panelSlot;
+          const inView = (x: Tab) => (x.main ? x.cwd === here && x.key === upFront?.key : shown && x.key === current?.key);
+          // A dev server is drawn in its Preview's place, under the Preview's toolbar.
+          const host = t.dev ? tabs.find((x) => x.kind === "preview" && x.cwd === t.cwd) : t;
+          const visible = !!host && inView(host) && (!t.dev || !!serverShown[t.cwd]);
+          const slot = host?.main ? mainSlot : panelSlot;
           if (t.kind === "preview") {
             const dev = tabs.find((x) => x.dev && x.cwd === t.cwd);
             return (
@@ -1008,7 +1033,8 @@ export function Workspace() {
                 visible={visible}
                 waiting={servers[t.cwd] ? undefined : dev?.run}
                 onTarget={(url) => setServers((all) => ({ ...all, [t.cwd]: url }))}
-                onShowServer={dev ? () => bring(dev.key) : undefined}
+                serverShown={!!dev && serverShown[t.cwd]}
+                onServer={dev ? (on) => setServerShown((s) => ({ ...s, [t.cwd]: on })) : undefined}
                 docked={!!t.main}
               />
               </Held>
@@ -1046,8 +1072,7 @@ export function Workspace() {
               />
               </Held>
             );
-          return (
-          <Held key={t.key} slot={slot}>
+          const shell = (
           <Shell
             startClaude={t.start === CLAUDE.id}
             run={t.run ?? (t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined)}
@@ -1070,6 +1095,10 @@ export function Workspace() {
             }}
             onExit={() => close(t.key)}
           />
+          );
+          return (
+          <Held key={t.key} slot={slot}>
+            {t.dev ? <div className={cn("absolute inset-x-0 top-9 bottom-0", !visible && "hidden")}>{shell}</div> : shell}
           </Held>
           );
         })}

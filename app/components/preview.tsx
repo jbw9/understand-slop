@@ -117,7 +117,8 @@ export function Preview({
   visible,
   waiting,
   onTarget,
-  onShowServer,
+  serverShown,
+  onServer,
   docked,
 }: {
   root: string;
@@ -128,8 +129,10 @@ export function Preview({
   waiting?: string;
   /** The preview was pointed at another server: from the address bar, or by Claude. */
   onTarget: (url: string) => void;
-  /** Bring the dev server's terminal to the front. */
-  onShowServer?: () => void;
+  /** The dev server's terminal is shown in the page's place (components/workspace.tsx). */
+  serverShown?: boolean;
+  /** Switch between the page and the dev server's terminal; absent with no dev server. */
+  onServer?: (shown: boolean) => void;
   /** In the main view rather than the window (components/workspace.tsx). */
   docked?: boolean;
 }) {
@@ -715,6 +718,28 @@ export function Preview({
   return (
     <div className={cn("absolute inset-0 flex flex-col", !visible && "pointer-events-none invisible")}>
       <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border-gray px-1.5">
+        {onServer ? (
+          <div role="radiogroup" aria-label="Show" className="mr-1 flex shrink-0 items-center rounded-[3px] bg-surface-container p-0.5">
+            {[
+              { label: "Page", on: !serverShown },
+              { label: "Server", on: !!serverShown },
+            ].map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                role="radio"
+                aria-checked={o.on}
+                onClick={() => onServer(o.label === "Server")}
+                className={cn(
+                  "h-5 cursor-pointer rounded-[2px] px-2 text-[11.5px]",
+                  o.on ? "bg-pure-white text-ink shadow-[0_0_0_1px_var(--color-border-gray)]" : "text-muted-slate hover:text-ink",
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <Tool label="Back" onClick={() => void navigate("back").catch(() => {})} disabled={!ready}>
           <path d="M10 3.5 5.5 8l4.5 4.5" />
         </Tool>
@@ -819,7 +844,7 @@ export function Preview({
           ]}
         />
       ) : null}
-      <div ref={stage} className="relative min-h-0 flex-1 overflow-hidden bg-surface-container">
+      <div ref={stage} className={cn("relative min-h-0 flex-1 overflow-hidden bg-surface-container", serverShown && "invisible")}>
         {ready ? (
           <>
             <div
@@ -868,8 +893,8 @@ export function Preview({
                 <p className="text-[13px] text-ink">Starting the dev server…</p>
                 <p className="max-w-full truncate font-mono text-[11.5px] text-faint">{waiting}</p>
                 <p className="text-[12px] text-muted-slate">The page opens here as soon as it prints its address.</p>
-                {onShowServer ? (
-                  <button type="button" onClick={onShowServer} className="mt-1 cursor-pointer text-[12px] text-deep-green hover:underline">
+                {onServer ? (
+                  <button type="button" onClick={() => onServer(true)} className="mt-1 cursor-pointer text-[12px] text-deep-green hover:underline">
                     Show its terminal
                   </button>
                 ) : null}

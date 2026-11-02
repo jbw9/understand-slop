@@ -13,7 +13,9 @@ export type Call =
   | { op: "resize"; args: { width?: number; height?: number; preset?: string } }
   | { op: "console"; args: { pattern?: string; only_errors?: boolean; clear?: boolean; limit?: number } }
   /** Claude reading the project's map (app/api/lookup); answered by the workspace, never a preview. */
-  | { op: "map"; name: string; args: { query?: string; name?: string; file?: string; line?: number } };
+  | { op: "map"; name: string; args: { query?: string; name?: string; file?: string; line?: number } }
+  /** An agent reading a terminal of its project, the dev server's by default; answered by the workspace. */
+  | { op: "terminal"; args: { name?: string; lines?: number } };
 
 export interface PreviewHandle {
   run(call: Call): Promise<unknown>;

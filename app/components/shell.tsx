@@ -140,8 +140,9 @@ export function Shell({
   onOutput?: (text: string) => void;
   /** The user typed into it: what the program prints next is the echo, not its own work. */
   onInput?: () => void;
-  /** How to read what is on screen now, line by line: how a plan's tab finds Claude Code's question. */
-  onScreen?: (read: () => string[]) => void;
+  /** How to read what is on screen now, line by line: how a plan's tab finds Claude Code's question.
+   * With `all`, the whole scrollback: how an agent reads the dev server's logs. */
+  onScreen?: (read: (all?: boolean) => string[]) => void;
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -279,9 +280,10 @@ export function Shell({
         if (run) void invoke("pty_write", { id, data: `${run}\r` });
         handlers.current.onTitle?.(spawned.shell);
         handlers.current.onSpawn?.(spawned.id);
-        handlers.current.onScreen?.(() => {
+        handlers.current.onScreen?.((all) => {
           const b = term.buffer.active;
-          return Array.from({ length: term.rows }, (_, i) => b.getLine(b.baseY + i)?.translateToString(true) ?? "");
+          const from = all ? 0 : b.baseY;
+          return Array.from({ length: all ? b.length : term.rows }, (_, i) => b.getLine(from + i)?.translateToString(true) ?? "");
         });
       } catch (e) {
         term.dispose();

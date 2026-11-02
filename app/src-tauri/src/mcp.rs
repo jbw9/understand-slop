@@ -2,7 +2,12 @@
 //! server in its MCP config (claude.rs), so it can look at the project's
 //! running app and use it, the way the Chrome extension lets it use a browser:
 //! screenshot, click, type, read the page, navigate, resize the viewport, read
-//! the console. And on a phone simulator, through `device` (devices.rs).
+//! the console. And on a phone simulator, through `device` (devices.rs). And
+//! the project's terminals, the dev server's logs first (`read_terminal`).
+//!
+//! Agents other than Claude get no MCP config, so `slop-terminal` (claude.rs)
+//! reaches `read_terminal` through `/text` on the same URL: one tools/call,
+//! answered as its plain text.
 //!
 //! It is MCP's streamable HTTP transport in its simplest form: one JSON-RPC
 //! message per POST, answered as plain JSON. The URL carries a secret, and the
@@ -62,16 +67,15 @@ pub fn start(app: AppHandle) {
     });
 }
 
+/// This server's address for tab `tab`, once it is up.
+pub fn url(tab: u32) -> Option<String> {
+    let s = SERVER.get()?;
+    Some(format!("http://127.0.0.1:{}/mcp/{}/{tab}", s.port, s.token))
+}
+
 /// The `--mcp-config` for Claude in tab `tab`, once the server is up.
 pub fn config(tab: u32) -> Option<String> {
-    let s = SERVER.get()?;
-    Some(
-        json!({ "mcpServers": { "slop-preview": {
-            "type": "http",
-            "url": format!("http://127.0.0.1:{}/mcp/{}/{tab}", s.port, s.token)
-        } } })
-        .to_string(),
-    )
+    Some(json!({ "mcpServers": { "slop-preview": { "type": "http", "url": url(tab)? } } }).to_string())
 }
 
 fn handle(conn: TcpStream, app: &AppHandle) -> std::io::Result<()> {
@@ -86,12 +90,15 @@ fn handle(conn: TcpStream, app: &AppHandle) -> std::io::Result<()> {
     }
     let mut line = head.line.split_whitespace();
     let (method, path) = (line.next().unwrap_or(""), line.next().unwrap_or(""));
-    let tab = path
+    let to = path
         .strip_prefix("/mcp/")
         .and_then(|rest| rest.split_once('/'))
         .filter(|(token, _)| *token == s.token)
-        .and_then(|(_, tab)| tab.parse::<u32>().ok());
-    let Some(tab) = tab else {
+        .and_then(|(_, rest)| {
+            let (tab, sub) = rest.split_once('/').unwrap_or((rest, ""));
+            Some((tab.parse::<u32>().ok()?, sub == "text")).filter(|(_, text)| *text || sub.is_empty())
+        });
+    let Some((tab, text)) = to else {
         return respond(&mut w, "404 Not Found", "text/plain", b"", &[]);
     };
     if method != "POST" {
@@ -103,6 +110,14 @@ fn handle(conn: TcpStream, app: &AppHandle) -> std::io::Result<()> {
         let e = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "Parse error" } });
         return respond(&mut w, "400 Bad Request", "application/json", e.to_string().as_bytes(), &[]);
     };
+    if text {
+        let r = rpc(&msg, tab, app).unwrap_or(Value::Null);
+        let result = &r["result"];
+        let said: Vec<&str> = result["content"].as_array().into_iter().flatten().filter_map(|c| c["text"].as_str()).collect();
+        let body = format!("{}\n", said.join("\n"));
+        let status = if result["isError"] == true || result.is_null() { "422 Unprocessable Entity" } else { "200 OK" };
+        return respond(&mut w, status, "text/plain; charset=utf-8", body.as_bytes(), &[]);
+    }
     let out = match &msg {
         Value::Array(all) => {
             let replies: Vec<Value> = all.iter().filter_map(|m| rpc(m, tab, app)).collect();
@@ -123,7 +138,8 @@ you would in a browser. They are your browser here: to look something up or read
 the web, navigate the preview there (an address, or words to search for) instead of opening \
 another browser, so the user sees it beside you. WebFetch and WebSearch are fine for reading \
 docs as text; what they read opens in the preview as well. `device` does the same on an iOS Simulator or \
-Android emulator running in the app. `map_search`, `map_section` and `map_where` read the project's \
+Android emulator running in the app. `read_terminal` reads the project's terminals, the dev \
+server's logs by default: read it when the page misbehaves, a build fails or a request errors. `map_search`, `map_section` and `map_where` read the project's \
 map in Mira: what each part of the code is for and which section explains it. Ask `map_where` about a \
 file before changing it, and name sections by the id path these tools give.";
 
@@ -179,6 +195,7 @@ fn call(name: &str, args: &Value, tab: u32, app: &AppHandle) -> Result<Vec<Value
         "read_console_messages" => ask(app, tab, json!({ "op": "console", "args": args })).map(said),
         "device" => crate::devices::tool(args, app),
         "map_search" | "map_section" | "map_where" => ask(app, tab, json!({ "op": "map", "name": name, "args": args })).map(said),
+        "read_terminal" => ask(app, tab, json!({ "op": "terminal", "args": args })).map(said),
         _ => Err(format!("No tool called {name}.")),
     }
 }
@@ -400,6 +417,17 @@ fn tools() -> Value {
                     "only_errors": { "type": "boolean" },
                     "clear": { "type": "boolean" },
                     "limit": { "type": "number" }
+                }
+            }
+        },
+        {
+            "name": "read_terminal",
+            "description": "What a terminal of this project printed, oldest first: by default the dev server's, to see its logs, build errors and requests. Lists the project's terminals too, so another can be read by name.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "description": "A terminal's name as listed, like \"dev server\" or \"zsh 2\". Leave out for the dev server." },
+                    "lines": { "type": "number", "description": "How many of its last lines; 200 by default." }
                 }
             }
         },

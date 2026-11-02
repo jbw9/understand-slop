@@ -51,8 +51,11 @@ export interface DiffState {
   error?: string;
   from?: string;
   to?: string;
+  /** `pr:<n>` or `<base>...<branch>`, where the diff is a review (lib/review.ts); it then sets both ends. */
+  review?: string;
   commits: Commit[];
   setRange: (from?: string, to?: string) => void;
+  setReview: (spec?: string) => void;
   off: () => void;
 }
 
@@ -115,7 +118,7 @@ export function DiffMode({ map, children }: { map: string; children: React.React
 }
 
 export function DiffProvider({ map, on, onOff, children }: { map: string; on: boolean; onOff: () => void; children: React.ReactNode }) {
-  const [range, setR] = useState<{ from?: string; to?: string }>({});
+  const [range, setR] = useState<{ from?: string; to?: string; review?: string }>({});
   const [commits, setCommits] = useState<Commit[]>([]);
   /**
    * The answer and the question it answers, in one piece of state. `loading` is
@@ -128,6 +131,7 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
   const q = new URLSearchParams({ map });
   if (range.from) q.set("from", range.from);
   if (range.to) q.set("to", range.to);
+  if (range.review) q.set("review", range.review);
   const asked = q.toString();
 
   useEffect(() => {
@@ -158,15 +162,16 @@ export function DiffProvider({ map, on, onOff, children }: { map: string; on: bo
   }, [map, on, commits.length]);
 
   const setRange = useCallback((from?: string, to?: string) => setR({ from, to }), []);
+  const setReview = useCallback((review?: string) => setR({ review }), []);
   const here = got?.q === asked ? got : undefined;
   const value = useMemo<DiffState>(
-    () => ({ diff: on ? (here?.diff ?? null) : null, loading: on && !here, error: here?.error, ...range, commits, setRange, off: onOff }),
-    [on, here, range, commits, setRange, onOff],
+    () => ({ diff: on ? (here?.diff ?? null) : null, loading: on && !here, error: here?.error, ...range, commits, setRange, setReview, off: onOff }),
+    [on, here, range, commits, setRange, setReview, onOff],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-/** A verdict as a word in its own colours. Shared with the diff panel. */
+/** A verdict as a word in its own colours. */
 export function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouched">; children: React.ReactNode }) {
   const t = TINT[verdict];
   return (
@@ -176,36 +181,6 @@ export function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouch
     >
       {children}
     </span>
-  );
-}
-
-/** The changed files with their line counts, each opening onto its hunks. */
-export function FileList({ diff }: { diff: MapDiff }) {
-  const [open, setOpen] = useState<string | null>(null);
-  if (!diff.files.length) return <p className="text-[13px] text-muted-slate">Nothing changed.</p>;
-  return (
-    <ul className="mt-1.5 flex flex-col gap-1">
-      {diff.files.map((f) => (
-        <li key={f.path}>
-          <button
-            type="button"
-            aria-expanded={open === f.path}
-            onClick={() => setOpen(open === f.path ? null : f.path)}
-            className="flex w-full cursor-pointer items-baseline gap-2 rounded-[2px] px-1 py-0.5 text-left font-mono text-[11px] hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
-          >
-            <span className="w-2 shrink-0 text-faint">{open === f.path ? "▾" : "▸"}</span>
-            <span className="min-w-0 flex-1 truncate text-on-surface">{f.path}</span>
-            <span className="tnum shrink-0" style={{ color: TINT.added.ink }}>
-              +{f.added}
-            </span>
-            <span className="tnum shrink-0" style={{ color: TINT.removed.ink }}>
-              −{f.removed}
-            </span>
-          </button>
-          {open === f.path ? <Hunks file={f} /> : null}
-        </li>
-      ))}
-    </ul>
   );
 }
 

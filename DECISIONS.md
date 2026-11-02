@@ -1768,3 +1768,11 @@ another level redoes the roots; the summaries and the cut replay from cache.
 **Fixed with it:** a whole-file save dropped the file's final newline, because `writeSlice` strips one; the file view sends one for it to strip.
 **Cost accepted:** no multi-cursor, find, or language smarts; an unsaved draft is lost when you leave the view.
 **At scale:** each keystroke re-highlights the whole file, which holds to a few thousand lines; past that, highlight only the visible window.
+
+## D75 — Changes read like an editor's source control
+
+**Chose:** the diff panel is a two-pane window. On the left are "Since the map was made" and then the commits, newest first, on one line with a dot each. The picked commit opens onto its changed files beneath it: name, folder, +/−, and an M/A/D letter. On the right is the picked file side by side (removals beside what replaced them, hatched where one side has no line) or inline, with "⋯ N unchanged lines" between hunks. With no file picked, the right side shows the commit: message, author, date, sha, and the map sections it moved, each opening its level. ↑/↓ walk commits and files as one list, ⇧-click a second commit compares the two, a filter narrows the history, and the layout choice is kept. The panel still routes and the level still shows the red and green (D58).
+**Beat:** the earlier dialog: a short commit list, from/to `<select>`s behind "Compare two commits…", and files that expanded inline under the section list. It had no way to read a commit file by file, and comparing meant two dropdowns of truncated subjects.
+**Fixed with it:** the commit log took 6–11 s on this repository, because one commit of build output made `--numstat` read 4,000 blobs. Files over 1 MB now count as binary (`core.bigFileThreshold=1m`), and the log is kept until HEAD moves: 2.0 s first, 24 ms after. Totals moved by 4 lines in 317,000.
+**Cost accepted:** the last 200 commits only; no word-level highlights inside a changed line; an older commit's diff still takes seconds while renames are followed, and its paths from the log show meanwhile.
+**At scale:** a commit with thousands of files lists every row; past a few thousand, the file list wants windowing.

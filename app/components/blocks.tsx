@@ -139,12 +139,22 @@ function Diagram({
   const sectionOf = (id: string | undefined) => (id ? order.indexOf(id) : -1);
   // In diff mode a box says what happened to the section it opens: amber
   // where its code changed, red where it is gone, the rest receding.
-  const sections = useDiff()?.diff?.sections;
+  // A section whose own lines held but something beneath it changed reads
+  // as changed too: on a review, the boxes on every level are the way down
+  // to the change, not only the one that holds it.
+  const diff = useDiff()?.diff;
+  const sections = diff?.sections;
   const verdictOf = (id: string | undefined) => {
-    const v = id ? sections?.find((s) => s.id === id)?.verdict : undefined;
-    return v && v !== "untouched" ? v : undefined;
+    const s = id ? sections?.find((x) => x.id === id) : undefined;
+    return s && s.verdict !== "untouched" ? s.verdict : s?.inside ? ("changed" as const) : undefined;
   };
   const moved = block.boxes.some((b) => verdictOf(b.opens));
+  // An arrow whose cited line changed: the path itself was edited.
+  const hot = new Set(block.arrows.filter((a) => a.at && diff?.arrows?.includes(a.at)).map((a) => `${a.from}→${a.to}`));
+  // A part that calls into a changed one, by an arrow drawn on this picture:
+  // its own code held, but what it relies on did not.
+  const boxVerdict = (id: string) => verdictOf(block.boxes.find((b) => b.id === id)?.opens);
+  const affected = new Set(block.arrows.filter((a) => boxVerdict(a.to) && !boxVerdict(a.from)).map((a) => a.from));
 
   return (
     <figure className="min-w-0">
@@ -191,13 +201,13 @@ function Diagram({
               </marker>
             ))}
           </defs>
-          {arrows.map(({ d, tone, label }, i) => (
+          {arrows.map(({ d, tone, label, from, to }, i) => (
             <g key={i}>
               <path
                 d={d}
                 fill="none"
-                stroke={TONE[tone].line}
-                strokeWidth="1.5"
+                stroke={hot.has(`${from}→${to}`) ? TINT.changed.line : TONE[tone].line}
+                strokeWidth={hot.has(`${from}→${to}`) ? 2.5 : 1.5}
                 strokeDasharray={tone === "warn" ? "5 4" : undefined}
                 markerEnd={`url(#dg-${tone})`}
               />
@@ -227,8 +237,9 @@ function Diagram({
             const sec = authored ? -1 : sectionOf(b.opens);
             const t = TONE[b.tone ?? "plain"];
             const v = verdictOf(b.opens);
+            const near = !v && affected.has(b.id);
             const fill = v ? TINT[v].surface : sec >= 0 ? sectionTone(sec).surface : t.fill;
-            const stroke = v ? TINT[v].line : sec >= 0 ? sectionTone(sec).ink : t.stroke;
+            const stroke = v ? TINT[v].line : near ? TINT.changed.line : sec >= 0 ? sectionTone(sec).ink : t.stroke;
             const ink = v ? TINT[v].ink : sec >= 0 ? sectionTone(sec).ink : t.ink;
             return (
               <Box
@@ -252,8 +263,8 @@ function Diagram({
                   // made the picture louder than the tables beside it.
                   strokeWidth={v ? 2 : 1}
                   strokeOpacity={v ? 1 : sec >= 0 ? 0.55 : 1}
-                  strokeDasharray={b.tone === "warn" || v === "removed" ? "5 4" : undefined}
-                  opacity={moved && !v ? 0.45 : 1}
+                  strokeDasharray={b.tone === "warn" || v === "removed" ? "5 4" : near ? "3 3" : undefined}
+                  opacity={moved && !v && !near ? 0.45 : 1}
                 />
                 <text
                   x={x + w / 2}
@@ -262,7 +273,7 @@ function Diagram({
                   fontSize="14.5"
                   fontWeight="600"
                   fill={ink}
-                  opacity={moved && !v ? 0.5 : 1}
+                  opacity={moved && !v && !near ? 0.5 : 1}
                   textDecoration={v === "removed" ? "line-through" : undefined}
                 >
                   {b.label}

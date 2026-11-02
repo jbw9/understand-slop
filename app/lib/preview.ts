@@ -11,7 +11,9 @@ export type Call =
   | { op: "agent"; name: string; args: Record<string, unknown> }
   | { op: "navigate"; url: string }
   | { op: "resize"; args: { width?: number; height?: number; preset?: string } }
-  | { op: "console"; args: { pattern?: string; only_errors?: boolean; clear?: boolean; limit?: number } };
+  | { op: "console"; args: { pattern?: string; only_errors?: boolean; clear?: boolean; limit?: number } }
+  /** Claude reading the project's map (app/api/lookup); answered by the workspace, never a preview. */
+  | { op: "map"; name: string; args: { query?: string; name?: string; file?: string; line?: number } };
 
 export interface PreviewHandle {
   run(call: Call): Promise<unknown>;

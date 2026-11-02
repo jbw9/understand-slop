@@ -308,6 +308,17 @@ export function Workspace() {
     const reply = (ok: boolean, value: unknown) => id && void invoke("preview_reply", { id, ok, value });
     try {
       const root = tabsNow.current.find((x) => x.pty === tab)?.cwd ?? latest.current.here;
+      // The map of the tab's own project, read on the server: no preview is involved.
+      if (cmd.op === "map") {
+        const a = cmd.args;
+        const q = new URLSearchParams({ root, tool: cmd.name.replace(/^map_/, "") });
+        if (a.query !== undefined) q.set("q", String(a.query));
+        if (a.name !== undefined) q.set("name", String(a.name));
+        if (a.file !== undefined) q.set("file", String(a.file));
+        if (a.line !== undefined) q.set("line", String(a.line));
+        const r = (await fetch(`/api/lookup?${q}`).then((x) => x.json())) as { text: string };
+        return reply(true, r.text);
+      }
       let handle = previewOf(root);
       if (!handle) {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;

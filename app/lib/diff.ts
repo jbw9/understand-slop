@@ -28,6 +28,7 @@
 
 import type { Anatomy, Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
+import type { Review } from "@/lib/review";
 import { changes, diffOf, git, hasAt, moved, refs, touches, type Base, type Change } from "@/scripts/generate/gitdiff";
 
 export type Verdict = "added" | "removed" | "changed" | "untouched";
@@ -57,6 +58,8 @@ export interface SectionDiff {
    * that is not the map's own text.
    */
   files: { path: string; lines: { s: number; e: number; at?: { s: number; e: number } }[] }[];
+  /** How many sections under this one changed: a level is worth opening when something below it moved, even where its own lines did not. */
+  inside?: number;
 }
 
 /** One row of a `schema`, `table` or `facts` block, matched across the two maps by its key. */
@@ -108,20 +111,60 @@ export interface MapDiff {
   sections: SectionDiff[];
   /** Only where a second map was given to compare against. */
   blocks: BlockDiff[];
+  /** The `at` of every diagram arrow whose line changed, as the map cites it: the path itself was edited. */
+  arrows?: string[];
+  /**
+   * Changed files no section's lines cover: new code, or edits between the
+   * lines the map cites. Each with the section citing that file nearest the
+   * change, where one does; a review is never silent about code it cannot place.
+   */
+  outside?: { path: string; near?: string[] }[];
+  /** The branch or pull request this diff reviews, where it was asked for as one. */
+  review?: Review;
 }
 
 /* ── the two comparisons ─────────────────────────────────────── */
 
-/** `from`..`to` as `Change`s, the shape `changes()` returns for the working tree. */
+/** One `git diff` split by file, keyed by the file's path on the `to` side. */
+function perFile(text: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  let cur: string[] | null = null;
+  for (const l of text.split("\n")) {
+    const m = /^diff --git a\/(.+) b\/(.+)$/.exec(l);
+    if (m) out.set(m[2], (cur = []));
+    else cur?.push(l);
+  }
+  return out;
+}
+
+const HUNK = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+
+/**
+ * `from`..`to` as `Change`s, the shape `changes()` returns for the working tree.
+ *
+ * Two `git diff`s for the whole range, not a `git show` and a diff per file:
+ * these calls are synchronous on the server, and a range holding a few
+ * thousand files (a vendored directory, a build folder committed by mistake)
+ * took minutes and froze every other request meanwhile. A range is only ever
+ * read for its hunks, its diff and whether a file was created or deleted, so
+ * `before`/`after` carry no text here — just `null` where the file is absent.
+ */
 function between(repo: string, from: string, to: string): Change[] {
-  const paths = new Set(git(repo, "diff", "--name-only", from, to).split("\n"));
-  paths.delete("");
+  const full = perFile(git(repo, "diff", "--no-color", "--no-renames", "-U3", from, to));
+  const zero = perFile(git(repo, "diff", "--no-color", "--no-renames", "-U0", from, to));
   const out: Change[] = [];
-  for (const path of [...paths].sort()) {
-    const before = hasAt(repo, from, path) ? git(repo, "show", `${from}:${path}`) : null;
-    const after = hasAt(repo, to, path) ? git(repo, "show", `${to}:${path}`) : null;
-    if (before === after) continue;
-    out.push({ path, before, after, ...diffOf(path, before, after) });
+  for (const [path, lines] of [...full].sort(([a], [b]) => a.localeCompare(b))) {
+    const created = lines.some((l) => l.startsWith("new file mode"));
+    const deleted = lines.some((l) => l.startsWith("deleted file mode"));
+    // A mode change alone moves no line.
+    if (!created && !deleted && !lines.some((l) => l.startsWith("@@") || l.startsWith("Binary files"))) continue;
+    const hunks = (zero.get(path) ?? []).flatMap((l) => {
+      const m = HUNK.exec(l);
+      return m ? [{ os: +m[1], ol: m[2] === undefined ? 1 : +m[2], ns: +m[3], nl: m[4] === undefined ? 1 : +m[4] }] : [];
+    });
+    const body = lines.filter((l) => !/^(index |--- |\+\+\+ |new file mode|deleted file mode|old mode|new mode)/.test(l));
+    const diff = [`--- ${created ? "/dev/null" : `a/${path}`}`, `+++ ${deleted ? "/dev/null" : `b/${path}`}`, ...body].join("\n");
+    out.push({ path, before: created ? null : "", after: deleted ? null : "", hunks, diff });
   }
   return out;
 }
@@ -172,12 +215,14 @@ function verdicts(map: MapFile, byPath: Map<string, Change>, carry?: (file: stri
     let gone = 0;
     let cited = 0;
     for (const ref of refs(node)) {
+      // Every ref counts toward "all it cites is gone", including those in
+      // files that did not change: a section still citing live code is not removed.
+      cited++;
       const c = byPath.get(ref.file);
       if (!c) continue;
       // A ref numbered to the map's text, carried to the `from` side's.
       const k = carry?.(ref.file);
       const r = k ? { ...ref, s: moved(k, ref.s), e: moved(k, ref.e) } : ref;
-      cited++;
       if (c.after === null) gone++;
       if (!touches(c, r.s, r.e)) continue;
       files.set(r.file, [...(files.get(r.file) ?? []), { s: ref.s, e: ref.e, ...(k ? { at: { s: r.s, e: r.e } } : {}) }]);
@@ -190,6 +235,55 @@ function verdicts(map: MapFile, byPath: Map<string, Change>, carry?: (file: stri
       files: [...files].map(([path, lines]) => ({ path, lines })),
     };
   });
+}
+
+const AT = /^(.+):(\d+)(?:-(\d+))?$/;
+
+/** The `at` of each diagram arrow whose cited line a change landed on. */
+function arrowsChanged(map: MapFile, byPath: Map<string, Change>, carry?: (file: string) => Change | undefined): string[] {
+  const out: string[] = [];
+  for (const { node } of walk(map.AUTHORED))
+    for (const b of node.anatomy ?? [])
+      if (b.kind === "diagram")
+        for (const a of b.arrows) {
+          const m = a.at ? AT.exec(a.at) : null;
+          const c = m && byPath.get(m[1]);
+          if (!m || !c) continue;
+          const k = carry?.(m[1]);
+          const s = +m[2];
+          const e = +(m[3] ?? m[2]);
+          if (touches(c, k ? moved(k, s) : s, k ? moved(k, e) : e)) out.push(a.at!);
+        }
+  return out;
+}
+
+/** Each section's count of changed sections beneath it. */
+function rollUp(sections: SectionDiff[]): SectionDiff[] {
+  const moved = sections.filter((s) => s.verdict !== "untouched");
+  return sections.map((s) => {
+    const n = moved.filter((m) => m.path.length > s.path.length && s.path.every((id, i) => m.path[i] === id)).length;
+    return n ? { ...s, inside: n } : s;
+  });
+}
+
+/** Changed files whose changes no section covers, each with the section citing that file nearest its first change. */
+function outsideOf(map: MapFile, byPath: Map<string, Change>, sections: SectionDiff[]): MapDiff["outside"] {
+  const covered = new Set(sections.flatMap((s) => s.files.map((f) => f.path)));
+  const all = walk(map.AUTHORED);
+  const out: NonNullable<MapDiff["outside"]> = [];
+  for (const [path, c] of byPath) {
+    if (covered.has(path) || c.after === null) continue;
+    const at = c.hunks[0]?.os ?? 1;
+    let best: { p: Placed; d: number } | null = null;
+    for (const p of all)
+      for (const r of refs(p.node))
+        if (r.file === path) {
+          const d = Math.min(Math.abs(r.s - at), Math.abs(r.e - at));
+          if (!best || d < best.d || (d === best.d && p.path.length > best.p.path.length)) best = { p, d };
+        }
+    out.push({ path, ...(best ? { near: best.p.path.map((n) => n.id) } : {}) });
+  }
+  return out;
 }
 
 /* ── two maps, block by block ────────────────────────────────── */
@@ -523,8 +617,10 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
     }
     return carried.get(path);
   };
-  const sections = verdicts(map, byPath, exact ? undefined : carry);
-  if (!other) return { basis: "sections", from: base, to: head, files, sections, blocks: [] };
+  const sections = rollUp(verdicts(map, byPath, exact ? undefined : carry));
+  const arrows = arrowsChanged(map, byPath, exact ? undefined : carry);
+  const outside = outsideOf(map, byPath, sections);
+  if (!other) return { basis: "sections", from: base, to: head, files, sections, blocks: [], arrows, outside };
   // Two maps: what the pictures say changed, over what the code says did,
   // keeping the files the code verdict found behind each section.
   const tree = treeDiff(map, other);
@@ -533,7 +629,7 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
     const code = byId.get(t.id);
     return { ...t, verdict: t.verdict === "untouched" ? (code?.verdict ?? "untouched") : t.verdict, files: code?.files ?? [] };
   });
-  return { basis: "sections", from: base, to: head, files, sections: merged, blocks: tree.blocks };
+  return { basis: "sections", from: base, to: head, files, sections: rollUp(merged), blocks: tree.blocks, arrows, outside };
 }
 
 /** One commit, as the commit list and the timeline draw it. */
@@ -568,9 +664,18 @@ function sides(spec: string): [string, string] {
  * The last `n` commits, newest first, from one `git log`. A binary file counts
  * no lines (numstat prints `-`), and a rename is listed as the path it became.
  */
+const logs = new Map<string, { head: string; commits: Commit[] }>();
+
 export function commitLog(root: string, n = 50): Commit[] {
+  // Commits never change, so the log holds until HEAD moves.
+  const head = git(root, "rev-parse", "HEAD").trim();
+  const kept = logs.get(`${root}\0${n}`);
+  if (kept && kept.head === head) return kept.commits;
   const out: Commit[] = [];
-  for (const block of git(root, "log", `-n${n}`, "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s", "--numstat").split("\x1e")) {
+  // Files over 1 MB count as binary, unread: one commit of build output
+  // otherwise costs seconds of numstat for lines nobody reads.
+  const log = git(root, "-c", "core.bigFileThreshold=1m", "log", `-n${n}`, "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s", "--numstat");
+  for (const block of log.split("\x1e")) {
     const [head, ...rest] = block.split("\n");
     const [sha, short, at, author, subject] = head.split("\x1f");
     if (!sha || subject === undefined) continue;
@@ -586,5 +691,6 @@ export function commitLog(root: string, n = 50): Commit[] {
     }
     out.push(c);
   }
+  logs.set(`${root}\0${n}`, { head, commits: out });
   return out;
 }

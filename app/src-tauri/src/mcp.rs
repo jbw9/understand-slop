@@ -123,7 +123,9 @@ you would in a browser. They are your browser here: to look something up or read
 the web, navigate the preview there (an address, or words to search for) instead of opening \
 another browser, so the user sees it beside you. WebFetch and WebSearch are fine for reading \
 docs as text; what they read opens in the preview as well. `device` does the same on an iOS Simulator or \
-Android emulator running in the app.";
+Android emulator running in the app. `map_search`, `map_section` and `map_where` read the project's \
+map in Mira: what each part of the code is for and which section explains it. Ask `map_where` about a \
+file before changing it, and name sections by the id path these tools give.";
 
 /// One JSON-RPC message; nothing back for a notification.
 fn rpc(msg: &Value, tab: u32, app: &AppHandle) -> Option<Value> {
@@ -176,6 +178,7 @@ fn call(name: &str, args: &Value, tab: u32, app: &AppHandle) -> Result<Vec<Value
         "resize_preview" => ask(app, tab, json!({ "op": "resize", "args": args })).map(said),
         "read_console_messages" => ask(app, tab, json!({ "op": "console", "args": args })).map(said),
         "device" => crate::devices::tool(args, app),
+        "map_search" | "map_section" | "map_where" => ask(app, tab, json!({ "op": "map", "name": name, "args": args })).map(said),
         _ => Err(format!("No tool called {name}.")),
     }
 }
@@ -413,6 +416,36 @@ fn tools() -> Value {
                     "text": { "type": "string", "description": "Text to type, or a key: home, back, enter, delete." }
                 },
                 "required": ["action"]
+            }
+        },
+        {
+            "name": "map_search",
+            "description": "Search the project's map in Mira: sections whose title or text match, and top-level symbols and files by name, each with the section that explains it and that section's id path.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "query": { "type": "string", "description": "Words, a symbol name, or part of a path." } },
+                "required": ["query"]
+            }
+        },
+        {
+            "name": "map_section",
+            "description": "One section of the map: what it is, what it says, the code it cites, its parts (with id paths to go deeper) and what to watch out for. An empty name is the whole repository.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "name": { "type": "string", "description": "An id path from map_search, an id, or a title." } },
+                "required": ["name"]
+            }
+        },
+        {
+            "name": "map_where",
+            "description": "Which sections of the map explain a file, or one line of it, deepest first; or why none does (left out, not source, new since the map was made).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "file": { "type": "string", "description": "Repository-relative path." },
+                    "line": { "type": "number" }
+                },
+                "required": ["file"]
             }
         }
     ])

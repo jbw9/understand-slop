@@ -289,6 +289,9 @@ export function generate(id: string, claude?: string, explain?: Explain): Projec
   const p = getProject(id);
   if (!p) return undefined;
   if (p.map.status === "generating" && p.map.pid && alive(p.map.pid)) return p;
+  // An update still running would write its map over this one when it ends,
+  // and it reads the files cleared below: the new map replaces it, so it stops.
+  if (p.update?.status === "running" && p.update.pid && alive(p.update.pid)) stop(p.update.pid);
   const dir = projectDir(id);
   mkdirSync(dir, { recursive: true });
   // A fresh map starts from the code as it is; what earlier updates saw goes.
@@ -335,9 +338,14 @@ export function cancel(id: string) {
   const p = getProject(id);
   if (!p?.map.pid) return;
   update(id, (q) => (q.map.status = "cancelled"));
+  stop(p.map.pid);
+}
+
+/** End a run started here and every `claude` it started: each is the leader of its own process group. */
+function stop(pid: number) {
   try {
-    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(p.map.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
-    else process.kill(-p.map.pid, "SIGTERM");
+    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+    else process.kill(-pid, "SIGTERM");
   } catch {
     /* already gone */
   }
@@ -426,7 +434,9 @@ export function updateMap(root: string, claude?: string, turn?: Turn): Project |
   child.on("exit", () => {
     let again = false;
     update(p.id, (q) => {
-      again = Boolean(q.update?.again);
+      // Stopped by a fresh map (generate), which forgot it.
+      if (!q.update) return;
+      again = Boolean(q.update.again);
       updated(q);
     });
     if (again) updateMap(root, claude);

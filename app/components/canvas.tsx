@@ -567,7 +567,7 @@ function Level({
         }
         link={top && RUN.url && RUN.commit ? { href: `${RUN.url}/tree/${RUN.commit}`, label: `${RUN.url.replace(/^https:\/\//, "")} ↗` } : undefined}
         shape={node.shape}
-        onCode={code.length ? () => setCodeFocus({ heading: `The code behind ${node.title}`, refs: code }) : undefined}
+        onCode={code.length ? () => setCodeFocus({ heading: `The code behind ${node.title}`, refs: code, verified: node.verified }) : undefined}
         actions={
           <>
             {explains ? <ExplainToggle /> : null}

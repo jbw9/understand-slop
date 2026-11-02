@@ -190,7 +190,7 @@ export function Palette() {
       { key: "a:diff", label: "What changed in the code", hint: "Diff two commits over the map", kind: "action", run: openDiff },
       { key: "a:files", label: "Every file", hint: "Where each part of the code is explained", kind: "action", run: () => openFiles() },
       { key: "a:timeline", label: "How the code got here", hint: "Its commits over time, on the map's sections", kind: "action", run: openTimeline },
-      { key: "a:audit", label: "How this map was made", hint: "What the agent read and decided", kind: "action", run: () => openAudit(map.name) },
+      { key: "a:audit", label: "How sure is this map", hint: "What was checked, and what to double-check", kind: "action", run: () => openAudit(map.name) },
       { key: "a:history", label: "What you added to this map", kind: "action", run: openHistory },
       { key: "a:docs", label: "Read the docs…", hint: "The project's Markdown: design notes, decisions", kind: "action", run: () => setTimeout(() => openPalette("docs")) },
       { key: "a:projects", label: "Projects", hint: "Start a new map, or import one", kind: "action", run: () => openProjects() },

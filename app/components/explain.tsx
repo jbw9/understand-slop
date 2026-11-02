@@ -181,6 +181,8 @@ export interface CodeFocus {
   heading: string;
   detail?: string;
   refs: { file: string; start: number; end: number; label?: string }[];
+  /** The level's own verification, for the level's code; a step's lines were not checked on their own. */
+  verified?: { claims: number; corrected: number };
 }
 
 /** `file:start-end` or `file:line`, as a step's `at` cites it. */
@@ -221,6 +223,12 @@ export function CodePopup({
           {focus.detail ? (
             <p className="mt-1 max-w-[760px] text-[13.5px] leading-relaxed text-on-surface-variant">
               <Prose text={focus.detail} />
+            </p>
+          ) : null}
+          {focus.verified ? (
+            <p className="mt-2 text-[12px] text-faint">
+              {focus.verified.claims === 1 ? "The one claim" : `All ${focus.verified.claims} claims`} on this level were checked against these lines by a second model
+              {focus.verified.corrected ? ` · ${focus.verified.corrected} ${focus.verified.corrected === 1 ? "was" : "were"} corrected` : ""}
             </p>
           ) : null}
         </div>

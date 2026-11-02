@@ -3,7 +3,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { openAudit } from "@/components/audit";
 import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
 import { useMaybeMap } from "@/components/map-context";
 import { PanelHead } from "@/components/panel";
@@ -23,7 +22,7 @@ const OPEN = "slop:projects";
 /** Opens the list; with a folder, ready to import it. */
 export const openProjects = (root?: string) => window.dispatchEvent(new CustomEvent<string | undefined>(OPEN, { detail: root }));
 
-type Listed = Project & { hasMap: boolean; hasAudit: boolean; stale: boolean; progress?: Progress };
+type Listed = Project & { hasMap: boolean; stale: boolean; progress?: Progress };
 interface List {
   vault: string;
   projects: Listed[];
@@ -208,10 +207,6 @@ export function ProjectsDialog() {
                     busy={busy}
                     onOpen={(at) => openMap(p.id, at)}
                     onRegenerate={(explain) => void regenerate(p.id, explain)}
-                    onAudit={() => {
-                      close();
-                      openAudit(p.id);
-                    }}
                     onCancel={() => void act({ action: "cancel", id: p.id })}
                     onRemove={() => void remove(p.id)}
                   />
@@ -553,7 +548,6 @@ function ProjectRow({
   busy,
   onOpen,
   onRegenerate,
-  onAudit,
   onCancel,
   onRemove,
 }: {
@@ -562,7 +556,6 @@ function ProjectRow({
   busy: boolean;
   onOpen: (at?: string) => void;
   onRegenerate: (explain: Explain) => void;
-  onAudit: () => void;
   onCancel: () => void;
   onRemove: () => void;
 }) {
@@ -581,11 +574,6 @@ function ProjectRow({
         {p.hasMap ? (
           <button type="button" onClick={() => onOpen()} className={cn(QUIET, "py-1")}>
             Open
-          </button>
-        ) : null}
-        {p.hasAudit ? (
-          <button type="button" onClick={onAudit} title="How the map was made: what the agent read and decided" className={cn(QUIET, "py-1")}>
-            Audit
           </button>
         ) : null}
         {status === "generating" ? (

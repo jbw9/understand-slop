@@ -1,8 +1,7 @@
-import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { auditOf } from "@/lib/maps";
-import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
  * The reader's projects (lib/vault.ts): list them, start or import one, regenerate,
@@ -49,7 +48,6 @@ export async function GET(request: Request) {
       ...p,
       // A map from an earlier run still opens while a new one is being made.
       hasMap: Boolean(mapFileOf(p.id)),
-      hasAudit: existsSync(join(projectDir(p.id), "audit.md")),
       // The code moved on since the map was made.
       stale: Boolean(p.map.status === "ready" && p.map.commit && head && head !== p.map.commit),
       progress: p.map.status === "generating" ? progressOf(p.id) : undefined,

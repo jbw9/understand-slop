@@ -187,12 +187,16 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
   const flags = screen.claims.filter((c) => c.verdict !== "supported").map((c) => `${c.claim} — ${c.verdict}${c.why ? `: ${c.why}` : ""}`);
   v.flagged = flags.length;
   v.flags = flags;
-  if (!flags.length) return v;
+  if (!flags.length) {
+    n.verified = { claims: screen.claims.length, corrected: 0 };
+    return v;
+  }
 
   // One failed review leaves this node unreviewed; it must not fail the whole stage.
   const r = await review(n, flags, inv, model).catch(() => null);
   if (!r) return v;
   v.claims = r.real;
+  n.verified = { claims: screen.claims.length, corrected: r.real.length };
   if (!r.real.length) return v;
   // A rewrite that still breaks the length rule is not applied; the node keeps its own detail.
   if (words(r.detail) <= 40 && sentences(r.detail) <= 2 && r.detail !== n.detail) n.detail = v.fixed = r.detail;

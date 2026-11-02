@@ -180,7 +180,7 @@ function MapTools() {
         <circle cx="8.5" cy="8" r="2.2" />
         <circle cx="12.5" cy="8" r="1.2" />
       </Control>
-      <Control label="How this map was made — what the agent read and decided" onClick={() => openAudit(name)}>
+      <Control label="How sure is this map — what was checked, and what to double-check" onClick={() => openAudit(name)}>
         {/* A page with a check: the run's record, read back. */}
         <path d="M4 1.5h5.5L12 4v10.5H4z" />
         <path d="m6 9 1.5 1.5L10 8" />

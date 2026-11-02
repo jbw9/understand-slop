@@ -1,37 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { goTo } from "@/components/chrome";
 import { DIALOG, Overlay } from "@/components/dialog";
+import { openDiff } from "@/components/diff";
+import { useMap } from "@/components/map-context";
 import { PanelHead } from "@/components/panel";
-import { Ident } from "@/components/state";
+import { Ident, Prose, StateChip } from "@/components/state";
+import type { Node } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 const OPEN = "slop:audit";
-/** Show how a map was made: the audit its last run wrote (scripts/generate/audit.ts). */
+/** Show how sure the map on screen is (`id` is its name). */
 export const openAudit = (id: string) => window.dispatchEvent(new CustomEvent<string>(OPEN, { detail: id }));
 
 /**
- * The run's audit, read as the page it is. It is Markdown, but only ever
- * the few shapes audit.ts writes — headings, lists, a table, a folded step
- * list, bold, italics, code — so those are drawn here rather than through
- * a Markdown library.
+ * How sure the map on screen is, from the map itself: what verification
+ * checked and corrected, what is not certain, whether the code moved on.
+ * The run's own audit (scripts/generate/audit.ts) is folded at the bottom
+ * for debugging the generator. It is Markdown, but only ever the few shapes
+ * audit.ts writes — headings, lists, a table, a folded step list, bold,
+ * italics, code — so those are drawn here rather than through a Markdown
+ * library.
  */
 export function AuditDialog() {
+  const { TOP, RUN, maps } = useMap();
   const [id, setId] = useState<string | null>(null);
   // undefined while it loads; null when the map has no audit.
   const [text, setText] = useState<string | null | undefined>(undefined);
+  // The log is fetched only once someone unfolds it.
+  const [wantLog, setWantLog] = useState(false);
+  const [behind, setBehind] = useState<string[]>([]);
+  const local = maps.some((m) => m.id === id && m.local);
 
   useEffect(() => {
     const on = (e: Event) => {
       setId((e as CustomEvent<string>).detail);
       setText(undefined);
+      setWantLog(false);
+      setBehind([]);
     };
     window.addEventListener(OPEN, on);
     return () => window.removeEventListener(OPEN, on);
   }, []);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !wantLog) return;
     let live = true;
     fetch(`/api/projects?audit=${encodeURIComponent(id)}`)
       .then((r) => (r.ok ? r.json() : { markdown: null }))
@@ -40,40 +54,131 @@ export function AuditDialog() {
     return () => {
       live = false;
     };
-  }, [id]);
+  }, [id, wantLog]);
+
+  useEffect(() => {
+    if (!id || !local) return;
+    let live = true;
+    fetch(`/api/files?map=${encodeURIComponent(id)}&behind=1`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r: { behind: string[] } | null) => live && setBehind(r?.behind ?? []))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [id, local]);
+
+  const sure = useMemo(() => {
+    let levels = 0;
+    let checked = 0;
+    let corrected = 0;
+    const look: { path: string[]; node: Node; trail: string; why: string }[] = [];
+    const walk = (n: Node, p: string[], trail: string[]) => {
+      levels++;
+      if (n.verified) checked++;
+      corrected += n.verified?.corrected ?? 0;
+      const where = trail.join(" › ") || RUN.repo;
+      if (n.state !== "derived") look.push({ path: p, node: n, trail: where, why: n.unsure ?? "" });
+      else if (n.verified?.corrected)
+        look.push({ path: p, node: n, trail: where, why: `${n.verified.corrected} ${n.verified.corrected === 1 ? "claim was" : "claims were"} wrong and corrected in review; the rest of this level held up.` });
+      for (const c of n.children ?? []) walk(c, [...p, c.id], p.length ? [...trail, n.title] : []);
+    };
+    walk(TOP, [], []);
+    return { levels, checked, corrected, unsure: look.filter((x) => x.node.state !== "derived").length, look };
+  }, [TOP, RUN.repo]);
 
   if (!id) return null;
+  const close = () => setId(null);
   const parsed = text ? parse(text) : [];
-  // The audit's own title names the repo; it heads the dialog instead.
-  const top = parsed[0]?.kind === "h1" ? parsed[0].text : null;
-  const blocks = top ? parsed.slice(1) : parsed;
-  const title = top ?? `How ${id} was mapped`;
+  // The log's own title repeats the dialog's.
+  const blocks = parsed[0]?.kind === "h1" ? parsed.slice(1) : parsed;
 
   return (
-    <Overlay onClose={() => setId(null)}>
-      <div role="dialog" aria-label="Audit" className={cn(DIALOG, "max-w-[820px]")}>
+    <Overlay onClose={close}>
+      <div role="dialog" aria-label="How sure is this map" className={cn(DIALOG, "max-w-[720px]")}>
         <PanelHead
-          title={title}
-          note="What the agent read, decided and was corrected on, in the order it happened."
+          title="How sure is this map"
+          note="What was checked against the code, and what to double-check."
           right={
-            <button type="button" onClick={() => setId(null)} className="cursor-pointer text-[13px] text-muted-slate hover:text-ink">
+            <button type="button" onClick={close} className="cursor-pointer text-[13px] text-muted-slate hover:text-ink">
               Close
             </button>
           }
         />
         <div className="min-h-0 flex-1 overflow-auto px-6 py-5 text-[13.5px] leading-relaxed text-on-surface-variant">
-          {text === undefined ? (
-            <p className="text-muted-slate">Loading…</p>
-          ) : text === null ? (
-            <p className="text-muted-slate">
-              This map has no audit: it was made before mapping runs kept one. Regenerate it from Projects to get one.
+          <div className="grid grid-cols-3 gap-3">
+            <Stat
+              value={sure.checked ? `${sure.checked}/${sure.levels}` : "—"}
+              label="levels checked against the code"
+              note={sure.checked ? "A second model read every claim against the lines it cites." : "This map was made before checks were recorded."}
+            />
+            <Stat value={String(sure.corrected)} label="claims corrected" note="Found wrong in review and rewritten before you saw them." />
+            <Stat value={String(sure.unsure)} label="not certain" note="Levels the map could not fully show from the code." warn={sure.unsure > 0} />
+          </div>
+
+          {behind.length ? (
+            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[3px] border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
+              <span>
+                Built from <Ident>{RUN.commit?.slice(0, 7) ?? "an earlier commit"}</Ident> · {behind.length} {behind.length === 1 ? "file has" : "files have"} changed since
+              </span>
+              <button type="button" onClick={() => (close(), openDiff())} className="cursor-pointer text-deep-green underline">
+                See which levels
+              </button>
             </p>
+          ) : null}
+
+          <h3 className="mb-2 mt-7 text-[15px] font-semibold text-ink">Worth a second look</h3>
+          {sure.look.length ? (
+            <ul className="flex flex-col divide-y divide-border-gray rounded-[3px] border border-border-gray">
+              {sure.look.map((x) => (
+                <li key={x.path.join("/")}>
+                  <button
+                    type="button"
+                    onClick={() => (close(), goTo(x.path))}
+                    className="flex w-full cursor-pointer flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-surface-container-low"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium text-ink">{x.node.title}</span>
+                      <StateChip state={x.node.state} alarm={x.node.alarm} />
+                      <span className="ml-auto truncate text-[12px] text-faint">{x.trail}</span>
+                    </span>
+                    {x.why ? (
+                      <span className="text-[12.5px] leading-snug">
+                        <Prose text={x.why} />
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : (
-            blocks.map((b, i) => <Block key={i} b={b} />)
+            <p className="text-muted-slate">Nothing: every level was shown from the code, and no claim needed correcting.</p>
           )}
+
+          <details className="mt-7" onToggle={(e) => (e.currentTarget.open ? setWantLog(true) : null)}>
+            <summary className="cursor-pointer text-[12.5px] text-muted-slate hover:text-ink">Generation log, for debugging the generator</summary>
+            <div className="mt-3">
+              {text === undefined ? (
+                <p className="text-muted-slate">Loading…</p>
+              ) : text === null ? (
+                <p className="text-muted-slate">This map has no log: it was made before mapping runs kept one.</p>
+              ) : (
+                blocks.map((b, i) => <Block key={i} b={b} />)
+              )}
+            </div>
+          </details>
         </div>
       </div>
     </Overlay>
+  );
+}
+
+function Stat({ value, label, note, warn }: { value: string; label: string; note: string; warn?: boolean }) {
+  return (
+    <div className="rounded-[3px] border border-border-gray px-3 py-2.5" title={note}>
+      <p className={cn("tnum text-[22px] font-semibold leading-none", warn ? "text-amber-ink" : "text-ink")}>{value}</p>
+      <p className="mt-1.5 text-[12px] leading-snug text-muted-slate">{label}</p>
+    </div>
   );
 }
 

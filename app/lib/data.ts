@@ -429,6 +429,12 @@ export interface Node {
    * `derived` — a mark with no reason is the "what does partial mean" defect.
    */
   unsure?: string;
+  /**
+   * What verification found: how many of this level's claims a second model
+   * read against the lines they cite, and how many a reviewer then corrected.
+   * Absent when the level was never fully checked.
+   */
+  verified?: { claims: number; corrected: number };
   /** Where the claim came from. Always a real location. */
   evidence?: string;
   anatomy?: Anatomy[];

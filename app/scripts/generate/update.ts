@@ -12,7 +12,10 @@
  *      inserted line shifts down), so the sections left alone stay true.
  *   3. The sections touched: the deepest ones whose own references overlap a
  *      changed line. A change no reference covers goes to the section nearest
- *      it in that file, or, for a new file, in its root's directory.
+ *      it in that file, or, for a new file, in its root's directory. A file no
+ *      root claims is first placed in the cut (cut.ts, place): in the root
+ *      whose work it does, which is then redone with it, or in a new root,
+ *      written whole as a full run writes one, with the overview redrawn.
  *   4. One agent per touched section rewrites it, seeing the diff and the old
  *      section, able to read only the changed files, what they import and
  *      what imports them, and the files the section already cites. It is
@@ -32,19 +35,20 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import type { Node } from "@/lib/data";
 import { lastExchange } from "@/lib/keep";
 import type { MapFile } from "@/lib/map";
 import { parseArgs } from "./args";
-import { converse, runTool } from "./author";
+import { authorRoot, converse, runTool } from "./author";
 import { catalogOf } from "./catalog";
-import { changes, moved, refs, touches, type Base, type Change } from "./gitdiff";
+import { changes, diffOf, moved, readText, refs, touches, type Base, type Change } from "./gitdiff";
 import { bill, cacheIn, MODELS } from "./bedrock";
 import { ccClose, type Handled } from "./claude-code";
 import { check } from "./check";
-import { owners, type Cut, type Root } from "./cut";
+import { owners, place, unclaimed, type Cut, type Root } from "./cut";
 import { inventory, isSource, type Inventory } from "./inventory";
+import { plain, redrawOverview } from "./pipeline";
 import { idsOf, submitProblems } from "./schema";
 import { full, oneLine, summarize, type FileSummary } from "./summarize";
 import { verifyTree } from "./verify";
@@ -319,7 +323,7 @@ export async function update(args: string[]) {
   // The map as it was at its commit, kept once before the first update
   // changes it: the other side the diff draws the pictures against (D74).
   if (!existsSync(`${out}/map.base.json`)) writeFileSync(`${out}/map.base.json`, readFileSync(`${out}/map.json`));
-  const cut: Cut = JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8"));
+  let cut: Cut = JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8"));
   const base: Base = existsSync(`${out}/base.json`) ? JSON.parse(readFileSync(`${out}/base.json`, "utf8")) : {};
   cacheIn(`${out}/.cache`);
   const model = MODELS[(process.env.SLOP_UPDATE ?? process.env.SLOP_AUTHOR ?? "opus") as keyof typeof MODELS] ?? MODELS.opus;
@@ -352,11 +356,37 @@ export async function update(args: string[]) {
   // Only code the map covers or could, and docs it cites: a lockfile or a test changing moves nothing.
   const found = changes(repo, map.RUN.commit, base).filter((c) => (c.after === null ? citedAnywhere.has(c.path) : isCode.get(c.path) || citedAnywhere.has(c.path)));
   console.log(`${found.length} changed code files${found.length ? `: ${found.map((c) => c.path).join(", ")}` : ""}`);
-  if (!found.length && !wrong.size) {
+  // Code no root claims — added since the cut, or left out by an earlier
+  // update — is placed in the cut as a remap places it (cut.ts, place).
+  const unplaced = unclaimed(cut, inv);
+  if (unplaced.length) console.log(`${unplaced.length} files no root claims: ${unplaced.join(", ")}`);
+  if (!found.length && !wrong.size && !unplaced.length) {
     result({ ok: true, changed: [], sections: [], unmatched });
     return;
   }
   const byPath = new Map(found.map((c) => [c.path, c]));
+  const sums = has("--dry-run") ? {} : await summarize(inv, () => {});
+  let added: Root[] = [];
+  if (unplaced.length && !has("--dry-run")) {
+    const placed = await place(cut, unplaced, inv, sums, model);
+    cut = placed.cut;
+    added = placed.added;
+    writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(cut, null, 1));
+    for (const [id, files] of placed.gained) console.log(`  ${id} takes ${files.join(", ")}`);
+    for (const r of added) console.log(`  new root ${r.id}: ${r.files.join(", ")}`);
+    // A file an earlier update saw but could not place is in base already, so
+    // it reads as unchanged: it is new to the map, so it comes in as new.
+    for (const files of placed.gained.values())
+      for (const path of files) {
+        const after = byPath.has(path) ? null : readText(join(repo, path));
+        if (after === null) continue;
+        const c: Change = { path, before: null, after, ...diffOf(path, null, after) };
+        found.push(c);
+        byPath.set(path, c);
+      }
+  }
+  // A new root's files are written from scratch with it, not into a section.
+  const isNew = (path: string) => added.some((r) => owners(cut, path).includes(r.id));
 
   // The map and the code as they stand before this update, so what one turn
   // changed can be shown afterwards as a before and after (changes.json).
@@ -368,7 +398,7 @@ export async function update(args: string[]) {
 
   // Which sections, read off the references as they were; then every
   // reference moves to where its code is now.
-  const { picked, homeless } = targets(map, cut, byPath, [...wrong.keys()], (p) => Boolean(isCode.get(p)));
+  const { picked, homeless } = targets(map, cut, new Map([...byPath].filter(([p]) => !isNew(p))), [...wrong.keys()], (p) => Boolean(isCode.get(p)));
   for (const p of walk(map.AUTHORED)) refs(p.node, (f, line) => (byPath.has(f) ? moved(byPath.get(f)!, line) : line));
   console.log(`${picked.length} sections to redo: ${picked.map((p) => p.node.id).join(", ")}`);
   // A section redone takes the notes on it and on anything inside it.
@@ -377,13 +407,13 @@ export async function update(args: string[]) {
     for (const p of picked) console.log(`  ${p.path.map((n) => n.id).join(" › ")}${notesFor(p).length ? ` — notes: ${notesFor(p).join(" | ")}` : ""}`);
     if (said) console.log(`the agent's account:\n${said}`);
     if (homeless.length) console.log(`  no section can take: ${homeless.join(", ")}`);
+    if (unplaced.length) console.log(`  to place in the cut first: ${unplaced.join(", ")}`);
     const after = check(map, repo, { generated: true }).problems;
     console.log(`references moved: ${after.length} check problems`);
     after.slice(0, 10).forEach((p) => console.log(`  ${p}`));
     return;
   }
 
-  const sums = await summarize(inv, () => {});
   const say = (s: string) => console.log(`  ${s}`);
   const failed: string[] = [];
   const removed: string[] = [];
@@ -421,13 +451,36 @@ export async function update(args: string[]) {
     }
     atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
   };
-  await Promise.all(
-    picked.map(async (t) => {
+  const fresh: { id: string; title: string; ok: boolean }[] = [];
+  await Promise.all([
+    ...picked.map(async (t) => {
       const node = await redo(t, map, cut, inv, sums, byPath, { account: said, notes: notesFor(t) }, model, say);
       if (node && !isRemoved(node)) await verifyTree(node, inv, model);
       land(t, node);
     }),
-  );
+    // A root the placing added is written whole, as a full run writes one.
+    ...added.map(async (r) => {
+      const a = await authorRoot(r, cut, inv, sums, model, (n, problems) => say(`${r.id}: submit ${n} — ${problems ? `${problems} problems` : "clean"}`));
+      if (!a.root) {
+        failed.push(r.id);
+        fresh.push({ id: r.id, title: r.title, ok: false });
+        say(`${r.id}: FAILED, not added`);
+        return;
+      }
+      const node = plain(a.root);
+      await verifyTree(node, inv, model);
+      // Below the last root: rows can have gaps where a root was taken out.
+      map.AUTHORED.push({ ...node, col: 0, row: Math.max(-1, ...map.AUTHORED.map((n) => n.row ?? 0)) + 1 });
+      fresh.push({ id: r.id, title: node.title, ok: true });
+      atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+      say(`${r.id}: added`);
+    }),
+  ]);
+  // The top level draws how the roots connect, so a new one needs it drawn again.
+  if (fresh.some((f) => f.ok)) {
+    const problems = await redrawOverview(map, cut, inv, model);
+    say(problems ? `overview: kept as it was — ${problems.slice(0, 3).join("; ")}` : "overview: redrawn");
+  }
 
   const final = check(map, repo, { generated: true });
   atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
@@ -439,7 +492,10 @@ export async function update(args: string[]) {
   writeFileSync(`${out}/base.json`, JSON.stringify(base) + "\n");
 
   const usd = Math.round(Object.values(bill).reduce((a, b) => a + b.usd, 0) * 100) / 100;
-  const sections = done.map(({ t, node }) => ({ id: t.node.id, title: node && !isRemoved(node) ? node.title : t.node.title, ok: Boolean(node), removed: removed.includes(t.node.id) }));
+  const sections = [
+    ...done.map(({ t, node }) => ({ id: t.node.id, title: node && !isRemoved(node) ? node.title : t.node.title, ok: Boolean(node), removed: removed.includes(t.node.id) })),
+    ...fresh.map((f) => ({ ...f, removed: false, added: true })),
+  ];
   result({ ok: !failed.length, changed: found.map((c) => c.path), sections, homeless, unmatched, corrected: [...wrong.keys()].map((p) => p.node.id), usd, problems: final.problems.slice(0, 20), ...(failed.length ? { error: `Could not update ${failed.join(", ")}` } : {}) });
   if (existsSync(`${out}/report.json`)) {
     const report = JSON.parse(readFileSync(`${out}/report.json`, "utf8"));

@@ -284,7 +284,14 @@ export function createProject(parentIn: string, nameIn: string): Project {
  * Claude Code. Detached, in its own process group, so it survives a reload of
  * this server and Cancel can end it and every `claude` it started at once.
  */
-export function generate(id: string, claude?: string, explain?: Explain): Project | undefined {
+export function generate(id: string, claude?: string, explain?: Explain, full?: boolean): Project | undefined {
+  const was = getProject(id);
+  // A finished map asked again at the same depth only needs bringing up to
+  // its code: an update redoes what changed and places what is new
+  // (scripts/generate/update.ts). A new depth rewrites every level, and
+  // `full` asks for the whole run whatever it costs.
+  if (was && !full && was.map.status === "ready" && (explain ?? was.explain ?? "full") === (was.explain ?? "full") && existsSync(join(projectDir(id), ".cache", "cut.json")))
+    return updateMap(was.root, claude);
   if (explain) update(id, (q) => (q.explain = explain));
   const p = getProject(id);
   if (!p) return undefined;

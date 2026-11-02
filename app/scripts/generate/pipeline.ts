@@ -17,8 +17,8 @@ import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
 import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
-import { cutRepo, excludedBy, owners, type Cut } from "./cut";
-import { inventory, isSource } from "./inventory";
+import { cutRepo, place, unclaimed, type Cut } from "./cut";
+import { inventory, isSource, type Inventory } from "./inventory";
 import { overviewOf, toOverview, type Overviewed } from "./overview";
 import { shapeProblems } from "./schema";
 import { summarize } from "./summarize";
@@ -49,15 +49,22 @@ async function redraw(out: string, inv: ReturnType<typeof inventory>, model: str
   const cut: Cut = existsSync(`${out}/.cache/cut.json`)
     ? withoutEdges(JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8")))
     : { about: "", excluded: [], roots: map.AUTHORED.map((r) => ({ id: r.id, prefix: "", title: r.title, sub: r.sub, why: "", files: [...new Set(cited(r))] })) };
-  const drawn = await overviewOf(map.AUTHORED, cut, inv, model, (n, problems) => console.log(`  overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`));
-  if (drawn.overview) {
-    const node = { ...drawn.overview, id: OVERVIEW_ID, title: "Overview", sub: drawn.overview.sub ?? "", col: 0, row: 0 };
-    await verifyTree(node, inv, model);
-    map.OVERVIEW = toOverview(node);
-    atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
-  }
-  console.log(`${out}/map.json — overview ${drawn.overview ? "redrawn" : `not accepted: ${drawn.problems.slice(0, 5).join("; ")}`}, $${Object.values(bill).reduce((a, b) => a + b.usd, 0).toFixed(2)}`);
+  const problems = await redrawOverview(map, cut, inv, model);
+  if (!problems) atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+  console.log(`${out}/map.json — overview ${problems ? `not accepted: ${problems.slice(0, 5).join("; ")}` : "redrawn"}, $${Object.values(bill).reduce((a, b) => a + b.usd, 0).toFixed(2)}`);
   await ccClose();
+}
+
+/** Draws `map`'s top level again from its roots as they are, in place; the checker's last word if it was not accepted. */
+export async function redrawOverview(map: MapFile, cut: Cut, inv: Inventory, model: string): Promise<string[] | null> {
+  const drawn = await overviewOf(map.AUTHORED, cut, inv, model, (n, problems) => console.log(`  overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`));
+  if (!drawn.overview) return drawn.problems;
+  const node = { ...drawn.overview, id: OVERVIEW_ID, title: "Overview", sub: drawn.overview.sub ?? "", col: 0, row: 0 };
+  await verifyTree(node, inv, model);
+  const top = toOverview(node);
+  if (EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary", "walkthrough"] as const) delete top[k];
+  map.OVERVIEW = top;
+  return null;
 }
 
 export type RootStatus = Progress["roots"][number]["status"];
@@ -67,7 +74,7 @@ export type RootStatus = Progress["roots"][number]["status"];
  * authors read describe `explain`, and measured, they wrote it on half the
  * levels unasked.
  */
-function plain(n: Node): Node {
+export function plain(n: Node): Node {
   if (EXPLAIN_LEVEL !== "none") return n;
   const out = { ...n, ...(n.children ? { children: n.children.map(plain) } : {}) };
   delete out.explain;
@@ -171,18 +178,23 @@ export async function main(args: string[]) {
   flush();
 
   // A re-run keeps the cut of the map that is there unless asked for a fresh
-  // one: a new cut could rename every root. But not once code has arrived
-  // that none of its roots claims: kept, that code would be in no root at all.
-  // Edges of a cut made before D60 are dropped; the overview draws how roots
-  // connect now.
+  // one: a new cut could rename every root. Code added since that no root
+  // claims is placed in it (cut.ts, place) rather than cut again, so only the
+  // roots that gain files are redone. Edges of a cut made before D60 are
+  // dropped; the overview draws how roots connect now.
   const cached: Cut | null = !has("--fresh") && existsSync(`${out}/.cache/cut.json`) ? withoutEdges(JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8"))) : null;
-  const unclaimed = cached ? inv.files.filter((f) => isSource(f) && !owners(cached, f.path).length && !excludedBy(cached, f.path)).map((f) => f.path) : [];
-  if (unclaimed.length) say(`${unclaimed.length} files the last cut does not claim (${unclaimed.slice(0, 3).join(", ")}${unclaimed.length > 3 ? ", …" : ""}); cutting again`);
-  const cutReused = Boolean(cached && !unclaimed.length);
-  const { cut, leftover, rejected } =
-    cutReused
-      ? { cut: cached!, leftover: [] as string[], rejected: [] as string[][] }
-      : await lap("cut", () => cutRepo(inv, sums, models.cut));
+  const cutReused = Boolean(cached);
+  let cut: Cut, leftover: string[] = [], rejected: string[][] = [];
+  if (cached) {
+    const added = unclaimed(cached, inv);
+    if (added.length) {
+      say(`${added.length} files the cut does not claim (${added.slice(0, 3).join(", ")}${added.length > 3 ? ", …" : ""}); placing them`);
+      const placed = await lap("cut", () => place(cached, added, inv, sums, models.cut));
+      for (const [id, files] of placed.gained) say(`${id} takes ${files.join(", ")}`);
+      for (const r of placed.added) say(`new root ${r.id}: ${r.files.join(", ")}`);
+      cut = placed.cut;
+    } else cut = cached;
+  } else ({ cut, leftover, rejected } = await lap("cut", () => cutRepo(inv, sums, models.cut)));
   writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(cut, null, 1));
   const index = catalogOf(inv, sums, cut);
   atomic(`${out}/index.json`, JSON.stringify(index) + "\n");

@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   // asking, but a JSON one needs a CORS preflight this route never grants.
   if (!request.headers.get("content-type")?.startsWith("application/json")) return bad("bad request", 415);
   const body = (await request.json().catch(() => null)) ?? {};
-  const { action, id, root, name, claude, turn, explain } = body as Record<string, unknown>;
+  const { action, id, root, name, claude, turn, explain, full } = body as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
   const level = (["none", "minimal", "brief", "detailed", "full"] as const).find((l) => l === explain);
   try {
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         return Response.json(createProject(root as string, name as string));
       case "regenerate":
         if (!str(id)) return bad("bad request");
-        return Response.json(generate(id as string, str(claude), level) ?? null);
+        return Response.json(generate(id as string, str(claude), level, full === true) ?? null);
       case "update":
         if (!str(root)) return bad("bad request");
         // A checkout no project of the user's maps (an example's) cannot follow it.

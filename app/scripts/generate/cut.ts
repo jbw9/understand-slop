@@ -177,3 +177,140 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   cut!.excluded.push(...leftover.map((path) => ({ path, reason: "left unassigned by the cut after three rounds" })));
   return { cut: cut!, leftover, rejected };
 }
+
+const covers = (claim: string, path: string) => claim === path || (claim.endsWith("/") && path.startsWith(claim));
+
+/** Source files the cut neither gives a root nor excludes: code added since it was made. */
+export const unclaimed = (cut: Cut, inv: Inventory) =>
+  inv.files.filter((f) => isSource(f) && !owners(cut, f.path).length && !excludedBy(cut, f.path)).map((f) => f.path);
+
+const PLACE_TOOL = {
+  name: "place",
+  description: "Place the new files in the map's top level.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["placed", "roots", "excluded"],
+    properties: {
+      placed: {
+        type: "array",
+        description: "Each new file and the root that takes it: an existing root's id, or the id of a root in `roots`. A path ending in '/' places every new file under it; claim a new directory whole when one root takes all of it.",
+        items: { type: "object", additionalProperties: false, required: ["path", "root"], properties: { path: { type: "string" }, root: { type: "string" } } },
+      },
+      roots: {
+        type: "array",
+        description: "New roots, only for files that are a new thing someone does that no existing root covers. Usually empty.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "prefix", "title", "sub", "why"],
+          properties: {
+            id: TOOL.input_schema.properties.roots.items.properties.id,
+            prefix: TOOL.input_schema.properties.roots.items.properties.prefix,
+            title: TOOL.input_schema.properties.roots.items.properties.title,
+            sub: TOOL.input_schema.properties.roots.items.properties.sub,
+            why: TOOL.input_schema.properties.roots.items.properties.why,
+          },
+        },
+      },
+      excluded: TOOL.input_schema.properties.excluded,
+    },
+  },
+};
+
+interface Placement {
+  placed: { path: string; root: string }[];
+  roots: Omit<Root, "files">[];
+  excluded: { path: string; reason: string }[];
+}
+
+/**
+ * Code added since the cut was made, given a place in it without cutting
+ * again: a new cut would rename the roots and redo every one of them, where
+ * placing redoes only the roots that gain files and writes any new one.
+ * Returns the cut with the files claimed, the existing roots that took some,
+ * and the roots added.
+ */
+export async function place(
+  cut: Cut,
+  files: string[],
+  inv: Inventory,
+  sums: Record<string, FileSummary>,
+  model: string,
+): Promise<{ cut: Cut; gained: Map<string, string[]>; added: Root[] }> {
+  const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
+  const rules = all.slice(0, all.indexOf("## What a level shows"));
+  const messages: Message[] = [
+    {
+      role: "user",
+      content: [
+        `# Repository: ${inv.name} @ ${inv.commit}`,
+        `## The map's top level — ${cut.about}\n${cut.roots
+          .map((r) => `- ${r.id} (prefix ${r.prefix}): ${r.title} — ${r.sub}\n  ${r.why}\n  owns: ${r.files.slice(0, 25).join(", ")}${r.files.length > 25 ? `, … ${r.files.length - 25} more` : ""}`)
+          .join("\n")}`,
+        `## New source files (${files.length}), in no root yet\n${files.map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}`,
+        `## Other files beside them (markup, styles, config) — a directory claim takes these too\n${inv.files.filter((f) => !f.code && files.some((p) => p.slice(0, p.lastIndexOf("/") + 1) === f.path.slice(0, f.path.lastIndexOf("/") + 1))).map((f) => f.path).join("\n") || "(none)"}`,
+        `Give every new file a root. Put it in the existing root whose work it does — a file a feature uses goes with that feature, shared code in Foundations if there is one. Add a new root only for files that are a new thing someone does, which no root covers now: a new page, a new command, a new flow. Its id must not match an existing root's and its prefix must be new. Exclude only what a full cut would: generated, vendored, dead, or config with no logic of its own.
+Call the place tool once.`,
+      ].join("\n\n"),
+    },
+  ];
+  const system = [{ type: "text" as const, text: rules, cache_control: { type: "ephemeral" as const } }];
+  const taken = new Set(cut.roots.map((r) => r.prefix));
+  const check = (p: Placement): string[] => {
+    const out: string[] = [];
+    const ids = new Set([...cut.roots.map((r) => r.id), ...p.roots.map((r) => r.id)]);
+    const prefixes = new Set(taken);
+    for (const r of p.roots) {
+      if (cut.roots.some((x) => x.id === r.id)) out.push(`new root id "${r.id}" is already a root's`);
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(r.id)) out.push(`root id "${r.id}" is not kebab-case`);
+      if (!/^[a-z]{2,3}$/.test(r.prefix) || prefixes.has(r.prefix)) out.push(`root ${r.id}: prefix "${r.prefix}" must be 2-3 lowercase letters and unused`);
+      prefixes.add(r.prefix);
+      if (r.title.split(/\s+/).length > 4) out.push(`root ${r.id}: title "${r.title}" has more than 4 words`);
+      if (words(r.sub) > SUB_WORDS) out.push(`root ${r.id}: sub "${r.sub}" has more than ${SUB_WORDS} words`);
+    }
+    for (const x of p.placed) if (!ids.has(x.root)) out.push(`${x.path}: no root "${x.root}"`);
+    const missing = files.filter((f) => ![...p.placed, ...p.excluded].some((x) => covers(x.path, f)));
+    if (missing.length) out.push(`${missing.length} new files are placed nowhere:\n${missing.join("\n")}`);
+    return out;
+  };
+
+  let p: Placement = { placed: [], roots: [], excluded: [] };
+  for (let round = 0; round < 2; round++) {
+    p = await ask<Placement>({ model, stage: "place", effort: "medium", maxTokens: 8000, system, messages, tool: PLACE_TOOL });
+    const wrong = check(p);
+    if (!wrong.length) break;
+    messages.push(
+      { role: "assistant", content: [{ type: "text", text: JSON.stringify(p) }] },
+      { role: "user", content: `That has problems. Fix them and call place again with every file:\n- ${wrong.join("\n- ")}` },
+    );
+  }
+
+  // Applied as far as it holds: a bad new root or an unknown id leaves its
+  // files excluded with the reason, never silently dropped.
+  const next: Cut = structuredClone(cut);
+  const added: Root[] = [];
+  const prefixes = new Set(taken);
+  for (const r of p.roots)
+    if (!next.roots.some((x) => x.id === r.id) && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(r.id) && /^[a-z]{2,3}$/.test(r.prefix) && !prefixes.has(r.prefix)) {
+      prefixes.add(r.prefix);
+      const root = { ...r, files: [] };
+      added.push(root);
+      next.roots.push(root);
+    }
+  const gained = new Map<string, string[]>();
+  const wanted = new Set(files);
+  for (const x of p.placed) {
+    const root = next.roots.find((r) => r.id === x.root);
+    const mine = [...wanted].filter((f) => covers(x.path, f));
+    if (!root || !mine.length) continue;
+    if (!root.files.includes(x.path)) root.files.push(x.path);
+    for (const f of mine) wanted.delete(f);
+    if (!added.includes(root)) gained.set(root.id, [...(gained.get(root.id) ?? []), ...mine]);
+  }
+  for (const x of p.excluded) if ([...wanted].filter((f) => covers(x.path, f)).map((f) => wanted.delete(f)).length) next.excluded.push(x);
+  next.excluded.push(...[...wanted].map((path) => ({ path, reason: "left unplaced when it was added to the map" })));
+  // A new root nothing went into has nothing to explain.
+  next.roots = next.roots.filter((r) => r.files.length || !added.includes(r));
+  return { cut: next, gained, added: added.filter((r) => r.files.length) };
+}

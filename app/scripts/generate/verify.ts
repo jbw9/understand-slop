@@ -232,7 +232,8 @@ async function review(n: Node, flags: string[], inv: Inventory, model: string): 
 - A false alarm: dismiss it.
 - A true claim whose lines were not cited: find them (read_file, grep) and add them in add_refs.
 - A wrong claim: correct the wording so every claim is shown by code — never add what the code does not show.
-- A claim nothing in this repository can show: say so in unresolvable.
+- A claim nothing in this repository can show: say so in unresolvable — but only after you have searched for it. Grep the whole repository (config, CI workflows under .github, other parts of the code) and the installed source of any dependency it hinges on (grep with under: "node_modules/<pkg>" or the Python site-packages). Code explained elsewhere in the map is not unresolvable.
+- Behaviour that only varies with the user's machine (an installed tool's version, what is on PATH) is not unresolvable when the code shows what it does: state what the code does.
 - An issue flagged intended: if the code shows the behaviour is deliberate (a docstring or comment saying so, an explicit raise for misuse, standard language behaviour), drop it from issues. Keep it only if it really makes something go wrong for whoever hits it.
 The detail must stay at most two sentences and 40 words. Finish by calling review.`;
   const prompt = `## The node\n${claims(n)}\n\n## Claims a first reader flagged\n- ${flags.join("\n- ")}\n\n## The cited code\n${evidence(n, inv)}`;

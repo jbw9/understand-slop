@@ -9,7 +9,8 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
@@ -55,12 +56,12 @@ function stepOf(name: string, input: any, content: string, problems?: string[]):
 export const TOOLS: Tool[] = [
   {
     name: "read_file",
-    description: "Read a file from the repository with line numbers, at most 400 lines per call. A file of 400 lines or fewer: leave out start and end and read it whole, once. Ask for every read you already know you need in the same turn.",
+    description: "Read a file from the repository with line numbers, at most 400 lines per call. Any text file on disk can be read, including installed dependencies (node_modules, site-packages) and config (.github, .yml, .toml). A file of 400 lines or fewer: leave out start and end and read it whole, once. Ask for every read you already know you need in the same turn.",
     input_schema: { type: "object", required: ["path"], properties: { path: { type: "string" }, start: { type: "integer" }, end: { type: "integer" } } },
   },
   {
     name: "grep",
-    description: "Search the repository (git grep -E, case-sensitive). Returns up to 60 matching lines as path:line:text.",
+    description: "Search the repository (git grep -E, case-sensitive). Returns up to 60 matching lines as path:line:text. With `under`, it also searches ignored files there, such as a dependency in node_modules.",
     input_schema: { type: "object", required: ["pattern"], properties: { pattern: { type: "string" }, under: { type: "string", description: "Optional directory or file to search within." } } },
   },
   {
@@ -187,6 +188,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     ...(inv.docs.length ? [`## Its docs (${inv.docs.length}): path, lines, first heading\n${inv.docs.slice(0, 80).map((d) => `${d.path} (${d.lines})${d.title ? ` — ${d.title}` : ""}`).join("\n")}`] : []),
     ...(inv.scope ? [`## Scope\nThis map covers only part of the repository. Its reader: ${inv.scope.focus} Files outside it can still be read and cited.`] : []),
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
+    `Code another root explains is not unknown: read it if you need it, and draw it as a box with no \`opens\` labelled with that root's title. Never mark a node unsure because something lies outside your root.`,
     `## Your root\nid: ${root.id}\ntitle: ${root.title}\nsub: ${root.sub}\nscope: ${root.why}\nEvery node id under it starts with "${root.prefix}-".`,
     `Brand marks you may use: ${inv.marks.length ? inv.marks.join(", ") : "none"}.`,
     `Screens: ${
@@ -219,16 +221,20 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   const i = call.input ?? {};
   if (call.name === "read_file") {
     const path = String(i.path ?? "").replace(/^\.?\//, "");
-    if (!known.has(path)) return `No such file in the repository listing: ${path}`;
+    const listed = known.has(path);
+    if (!listed && (reach || !unlisted(inv.repo, path))) return `No such file in the repository: ${path}`;
     const start = Math.max(1, Number(i.start) || 1);
     const end = Math.min(start + 399, Number(i.end) || start + 399);
-    const total = inv.files.find((f) => f.path === path)!.lines;
+    const total = listed ? inv.files.find((f) => f.path === path)!.lines : readFileSync(join(inv.repo, path), "utf8").split("\n").length;
     return `${path} (lines ${start}-${Math.min(end, total)} of ${total})\n${numbered(inv.repo, path, start, end)}`;
   }
   if (call.name === "grep") {
     const args = ["-C", inv.repo, "grep", "--untracked", "-n", "-I", "-E", "-e", String(i.pattern ?? "")];
-    if (i.under) args.push("--", String(i.under).replace(/^\.?\//, ""));
-    else if (reach) args.push("--", ...reach);
+    // Scoped to a path, grep also searches what git ignores (installed dependencies, generated files), never .env files.
+    if (i.under) {
+      args.splice(4, 0, "--no-exclude-standard");
+      args.push("--", String(i.under).replace(/^\.?\//, ""), ":!:**/.env*");
+    } else if (reach) args.push("--", ...reach);
     try {
       const hits = execFileSync("git", args, { encoding: "utf8", maxBuffer: 16 << 20, stdio: ["ignore", "pipe", "pipe"] }).split("\n").filter(Boolean);
       return hits.slice(0, 60).map((h) => h.slice(0, 220)).join("\n") + (hits.length > 60 ? `\n… ${hits.length - 60} more` : "");
@@ -239,9 +245,30 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
   if (call.name === "list") {
     const dir = String(i.dir ?? "").replace(/^\.?\//, "").replace(/\/?$/, "/");
     const hits = inv.files.filter((f) => (dir === "/" || f.path.startsWith(dir)) && (!reach || known.has(f.path)));
+    if (!hits.length && !reach) {
+      const abs = resolve(inv.repo, dir);
+      if (inside(inv.repo, abs) && existsSync(abs) && statSync(abs).isDirectory())
+        return readdirSync(abs, { withFileTypes: true }).slice(0, 200).map((e) => `${posixPath(relative(inv.repo, join(abs, e.name)))}${e.isDirectory() ? "/" : ""}`).join("\n") || "Nothing there.";
+    }
     return hits.slice(0, 200).map((f) => `${f.path} (${f.lines})`).join("\n") + (hits.length > 200 ? `\n… ${hits.length - 200} more` : "") || "Nothing there.";
   }
   return `Unknown tool ${call.name}`;
+}
+
+const posixPath = (p: string) => p.split(sep).join("/");
+const inside = (repo: string, abs: string) => abs.startsWith(resolve(repo) + sep);
+
+/**
+ * Whether read_file may open a file the listing leaves out: anything in the
+ * repo on disk that git ignores or the inventory skips (installed dependencies,
+ * generated code, configs), so a claim settled there can be checked. Never
+ * .git, .env files or binaries.
+ */
+function unlisted(repo: string, path: string): boolean {
+  const abs = resolve(repo, path);
+  if (!inside(repo, abs) || /(^|\/)\.git\//.test(path) || /(^|\/)\.env[^/]*$/.test(path)) return false;
+  if (!existsSync(abs) || !statSync(abs).isFile() || statSync(abs).size > 2_000_000) return false;
+  return !readFileSync(abs).includes(0);
 }
 
 const tryJson = (s: string) => {

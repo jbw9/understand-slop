@@ -11,6 +11,8 @@ The reader is a developer who has to *explain* this system under questioning: wh
   - `partial`: you found it, but part of the answer is not in this repo (an external service, a database schema that isn't checked in, config injected at deploy time).
   - `inferred`: a judgement from naming or layout.
   - Whenever the state is not `derived`, `unsure` says why in plain words.
+  - Before calling anything unknown, look for it: grep the whole repository (config, CI workflows, other roots' code) and the installed source of the dependency it hinges on. You can read all of it.
+  - Not reasons to be unsure: code another root explains (read it, or point a box at that root); behaviour that varies with the user's machine when the code shows what it does (say what it does: "needs `idb` on PATH"); a check the code doesn't make (that is a fact, or an issue).
   - Missing analysis must never look like confident empty space.
 - **Every claim cites real lines.** Every node has `code` refs: file plus 1-indexed inclusive line range, with a plain label saying what those lines do. Cite the lines that prove the node's `detail`, not the file header.
 - **Every arrow is a real path.** Draw an arrow in a `diagram` only where the code really goes from one thing to the other: a call, a redirect, a write, a read, a navigation. Give its `at` as `file:line` where that happens. Its `label` is a few words (at most 24 characters): "tap", "reads rsvp", "redirects". An arrow you cannot cite is an arrow you must not draw. A dead end or broken path is drawn with `tone: "warn"`, not left out.

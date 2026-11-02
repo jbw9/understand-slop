@@ -2,11 +2,13 @@
 
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { openSettings } from "@/lib/settings";
 import { openPalette } from "@/components/palette";
 import { useMap } from "@/components/map-context";
-import { openProjects } from "@/components/projects";
+import { openFolder, openProjects } from "@/components/projects";
+import { Menu } from "@/components/menu";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff, useDiff } from "@/components/diff";
@@ -38,8 +40,8 @@ const noSubscribe = () => () => {};
 
 /**
  * `bare` is the window with no map open (components/welcome.tsx): the frame,
- * the projects and settings buttons, and the window buttons, so it can still
- * be moved and closed.
+ * settings and the window buttons, so it can still be moved and closed. The
+ * page itself offers Open Folder there, as VS Code's welcome does.
  */
 export function Titlebar({ bare }: { bare?: boolean }) {
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
@@ -81,9 +83,6 @@ export function Titlebar({ bare }: { bare?: boolean }) {
         )}
       </div>
       <div data-tauri-drag-region className="flex h-full items-center justify-end">
-        <Control label="Projects — start a new one, or switch maps" onClick={() => openProjects()}>
-          <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
-        </Control>
         {bare ? null : <MapTools />}
         <span aria-hidden className="mx-1 h-4 w-px bg-border-strong" />
         {bare ? null : (
@@ -133,23 +132,50 @@ export function Titlebar({ bare }: { bare?: boolean }) {
   );
 }
 
-/** The map's name, which switches maps. Where you are inside it is the tabs' to say (components/tabs.tsx). */
+/**
+ * The map's name, a dropdown of the reader's projects, the last opened first,
+ * with importing another below them. Where you are inside the map is the
+ * tabs' to say (components/tabs.tsx).
+ */
 function Where() {
-  const { name } = useMap();
+  const { name, maps } = useMap();
+  const router = useRouter();
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const current = maps.find((m) => m.id === name);
   return (
     <>
       {/* Outside the drag region, so a click opens it rather than moving the window. */}
       <button
         type="button"
-        onClick={() => openPalette("maps")}
-        title="Switch map"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setMenu({ x: r.left, y: r.bottom + 4 });
+        }}
+        aria-haspopup="menu"
+        title="Switch project"
         className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] px-2 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
       >
-        {name}
+        {current?.label ?? name}
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-faint">
           <path d="m2.5 4 2.5 2.5L7.5 4" />
         </svg>
       </button>
+      {menu ? (
+        <Menu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            ...maps.map((m) => ({
+              label: m.label,
+              icon: <span className="w-3 text-deep-green">{m.id === name ? "✓" : ""}</span>,
+              onClick: () => m.id !== name && router.push(`/?map=${encodeURIComponent(m.id)}`),
+            })),
+            { label: "Import project…", icon: <span className="w-3 text-muted-slate">+</span>, onClick: () => void openFolder(), separated: true },
+            { label: "Manage projects…", icon: <span className="w-3" />, onClick: () => openProjects() },
+          ]}
+        />
+      ) : null}
     </>
   );
 }

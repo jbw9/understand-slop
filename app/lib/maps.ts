@@ -51,10 +51,12 @@ function progressFor(p: Project): Progress | undefined {
   return { ...progressOf(p.id), stage: p.map.status === "cancelled" ? "cancelled" : "failed" };
 }
 
-/** Every map that can be opened: the reader's projects that have one, or are making one. */
+/** Every map that can be opened: the reader's projects that have one, or are making one, the last opened first. */
 export function listMaps(): MapEntry[] {
+  const opened = (p: Project) => Date.parse(p.openedAt ?? p.addedAt);
   return listProjects()
     .filter(openable)
+    .sort((a, b) => opened(b) - opened(a))
     .map((p) => ({ id: p.id, label: p.name, local: true }));
 }
 

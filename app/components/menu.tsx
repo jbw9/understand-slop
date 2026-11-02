@@ -15,6 +15,8 @@ export interface MenuItem {
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  /** A rule above it, setting it apart from the items before. */
+  separated?: boolean;
 }
 
 export function Menu({
@@ -75,9 +77,9 @@ export function Menu({
       {title ? (
         <p className="truncate border-b border-border-gray px-3 pb-1.5 pt-1 text-[11.5px] text-faint">{title}</p>
       ) : null}
-      {items.map((item) => (
+      {items.map((item, i) => (
         <button
-          key={item.label}
+          key={i}
           type="button"
           role="menuitem"
           disabled={item.disabled}
@@ -88,6 +90,7 @@ export function Menu({
           className={cn(
             "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink",
             item.disabled ? "text-faint" : "cursor-pointer hover:bg-surface-container-low",
+            item.separated && "mt-1 border-t border-border-gray pt-2",
           )}
         >
           {item.icon}

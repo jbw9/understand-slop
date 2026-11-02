@@ -76,6 +76,22 @@ export function DiffPanel() {
           <p className="mt-0.5 text-[12px] text-muted-slate">
             Pick one to open the level it is on — red is gone, green is new, there.
           </p>
+          {/* The comparison open now, named — the commit may be older than the list goes. */}
+          {d.to && diff ? (
+            <p className="mt-2 text-[12px] text-muted-slate">
+              Showing{" "}
+              {d.from === `${d.to}~1` ? (
+                <>
+                  what <span className="font-mono">{diff.to}</span> did
+                  {d.commits.find((c) => c.sha === d.to || c.short === d.to) ? `: ${d.commits.find((c) => c.sha === d.to || c.short === d.to)!.subject}` : ""}
+                </>
+              ) : (
+                <>
+                  <span className="font-mono">{diff.from}</span> to <span className="font-mono">{diff.to}</span>
+                </>
+              )}
+            </p>
+          ) : null}
           <Commits
             commits={d.commits}
             picked={d.to && d.from === `${d.to}~1` ? d.to : d.from || d.to ? "pair" : ""}

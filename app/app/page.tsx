@@ -3,6 +3,7 @@ import { Acts } from "@/components/acts";
 import { Canvas } from "@/components/canvas";
 import { DiffMode } from "@/components/diff";
 import { DiffPanel } from "@/components/diff-panel";
+import { FilesPanel } from "@/components/files";
 import { MapProvider } from "@/components/map-context";
 import { ProjectsDialog } from "@/components/projects";
 import { AuditDialog } from "@/components/audit";
@@ -76,6 +77,7 @@ export default async function Home({
               {/* Inside the provider: the panel is the diff's own list, and
                   what Claude shows needs both the map and the diff's range. */}
               <DiffPanel />
+              <FilesPanel />
               <Acts />
             </DiffMode>
           </Suspense>

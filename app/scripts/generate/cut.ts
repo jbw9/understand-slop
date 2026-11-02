@@ -57,7 +57,7 @@ const TOOL = {
       },
       excluded: {
         type: "array",
-        description: "Source files or directories ('/'-terminated) deliberately left out of every root, each with a reason: generated, vendored, dead, pure tooling.",
+        description: "Source files or directories ('/'-terminated) deliberately left out of every root, each with a reason: generated, vendored, dead, or tooling with no logic of its own (a framework config). Shared code is never excluded; it goes in Foundations.",
         items: { type: "object", additionalProperties: false, required: ["path", "reason"], properties: { path: { type: "string" }, reason: { type: "string" } } },
       },
     },
@@ -69,7 +69,8 @@ const INSTRUCTIONS = `Choose the top level of the map: 4 to 10 roots.
 - Roots are what someone DOES with the product, in the order they do it — a journey, not a stack of layers. For a library, the someone is the caller.
 - Title a journey root as the action, the way a user would say it: "Signing Up", "Writing A Post", "Making A Request" — not a layer or module name like "Authentication" or "Post Dashboard". Roots that are not steps may be nouns ("The Database").
 - List the roots in the order someone meets them.
-- Things that are not steps (the database, background jobs, shared infrastructure, admin tooling) may be roots of their own. Use them sparingly; prefer folding infrastructure into the feature that uses it.
+- Things that are not steps (the database, background jobs, admin tooling) may be roots of their own. Use them sparingly; fold infrastructure into the feature that uses it when only one feature does.
+- Code that two or more features share — the data model and its types, shared state, utilities, a UI kit — goes in one last root titled "Foundations", never excluded and never parked in whichever feature happens to use it first. Every part of the repository must be explained somewhere a reader would look for it.
 - Every source file listed must be in at least one root's files or in excluded. Use '/'-terminated directory paths to keep the list short when a whole directory belongs to one root.
 - A root should own enough to explain in 2-3 levels and not so much that it can't: roughly 3-60 files.
 - Ids are kebab-case; prefixes are 2-3 letters and unique.
@@ -102,7 +103,10 @@ export function owners(cut: Cut, path: string): string[] {
 
 export const excludedBy = (cut: Cut, path: string) => cut.excluded.some((e) => e.path === path || (e.path.endsWith("/") && path.startsWith(e.path)));
 
-function problems(cut: Cut, inv: Inventory): string[] {
+/** Kinds of file that are the shape of the code, whatever uses them: never left out. */
+const SHARED_KINDS = new Set(["types", "data-model", "state"]);
+
+function problems(cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string[] {
   const out: string[] = [];
   const prefixes = new Set<string>();
   for (const r of cut.roots) {
@@ -114,6 +118,14 @@ function problems(cut: Cut, inv: Inventory): string[] {
   }
   const missing = inv.files.filter((f) => isSource(f) && !owners(cut, f.path).length && !excludedBy(cut, f.path)).map((f) => f.path);
   if (missing.length) out.push(`${missing.length} source files are in no root and not excluded:\n${missing.slice(0, 300).join("\n")}`);
+  // Imported from two roots, or the shape of the data: shared, so it belongs in Foundations.
+  const importers = new Map<string, Set<string>>();
+  for (const [from, tos] of Object.entries(inv.imports))
+    for (const to of tos) for (const id of owners(cut, from)) importers.set(to, (importers.get(to) ?? new Set()).add(id));
+  const shared = inv.files
+    .filter((f) => isSource(f) && excludedBy(cut, f.path) && (SHARED_KINDS.has(sums[f.path]?.kind ?? "") || (importers.get(f.path)?.size ?? 0) >= 2))
+    .map((f) => f.path);
+  if (shared.length) out.push(`${shared.length} excluded files are shared code — the data model, state, or imported by two or more roots — and belong in Foundations, not excluded:\n${shared.slice(0, 100).join("\n")}`);
   return out;
 }
 
@@ -152,7 +164,7 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   const rejected: string[][] = [];
   for (let round = 0; round < 3; round++) {
     cut = await ask<Cut>({ model, stage: "cut", effort: "high", maxTokens: 32000, system, messages, tool: TOOL });
-    const p = problems(cut, inv);
+    const p = problems(cut, inv, sums);
     if (!p.length) return { cut, leftover: [], rejected };
     rejected.push(p);
     messages.push(

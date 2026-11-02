@@ -10,11 +10,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
 import { ccAgent, type Handled } from "./claude-code";
 import type { Cut, Root } from "./cut";
-import { owners } from "./cut";
+import { excludedBy, owners } from "./cut";
 import { isSource, numbered, type Inventory } from "./inventory";
 import { EXPLAIN_LEVEL } from "./check";
 import { submitProblems, typeReference } from "./schema";
@@ -29,6 +30,8 @@ export interface Authored {
   problems: string[];
   /** What the agent did, in order: each read, search and submit, for the run's audit. */
   trail: Step[];
+  /** Required symbols of the files this root explains, and those still unexplained when it was accepted. */
+  coverage?: { symbols: number; gaps: { file: string; symbol: Sym }[] };
 }
 
 /** One agent action, in words: "read app/page.tsx 1-80", and what came of it. */
@@ -160,6 +163,13 @@ export function system(): Block[] {
  */
 const OWNED_BUDGET = 110_000;
 
+/** The files whose symbols this root must explain: source it owns first, so a shared file is held to one root. */
+const explains = (root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>) =>
+  inv.files.filter((f) => isSource(f) && sums[f.path] && !excludedBy(cut, f.path) && owners(cut, f.path)[0] === root.id);
+
+/** At most this many rounds are spent on coverage alone; what is left is recorded, not hidden. */
+const COVER_ROUNDS = 2;
+
 function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
   const mine = inv.files.filter((f) => isSource(f) && owners(cut, f.path).includes(root.id));
   const mineSet = new Set(mine.map((f) => f.path));
@@ -194,6 +204,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     `## Task
 Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
 Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", detailed: "Every level also has a one- or two-paragraph `explain` for a reader who knows a little of the field and none of this project. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", minimal: "Every level also has a one-sentence `explain` for a reader who knows the field and has used this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
+Cover the code: every symbol listed above of more than ${TRIVIAL_LINES} lines, in a file whose first owner is this root, must be opened by a leaf's \`code\` or a step's \`at\`. A few small related ones may share a leaf; a part with more pieces than fit gets another level, not a summary.
 ${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
 Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");
@@ -281,6 +292,12 @@ export async function authorRoot(
   const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
   // The last tree handed in, so a fix after a rejection resends only the nodes it changed.
   let last: Node | null = null;
+  const owned = explains(root, cut, inv, sums);
+  let coverRounds = 0;
+  const gapsIn = (node: Node) => {
+    const cited = citations([node]);
+    return owned.flatMap((f) => symbolsOf(cited, f.path, sums[f.path]).filter((s) => required(s) && !s.by.length).map((symbol) => ({ file: f.path, symbol })));
+  };
 
   /** One tool call, answered the same way whichever backend made it. */
   const handle = (name: string, input: any): Handled => {
@@ -296,9 +313,21 @@ export async function authorRoot(
     const node = Array.isArray(fixes) && last && !input?.root ? patched(last, fixes, missing) : input?.root;
     if (node && typeof node === "object" && node.id !== root.id) node.id = root.id;
     if (node && typeof node === "object") last = structuredClone(node);
-    const problems = missing.length
+    let problems = missing.length
       ? missing.map((id) => `REPLACE no node "${id}" in your last submit — send it with its parent, or send the whole root`)
       : submitProblems(node, root.prefix, inv.repo);
+    // Coverage is asked only of a tree that is otherwise clean, so it never
+    // competes with a problem the map cannot be shown with.
+    if (!problems.length) {
+      const gaps = gapsIn(node);
+      res.coverage = { symbols: owned.reduce((a, f) => a + sums[f.path].symbols.filter(required).length, 0), gaps };
+      if (gaps.length && coverRounds < COVER_ROUNDS) {
+        coverRounds++;
+        const byFile = new Map<string, typeof gaps>();
+        for (const g of gaps) byFile.set(g.file, [...(byFile.get(g.file) ?? []), g]);
+        problems = [...byFile].map(([file, gs]) => `COVER ${file}: ${gs.map((g) => `${g.symbol.name} (${g.symbol.start}-${g.symbol.end})`).join(", ")} — no leaf or step opens these lines; give each a leaf, or a step that cites it`);
+      }
+    }
     res.problems = problems;
     res.trail.push(stepOf(name, input, "", problems));
     onSubmit(res.submits, problems.length, node);
@@ -307,7 +336,7 @@ export async function authorRoot(
     return { content: `Not accepted. Fix every one of these, then submit with \`replace\`: only the nodes you changed.\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
   };
 
-  const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 45 });
+  const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 60 });
   return { ...(r.value ?? res), turns: r.turns };
 }
 

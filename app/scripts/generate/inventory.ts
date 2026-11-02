@@ -57,12 +57,12 @@ export interface Inventory {
 }
 
 const CODE = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro",
+  ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro",
   ".py", ".go", ".rb", ".rs", ".java", ".kt", ".scala", ".swift", ".php", ".cs", ".ex", ".exs",
   ".sql", ".prisma", ".graphql", ".gql", ".proto",
 ]);
 const SKIP = [
-  /(^|\/)(node_modules|vendor|dist|build|out|coverage|\.next|\.turbo|\.git|__snapshots__|migrations\/meta)\//,
+  /(^|\/)(node_modules|vendor|dist|build|out|target|coverage|\.next|\.turbo|\.git|__snapshots__|migrations\/meta)\//,
   /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|poetry\.lock|uv\.lock|Cargo\.lock|go\.sum|composer\.lock)$/,
   /\.(min\.js|map|png|jpe?g|gif|webp|ico|svg|woff2?|ttf|otf|eot|mp4|mp3|wav|pdf|zip|gz|lock|snap)$/i,
   /\.d\.ts$/,

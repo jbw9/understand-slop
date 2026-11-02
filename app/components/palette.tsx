@@ -11,6 +11,7 @@ import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff } from "@/components/diff";
 import { openTimeline } from "@/components/timeline";
+import { openFiles, useCitations, useFiles, useTrail } from "@/components/files";
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon, openDoc, useDocList } from "@/components/docs";
 import { openSettings, readSettings, saveSettings } from "@/lib/settings";
@@ -40,8 +41,10 @@ interface Item {
   hint?: string;
   /** A second line: why a level is not certain, or what goes wrong. */
   detail?: string;
-  kind: "level" | "action" | "map" | "unsure" | "problem" | "doc";
+  kind: "level" | "action" | "map" | "unsure" | "problem" | "doc" | "file" | "symbol";
   node?: Node;
+  /** Words it is about, matched last and weakest: a level's sub, detail and plain-words layer. */
+  body?: string;
   kbd?: string;
   run: () => void;
 }
@@ -120,6 +123,7 @@ export function Palette() {
           hint: trail.join(" › ") || map.RUN.repo,
           kind: "level",
           node: n,
+          body: [n.sub, n.detail, n.explain?.body].filter(Boolean).join(" ").toLowerCase(),
           run: () => goTo(p),
         });
         walk(n.children ?? [], p, [...trail, n.title]);
@@ -129,6 +133,40 @@ export function Palette() {
     walk(map.L0, [], []);
     return out;
   }, [map]);
+
+  // The checkout's own names — paths and top-level symbols — each leading to
+  // the deepest level that opens it, so a name from a stack trace or a review
+  // finds its place on a map cut by features.
+  const files = useFiles();
+  const cited = useCitations();
+  const trailOf = useTrail();
+  const code = useMemo<Item[]>(() => {
+    const out: Item[] = [];
+    const deepest = (file: string, s = 1, e = Infinity) =>
+      (cited.get(file) ?? []).filter((c) => c.start <= e && c.end >= s).sort((a, b) => b.path.length - a.path.length)[0]?.path;
+    for (const [file, f] of Object.entries(files?.index?.files ?? {})) {
+      const at = deepest(file);
+      out.push({
+        key: `file:${file}`,
+        label: file,
+        hint: at ? trailOf(at) : f.status === "excluded" ? "left out of the map" : "not on any level",
+        kind: "file",
+        run: () => (at ? goTo(at) : setTimeout(() => openFiles())),
+      });
+      for (const sym of f.symbols) {
+        const by = deepest(file, sym.start, sym.end);
+        out.push({
+          key: `sym:${file}:${sym.name}:${sym.start}`,
+          label: sym.name,
+          hint: `${file} → ${by ? trailOf(by) : at ? `not explained; nearest ${trailOf(at)}` : "not explained"}`,
+          kind: "symbol",
+          run: () => (by ?? at ? goTo((by ?? at)!) : setTimeout(() => openFiles("gaps"))),
+        });
+      }
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- trailOf reads the same map as cited
+  }, [files, cited]);
 
   const docList = useDocList();
   const docs = useMemo<Item[]>(
@@ -150,6 +188,7 @@ export function Palette() {
       { key: "a:back", label: "Go back a level", kind: "action", kbd: "Esc", run: () => path.length && goTo(path.slice(0, -1)) },
       { key: "a:workspace", label: "Toggle Claude Code & terminal", kind: "action", kbd: "Ctrl+`", run: toggleWorkspace },
       { key: "a:diff", label: "What changed in the code", hint: "Diff two commits over the map", kind: "action", run: openDiff },
+      { key: "a:files", label: "Every file", hint: "Where each part of the code is explained", kind: "action", run: () => openFiles() },
       { key: "a:timeline", label: "How the code got here", hint: "Its commits over time, on the map's sections", kind: "action", run: openTimeline },
       { key: "a:audit", label: "How this map was made", hint: "What the agent read and decided", kind: "action", run: () => openAudit(map.name) },
       { key: "a:history", label: "What you added to this map", kind: "action", run: openHistory },
@@ -212,17 +251,17 @@ export function Palette() {
       : mode === "problems" ? findings.problems
       : mode === "docs" ? docs
       : actionsOnly ? actions
-      : q ? [...levels, ...docs, ...actions]
+      : q ? [...levels, ...code, ...docs, ...actions]
       : levels;
     return pool
-      // A hint counts only as a plain substring: scattered letters across a
-      // sentence match nearly anything.
-      .map((it) => ({ it, s: score(q, it.label) ?? (it.hint?.toLowerCase().includes(q) ? 1 : null) }))
+      // A hint or a body counts only as a plain substring: scattered letters
+      // across a sentence match nearly anything.
+      .map((it) => ({ it, s: score(q, it.label) ?? (it.hint?.toLowerCase().includes(q) ? 1 : it.body?.includes(q) ? 0.5 : null) }))
       .filter((x): x is { it: Item; s: number } => x.s !== null)
       .sort((a, b) => b.s - a.s)
       .slice(0, 60)
       .map((x) => x.it);
-  }, [mode, query, levels, docs, actions, maps, findings]);
+  }, [mode, query, levels, code, docs, actions, maps, findings]);
 
   useEffect(() => {
     list.current?.querySelector(`[data-i="${sel}"]`)?.scrollIntoView({ block: "nearest" });
@@ -295,7 +334,7 @@ export function Palette() {
                   <KindIcon kind={it.kind} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2.5">
-                      <span className="truncate text-[13px] text-ink">{it.label}</span>
+                      <span className={cn("truncate text-[13px] text-ink", it.kind === "symbol" && "shrink-0")}>{it.label}</span>
                       {it.node && it.kind === "level" ? <StateChip state={it.node.state} alarm={it.node.alarm} /> : null}
                       {it.hint ? <span className="min-w-0 truncate text-[12px] text-faint">{it.hint}</span> : null}
                       <span className="flex-1" />
@@ -363,6 +402,10 @@ function KindIcon({ kind }: { kind: Item["kind"] }) {
         </>
       ) : kind === "doc" ? (
         <DocIcon />
+      ) : kind === "file" ? (
+        <path d="M4 1.5h5l3 3v10H4zM9 1.5v3h3" />
+      ) : kind === "symbol" ? (
+        <path d="M6 3.5c-1.5 0-2 .7-2 2v1c0 .8-.5 1.5-1.5 1.5 1 0 1.5.7 1.5 1.5v1c0 1.3.5 2 2 2M10 3.5c1.5 0 2 .7 2 2v1c0 .8.5 1.5 1.5 1.5-1 0-1.5.7-1.5 1.5v1c0 1.3-.5 2-2 2" />
       ) : kind === "map" ? (
         <path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
       ) : (

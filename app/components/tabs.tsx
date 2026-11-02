@@ -3,8 +3,12 @@
 import { useEffect, type ReactNode } from "react";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
-import { closeTab, follow, openTab, readTabs, selectTab, useTabs } from "@/lib/tabs";
+import { openFile, useOpenFile } from "@/components/code";
+import { closeTab, follow, openTab, readTabs, selectTab, useTabs, type Tab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
+
+/** What a tab holds, opened: its level, and its file over it. */
+export const show = (t: Tab) => (t.file ? openFile(t.path, t.file) : goTo(t.path));
 
 /** Opens a level of the open map in a new tab, in front. */
 export function openInTab(map: string, path: string[]) {
@@ -22,25 +26,26 @@ export function openInTab(map: string, path: string[]) {
 export function SectionTabs({ path }: { path: string[] }) {
   const { name, nodeAt, RUN } = useMap();
   const state = useTabs(name);
-  const key = path.join("/");
-  // Only when the level changes, not when a tab comes forward: the tab
-  // brought forward already holds the level about to open.
+  const file = useOpenFile()?.file;
+  const key = `${path.join("/")}|${file ?? ""}`;
+  // Only when the level or its file changes, not when a tab comes forward:
+  // the tab brought forward already holds what is about to open.
   useEffect(() => {
-    follow(name, path);
+    follow(name, path, file);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, key]);
   const tabs = state?.tabs ?? [{ id: 0, path }];
   const active = state?.active ?? 0;
   const many = tabs.length > 1;
-  const titleOf = (p: string[]) => (p.length ? (nodeAt(p)?.title ?? RUN.repo) : RUN.repo);
+  const titleOf = (t: Tab) => (t.file ? t.file.split("/").pop()! : t.path.length ? (nodeAt(t.path)?.title ?? RUN.repo) : RUN.repo);
 
   const select = (id: number) => {
     const p = selectTab(name, id);
-    if (p) goTo(p);
+    if (p) show(p);
   };
   const close = (id: number) => {
     const p = closeTab(name, id);
-    if (p) goTo(p);
+    if (p) show(p);
   };
 
   // Read fresh on each key rather than closed over, so a held Ctrl+Tab steps
@@ -58,7 +63,7 @@ export function SectionTabs({ path }: { path: string[] }) {
         const next = t.tabs[(at + step + t.tabs.length) % t.tabs.length];
         if (next.id !== t.active) {
           const p = selectTab(name, next.id);
-          if (p) goTo(p);
+          if (p) show(p);
         }
         return;
       }
@@ -66,7 +71,7 @@ export function SectionTabs({ path }: { path: string[] }) {
       if (e.code === "KeyW" && mod && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         const p = closeTab(name, t.active);
-        if (p) goTo(p);
+        if (p) show(p);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -83,7 +88,7 @@ export function SectionTabs({ path }: { path: string[] }) {
       {tabs.map((t) => (
         <SectionTab
           key={t.id}
-          label={titleOf(t.path)}
+          label={titleOf(t)}
           active={t.id === active}
           onSelect={() => select(t.id)}
           onClose={many ? () => close(t.id) : undefined}

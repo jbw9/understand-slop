@@ -9,6 +9,9 @@ import { AnatomyView, SourceView, type RowCtx } from "@/components/anatomy";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
 import { Hunks, useDiff } from "@/components/diff";
 import { useMap } from "@/components/map-context";
+import { goTo, useLocation } from "@/components/chrome";
+import { useCitations, useTrail } from "@/components/files";
+import { nodesAt } from "@/lib/coverage";
 import { hunksOf, type HunkLines } from "@/lib/hunks";
 import { readSource } from "@/lib/source";
 import type { Slice } from "@/lib/repo";
@@ -231,6 +234,7 @@ export function CodePopup({
                 </span>
               </p>
               <ChangedHere file={r.file} start={r.start} end={r.end} />
+              <AlsoExplained file={r.file} start={r.start} end={r.end} onGo={onClose} />
               <CodeSlice owner={owner} file={r.file} start={r.start} end={r.end} ctx={ctx} />
             </div>
           ))}
@@ -262,6 +266,29 @@ function ChangedHere({ file, start, end }: { file: string; start: number; end: n
       <p className="mb-1 text-[12px] font-medium text-muted-slate">What changed here — red is gone, green is new</p>
       <Hunks file={change} only={near} />
     </div>
+  );
+}
+
+/**
+ * Other levels that open these same lines: a function shared by two features
+ * is explained where each one uses it, and a reader on one should know the
+ * other exists rather than find it by chance.
+ */
+function AlsoExplained({ file, start, end, onGo }: { file: string; start: number; end: number; onGo: () => void }) {
+  const cited = useCitations();
+  const trail = useTrail();
+  const here = useLocation().path.join("/");
+  const others = [...new Map(nodesAt(cited, file, start, end).filter((c) => c.path.join("/") !== here).map((c) => [c.path.join("/"), c.path])).values()];
+  if (!others.length) return null;
+  return (
+    <p className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
+      <span className="text-faint">Also explained in</span>
+      {others.slice(0, 4).map((p) => (
+        <button key={p.join("/")} type="button" onClick={() => (goTo(p), onGo())} className="cursor-pointer text-deep-green hover:underline">
+          {trail(p)}
+        </button>
+      ))}
+    </p>
   );
 }
 

@@ -9,6 +9,7 @@ import { useMap } from "@/components/map-context";
 import { readSource } from "@/lib/source";
 import { openDoc } from "@/components/docs";
 import { BOX_H, layoutDiagram } from "@/lib/diagram";
+import { TINT, useDiff } from "@/components/diff";
 
 /**
  * The blocks a reader learns from without opening code (round 3, D34): the
@@ -136,6 +137,14 @@ function Diagram({
   // that part — the same test `onOpen` makes before it navigates.
   const order = sectionOrder(block, (id) => Boolean(hrefFor?.(id)));
   const sectionOf = (id: string | undefined) => (id ? order.indexOf(id) : -1);
+  // In diff mode a box says what happened to the section it opens: amber
+  // where its code changed, red where it is gone, the rest receding.
+  const sections = useDiff()?.diff?.sections;
+  const verdictOf = (id: string | undefined) => {
+    const v = id ? sections?.find((s) => s.id === id)?.verdict : undefined;
+    return v && v !== "untouched" ? v : undefined;
+  };
+  const moved = block.boxes.some((b) => verdictOf(b.opens));
 
   return (
     <figure className="min-w-0">
@@ -217,9 +226,10 @@ function Diagram({
             // the code, and a section hue is only an index.
             const sec = authored ? -1 : sectionOf(b.opens);
             const t = TONE[b.tone ?? "plain"];
-            const fill = sec >= 0 ? sectionTone(sec).surface : t.fill;
-            const stroke = sec >= 0 ? sectionTone(sec).ink : t.stroke;
-            const ink = sec >= 0 ? sectionTone(sec).ink : t.ink;
+            const v = verdictOf(b.opens);
+            const fill = v ? TINT[v].surface : sec >= 0 ? sectionTone(sec).surface : t.fill;
+            const stroke = v ? TINT[v].line : sec >= 0 ? sectionTone(sec).ink : t.stroke;
+            const ink = v ? TINT[v].ink : sec >= 0 ? sectionTone(sec).ink : t.ink;
             return (
               <Box
                 key={b.id}
@@ -240,9 +250,10 @@ function Diagram({
                   // A hairline, like every other container on the page: the
                   // tint already says which section it is, and a heavy edge
                   // made the picture louder than the tables beside it.
-                  strokeWidth="1"
-                  strokeOpacity={sec >= 0 ? 0.55 : 1}
-                  strokeDasharray={b.tone === "warn" ? "5 4" : undefined}
+                  strokeWidth={v ? 2 : 1}
+                  strokeOpacity={v ? 1 : sec >= 0 ? 0.55 : 1}
+                  strokeDasharray={b.tone === "warn" || v === "removed" ? "5 4" : undefined}
+                  opacity={moved && !v ? 0.45 : 1}
                 />
                 <text
                   x={x + w / 2}
@@ -251,9 +262,16 @@ function Diagram({
                   fontSize="14.5"
                   fontWeight="600"
                   fill={ink}
+                  opacity={moved && !v ? 0.5 : 1}
+                  textDecoration={v === "removed" ? "line-through" : undefined}
                 >
                   {b.label}
                 </text>
+                {v ? (
+                  <text x={x + w - 8} y={y + 15} textAnchor="end" fontSize="12" fontWeight="700" fill={TINT[v].ink}>
+                    {TINT[v].mark}
+                  </text>
+                ) : null}
                 {b.sub ? (
                   <text x={x + w / 2} y={y + 43} textAnchor="middle" fontSize="12" fill="var(--color-faint)">
                     {b.sub}

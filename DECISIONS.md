@@ -1737,3 +1737,34 @@ would need every map generated at full.
 **Cost accepted:** a map is often read by someone other than the person who
 imported it, and their answers set it for every reader. Regenerating at
 another level redoes the roots; the summaries and the cut replay from cache.
+
+## D71 — What Claude reads on the web opens in the Preview
+
+**Chose:** Claude Code's own WebSearch and WebFetch are allowed without asking in a Mira tab, and a PostToolUse hook hands each one's address (or search) to the app as a `web` act, which navigates the project's Preview there. The system prompt and the preview's MCP instructions say WebFetch is fine for reading docs as text.
+**Why:** a tester asked whether search "opens the search tab in the app itself". The Preview was already a browser Claude could drive, but asked to fetch docs Claude reaches for WebFetch, which read the page out of sight and asked permission first. Now every page Claude reads is one the reader can see beside the answer.
+**Beat:** denying WebFetch so Claude must browse the Preview, which is slower for plain reading and fights the model's habit.
+**Cost accepted:** the Preview comes forward on each read, as it does when Claude navigates it. Preview screenshots and real input are still macOS only; elsewhere Claude reads pages as text and a tree.
+**At scale:** a turn that fetches ten pages flips the Preview ten times; batching to the last one is the next step if that grates.
+
+## D72 — Commits are a list in the diff panel, and lines are drawn under what they changed
+
+**Chose:** the diff panel opens on the commit list (subject, author, date, +/−) under the map's own default; a click shows what that commit did (`<it>~1..<it>`), and two arbitrary ends sit behind "Compare two commits…". Every changed file opens onto its hunks, and a step's code popup shows "What changed here" — only the hunks inside its lines. The map's line references are carried to any `from` commit through the diff from the map's text, following renames commit by commit, so any commit gets section verdicts. Supersedes D56's rule that only the map's own commit could.
+**Fixed with it:** after an update the working-tree diff started from the commit, not `base.json`, so verdicts compared refs to the wrong numbering.
+**Beat:** a separate commit screen (D56 holds: the hunks sit next to the code they belong to).
+**Cost accepted:** a ref whose own lines changed between the map's text and `from` lands near, not on. A commit far from the map's takes 2–5 s.
+
+## D73 — How the code got here: commits on the map's sections, chapters on request
+
+**Chose:** `?timeline` takes the level's place (the D66 pattern) and draws every commit (up to 2000) as a dot on the rows of the map's roots, by the cut's `owners`, one step per commit with dates under it and each commit's size as a bar above. Paths follow renames, so history from before a move still lands on today's roots. A dot opens what that commit did on its root's level; a drag opens a stretch; both through diff mode. "Tell the story" is one structured model call over the commit messages, checked so every chapter's ends are real commits in order, drawn as bands. Claude opens it with `slop-map-show timeline`.
+**Beat:** a time-scaled axis, which crushed three busy weeks into slivers beside empty gaps; and narrating history in chat only.
+**Measured:** this repository: 193 commits, first read 6.8 s, cached 69 ms (keyed by HEAD and the roots). Story: 7 chapters, $0.05, 27 s, accepted first try.
+**Cost accepted:** every new commit re-reads the log; a repository past 2000 commits shows its newest.
+**At scale:** 2000 commits at ~0.6px a step become density, not dots; zooming into a span is the next step.
+
+## D74 — Changes in the diagrams, code you type into, whole files in tabs
+
+**Chose:** in diff mode a diagram box takes its section's verdict colour: amber when changed, red, dashed and struck through when gone, green when new. After a map update, a diagram also compares against `map.base.json`, a copy of the map from before the update's first write, so boxes and arrows added or removed show in green and red. Code panes have no edit button: the code is an editor (a transparent textarea over the highlighted text) that writes only on Save or ⌘S, with the trimmed diff shown first. "open file ↗" opens the whole file in a tab of its own as `?file=`, an editor with the same save and stale check; Esc, Back and closing the tab return to the level.
+**Beat:** an edit toggle, which was one more click before every fix; and a code-editor dependency (CodeMirror/Monaco), which would mean a new package and a second colour scheme.
+**Fixed with it:** a whole-file save dropped the file's final newline, because `writeSlice` strips one; the file view sends one for it to strip.
+**Cost accepted:** no multi-cursor, find, or language smarts; an unsaved draft is lost when you leave the view.
+**At scale:** each keystroke re-highlights the whole file, which holds to a few thousand lines; past that, highlight only the visible window.

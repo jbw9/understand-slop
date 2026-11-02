@@ -46,6 +46,11 @@ const BAND_H = 22;
 const AXIS_H = 22;
 
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+/** A label cut to about `px` wide at 11.5px sans, whole when it fits; the band's tooltip has it all. */
+const fit = (text: string, px: number) => {
+  const n = Math.floor(px / 6.6);
+  return text.length <= n ? text : n < 2 ? "" : `${text.slice(0, n - 1)}…`;
+};
 const size = (c: TimelineCommit) => Math.sqrt(c.added + c.removed);
 
 export function TimelineView() {
@@ -204,7 +209,7 @@ export function TimelineView() {
                 <rect x={x0} y={0} width={Math.max(x1 - x0, 6)} height={h - AXIS_H} fill={i % 2 ? "transparent" : "var(--color-surface-container-low)"} />
                 <line x1={x0} x2={x0} y1={0} y2={h - AXIS_H} stroke="var(--color-border-gray)" />
                 <text x={x0 + 5} y={15} fontSize={11.5} fontWeight={600} fill="var(--color-ink)" className="font-sans">
-                  {ch.title}
+                  {fit(ch.title, x1 - x0 - 10)}
                 </text>
               </g>
             );

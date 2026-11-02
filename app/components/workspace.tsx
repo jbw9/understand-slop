@@ -15,8 +15,8 @@ import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
-import { goTo, useLocation } from "@/components/chrome";
-import { TAB_STRIP, TabClose, TabLabel, openInTab, tabLook } from "@/components/tabs";
+import { useLocation } from "@/components/chrome";
+import { TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
@@ -163,7 +163,8 @@ export function Workspace() {
   const mapState = useTabs(map.name);
   const mapTabs = mapState?.tabs ?? [{ id: 0, path }];
   const mapActive = mapState?.active ?? 0;
-  const titleOf = (p: string[]) => (p.length ? (map.nodeAt(p)?.title ?? map.RUN.repo) : map.RUN.repo);
+  const titleOf = (p: string[], file?: string) =>
+    file ? file.split("/").pop()! : p.length ? (map.nodeAt(p)?.title ?? map.RUN.repo) : map.RUN.repo;
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   // Hidden once it has slid away, so it takes no clicks and no focus.
   const [settled, setSettled] = useState(true);
@@ -882,17 +883,17 @@ export function Workspace() {
           strip reads as it does without one, just longer. */}
       <header role="tablist" data-chrome className={cn(TAB_STRIP, "pointer-events-auto")}>
         {mapTabs.map((m) => {
-          const label = titleOf(m.path);
+          const label = titleOf(m.path, m.file);
           const selected = !upFront && m.id === mapActive;
           const closable = mapTabs.length > 1;
           const toMap = () => {
             setFront((f) => ({ ...f, [here]: null }));
             const p = selectTab(map.name, m.id);
-            if (p) goTo(p);
+            if (p) showTab(p);
           };
           const closeMap = () => {
             const p = closeTab(map.name, m.id);
-            if (p) goTo(p);
+            if (p) showTab(p);
           };
           return (
             <div
@@ -1169,7 +1170,7 @@ interface Turn {
  * wrong, are redone, by the same Claude Code the tabs run. Nothing happens
  * for a map that is not the user's own project.
  */
-async function updateMap(root: string, turn: Turn) {
+export async function updateMap(root: string, turn: Turn) {
   const found = await invoke<{ path: string } | null>("claude_detect", { configured: readSettings().claudePath || null }).catch(() => null);
   const res = await fetch("/api/projects", {
     method: "POST",

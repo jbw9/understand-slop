@@ -432,13 +432,22 @@ export function DiagramDiff({
 }) {
   const verdictOf = new Map(boxes.map((b) => [b.key, b.verdict]));
   const arrowOf = new Map(arrows.map((a) => [a.key, a.verdict]));
-  // Boxes the `to` side added are not in this block, so they are placed after
-  // the ones that are, on a row of their own.
-  const extra = boxes.filter((b) => b.verdict === "added" && !block.boxes.some((x) => x.id === b.key));
+  // Boxes only the other side has are not in this block — added ones when it
+  // is the `from` side's (a plan), gone ones when it is the `to` side's (the
+  // map on screen) — so they are placed after the ones that are, on a row of
+  // their own. Arrows the other side had between boxes now drawn come back
+  // the same way, so a dropped hand-off is a red line where it used to run.
+  const extra = boxes.filter((b) => b.verdict !== "untouched" && !block.boxes.some((x) => x.id === b.key));
   const row = Math.max(0, ...block.boxes.map((b) => b.row)) + 1;
+  const ids = new Set([...block.boxes.map((b) => b.id), ...extra.map((b) => b.key)]);
+  const lost = arrows
+    .filter((a) => a.verdict !== "untouched" && !block.arrows.some((x) => `${x.from}→${x.to}` === a.key))
+    .map((a) => ({ from: a.key.split("→")[0], to: a.key.split("→")[1], label: a.label }))
+    .filter((a) => ids.has(a.from) && ids.has(a.to));
   const whole: Extract<Anatomy, { kind: "diagram" }> = {
     ...block,
     boxes: [...block.boxes, ...extra.map((b, i) => ({ id: b.key, label: b.label ?? b.key, col: i, row }))],
+    arrows: [...block.arrows, ...lost],
   };
   const { W, H, boxes: placed, arrows: drawn } = layoutDiagram(whole);
 

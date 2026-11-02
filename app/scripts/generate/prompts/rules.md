@@ -33,9 +33,10 @@ The reader is a developer who has to *explain* this system under questioning: wh
     Add a second block only when it shows something the first cannot: the stored value a `flow` writes as an `example`, say.
   - **Every step of a leaf's `flow` and every message of its `sequence` cites the lines it happens on** in `at`, as `file:start-end`: the few lines (at most 40) where that one step is done, not the whole function. The reader clicks a step to see exactly those lines, so the code arrives attached to the sentence that explains it. They are usually inside the leaf's own `code`; a step that happens in code another part explains (the other side of a race, say) cites that code.
   - The reader sees code only on a leaf; above it, `code` refs back the claims but are not shown. So when a node would cite several separate things (five route handlers, a form and the endpoint it posts to, a writer and a reader), each is its own leaf, and the node is a level whose diagram opens them. Never stop at a node that summarises several parts and hands over all their code at once.
+- **Every part of the code is reachable.** Each top-level function, component, type, route or handler (more than 3 lines) in the files a root owns is opened by some leaf's `code` or some step's `at`. A reader looking for any of them must be able to get there by clicking down. Small related ones (a type and its helpers, three tiny formatters) may share a leaf.
 - **Depth belongs to the branch.**
   - Most roots go 2–3 levels: root → parts → the piece of code each part is.
-  - Go one level deeper only when a part is itself several pieces of code. Don't pad a branch with a level that says nothing new.
+  - Go one level deeper when a part is itself several pieces of code, including when that is what it takes to reach every symbol. Don't pad a branch with a level that says nothing new.
 - **Breadth:** 3–6 children per node is typical, never more than about 8.
 
 ## What a level shows

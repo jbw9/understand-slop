@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { commitLog, mapDiff, resolveRef, type Resolved } from "@/lib/diff";
 import { loadMap, rootOf } from "@/lib/maps";
+import { apply, readOverlay } from "@/lib/overlay";
 import { projectDir } from "@/lib/vault";
 
 /**
@@ -75,8 +76,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const seen = join(projectDir(open.name), "base.json");
-    const diff = mapDiff(root, from, to, open.file, existsSync(seen) ? JSON.parse(readFileSync(seen, "utf8")) : {});
+    const dir = projectDir(open.name);
+    const json = (f: string) => (existsSync(join(dir, f)) ? JSON.parse(readFileSync(join(dir, f), "utf8")) : undefined);
+    // Since the map was made, and it has been updated since: the map as it was
+    // then is the other picture, so its diagrams and tables diff box by box.
+    // The reader's own additions are on both, so they never read as a change.
+    const snapshot = !from && !to ? json("map.base.json") : undefined;
+    const before = snapshot && { ...apply(snapshot, readOverlay(open.name)).file, RUN: { ...snapshot.RUN, root } };
+    const diff = before
+      ? mapDiff(root, from, to, before, {}, open.file)
+      : mapDiff(root, from, to, open.file, json("base.json") ?? {});
     return Response.json(read.from || read.to ? { ...diff, read } : diff);
   } catch (e) {
     return bad(e instanceof RangeError ? e.message : "Could not read the checkout.", e instanceof RangeError ? 400 : 500);

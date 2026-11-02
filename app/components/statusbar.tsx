@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentIcon } from "@/components/agents";
 import { Kbd } from "@/components/button";
 import { useMap } from "@/components/map-context";
+import { openFiles, useFiles } from "@/components/files";
 import { openPalette } from "@/components/palette";
 import { openProjects } from "@/components/projects";
 import { UNFOLLOWED, toggleWorkspace } from "@/components/workspace";
+import { coverage } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { STATIC_MAP } from "@/lib/source";
 import { cn } from "@/lib/utils";
@@ -40,6 +42,8 @@ export function StatusBar() {
     problems += TOP.issues?.length ?? 0;
     return { levels, unsure, problems };
   }, [L0, TOP]);
+  const files = useFiles();
+  const covered = useMemo(() => (files?.index ? coverage(files.index, L0) : null), [files, L0]);
 
   return (
     <footer data-chrome className="flex h-6 shrink-0 select-none items-center gap-0.5 border-t border-border-gray bg-surface-container-low px-2 text-[11.5px] text-muted-slate">
@@ -50,7 +54,24 @@ export function StatusBar() {
         </svg>
         {RUN.commit?.slice(0, 7) ?? "no commit"}
       </Item>
-      <Item title="Files the map read">{RUN.files} files</Item>
+      {covered ? (
+        <Item
+          title="Top-level symbols a level opens, of those the map must explain — click for every file"
+          onClick={() => openFiles(covered.gaps.length ? "gaps" : "all")}
+          className={covered.gaps.length ? "text-amber-ink" : undefined}
+        >
+          {covered.explained}/{covered.symbols} explained
+        </Item>
+      ) : (
+        <Item title="Files the map read — click for every file" onClick={() => openFiles()}>
+          {RUN.files} files
+        </Item>
+      )}
+      {files?.added.length ? (
+        <Item title="Files added since the map was made — click to list them" onClick={() => openFiles("added")} className="text-amber-ink">
+          {files.added.length} not on the map yet
+        </Item>
+      ) : null}
       <Sep />
       <Item title="Levels in the map — Ctrl+K to go to one" onClick={() => openPalette()}>
         {counts.levels} levels

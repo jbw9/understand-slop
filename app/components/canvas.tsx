@@ -18,6 +18,7 @@ import { useMap } from "@/components/map-context";
 import { useFlash } from "@/components/flash";
 import { DocView, closeDoc, useOpenDoc } from "@/components/docs";
 import { TimelineView, closeTimeline, useTimelineOpen } from "@/components/timeline";
+import { FileView, closeFile, useOpenFile } from "@/components/code";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { FixAndKeep, onAnswer } from "@/components/keep";
@@ -115,7 +116,9 @@ export function Canvas() {
   const doc = useOpenDoc();
   // So does the history (components/timeline.tsx).
   const timeline = useTimelineOpen();
-  const key = doc ? `doc:${doc.file}` : timeline ? "timeline" : path.join("/");
+  // And a whole file open to edit (components/code.tsx).
+  const file = useOpenFile();
+  const key = doc ? `doc:${doc.file}` : file ? `file:${file.file}` : timeline ? "timeline" : path.join("/");
   const focus = path.length ? nodeAt(path) : null;
 
   // Which way the level slides: deeper or back. Derived when the depth
@@ -171,8 +174,9 @@ export function Canvas() {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && e.target.closest("textarea, input")) return;
       if (e.key === "Escape") {
-        // Unwind one layer at a time: an open doc or the history, the trace, then one level.
+        // Unwind one layer at a time: an open doc, file or the history, the trace, then one level.
         if (doc) closeDoc();
+        else if (file) closeFile();
         else if (timeline) closeTimeline();
         else if (traced) setTraced(null);
         else if (path.length) goTo(path.slice(0, -1));
@@ -183,7 +187,7 @@ export function Canvas() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [traced, setTraced, path, doc, timeline]);
+  }, [traced, setTraced, path, doc, file, timeline]);
 
   /* ── handing a section to Claude ──────────────────────────── */
 
@@ -255,6 +259,8 @@ export function Canvas() {
             >
               {doc ? (
                 <DocView file={doc.file} line={doc.line} />
+              ) : file ? (
+                <FileView key={file.file} file={file.file} line={file.line} />
               ) : timeline ? (
                 <TimelineView />
               ) : (

@@ -5,11 +5,13 @@ import { StateChip } from "@/components/state";
 import { rowId, type Anatomy } from "@/lib/data";
 import { ROW_LABEL_MAX_PCT, ROW_VALUE_MIN_PX } from "@/lib/view";
 import { ExplainedBlock, isExplained } from "@/components/blocks";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Slice, WriteResult } from "@/lib/repo";
 import { useMap } from "@/components/map-context";
 import { readSource, SOURCE_URL } from "@/lib/source";
-import { highlight, langOf, TOKEN_COLOR } from "@/lib/highlight";
+import { useLocation } from "@/components/chrome";
+import { openFileInTab } from "@/components/code";
+import { CodeEditor } from "@/components/editor";
 
 /**
  * Level 2 renders in the SHAPE of the thing it describes, and the rows are the
@@ -711,10 +713,12 @@ export function SourceView({
 
   const [slice, setSlice] = useState<Slice | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(quoted);
+  // Null until the reader types: the pane is always editable, and only a
+  // change makes a draft (D74).
+  const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState<WriteResult | null>(null);
   const { name: map } = useMap();
+  const { path } = useLocation();
 
   /**
    * One read of the repository, resolved to what the UI should show.
@@ -748,16 +752,13 @@ export function SourceView({
 
   // Disk is the truth once we have it; the fixture is the fallback.
   const shown = slice?.code ?? quoted;
-  const lines = shown.split("\n");
-  // Tokenized once per text, not per render: a 90-line slice re-scanned on
-  // every trace or hover is work nobody asked for.
-  const painted = useMemo(() => highlight(shown, langOf(block.file)), [shown, block.file]);
+  const dirty = draft !== null && draft !== shown;
   const drifted = slice != null && !slice.matchesFixture;
 
-  // Nothing is ever written without an explicit click, so this is only ever
-  // reached from the save button's own handler. Never a blur, never a timer,
-  // never navigation.
+  // Nothing is ever written without an explicit act — the Save button or ⌘S.
+  // Never a keystroke, a blur, a timer or navigation.
   async function save() {
+    if (!dirty) return;
     const res = await fetch("/api/source", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -775,7 +776,7 @@ export function SourceView({
     const body = (await res.json()) as WriteResult;
     setSaved(body);
     if (body.ok) {
-      setEditing(false);
+      setDraft(null);
       // Re-read rather than trusting the draft: what is now on disk is the
       // only thing this card is allowed to show as the file's contents.
       const r = await read();
@@ -837,22 +838,16 @@ export function SourceView({
             github ↗
           </a>
         ) : (
-          /* Read-only is the default. Editing is a control you go and press. */
+          /* The code here is a slice; the whole file opens in a tab of its own. */
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setDraft(shown);
-              setSaved(null);
-              setEditing((v) => !v);
+              openFileInTab(map, path, block.file, block.start);
             }}
-            className={cn(
-              "shrink-0 rounded-[2px] border px-1.5 py-0.5 font-mono text-[9px] transition-colors",
-              editing
-                ? "border-deep-green bg-deep-green text-white"
-                : "border-border-strong text-muted-slate hover:text-on-surface",
-            )}
+            title={`Open all of ${block.file} in a new tab, to read and edit`}
+            className="shrink-0 rounded-[2px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
           >
-            {editing ? "cancel" : "edit"}
+            open file ↗
           </button>
         )}
       </div>
@@ -872,72 +867,44 @@ export function SourceView({
         </p>
       ) : null}
 
-      {editing ? (
-        <div className="px-3 py-2">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            spellCheck={false}
-            rows={Math.min(lines.length + 2, 24)}
-            className="w-full resize-y rounded-[2px] border border-border-strong bg-surface-container-low p-2 font-mono text-[11.5px] leading-[1.55] text-on-surface outline-none focus:border-deep-green"
-          />
-          {/* The diff is shown BEFORE the write, and the write needs this
-              click. There is no other path to disk. */}
-          <div className="mt-2 flex items-center gap-2">
+      {/* Real line numbers, counting from the file's own offset, coloured by
+          lib/highlight.ts — and editable where it is read. */}
+      <CodeEditor file={block.file} start={block.start} value={draft ?? shown} onChange={setDraft} onSave={() => void save()} readOnly={Boolean(SOURCE_URL)} />
+      {/* The diff is shown BEFORE the write, and the write needs Save or ⌘S.
+          There is no other path to disk. */}
+      {dirty ? (
+        <div className="border-t border-border-gray px-3 py-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 void save();
               }}
-              disabled={draft === shown}
-              className="rounded-[2px] bg-deep-green px-2 py-1 font-mono text-[10px] text-white disabled:opacity-40"
+              className="rounded-[2px] bg-deep-green px-2 py-1 font-mono text-[10px] text-white"
             >
-              save to disk
+              save to disk ⌘S
             </button>
-            <span className="font-mono text-[9.5px] text-faint">
-              {draft === shown
-                ? "no change"
-                : `rewrites ${block.file}:${block.start}-${end}`}
-            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDraft(null);
+                setSaved(null);
+              }}
+              className="rounded-[2px] border border-border-strong px-2 py-1 font-mono text-[10px] text-muted-slate hover:text-on-surface"
+            >
+              discard
+            </button>
+            <span className="font-mono text-[9.5px] text-faint">rewrites {block.file}:{block.start}-{end}</span>
           </div>
-          {draft !== shown ? <DraftDiff before={shown} after={draft} /> : null}
-          {saved && !saved.ok ? (
-            <p className="mt-2 text-[10px] leading-relaxed text-clay-ink">
-              Refused: {saved.refused}
-              {saved.refused === "stale"
-                ? " — the file changed since this was read. Cancel and reopen to get the current text."
-                : null}
-            </p>
-          ) : null}
+          <DraftDiff before={shown} after={draft!} />
         </div>
-      ) : (
-        /* Real line numbers, counting from the file's own offset. A gutter
-           that restarts at 1 is a quiet lie about where this code lives.
-           Coloured by lib/highlight.ts: the same reading a code editor gives,
-           since this pane's whole job is to be read. */
-        <div className="overflow-x-auto bg-code">
-          <pre className="min-w-full py-2 font-mono text-[12.5px] leading-[1.65]">
-            {painted.map((line, i) => (
-              <div key={i} className="flex">
-                <span className="tnum sticky left-0 shrink-0 select-none border-r border-border-gray bg-code pl-3 pr-2.5 text-right text-faint">
-                  {block.start + i}
-                </span>
-                <code className="whitespace-pre pl-3 pr-4 text-code-plain">
-                  {line.length ? (
-                    line.map((t, j) => (
-                      <span key={j} style={{ color: TOKEN_COLOR[t.kind] }}>
-                        {t.text}
-                      </span>
-                    ))
-                  ) : (
-                    " "
-                  )}
-                </code>
-              </div>
-            ))}
-          </pre>
-        </div>
-      )}
+      ) : null}
+      {saved && !saved.ok ? (
+        <p className="border-t border-border-gray px-3 py-2 text-[10px] leading-relaxed text-clay-ink">
+          Refused: {saved.refused}
+          {saved.refused === "stale" ? " — the file changed since this was read. Discard and reopen to get the current text." : null}
+        </p>
+      ) : null}
 
       {/* Commentary, in its own band, below the code, labelled. It is
           synthesized and must never be able to read as something the file
@@ -958,8 +925,16 @@ export function SourceView({
 
 /** Line-wise diff of the pending edit, shown before anything is written. */
 function DraftDiff({ before, after }: { before: string; after: string }) {
-  const b = before.split("\n");
-  const a = after.split("\n");
+  // Only the lines between the first and last that differ: the pane is
+  // always editable, so one typed character must not paint the whole slice.
+  let b = before.split("\n");
+  let a = after.split("\n");
+  let head = 0;
+  while (head < b.length && head < a.length && b[head] === a[head]) head++;
+  let tail = 0;
+  while (tail < b.length - head && tail < a.length - head && b[b.length - 1 - tail] === a[a.length - 1 - tail]) tail++;
+  b = b.slice(head, b.length - tail);
+  a = a.slice(head, a.length - tail);
   return (
     <pre className="mt-2 overflow-x-auto rounded-[2px] border border-border-gray bg-pure-white py-1.5 font-mono text-[10.5px] leading-[1.5]">
       {b.map((l, i) => (

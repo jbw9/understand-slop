@@ -10,6 +10,8 @@ import { useCallback, useSyncExternalStore } from "react";
 export interface Tab {
   id: number;
   path: string[];
+  /** A whole file open over the level (components/code.tsx), as `?file=` spells it. */
+  file?: string;
 }
 export interface Tabs {
   tabs: Tab[];
@@ -56,39 +58,39 @@ function save(map: string, next: Tabs) {
   window.dispatchEvent(new Event(CHANGED));
 }
 
-/** The tab in front follows the level on screen; the first visit makes it. */
-export function follow(map: string, path: string[]) {
+/** The tab in front follows the level on screen, and the file over it; the first visit makes it. */
+export function follow(map: string, path: string[], file?: string) {
   const t = readTabs(map);
-  if (!t) return save(map, { tabs: [{ id: 1, path }], active: 1 });
+  if (!t) return save(map, { tabs: [{ id: 1, path, file }], active: 1 });
   const front = t.tabs.find((x) => x.id === t.active)!;
-  if (!same(front.path, path))
-    save(map, { ...t, tabs: t.tabs.map((x) => (x.id === t.active ? { ...x, path } : x)) });
+  if (!same(front.path, path) || front.file !== file)
+    save(map, { ...t, tabs: t.tabs.map((x) => (x.id === t.active ? { id: x.id, path, ...(file ? { file } : {}) } : x)) });
 }
 
-/** A new tab beside the one in front, holding `path`, brought to the front. */
-export function openTab(map: string, path: string[]) {
+/** A new tab beside the one in front, holding `path` (and `file` over it), brought to the front. */
+export function openTab(map: string, path: string[], file?: string) {
   const t = readTabs(map) ?? { tabs: [], active: 0 };
   const id = Math.max(0, ...t.tabs.map((x) => x.id)) + 1;
   const at = t.tabs.findIndex((x) => x.id === t.active);
   const tabs = [...t.tabs];
-  tabs.splice(at + 1, 0, { id, path });
+  tabs.splice(at + 1, 0, { id, path, ...(file ? { file } : {}) });
   save(map, { tabs, active: id });
 }
 
-/** Brings a tab to the front, and says which level to open. */
-export function selectTab(map: string, id: number): string[] | null {
+/** Brings a tab to the front, and says what it holds to open. */
+export function selectTab(map: string, id: number): Tab | null {
   const t = readTabs(map);
   const tab = t?.tabs.find((x) => x.id === id);
   if (!t || !tab) return null;
   save(map, { ...t, active: id });
-  return tab.path;
+  return tab;
 }
 
 /**
  * Closes a tab. If it was in front, the one to its right comes forward (else
- * the one to its left), and its level is returned to open. The last tab stays.
+ * the one to its left), and what it holds is returned to open. The last tab stays.
  */
-export function closeTab(map: string, id: number): string[] | null {
+export function closeTab(map: string, id: number): Tab | null {
   const t = readTabs(map);
   if (!t || t.tabs.length < 2) return null;
   const at = t.tabs.findIndex((x) => x.id === id);
@@ -99,7 +101,7 @@ export function closeTab(map: string, id: number): string[] | null {
   }
   const next = tabs[at] ?? tabs[at - 1];
   save(map, { tabs, active: next.id });
-  return next.path;
+  return next;
 }
 
 const subscribe = (f: () => void) => {

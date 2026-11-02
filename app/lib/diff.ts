@@ -304,7 +304,8 @@ function blockDiff(path: string[], at: number, a: Anatomy, b: Anatomy): BlockDif
  *
  * Exported because this is the half that does not need git at all: given any
  * two `MapFile`s — two commits' maps, or a map before and after an update —
- * it says what changed on the map itself.
+ * it says what changed on the map itself. A block's `at` is its index in
+ * `b`'s section, the map the canvas draws; a block only `a` had keeps `a`'s.
  */
 export function treeDiff(a: MapFile, b: MapFile): { sections: SectionDiff[]; blocks: BlockDiff[] } {
   const was = walk(a.AUTHORED);
@@ -328,7 +329,8 @@ export function treeDiff(a: MapFile, b: MapFile): { sections: SectionDiff[]; blo
         blocks.push({ path: ids, at: i, kind: block.kind, verdict: "removed" });
         continue;
       }
-      const d = blockDiff(ids, i, block, other);
+      // Indexed where `b` has it: `b` is the map on screen.
+      const d = blockDiff(ids, theirs.indexOf(other), block, other);
       if (d) blocks.push(d);
     }
     // Added is the mirror of removed: past the count of that kind it had.
@@ -434,14 +436,41 @@ export function resolveRef(root: string, phrase: string): Resolved | { error: st
   return { commit, how: `${author}'s last commit · ${describe(root, commit)}`, span: true };
 }
 
+/**
+ * Where each file renamed between commits `a` and `b` ended up: its path at
+ * `a` to its path at `b`. Followed one commit at a time, because one diff
+ * across a long gap holds too many files for git to look for renames in.
+ * Commits that are not one behind the other move nothing.
+ */
+function movesBetween(root: string, a: string, b: string): Map<string, string> {
+  const ahead = (x: string, y: string) => git(root, "rev-list", "--count", `${y}..${x}`).trim() === "0";
+  const forward = ahead(a, b);
+  if (!forward && !ahead(b, a)) return new Map();
+  const [from, to] = forward ? [a, b] : [b, a];
+  // Today's path for each path as it was at `from`, renamed oldest commit first.
+  const now = new Map<string, string>();
+  const was = new Map<string, string>();
+  for (const l of git(root, "log", "--reverse", "--format=", "--name-status", "-M", `${from}..${to}`).split("\n")) {
+    const [status, old, moved] = l.split("\t");
+    if (!status?.startsWith("R") || !moved) continue;
+    const first = was.get(old) ?? old;
+    was.delete(old);
+    was.set(moved, first);
+    now.set(first, moved);
+  }
+  return forward ? now : new Map([...now].map(([x, y]) => [y, x]));
+}
+
 /* ── the answer ──────────────────────────────────────────────── */
 
 /**
  * What changed in `root` between `from` and `to`, in the map's terms.
  *
  * `to` undefined is the working tree, uncommitted work included. `other` is the
- * `to` side's own map where one exists; without it there is one map, so the
- * answer is section verdicts off the code and no block diff.
+ * `to` side's own map where one exists, and then `map` is the `from` side's:
+ * the boxes, rows and sections between the two are compared as well. Without
+ * it there is one map, so the answer is section verdicts off the code and no
+ * block diff.
  *
  * `seen` is the project's base.json: once an update has run, the map's lines
  * are numbered to the code as that update saw it, not to its commit, so the
@@ -456,11 +485,6 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
   const mapped = resolve(root, map.RUN.commit);
   // `seen` is the map's text, so it is the starting point only from the map's commit.
   const found = head ? between(root, base, head) : changes(root, base, base === mapped ? seen : {});
-  if (other) {
-    const files = found.map(counted);
-    const { sections, blocks } = treeDiff(map, other);
-    return { basis: "sections", from: base, to: head, files, sections, blocks };
-  }
   if (!mapped) {
     const files = found.map(counted);
     return {
@@ -483,12 +507,7 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
   // A file may also have moved between `from` and the map's commit, so a
   // commit made under its old path is still held to the sections citing it.
   const exact = base === mapped && (!head || !Object.keys(seen).length);
-  const renamed = new Map<string, string>();
-  if (!exact)
-    for (const l of git(root, "diff", "--name-status", "-M", base, mapped).split("\n")) {
-      const [status, was, now] = l.split("\t");
-      if (status?.startsWith("R") && now) renamed.set(was, now);
-    }
+  const renamed = exact ? new Map<string, string>() : movesBetween(root, base, mapped);
   const back = new Map([...renamed].map(([was, now]) => [now, was]));
   const files = found.map((c) => ({ ...counted(c), ...(renamed.has(c.path) ? { mapped: renamed.get(c.path) } : {}) }));
   const byPath = new Map(found.map((c) => [renamed.get(c.path) ?? c.path, c]));
@@ -504,7 +523,17 @@ export function mapDiff(root: string, from: string | undefined, to: string | und
     }
     return carried.get(path);
   };
-  return { basis: "sections", from: base, to: head, files, sections: verdicts(map, byPath, exact ? undefined : carry), blocks: [] };
+  const sections = verdicts(map, byPath, exact ? undefined : carry);
+  if (!other) return { basis: "sections", from: base, to: head, files, sections, blocks: [] };
+  // Two maps: what the pictures say changed, over what the code says did,
+  // keeping the files the code verdict found behind each section.
+  const tree = treeDiff(map, other);
+  const byId = new Map(sections.map((s) => [s.id, s]));
+  const merged = tree.sections.map((t) => {
+    const code = byId.get(t.id);
+    return { ...t, verdict: t.verdict === "untouched" ? (code?.verdict ?? "untouched") : t.verdict, files: code?.files ?? [] };
+  });
+  return { basis: "sections", from: base, to: head, files, sections: merged, blocks: tree.blocks };
 }
 
 /** One commit, as the commit list and the timeline draw it. */

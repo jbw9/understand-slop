@@ -11,7 +11,9 @@ import type { MapFile, Overview } from "@/lib/map";
 import type { Progress } from "@/lib/vault";
 import { parseArgs } from "./args";
 import { auditMarkdown } from "./audit";
+import { coverage } from "@/lib/coverage";
 import { authorRoot, type Authored } from "./author";
+import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
 import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
@@ -182,6 +184,8 @@ export async function main(args: string[]) {
       ? { cut: cached!, leftover: [] as string[], rejected: [] as string[][] }
       : await lap("cut", () => cutRepo(inv, sums, models.cut));
   writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(cut, null, 1));
+  const index = catalogOf(inv, sums, cut);
+  atomic(`${out}/index.json`, JSON.stringify(index) + "\n");
   for (const r of cut.roots) say(`${r.id.padEnd(18)} ${r.title} — ${r.files.length} paths`);
   if (leftover.length) say(`${leftover.length} files left unassigned after three rounds`);
   if (stopAfter === "cut") return;
@@ -249,7 +253,8 @@ export async function main(args: string[]) {
         authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, submitted(r.id, r.prefix));
         delete drafts[r.id];
         void writeDrafts();
-        say(`${r.id}: ${authored[r.id].root ? "accepted" : "FAILED"} after ${authored[r.id].turns + 1} turns, ${authored[r.id].reads} reads`);
+        const cov = authored[r.id].coverage;
+        say(`${r.id}: ${authored[r.id].root ? "accepted" : "FAILED"} after ${authored[r.id].turns + 1} turns, ${authored[r.id].reads} reads${cov ? `, ${cov.symbols - cov.gaps.length}/${cov.symbols} symbols explained` : ""}`);
         // Accepted means it already passed, inside authorRoot's submit, the
         // same check() the finished map passes — so showing it now shows
         // nothing a finished root would not.
@@ -317,6 +322,7 @@ export async function main(args: string[]) {
   const map = assemble({ ...runNow(), elapsed: `${Math.round(total / 60)} min` });
   const { AUTHORED } = map;
   const final = check(map, repo, { generated: true });
+  const covered = coverage(index, AUTHORED);
   atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
   progress.stage = "done";
   flush();
@@ -339,6 +345,7 @@ export async function main(args: string[]) {
     throttled: { waits: throttle.waits, seconds: Math.round(throttle.seconds) },
     files: { listed: inv.files.length, summarised: code.length, unassigned: leftover },
     excluded: cut.excluded,
+    coverage: { symbols: covered.symbols, explained: covered.explained, gaps: covered.gaps.map((g) => `${g.file}: ${g.symbol.name}`) },
     overview: drawn ? { accepted: Boolean(drawn.overview), turns: drawn.turns + 1, submits: drawn.submits, lastProblems: drawn.overview ? [] : drawn.problems.slice(0, 20) } : (overview ? "kept" : null),
     roots: cut.roots.map((r) => ({
       id: r.id,
@@ -348,6 +355,7 @@ export async function main(args: string[]) {
       reads: authored[r.id].reads,
       submits: authored[r.id].submits,
       lastProblems: authored[r.id].root ? [] : authored[r.id].problems.slice(0, 20),
+      ...(authored[r.id].coverage ? { coverage: { symbols: authored[r.id].coverage!.symbols, unexplained: authored[r.id].coverage!.gaps.length } } : {}),
       verify: verdicts[r.id] ? { nodes: verdicts[r.id].length, ok: verdicts[r.id].filter((v) => v.ok).length, flagged: verdicts[r.id].filter((v) => v.flagged).length, rewritten: verdicts[r.id].filter((v) => v.rewritten).map((v) => ({ id: v.id, claims: v.claims })), downgraded: verdicts[r.id].filter((v) => v.downgraded).map((v) => v.id) } : (last?.roots?.find((x: { id: string }) => x.id === r.id)?.verify ?? null),
     })),
     check: { problems: final.problems, depth: final.roots },
@@ -364,7 +372,7 @@ export async function main(args: string[]) {
     `${out}/audit.md`,
     auditMarkdown({ inv, cut, rejected, leftover, cutReused, authored, drawn, overview, verdicts, only, backend: BACKEND, models, seconds: total, checkProblems: final.problems }),
   );
-  console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
+  console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, ${covered.explained}/${covered.symbols} symbols explained, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));
   await ccClose();
 }

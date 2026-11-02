@@ -10,6 +10,7 @@
  *   <vault>/projects/<id>/progress.json how far a run in flight has got, root by root
  *   <vault>/projects/<id>/.cache/     model replies, so a regenerate is cheap
  *   <vault>/projects/<id>/base.json   the code as the last update saw it (scripts/generate/update.ts)
+ *   <vault>/projects/<id>/map.base.json the map as it was before its first update, for the diff's pictures
  *   <vault>/projects/<id>/update.json what the last update did
  *   <vault>/projects/<id>/update.log  its output
  *   <vault>/projects/<id>/turns.json  agents' turns waiting for the next update to take them
@@ -292,6 +293,7 @@ export function generate(id: string, claude?: string, explain?: Explain): Projec
   mkdirSync(dir, { recursive: true });
   // A fresh map starts from the code as it is; what earlier updates saw goes.
   rmSync(join(dir, "base.json"), { force: true });
+  rmSync(join(dir, "map.base.json"), { force: true });
   rmSync(join(dir, "update.json"), { force: true });
   // The last run's progress would otherwise read as this one's until the
   // first stage overwrites it.

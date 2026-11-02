@@ -27,7 +27,7 @@
  * and the sections it reported wrong with slop-map-fix, which are redone
  * with its notes even where no code changed.
  *
- * Writes <out>/map.json, <out>/base.json, <out>/update.json (what this run
+ * Writes <out>/map.json, <out>/map.base.json (once, before the first update), <out>/base.json, <out>/update.json (what this run
  * did, read by the app) and adds the run to <out>/report.json's `updates`.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
@@ -37,6 +37,7 @@ import type { Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { parseArgs } from "./args";
 import { converse, runTool } from "./author";
+import { catalogOf } from "./catalog";
 import { changes, moved, refs, touches, type Base, type Change } from "./gitdiff";
 import { bill, cacheIn, MODELS } from "./bedrock";
 import { ccClose, type Handled } from "./claude-code";
@@ -311,6 +312,9 @@ export async function update(args: string[]) {
     return;
   }
   const map: MapFile = JSON.parse(readFileSync(`${out}/map.json`, "utf8"));
+  // The map as it was at its commit, kept once before the first update
+  // changes it: the other side the diff draws the pictures against (D74).
+  if (!existsSync(`${out}/map.base.json`)) writeFileSync(`${out}/map.base.json`, readFileSync(`${out}/map.json`));
   const cut: Cut = JSON.parse(readFileSync(`${out}/.cache/cut.json`, "utf8"));
   const base: Base = existsSync(`${out}/base.json`) ? JSON.parse(readFileSync(`${out}/base.json`, "utf8")) : {};
   cacheIn(`${out}/.cache`);
@@ -415,6 +419,9 @@ export async function update(args: string[]) {
 
   const final = check(map, repo, { generated: true });
   atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+  // Summaries of the changed files are fresh now, so the index (and every
+  // file added since the cut) follows the code too.
+  atomic(`${out}/index.json`, JSON.stringify(catalogOf(inv, sums, cut)) + "\n");
   // The map now describes these files as they are: the next update starts here.
   for (const c of found) base[c.path] = c.after;
   writeFileSync(`${out}/base.json`, JSON.stringify(base) + "\n");

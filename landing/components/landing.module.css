@@ -12,6 +12,14 @@
   --on-green: #fff;
 }
 :root[data-theme="dark"] .page {
+  --color-warm-cream: #141416;
+  --color-pure-white: #202023;
+  --color-surface-container-low: #1b1b1e;
+  --color-surface-dim: #2d2d31;
+  --color-border-gray: #2c2c30;
+  --color-ink: #f7f8f8;
+  --color-on-surface-variant: #d6d6d8;
+  --color-muted-slate: #a8a8ad;
   --color-deep-green: #4ac777;
   --color-mint-success: #173020;
   --on-green: #0f1a12;

@@ -9,6 +9,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/coverage";
@@ -185,18 +186,35 @@ const needs = (inv: Inventory) => {
 /** At most this many rounds are spent on coverage alone; what is left is recorded, not hidden. */
 const COVER_ROUNDS = 2;
 
-function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
+/** A root's own source files, and those just across its boundary: what it imports, and what imports it. */
+function neighbourhood(root: Root, cut: Cut, inv: Inventory) {
   const mine = inv.files.filter((f) => isSource(f) && owners(cut, f.path).includes(root.id));
   const mineSet = new Set(mine.map((f) => f.path));
-  // Files just across the boundary: what this root imports, and what imports it.
   const near = new Set<string>();
   for (const [from, tos] of Object.entries(inv.imports))
     for (const to of tos) {
       if (mineSet.has(from) && !mineSet.has(to)) near.add(to);
       if (mineSet.has(to) && !mineSet.has(from)) near.add(from);
     }
+  return { mine, near };
+}
+
+/**
+ * What a root's authoring depends on beyond its brief: the content of the
+ * files it owns and of those it talks to. The brief names no commit, so a
+ * commit that leaves these alone replays the root from cache.
+ */
+function contentKey(root: Root, cut: Cut, inv: Inventory): string {
+  const { mine, near } = neighbourhood(root, cut, inv);
+  const hash = new Map(inv.files.map((f) => [f.path, f.hash]));
+  const lines = [...mine.map((f) => f.path), ...near].sort().map((p) => `${p} ${hash.get(p) ?? "-"}`);
+  return createHash("sha256").update(lines.join("\n")).digest("hex");
+}
+
+function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
+  const { mine, near } = neighbourhood(root, cut, inv);
   return [
-    `# Repository: ${inv.name} @ ${inv.commit}${inv.dirty.length ? ` (with uncommitted edits to ${inv.dirty.length} files, which you read as they are on disk)` : ""}`,
+    `# Repository: ${inv.name}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
     ...(inv.instructions ? [`## What the repository tells coding agents\nIts own conventions and rules (AGENTS.md, CLAUDE.md). They say what its parts are meant to be; where the code departs from them, that is worth an issue.\n\n${inv.instructions}`] : []),
     ...(inv.docs.length ? [`## Its docs (${inv.docs.length}): path, lines, first heading\n${inv.docs.slice(0, 80).map((d) => `${d.path} (${d.lines})${d.title ? ` — ${d.title}` : ""}`).join("\n")}`] : []),
@@ -392,7 +410,7 @@ export async function authorRoot(
     return { content: `Not accepted. Fix every one of these, then submit with \`replace\`: only the nodes you changed.\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
   };
 
-  const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 60 });
+  const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 40, salt: contentKey(root, cut, inv) });
   return { ...(r.value ?? res), turns: r.turns };
 }
 
@@ -408,6 +426,8 @@ interface Agent {
   /** Through Claude Code, which gives Opus thinking no budget (see claude-code.ts). */
   ccEffort?: "low" | "medium" | "high";
   nudge?: string;
+  /** Extra cache key through Claude Code (contentKey); the API path keys on the tool results it is sent. */
+  salt?: string;
 }
 
 /**
@@ -421,7 +441,7 @@ export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: n
   if (BACKEND === "claude-code") {
     // Medium, not the API path's high: at high one root thought for 32k
     // tokens in a reply. Medium halved that root's time (1118s to 614s) with a map as full.
-    return ccAgent<T>({ model: a.model, system: a.system ?? system(), prompt: a.prompt, tools: a.tools ?? TOOLS, handle: a.handle, effort: a.ccEffort ?? "medium", stage: a.stage, maxTurns: a.maxTurns, nudge });
+    return ccAgent<T>({ model: a.model, system: a.system ?? system(), prompt: a.prompt, tools: a.tools ?? TOOLS, handle: a.handle, effort: a.ccEffort ?? "medium", stage: a.stage, maxTurns: a.maxTurns, nudge, salt: a.salt });
   }
 
   const messages: Message[] = [{ role: "user", content: a.prompt }];

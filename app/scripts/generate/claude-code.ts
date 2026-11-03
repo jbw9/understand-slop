@@ -234,10 +234,12 @@ export async function ccAgent<T>(req: {
   stage: string;
   maxTurns: number;
   nudge: string;
+  /** What the run depends on beyond its prompt, such as the hashes of the files it reads; part of the cache key only. */
+  salt?: string;
 }): Promise<{ value: T | null; turns: number; calls: number; usage: Usage }> {
   const system = systemText(req.system);
   const effort = ccEffort(req.effort);
-  const key = keyOf(req.model, effort ?? "", system, req.prompt, JSON.stringify(req.tools));
+  const key = keyOf(req.model, effort ?? "", system, req.prompt, JSON.stringify(req.tools), ...(req.salt ? [req.salt] : []));
   const hit = cached<{ value: T | null; turns: number; calls: number }>(key, req.stage, req.model);
   if (hit) return hit;
 

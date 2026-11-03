@@ -81,7 +81,6 @@ export function SettingsDialog() {
       >
         <PanelHead
           title="Settings"
-          note="How the app looks, which agent tabs open into, whether a project's dev server starts by itself, and how Claude Code runs. Changes apply as you make them."
           right={
             <button
               type="submit"
@@ -95,7 +94,7 @@ export function SettingsDialog() {
             </button>
           }
         />
-        <div className="flex flex-col gap-5 px-5 py-5">
+        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-5">
           <Field label="Theme" hint="System follows your desktop's light or dark setting.">
             <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {THEMES.map((t) => (
@@ -251,7 +250,7 @@ export function SettingsDialog() {
           <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
           <Field
             label="On-device dictation"
-            hint="Hold Option+Space (⌥Space) anywhere in the app and speak: the words go into the field you're in, or Claude's prompt. Runs on this machine, for any sign-in; nothing is sent anywhere."
+            hint="Hold Control+Option (⌃⌥) anywhere in the app and speak: the words go into the field you're in, or Claude's prompt. Runs on this machine, for any sign-in; nothing is sent anywhere."
           >
             <OnDevice />
           </Field>

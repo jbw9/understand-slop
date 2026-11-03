@@ -234,8 +234,6 @@ export function Shell({
         // Ctrl+` (Cmd+` too) and Ctrl+W belong to the workspace window, never the program in a tab.
         if (e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyW") return false;
         if ((e.ctrlKey || e.metaKey) && e.code === "Backquote") return false;
-        // Option+Space (Alt+Space) is the app's on-device dictation (lib/dictate.ts).
-        if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === "Space") return false;
         const action = actionFor(e, term.hasSelection());
         if (!action) return true;
         e.preventDefault();

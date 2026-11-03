@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 /**
  * On-device dictation's only chrome (lib/dictate.ts): a pill over the bottom
  * of the window while it listens or writes out, and for a moment after when
- * it put nothing in. Mounted once; it also holds the Option+Space key.
+ * it put nothing in. Mounted once; it also holds the Control+Option keys.
  */
 export function Dictation() {
   useDictationKey();
@@ -31,7 +31,7 @@ export function Dictation() {
           aria-hidden
           className={cn("h-2 w-2 rounded-full", listening ? "animate-pulse bg-clay-ink" : d.phase === "working" ? "bg-deep-green" : "bg-faint")}
         />
-        {listening ? "Listening… let go of ⌥Space" : d.phase === "working" ? "Writing it out…" : d.error}
+        {listening ? "Listening… let go of ⌃⌥" : d.phase === "working" ? "Writing it out…" : d.error}
         {listening ? (
           <>
             <button type="button" onClick={() => void stopDictation()} className="cursor-pointer text-deep-green hover:underline">

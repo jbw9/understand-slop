@@ -4,12 +4,13 @@ import { insertPrompt } from "@/lib/context";
 import { openSettings } from "@/lib/settings";
 
 /**
- * On-device dictation (src-tauri/src/dictate.rs): hold Option+Space, speak,
+ * On-device dictation (src-tauri/src/dictate.rs): hold Control+Option, speak,
  * let go. The words go where the cursor was — a text field in the app if one
  * had focus, else Claude's prompt in the tab picks go to, without Enter, so
  * they can be read before they are sent. Esc while holding throws it away.
  * Plain Space stays Claude Code's own dictation (claude.rs). Not Ctrl+Space:
  * macOS keeps that for switching input source, and takes it before the page does.
+ * Modifiers alone type nothing, so neither a field nor the terminal needs keeping from them.
  */
 
 export type Phase = "idle" | "listening" | "working";
@@ -93,33 +94,48 @@ function put(text: string): boolean {
   return insertPrompt(text);
 }
 
-const isHotkey = (e: KeyboardEvent) => e.code === "Space" && e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
+const MODIFIER = new Set(["Control", "Alt", "Meta", "Shift"]);
+/** Control and Option down together, and nothing else. */
+const both = (e: KeyboardEvent) => e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
 
-/** Mounted once, by the workspace: the hold-to-talk key, anywhere in the window. */
+/** Mounted once: the hold-to-talk keys, anywhere in the window. */
 export function useDictationKey() {
   useEffect(() => {
     if (!isTauri()) return;
-    // Capture phase, so it wins before xterm's textarea sends Option+Space to the program, or a field types a no-break space.
+    // Started by holding the keys, so letting go ends it; one from the palette ends on "done".
+    let held = false;
+    // Capture phase, so it is seen before xterm or a field takes the key.
     const down = (e: KeyboardEvent) => {
-      if (isHotkey(e)) {
+      if (e.code === "Escape" && started) {
         e.preventDefault();
         e.stopPropagation();
-        if (!e.repeat) startDictation();
-      } else if (e.code === "Escape" && started) {
-        e.preventDefault();
-        e.stopPropagation();
-        cancelDictation();
+        held = false;
+        return cancelDictation();
+      }
+      if (!MODIFIER.has(e.key)) {
+        // Control+Option+a key is someone's shortcut, not speech.
+        if (held) {
+          held = false;
+          cancelDictation();
+        }
+        return;
+      }
+      if (both(e) && !e.repeat && !started) {
+        held = true;
+        startDictation();
       }
     };
     // Letting go of either key ends it.
     const up = (e: KeyboardEvent) => {
-      if (!started || (e.code !== "Space" && e.key !== "Alt")) return;
-      e.preventDefault();
-      e.stopPropagation();
+      if (!held || (e.key !== "Control" && e.key !== "Alt")) return;
+      held = false;
       void stopDictation();
     };
     // A key-up lost to another window would leave the microphone open.
-    const blur = () => void stopDictation();
+    const blur = () => {
+      held = false;
+      void stopDictation();
+    };
     window.addEventListener("keydown", down, true);
     window.addEventListener("keyup", up, true);
     window.addEventListener("blur", blur);

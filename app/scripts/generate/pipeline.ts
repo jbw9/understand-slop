@@ -14,7 +14,7 @@ import { auditMarkdown } from "./audit";
 import { coverage } from "@/lib/coverage";
 import { authorRoot, type Authored } from "./author";
 import { catalogOf } from "./catalog";
-import { BACKEND, bill, MODELS, cacheIn, throttle } from "./bedrock";
+import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
 import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, place, unclaimed, type Cut } from "./cut";
@@ -386,5 +386,10 @@ export async function main(args: string[]) {
   );
   console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, ${covered.explained}/${covered.symbols} symbols explained, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));
+  // A whole map asked for every reply it still needs; the rest can never replay.
+  if (!only) {
+    const swept = sweepCache();
+    if (swept) console.log(`  swept ${swept} stale cached replies`);
+  }
   await ccClose();
 }

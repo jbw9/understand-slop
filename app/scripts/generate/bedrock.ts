@@ -13,7 +13,7 @@
 
 import { BedrockRuntimeClient, InvokeModelWithResponseStreamCommand } from "@aws-sdk/client-bedrock-runtime";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -120,7 +120,29 @@ export function cacheIn(dir: string, opts: { fresh?: boolean } = {}) {
 
 /** Where a reply with this key is cached; `replay` false asks only where to write it (a --fresh run reads nothing). */
 export function cacheFile(key: string, replay = true): string | null {
+  if (cacheDir) used.add(`${key}.json`);
   return cacheDir && !(replay && fresh) ? join(cacheDir, `${key}.json`) : null;
+}
+
+/** Replies this run asked for, whether replayed or fresh: the cache a full run still needs. */
+const used = new Set<string>();
+
+/**
+ * Drops the cached replies a full run never asked for. Their keys hash the
+ * prompts and files they were made from, so once those change nothing can
+ * ask for them again. Only after a whole map, never a partial run (--roots,
+ * an update), which leaves the other roots' replies unasked but still live.
+ * Named files beside them (cut.json, summaries.json) are not replies and stay.
+ */
+export function sweepCache(): number {
+  if (!cacheDir) return 0;
+  let n = 0;
+  for (const f of readdirSync(cacheDir))
+    if (/^[0-9a-f]{64}\.json$/.test(f) && !used.has(f)) {
+      rmSync(join(cacheDir, f), { force: true });
+      n++;
+    }
+  return n;
 }
 
 /** Which door the calls go through: an AWS account (default) or the reader's own Claude Code. */
@@ -160,6 +182,7 @@ export async function invoke(req: Request): Promise<Reply> {
   // the first maps were cached under — so a routing switch replays them.
   const key = createHash("sha256").update(`us.${bare(req.model)}\n${json}`).digest("hex");
   const file = cacheDir ? join(cacheDir, `${key}.json`) : null;
+  if (file) used.add(`${key}.json`);
   if (file && !fresh && existsSync(file)) {
     const r = JSON.parse(readFileSync(file, "utf8")) as Reply;
     charge(req.stage, req.model, r, true);

@@ -193,46 +193,49 @@ function Block({
             {block.rows.length} {/\.\w+$/.test(block.table) ? "fields" : "columns"}
           </span>
         </div>
-        <div>
-          {block.rows.map((c) => {
-            const id = rowId(owner, c.name);
-            const isLit = ctx.traced === id;
-            return (
-              <button
-                key={c.name}
-                data-row={id}
-                onClick={() => ctx.onTrace(id)}
-                className={rowClass(
-                  id,
-                  ctx,
-                  cn(PAIR_SCOPE, "border-b border-border-gray px-3 py-1.5 last:border-b-0"),
-                )}
-              >
-                {/* The column name, its type and its key are the question; the
-                    note is the answer. The note was `truncate` against three
-                    `shrink-0` siblings, so it was the one thing on the row
-                    guaranteed to be cut — and it wraps now instead. */}
-                <span className={PAIR_ROW}>
-                  <span className={cn(PAIR_LABEL, "flex items-center gap-2")}>
-                    <span
-                      className={cn(
-                        "min-w-0 font-mono text-[10.5px]",
-                        isLit ? "font-semibold text-deep-green" : "text-on-surface",
-                      )}
-                    >
-                      {c.name}
-                      {c.nullable ? <span className="text-faint">?</span> : null}
-                    </span>
-                    <span className="shrink-0 font-mono text-[10.5px] text-muted-slate">
-                      {c.type}
-                    </span>
-                    {c.key ? <KeyTag k={c.key} lit={isLit} /> : null}
+        {/* One grid for the whole table, each row a subgrid of it, so names,
+            types and keys line up down the page the way a table's columns do.
+            Under 300px the note leaves its column for a line of its own. */}
+        <div className="@container">
+          <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_max-content] gap-x-4 @min-[300px]:grid-cols-[minmax(0,max-content)_minmax(0,max-content)_max-content_minmax(0,1fr)]">
+            <div className="col-span-full grid grid-cols-subgrid border-b border-border-gray px-3 py-1 font-mono text-[9px] uppercase tracking-wide text-faint">
+              <span>{/\.\w+$/.test(block.table) ? "field" : "column"}</span>
+              <span>type</span>
+              <span>key</span>
+              <span className="hidden @min-[300px]:block">notes</span>
+            </div>
+            {block.rows.map((c) => {
+              const id = rowId(owner, c.name);
+              const isLit = ctx.traced === id;
+              return (
+                <button
+                  key={c.name}
+                  data-row={id}
+                  onClick={() => ctx.onTrace(id)}
+                  className={rowClass(
+                    id,
+                    ctx,
+                    "col-span-full grid grid-cols-subgrid items-baseline gap-y-0.5 border-b border-border-gray px-3 py-1.5 last:border-b-0",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "min-w-0 break-words font-mono text-[10.5px]",
+                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                    )}
+                  >
+                    {c.name}
+                    {c.nullable ? <span className="text-faint" title="can be empty">?</span> : null}
                   </span>
-                  <span className={cn(PAIR_VALUE, "flex items-start gap-2")}>
+                  <span className="min-w-0 break-words font-mono text-[10.5px] text-muted-slate">
+                    {c.type}
+                  </span>
+                  <span className="self-center">{c.key ? <KeyTag k={c.key} lit={isLit} /> : null}</span>
+                  <span className="col-span-full flex items-start gap-2 @min-[300px]:col-span-1">
                     {c.note ? (
                       <span
                         className={cn(
-                          "min-w-0 flex-1 text-[10px] leading-snug @min-[267px]:text-right",
+                          "min-w-0 flex-1 text-[10px] leading-snug",
                           c.state === "derived" ? "text-faint" : "text-amber-ink",
                         )}
                       >
@@ -243,10 +246,10 @@ function Block({
                     )}
                     <StateChip state={c.state} />
                   </span>
-                </span>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
         {block.rel?.length ? (
           <div className="border-t border-border-gray bg-surface-container-low px-3 py-2">

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { openFile, useOpenFile } from "@/components/code";
 import { closeTab, follow, openTab, readTabs, selectTab, useTabs, type Tab } from "@/lib/tabs";
+import { Menu } from "@/components/menu";
 import { cn } from "@/lib/utils";
 
 /** What a tab holds, opened: its level, and its file over it. */
@@ -14,6 +15,44 @@ export const show = (t: Tab) => (t.file ? openFile(t.path, t.file) : goTo(t.path
 export function openInTab(map: string, path: string[]) {
   openTab(map, path);
   goTo(path);
+}
+
+/** A Preview tab asked for from the main view's `+`; the workspace (components/workspace.tsx) opens it. */
+export const OPEN_PREVIEW = "slop:new-preview";
+
+/** The main view's `+`: another tab of the map, or a Preview. */
+export function NewTab({ onMap }: { onMap: () => void }) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setMenu({ x: r.left, y: r.bottom + 4 });
+        }}
+        aria-label="New tab"
+        aria-haspopup="menu"
+        title="New tab"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+      >
+        <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+          <path d="M5 1.5v7M1.5 5h7" />
+        </svg>
+      </button>
+      {menu ? (
+        <Menu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: "Map", onClick: onMap },
+            { label: "Preview", onClick: () => window.dispatchEvent(new Event(OPEN_PREVIEW)) },
+          ]}
+        />
+      ) : null}
+    </>
+  );
 }
 
 /**
@@ -94,17 +133,7 @@ export function SectionTabs({ path }: { path: string[] }) {
           onClose={many ? () => close(t.id) : undefined}
         />
       ))}
-      <button
-        type="button"
-        onClick={() => openInTab(name, [])}
-        aria-label="New tab"
-        title="New tab"
-        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
-      >
-        <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-          <path d="M5 1.5v7M1.5 5h7" />
-        </svg>
-      </button>
+      <NewTab onMap={() => openInTab(name, [])} />
     </div>
   );
 }

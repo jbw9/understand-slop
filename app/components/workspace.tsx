@@ -16,7 +16,7 @@ import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
-import { TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
+import { NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
@@ -299,6 +299,11 @@ export function Workspace() {
     },
     [add, here, show],
   );
+  useEffect(() => {
+    const open = () => add(null, { kind: "preview", title: "Preview", cwd: here });
+    window.addEventListener(OPEN_PREVIEW, open);
+    return () => window.removeEventListener(OPEN_PREVIEW, open);
+  }, [add, here]);
 
   /** This project's phone of a kind: brought to the front, or opened. */
   const phone = (platform: Platform) => {
@@ -1056,20 +1061,12 @@ export function Workspace() {
           );
         })}
         {docked.map((t) => tabView(t, t.key === upFront?.key, true))}
-        <button
-          type="button"
-          onClick={() => {
+        <NewTab
+          onMap={() => {
             setFront((f) => ({ ...f, [here]: null }));
             openInTab(map.name, []);
           }}
-          aria-label="New tab"
-          title="New tab"
-          className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center self-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
-        >
-          <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-            <path d="M5 1.5v7M1.5 5h7" />
-          </svg>
-        </button>
+        />
       </header>
       <div
         ref={setMainSlot}

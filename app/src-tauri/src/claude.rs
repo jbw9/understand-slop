@@ -351,22 +351,47 @@ pub fn queue(id: u32) -> PathBuf {
         .join(format!("context-{}-{id}.md", std::process::id()))
 }
 
+/// Removes the tab's queue and everything kept beside it: every file named
+/// `context-<pid>-<tab>.md` plus a suffix, so a marker added later (or a
+/// `.part` a hook left half-written) goes with the rest.
 pub fn forget(queue: &Path) {
-    let _ = std::fs::remove_file(queue);
-    let _ = std::fs::remove_file(queue.with_extension("md.sent"));
-    let _ = std::fs::remove_file(live(queue));
-    let _ = std::fs::remove_file(queue.with_extension("md.dirty"));
-    let _ = std::fs::remove_file(queue.with_extension("md.turn"));
-    let _ = std::fs::remove_file(queue.with_extension("md.fix"));
-    let _ = std::fs::remove_file(queue.with_extension("md.act"));
-    let _ = std::fs::remove_file(queue.with_extension("md.map"));
-    let _ = std::fs::remove_file(queue.with_extension("md.where"));
-    let _ = std::fs::remove_file(queue.with_extension("md.where.sent"));
-    let _ = std::fs::remove_file(queue.with_extension("md.status"));
-    let _ = std::fs::remove_file(queue.with_extension("md.plan"));
-    let _ = std::fs::remove_file(queue.with_extension("md.approved"));
-    let _ = std::fs::remove_file(session(queue));
-    let _ = std::fs::remove_file(queue.with_extension("md.resume"));
+    let (Some(dir), Some(name)) = (queue.parent(), queue.file_name().and_then(|n| n.to_str())) else { return };
+    remove_named(dir, |f| f == name || f.strip_prefix(name).is_some_and(|rest| rest.starts_with('.')));
+}
+
+fn remove_named(dir: &Path, doomed: impl Fn(&str) -> bool) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        if e.file_name().to_str().is_some_and(&doomed) {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
+}
+
+/// At startup: the tab files of a Mira that is gone. A crash or a kill skips
+/// `forget`, and the files would wait for a reboot. Another Mira still
+/// running (the dev build beside the installed one) keeps its own.
+pub fn sweep_stale() {
+    let Some(dir) = queue(0).parent().map(Path::to_path_buf) else { return };
+    let me = std::process::id();
+    remove_named(&dir, |f| {
+        let Some(pid) = f.strip_prefix("context-").and_then(|r| r.split('-').next()).and_then(|p| p.parse::<u32>().ok()) else {
+            return false;
+        };
+        pid != me && !alive(pid, &dir.join(f))
+    });
+}
+
+#[cfg(unix)]
+fn alive(pid: u32, _file: &Path) -> bool {
+    crate::proc::command("kill").args(["-0", &pid.to_string()]).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success())
+}
+
+/// No cheap liveness check without a dependency: a day untouched is gone.
+#[cfg(not(unix))]
+fn alive(_pid: u32, file: &Path) -> bool {
+    let age = std::fs::metadata(file).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok());
+    age.map_or(true, |a| a < std::time::Duration::from_secs(24 * 3600))
 }
 
 /// A plan Claude is waiting to have accepted: its Markdown, and the file

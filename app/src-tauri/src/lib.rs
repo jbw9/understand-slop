@@ -19,6 +19,8 @@ pub fn run() {
         .setup(|app| {
             // Claude's way into the preview, for every Claude tab (mcp.rs).
             mcp::start(app.handle().clone());
+            // Tab files a crashed or killed Mira left in the temp folder.
+            std::thread::spawn(claude::sweep_stale);
             #[cfg(target_os = "linux")]
             if let Some(window) = app.get_webview_window("main") {
                 pinch_to_page(&window);

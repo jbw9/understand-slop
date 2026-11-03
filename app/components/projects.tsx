@@ -163,9 +163,11 @@ export function ProjectsDialog() {
     }
   };
 
-  const regenerate = async (id: string, explain?: Explain) => {
+  // `full` makes the whole map again; without it a finished map at the same
+  // depth is only brought up to its code (lib/vault.ts, generate).
+  const regenerate = async (id: string, explain?: Explain, full?: boolean) => {
     try {
-      if (await act({ action: "regenerate", id, claude: await claudePath(), explain })) openMap(id);
+      if (await act({ action: "regenerate", id, claude: await claudePath(), explain, ...(full ? { full: true } : {}) })) openMap(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -235,7 +237,7 @@ export function ProjectsDialog() {
                     current={p.id === current}
                     busy={busy}
                     onOpen={(at) => openMap(p.id, at)}
-                    onRegenerate={(explain) => void regenerate(p.id, explain)}
+                    onRegenerate={(explain, full) => void regenerate(p.id, explain, full)}
                     onCancel={() => void act({ action: "cancel", id: p.id })}
                     onRemove={() => void remove(p.id)}
                   />
@@ -523,12 +525,14 @@ function ProjectRow({
   current: boolean;
   busy: boolean;
   onOpen: (at?: string) => void;
-  onRegenerate: (explain: Explain) => void;
+  onRegenerate: (explain: Explain, full?: boolean) => void;
   onCancel: () => void;
   onRemove: () => void;
 }) {
   // Forgetting a project takes a second click: it deletes the map, not the code.
   const [confirm, setConfirm] = useState(false);
+  // So does making a finished map again from scratch: it is a whole run's time and cost.
+  const [confirmFull, setConfirmFull] = useState(false);
   // What the next run explains; changing it takes effect when the map is made again.
   const [explain, setExplain] = useState<Explain>(p.explain ?? "full");
   const { status } = p.map;
@@ -566,6 +570,18 @@ function ProjectRow({
             <button type="button" onClick={() => onRegenerate(explain)} disabled={busy} className={cn(QUIET, "py-1")}>
               {status === "ready" ? "Regenerate" : status === "empty" ? "Map it" : "Retry"}
             </button>
+            {status === "ready" ? (
+              <button
+                type="button"
+                onClick={() => (confirmFull ? onRegenerate(explain, true) : setConfirmFull(true))}
+                onBlur={() => setConfirmFull(false)}
+                disabled={busy}
+                title="Make the whole map again, not only what changed since it was made"
+                className={cn(QUIET, "py-1", confirmFull && "text-clay-ink")}
+              >
+                {confirmFull ? "Rebuild all?" : "From scratch"}
+              </button>
+            ) : null}
           </>
         )}
         <button

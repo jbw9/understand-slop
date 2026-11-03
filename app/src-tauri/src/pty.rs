@@ -94,12 +94,10 @@ pub fn pty_spawn(
         claude::prepare(&mut cmd, launch, &context, outline.as_deref(), id).map_err(|e| e.to_string())?;
         if start_claude {
             if cfg!(unix) {
-                // Unset after, so a `claude` typed later starts afresh.
-                cmd.args(["-c", r#""$SLOP_LAUNCHER" ${SLOP_RESUME:+--resume "$SLOP_RESUME"}; unset SLOP_RESUME; exec "$SHELL""#]);
+                cmd.args(["-c", r#""$SLOP_LAUNCHER"; exec "$SHELL""#]);
                 cmd.env("SHELL", &program);
                 if let Some(id) = &resume {
                     claude::resuming(&context, id).map_err(|e| e.to_string())?;
-                    cmd.env("SLOP_RESUME", id);
                 }
             } else if name.eq_ignore_ascii_case("cmd") {
                 cmd.args(["/k", "slop-claude"]);

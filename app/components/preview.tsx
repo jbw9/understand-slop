@@ -112,6 +112,7 @@ interface Line {
 let nextCall = 1;
 
 export function Preview({
+  id,
   root,
   target,
   visible,
@@ -121,6 +122,8 @@ export function Preview({
   onServer,
   docked,
 }: {
+  /** Its tab's key: what Claude's calls find it by. */
+  id: number;
   root: string;
   /** The dev server's address, once it has printed one. */
   target?: string;
@@ -648,7 +651,7 @@ export function Preview({
   const quiet = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(
     () =>
-      registerPreview(root, {
+      registerPreview(id, {
         run: (c) => {
           setClaude(true);
           clearTimeout(quiet.current);
@@ -657,7 +660,7 @@ export function Preview({
           });
         },
       }),
-    [root],
+    [id],
   );
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "motion/react";
+import { motion, useMotionValue } from "motion/react";
 import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } from "@/components/agents";
 import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
@@ -207,6 +207,10 @@ export function Workspace() {
   const { agents, others, main: mainAgent } = useAgents();
   const main = mainAgent.id;
   const aside = useRef<HTMLElement>(null);
+  // Where the closed window's dots were dragged to, kept while it opens and closes.
+  const dotsX = useMotionValue(0);
+  const dotsY = useMotionValue(0);
+  const dotsMoved = useRef(false);
   // Text waiting to be pasted into a new tab's agent once it is up, by tab;
   // sent, not only pasted, when it carries a question.
   const [toPaste, setToPaste] = useState<Record<number, { text: string; send: boolean }>>({});
@@ -263,10 +267,21 @@ export function Workspace() {
     tabsNow.current = tabs;
   });
 
-  /** A project's one Preview tab: brought to the front, or opened. */
+  // The Preview last in view, per project: the one Claude uses, and the one
+  // brought back when a project's Preview is asked for.
+  const lastPreview = useRef<Record<string, number>>({});
+  useEffect(() => {
+    for (const t of [current, upFront]) if (t?.kind === "preview") lastPreview.current[t.cwd] = t.key;
+  });
+  const previewTab = (root: string) => {
+    const all = tabsNow.current.filter((x) => x.kind === "preview" && x.cwd === root);
+    return all.find((x) => x.key === lastPreview.current[root]) ?? all.at(-1);
+  };
+
+  /** A project's Preview tab, the one last in view: brought to the front, or opened. */
   const preview = useCallback(
     (root: string) => {
-      const open = tabsNow.current.find((x) => x.kind === "preview" && x.cwd === root);
+      const open = previewTab(root);
       setServerShown((s) => ({ ...s, [root]: false }));
       if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
       if (open.main) setFront((f) => ({ ...f, [root]: open.key }));
@@ -360,7 +375,7 @@ export function Workspace() {
         return reply(true, r.text);
       }
       if (cmd.op === "terminal") return reply(true, terminal(root, tab, cmd.args));
-      let handle = previewOf(root);
+      let handle = previewOf(previewTab(root)?.key);
       if (!handle) {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
         // Anything else to navigate to is a page from the web, which needs no server.
@@ -371,7 +386,7 @@ export function Workspace() {
           );
         if (asked) setServers((all) => ({ ...all, [root]: asked }));
         preview(root);
-        handle = await until(() => previewOf(root), 8000);
+        handle = await until(() => previewOf(previewTab(root)?.key), 8000);
         if (asked) return reply(true, `Opened ${asked} in the preview.`);
       }
       const seen = cmd.op === "frame" || (cmd.op === "agent" && cmd.name === "computer");
@@ -583,8 +598,9 @@ export function Workspace() {
     (key: number) => {
       const gone = tabs.find((x) => x.key === key);
       if (!gone) return;
-      // A Preview's dev server goes with it.
-      const dev = gone.kind === "preview" ? tabs.find((x) => x.dev && x.cwd === gone.cwd) : undefined;
+      // The dev server goes with its project's last Preview.
+      const last = gone.kind === "preview" && !tabs.some((x) => x !== gone && x.kind === "preview" && x.cwd === gone.cwd);
+      const dev = last ? tabs.find((x) => x.dev && x.cwd === gone.cwd) : undefined;
       const rest = tabs.filter((x) => x.key !== key && x !== dev);
       setTabs(rest);
       if (gone.pty !== undefined) tabEnded(gone.pty);
@@ -756,8 +772,11 @@ export function Workspace() {
   const nameOf = (t: Tab) => {
     const i = mine.indexOf(t);
     const front = inFront(t);
+    const previews = mine.filter((x) => x.kind === "preview");
     return t.kind === "preview"
-      ? "Preview"
+      ? previews.length > 1
+        ? `Preview ${previews.indexOf(t) + 1}`
+        : "Preview"
       : t.kind === "plan"
         ? "Plan"
         : t.kind !== "shell"
@@ -922,7 +941,7 @@ export function Workspace() {
             ...[...agents]
               .sort((a, b) => Number(b.id === main) - Number(a.id === main))
               .map((a) => ({ label: a.label, icon: <AgentIcon id={a.id} />, onClick: () => add(a.id) })),
-            { label: "Preview", icon: <GlobeIcon />, onClick: () => preview(here) },
+            { label: "Preview", icon: <GlobeIcon />, onClick: () => add(null, { kind: "preview", title: "Preview", cwd: here }) },
             ...phones.map((p) => ({ label: PLATFORM[p].label === "iOS" ? "iOS Simulator" : "Android emulator", icon: <PhoneIcon />, onClick: () => phone(p) })),
           ]}
         />
@@ -1052,24 +1071,59 @@ export function Workspace() {
         </div>
       </>
     ) : null}
+    {/* With the window closed, its agents float in the corner, so one still
+        working, or done and waiting to be read, is not lost from sight. */}
+    {!shown && panel.some((t) => t.status) ? (
+      <motion.div
+        drag
+        dragMomentum={false}
+        dragConstraints={{ top: 0, left: -window.innerWidth, right: 0, bottom: window.innerHeight }}
+        onDragStart={() => (dotsMoved.current = true)}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{ x: dotsX, y: dotsY, right: GAP, top: (desktop ? TITLEBAR : 0) + GAP }}
+        title="Drag to move"
+        data-chrome
+        className="fixed z-40 flex cursor-grab flex-col items-center gap-0.5 rounded-full border border-border-gray bg-pure-white p-0.5 shadow-lift active:cursor-grabbing"
+      >
+        {panel
+          .filter((t) => t.status)
+          .map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              // A drag ends on a button too: only a press that stayed put opens it.
+              onPointerDown={() => (dotsMoved.current = false)}
+              onClick={() => !dotsMoved.current && bring(t.key)}
+              title={`${nameOf(t)}: ${DOT[t.status!].label}`}
+              className="flex size-5 cursor-pointer items-center justify-center rounded-full hover:bg-surface-container"
+            >
+              <StatusDot status={t.status!} />
+            </button>
+          ))}
+      </motion.div>
+    ) : null}
     {tabs.map((t) => {
           const inView = (x: Tab) => (x.main ? x.cwd === here && x.key === upFront?.key : shown && x.key === current?.key);
-          // A dev server is drawn in its Preview's place, under the Preview's toolbar.
+          // A dev server is drawn in its project's first Preview, under that Preview's toolbar.
           const host = t.dev ? tabs.find((x) => x.kind === "preview" && x.cwd === t.cwd) : t;
           const visible = !!host && inView(host) && (!t.dev || !!serverShown[t.cwd]);
           const slot = host?.main ? mainSlot : panelSlot;
           if (t.kind === "preview") {
             const dev = tabs.find((x) => x.dev && x.cwd === t.cwd);
+            // Only the first Preview can switch to the dev server's terminal: that is where it is drawn.
+            const owns = !!dev && tabs.find((x) => x.kind === "preview" && x.cwd === t.cwd) === t;
             return (
               <Held key={t.key} slot={slot}>
               <Preview
+                id={t.key}
                 root={t.cwd}
                 target={servers[t.cwd]}
                 visible={visible}
                 waiting={servers[t.cwd] ? undefined : dev?.run}
                 onTarget={(url) => setServers((all) => ({ ...all, [t.cwd]: url }))}
-                serverShown={!!dev && serverShown[t.cwd]}
-                onServer={dev ? (on) => setServerShown((s) => ({ ...s, [t.cwd]: on })) : undefined}
+                serverShown={owns && serverShown[t.cwd]}
+                onServer={owns ? (on) => setServerShown((s) => ({ ...s, [t.cwd]: on })) : undefined}
                 docked={!!t.main}
               />
               </Held>

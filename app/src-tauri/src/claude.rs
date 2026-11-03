@@ -232,7 +232,9 @@ const LAUNCHER: &str = r#"#!/bin/sh
 # Claude Code with Mira's map-context hook (src-tauri/src/claude.rs).
 trap 'rm -f "$SLOP_CONTEXT.live" "$SLOP_CONTEXT.session"' EXIT INT TERM HUP
 : > "$SLOP_CONTEXT.live"
-"$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} ${SLOP_CLAUDE_MCP:+--mcp-config "$SLOP_CLAUDE_MCP"} "$@"
+# A reopened tab's conversation, taken once: a `claude` typed later starts afresh.
+r=$(cat "$SLOP_CONTEXT.resume" 2>/dev/null); rm -f "$SLOP_CONTEXT.resume"
+"$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} ${SLOP_CLAUDE_MCP:+--mcp-config "$SLOP_CLAUDE_MCP"} ${r:+--resume "$r"} "$@"
 "#;
 
 /// `claude` typed in a tab: the launcher, so it is in front and takes context
@@ -364,6 +366,7 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue.with_extension("md.plan"));
     let _ = std::fs::remove_file(queue.with_extension("md.approved"));
     let _ = std::fs::remove_file(session(queue));
+    let _ = std::fs::remove_file(queue.with_extension("md.resume"));
 }
 
 /// A plan Claude is waiting to have accepted: its Markdown, and the file
@@ -507,13 +510,15 @@ pub fn session_of(queue: &Path) -> Option<String> {
     std::fs::read_to_string(session(queue)).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
-/// A tab reopened into `id`: it counts as that conversation's from the start,
-/// so a restart before Claude is up does not lose it, and a resume that fails
-/// drops it when the launcher exits.
+/// A tab reopened into `id`: the launcher resumes it, in a file rather than the
+/// tab's command line so the user's shell never has to split it. The tab counts
+/// as that conversation's from the start, so a restart before Claude is up does
+/// not lose it, and a resume that fails drops it when the launcher exits.
 pub fn resuming(queue: &Path, id: &str) -> std::io::Result<()> {
     if let Some(dir) = queue.parent() {
         std::fs::create_dir_all(dir)?;
     }
+    std::fs::write(queue.with_extension("md.resume"), id)?;
     std::fs::write(session(queue), format!("{id}\n"))
 }
 
@@ -1058,6 +1063,18 @@ mod tests {
         assert_eq!(session_of(&q).as_deref(), Some("abc-3"));
         assert!(!launch(&q, "/usr/bin/false").success());
         assert!(session_of(&q).is_none());
+        // Claude is handed it as its own two arguments, once.
+        let args = dir.path().join("args");
+        let probe = dir.path().join("probe");
+        std::fs::write(&probe, format!("#!/bin/sh
+printf '[%s]' \"$@\" > '{}'\n", args.display())).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&probe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        resuming(&q, "abc-4").unwrap();
+        launch(&q, probe.to_str().unwrap());
+        assert!(std::fs::read_to_string(&args).unwrap().ends_with("[--resume][abc-4]"));
+        launch(&q, probe.to_str().unwrap());
+        assert!(!std::fs::read_to_string(&args).unwrap().contains("--resume"));
     }
 
     #[test]

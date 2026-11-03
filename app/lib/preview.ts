@@ -21,17 +21,17 @@ export interface PreviewHandle {
   run(call: Call): Promise<unknown>;
 }
 
-const handles = new Map<string, PreviewHandle>();
+const handles = new Map<number, PreviewHandle>();
 
-/** A project's preview, while it is mounted. Returns its removal. */
-export function registerPreview(root: string, handle: PreviewHandle) {
-  handles.set(root, handle);
+/** A Preview tab's preview, by the tab's key, while it is mounted. Returns its removal. */
+export function registerPreview(tab: number, handle: PreviewHandle) {
+  handles.set(tab, handle);
   return () => {
-    if (handles.get(root) === handle) handles.delete(root);
+    if (handles.get(tab) === handle) handles.delete(tab);
   };
 }
 
-export const previewOf = (root: string) => handles.get(root);
+export const previewOf = (tab: number | undefined) => (tab === undefined ? undefined : handles.get(tab));
 
 /** Sizes a viewport is often checked at, as the toolbar and Claude name them. */
 export const PRESETS = [

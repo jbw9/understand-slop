@@ -223,9 +223,9 @@ export function Shell({
         /* no WebGL: the DOM renderer stays */
       }
       term.attachCustomKeyEventHandler((e) => {
-        // Ctrl+` and Ctrl+W belong to the workspace window, never the program in a tab.
+        // Ctrl+` (Cmd+` too) and Ctrl+W belong to the workspace window, never the program in a tab.
         if (e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyW") return false;
-        if (e.ctrlKey && e.code === "Backquote") return false;
+        if ((e.ctrlKey || e.metaKey) && e.code === "Backquote") return false;
         const action = actionFor(e, term.hasSelection());
         if (!action) return true;
         e.preventDefault();

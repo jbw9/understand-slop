@@ -23,6 +23,8 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 pinch_to_page(&window);
             }
+            #[cfg(target_os = "macos")]
+            terminal_menu(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -65,6 +67,27 @@ pub fn run() {
                 devices::stop_all();
             }
         });
+}
+
+/// Cmd+` and Ctrl+` from the menu bar as well as the page: a key pressed in
+/// a Preview's page (its own webview, or a frame) never reaches the page's
+/// handler, but a menu key equivalent is the app's wherever focus is. A key
+/// the page handles itself is not passed on to the menu, so it toggles once.
+#[cfg(target_os = "macos")]
+fn terminal_menu(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem, Submenu};
+    use tauri::Emitter;
+    let menu = Menu::default(app.handle())?;
+    let cmd = MenuItem::with_id(app, "terminal", "Toggle Terminal", true, Some("Cmd+`"))?;
+    let ctrl = MenuItem::with_id(app, "terminal-ctrl", "Toggle Terminal", true, Some("Ctrl+`"))?;
+    menu.append(&Submenu::with_items(app, "Terminal", true, &[&cmd, &ctrl])?)?;
+    app.set_menu(menu)?;
+    app.on_menu_event(|app, e| {
+        if e.id() == "terminal" || e.id() == "terminal-ctrl" {
+            let _ = app.emit_to("main", "slop:toggle-workspace", ());
+        }
+    });
+    Ok(())
 }
 
 /// WebKitGTK answers a touchpad pinch by magnifying the whole page — the title

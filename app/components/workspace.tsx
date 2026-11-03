@@ -641,6 +641,13 @@ export function Workspace() {
         add(main);
         return;
       }
+      // Cmd+` as well as Ctrl+`, as on a Mac.
+      if (e.code === "Backquote" && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggle();
+        return;
+      }
       if (!e.ctrlKey || e.altKey || e.metaKey) return;
       // Ctrl+T: a new terminal tab.
       if (e.code === "KeyT" && !e.shiftKey) {
@@ -680,15 +687,18 @@ export function Workspace() {
     };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener(TOGGLE, toggle);
+    // The menu bar's Cmd+`/Ctrl+`, for when focus is in a Preview's page (src-tauri/src/lib.rs).
+    const fromMenu = desktop ? listen("slop:toggle-workspace", toggle) : undefined;
     const off = onOpenClaude(toClaude);
     const offHand = onHand(toAgent);
     return () => {
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener(TOGGLE, toggle);
+      void fromMenu?.then((f) => f());
       off();
       offHand();
     };
-  }, [open, mine, panel, current, upFront, main, add, close, bring, show]);
+  }, [open, mine, panel, current, upFront, main, add, close, bring, show, desktop]);
 
   const drag = (e: React.PointerEvent) => {
     e.preventDefault();

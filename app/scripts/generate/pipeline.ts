@@ -12,7 +12,7 @@ import type { Progress } from "@/lib/vault";
 import { parseArgs } from "./args";
 import { auditMarkdown } from "./audit";
 import { coverage } from "@/lib/coverage";
-import { authorRoot, type Authored } from "./author";
+import { authorRoot, authorSplit, tooBig, type Authored } from "./author";
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
@@ -95,8 +95,17 @@ export async function main(args: string[]) {
   }
   const only = opt("--roots")?.split(",");
   const stopAfter = opt("--stop-after");
-  const pick = (env: string | undefined) => MODELS[(env ?? "opus") as keyof typeof MODELS] ?? MODELS.opus;
-  const models = { summarize: MODELS.haiku, cut: pick(process.env.SLOP_CUT), author: pick(process.env.SLOP_AUTHOR), verify: MODELS.haiku };
+  const pick = (env: string | undefined, fallback: keyof typeof MODELS = "opus") => MODELS[(env ?? fallback) as keyof typeof MODELS] ?? MODELS[fallback];
+  // The parts of a split root and the verify reviewer read a bounded amount
+  // of code against a set brief; Sonnet does that at a fraction of Opus.
+  const models = {
+    summarize: MODELS.haiku,
+    cut: pick(process.env.SLOP_CUT),
+    author: pick(process.env.SLOP_AUTHOR),
+    part: pick(process.env.SLOP_PART, "sonnet"),
+    verify: MODELS.haiku,
+    review: pick(process.env.SLOP_REVIEW, "sonnet"),
+  };
 
   // --out puts the map elsewhere: the app's project vault (lib/vault.ts), so an
   // imported project's map never lands in this repo's committed examples.
@@ -222,6 +231,9 @@ export async function main(args: string[]) {
     return { RUN: run, ...(top ? { OVERVIEW: top } : {}), AUTHORED };
   };
 
+  // The parts each split root was cut into, kept as the top cut is (see above).
+  const subcuts: Record<string, Cut> = !has("--fresh") && existsSync(`${out}/.cache/subcuts.json`) ? JSON.parse(readFileSync(`${out}/.cache/subcuts.json`, "utf8")) : {};
+
   progress.stage = "author";
   progress.roots = cut.roots.map((r) => ({ id: r.id, title: r.title, sub: r.sub, status: "queued" as RootStatus, detail: "queued" }));
   flush();
@@ -262,7 +274,25 @@ export async function main(args: string[]) {
           return;
         }
         mark(r.id, "drafting", "drafting");
-        authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, submitted(r.id, r.prefix));
+        if (tooBig(r, cut, inv, sums)) {
+          mark(r.id, "drafting", "splitting into parts");
+          const split = await authorSplit(r, cut, inv, sums, { cut: models.cut, part: models.part, join: models.author }, subcuts[r.id] ?? null, {
+            submit: submitted(r.id, r.prefix),
+            // The parts as they come back, under a placeholder of the root, shown dimmed until its own level is written.
+            part: (draft) => {
+              if (shapeProblems(structuredClone(draft), r.prefix).length) return;
+              drafts[r.id] = draft;
+              void writeDrafts();
+              mark(r.id, "drafting", `${draft.children?.length ?? 0} parts written`);
+            },
+            say,
+          });
+          if (split) {
+            subcuts[r.id] = split.cut;
+            writeFileSync(`${out}/.cache/subcuts.json`, JSON.stringify(subcuts, null, 1));
+          }
+          authored[r.id] = split?.authored ?? (await authorRoot(r, cut, inv, sums, models.author, submitted(r.id, r.prefix)));
+        } else authored[r.id] = await authorRoot(r, cut, inv, sums, models.author, submitted(r.id, r.prefix));
         delete drafts[r.id];
         void writeDrafts();
         const cov = authored[r.id].coverage;

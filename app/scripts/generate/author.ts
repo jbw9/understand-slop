@@ -17,7 +17,7 @@ import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
 import { ccAgent, type Handled } from "./claude-code";
 import type { Cut, Root } from "./cut";
-import { excludedBy, owners } from "./cut";
+import { cutRepo, excludedBy, owners, place, unclaimed } from "./cut";
 import { isSource, numbered, type Inventory } from "./inventory";
 import { EXPLAIN_LEVEL } from "./check";
 import { submitProblems, typeReference } from "./schema";
@@ -465,4 +465,136 @@ export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: n
     messages.push({ role: "user", content: results });
   }
   return { value: null, turns };
+}
+
+/* ── large roots: cut into parts, authored in parallel, then joined ── */
+
+/** A root owning more than this many source files, or required symbols, is split. SLOP_SPLIT_FILES / SLOP_SPLIT_SYMBOLS override. */
+const SPLIT_FILES = Number(process.env.SLOP_SPLIT_FILES ?? 40);
+const SPLIT_SYMBOLS = Number(process.env.SLOP_SPLIT_SYMBOLS ?? 150);
+
+/**
+ * Whether one agent should not write this root alone. One that did reached
+ * 20–29 turns and 160k tokens of context, re-sent every turn, and held a
+ * concurrency slot for most of the run.
+ */
+export function tooBig(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): boolean {
+  const owned = explains(root, cut, inv, sums);
+  const need = needs(inv);
+  return owned.length > SPLIT_FILES || owned.reduce((a, f) => a + sums[f.path].symbols.filter(need).length, 0) > SPLIT_SYMBOLS;
+}
+
+/** The repository as a cut of one root sees it: only that root's files are source. */
+function scoped(root: Root, cut: Cut, inv: Inventory): Inventory {
+  const files = inv.files.map((f) => (isSource(f) && owners(cut, f.path).includes(root.id) ? f : { ...f, code: false, outside: true }));
+  return { ...inv, files, scope: { paths: root.files, focus: `${inv.scope ? `${inv.scope.focus} ` : ""}This is one part of the map, "${root.title}" (${root.sub}): ${root.why} Cut it into the 2-6 parts a reader of that part opens first.` } };
+}
+
+/** The parts' cut, its ids and prefixes put under the root's, as the briefs of its parts read it. */
+function partsCut(root: Root, sub: Cut, cut: Cut): Cut {
+  return {
+    about: `${root.title} — ${root.sub}, one part of a map whose top level is ${cut.roots.map((r) => r.title).join(", ")}. ${sub.about}`,
+    roots: sub.roots.map((p) => ({ ...p, id: `${root.prefix}-${p.id}`, prefix: `${root.prefix}-${p.prefix}`, why: `${p.why} It is one part of ${root.title}: ${root.why}` })),
+    excluded: [...cut.excluded, ...sub.excluded],
+  };
+}
+
+export interface Split {
+  /** The parts as cut, kept between runs (like the top cut) so a re-run keeps their names. */
+  cut: Cut;
+  authored: Authored;
+}
+
+/**
+ * A large root, written in pieces: its files cut into parts as the repository
+ * is (cutRepo, scoped to them), each part written as its own subtree by
+ * `authorRoot` with a brief a fraction of the size, all at once; then one
+ * short agent writes the root's own level over the parts that came back.
+ * `keep` is the parts' cut from a previous run.
+ */
+export async function authorSplit(
+  root: Root,
+  cut: Cut,
+  inv: Inventory,
+  sums: Record<string, FileSummary>,
+  models: { cut: string; part: string; join: string },
+  keep: Cut | null,
+  on: { submit: (submit: number, problems: number, draft: unknown) => void; part: (draft: Node) => void; say: (s: string) => void },
+): Promise<Split | null> {
+  const inner = scoped(root, cut, inv);
+  let sub: Cut;
+  if (keep) {
+    const added = unclaimed(keep, inner);
+    sub = added.length ? (await place(keep, added, inner, sums, models.cut)).cut : keep;
+  } else sub = (await cutRepo(inner, sums, models.cut)).cut;
+  if (sub.roots.length < 2) return null;
+  const parts = partsCut(root, sub, cut);
+  on.say(`${root.id}: split into ${parts.roots.map((p) => p.id).join(", ")}`);
+
+  const done: Record<string, Authored> = {};
+  const provisional = () => {
+    const children = parts.roots.flatMap((p) => (done[p.id]?.root ? [done[p.id].root!] : []));
+    return { id: root.id, title: root.title, sub: root.sub, state: "partial", code: [], children } as unknown as Node;
+  };
+  await Promise.all(
+    parts.roots.map(async (p) => {
+      done[p.id] = await authorRoot(p, parts, inv, sums, models.part, () => {});
+      on.say(`${p.id}: ${done[p.id].root ? "accepted" : "FAILED"} after ${done[p.id].turns + 1} turns`);
+      if (done[p.id].root) on.part(provisional());
+    }),
+  );
+  const kids = parts.roots.flatMap((p) => (done[p.id].root ? [done[p.id].root!] : []));
+  const all = Object.values(done);
+  const total: Authored = {
+    root: null,
+    turns: all.reduce((a, x) => a + x.turns, 0),
+    reads: all.reduce((a, x) => a + x.reads, 0),
+    submits: all.reduce((a, x) => a + x.submits, 0),
+    problems: parts.roots.filter((p) => !done[p.id].root).flatMap((p) => done[p.id].problems.map((x) => `${p.id}: ${x}`)),
+    trail: parts.roots.flatMap((p) => done[p.id].trail.map((t) => ({ ...t, what: `${p.id} ${t.what}` }))),
+    coverage: { symbols: all.reduce((a, x) => a + (x.coverage?.symbols ?? 0), 0), gaps: all.flatMap((x) => x.coverage?.gaps ?? []) },
+  };
+  if (kids.length < 2) {
+    total.problems.unshift(`only ${kids.length} of ${parts.roots.length} parts were accepted`);
+    return { cut: sub, authored: total };
+  }
+
+  const joined = await joinParts(root, kids, inv, models.join, on.submit);
+  total.turns += joined.turns;
+  total.submits += joined.submits;
+  if (joined.node) total.root = joined.node;
+  else total.problems.unshift(...joined.problems.map((x) => `join: ${x}`));
+  return { cut: sub, authored: total };
+}
+
+/** The root's own level over parts already written: its words and the diagram whose boxes open them. */
+async function joinParts(root: Root, kids: Node[], inv: Inventory, model: string, onSubmit: (submit: number, problems: number, draft: unknown) => void) {
+  const known = new Set(inv.files.map((f) => f.path));
+  const out = { node: null as Node | null, turns: 0, submits: 0, problems: [] as string[] };
+  const describe = (n: Node) => `- ${n.id}: ${n.title} — ${n.sub}\n  ${n.detail ?? ""}\n  its parts: ${(n.children ?? []).map((c) => c.title).join(", ")}`;
+  const prompt = [
+    `# Repository: ${inv.name}`,
+    `## Your root\nid: ${root.id}\ntitle: ${root.title}\nsub: ${root.sub}\nscope: ${root.why}`,
+    `## Its parts, already written and checked\nEach is a child of this root as it stands; you do not change them.\n${kids.map(describe).join("\n")}`,
+    `## Task
+Write this root's own level only, and submit it as \`root\` without \`children\`: they are put under it as they are. It has the fields any level with parts has: title, sub, detail, state, code (the few ranges that tie the parts together, or none), a diagram whose boxes open each part by its id (${kids.map((k) => k.id).join(", ")}) with arrows that cite the lines where one part reaches another${EXPLAIN_LEVEL === "none" ? "" : ", and an explain"}.
+Read only what you need to draw those arrows. Budget: about 10 tool calls before you submit.`,
+  ].join("\n\n");
+  const handle = (name: string, input: any): Handled => {
+    if (name !== "submit") return { content: runTool({ name, input }, inv, known) };
+    out.submits++;
+    const top = input?.root;
+    if (!top || typeof top !== "object") return { content: "Send `root`: this root's own level, without children.", isError: true };
+    const node = { ...top, id: root.id, children: structuredClone(kids) };
+    // The parts were checked as they were written; what is asked of this agent is its own level.
+    const problems = submitProblems(node, root.prefix, inv.repo).filter((p) => p.includes(root.id) || !kids.some((k) => p.includes(k.id)));
+    out.problems = problems;
+    onSubmit(out.submits, problems.length, node);
+    if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: node };
+    return { content: `Not accepted. Fix every one of these, then submit the whole level again as \`root\`:\n- ${problems.slice(0, 60).join("\n- ")}`, isError: true };
+  };
+  const r = await converse<Node>({ prompt, handle, model, stage: "author-join", maxTurns: 16, salt: createHash("sha256").update(JSON.stringify(kids)).digest("hex") });
+  out.turns = r.turns;
+  out.node = r.value;
+  return out;
 }

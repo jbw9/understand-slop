@@ -330,6 +330,16 @@ export async function update(args: string[]) {
 
   // The turns that asked for this, taken so a run after this one gets only newer ones.
   let turns: Turn[] = [];
+  // A run that died after taking its turns left them in turns.taken.json, where
+  // nothing would read them again: they go back in front of any newer ones.
+  const stranded = `${out}/turns.taken.json`;
+  if (existsSync(stranded) && !has("--dry-run")) {
+    let kept: Turn[] = [];
+    try { kept = JSON.parse(readFileSync(stranded, "utf8")); } catch { /* torn: nothing to recover */ }
+    const newer: Turn[] = existsSync(`${out}/turns.json`) ? JSON.parse(readFileSync(`${out}/turns.json`, "utf8")) : [];
+    if (kept.length) atomic(`${out}/turns.json`, JSON.stringify([...kept, ...newer]) + "\n");
+    rmSync(stranded);
+  }
   if (existsSync(`${out}/turns.json`)) {
     // A dry run only looks.
     const taken = has("--dry-run") ? `${out}/turns.json` : `${out}/turns.taken.json`;

@@ -4,11 +4,12 @@ import { insertPrompt } from "@/lib/context";
 import { openSettings } from "@/lib/settings";
 
 /**
- * On-device dictation (src-tauri/src/dictate.rs): hold Ctrl+Space, speak,
+ * On-device dictation (src-tauri/src/dictate.rs): hold Option+Space, speak,
  * let go. The words go where the cursor was — a text field in the app if one
  * had focus, else Claude's prompt in the tab picks go to, without Enter, so
  * they can be read before they are sent. Esc while holding throws it away.
- * Plain Space stays Claude Code's own dictation (claude.rs).
+ * Plain Space stays Claude Code's own dictation (claude.rs). Not Ctrl+Space:
+ * macOS keeps that for switching input source, and takes it before the page does.
  */
 
 export type Phase = "idle" | "listening" | "working";
@@ -92,13 +93,13 @@ function put(text: string): boolean {
   return insertPrompt(text);
 }
 
-const isHotkey = (e: KeyboardEvent) => e.code === "Space" && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+const isHotkey = (e: KeyboardEvent) => e.code === "Space" && e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
 
 /** Mounted once, by the workspace: the hold-to-talk key, anywhere in the window. */
 export function useDictationKey() {
   useEffect(() => {
     if (!isTauri()) return;
-    // Capture phase, so it wins before xterm's textarea sends Ctrl+Space (NUL) to the program.
+    // Capture phase, so it wins before xterm's textarea sends Option+Space to the program, or a field types a no-break space.
     const down = (e: KeyboardEvent) => {
       if (isHotkey(e)) {
         e.preventDefault();
@@ -112,7 +113,7 @@ export function useDictationKey() {
     };
     // Letting go of either key ends it.
     const up = (e: KeyboardEvent) => {
-      if (!started || (e.code !== "Space" && e.key !== "Control")) return;
+      if (!started || (e.code !== "Space" && e.key !== "Alt")) return;
       e.preventDefault();
       e.stopPropagation();
       void stopDictation();

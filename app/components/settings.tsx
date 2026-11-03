@@ -251,7 +251,7 @@ export function SettingsDialog() {
           <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
           <Field
             label="On-device dictation"
-            hint="Hold Ctrl+Space anywhere in the app and speak: the words go into the field you're in, or Claude's prompt. Runs on this machine, for any sign-in; nothing is sent anywhere."
+            hint="Hold Option+Space (⌥Space) anywhere in the app and speak: the words go into the field you're in, or Claude's prompt. Runs on this machine, for any sign-in; nothing is sent anywhere."
           >
             <OnDevice />
           </Field>

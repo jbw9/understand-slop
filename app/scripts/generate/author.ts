@@ -168,6 +168,20 @@ const OWNED_BUDGET = 110_000;
 const explains = (root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>) =>
   inv.files.filter((f) => isSource(f) && sums[f.path] && !excludedBy(cut, f.path) && owners(cut, f.path)[0] === root.id);
 
+/**
+ * The shortest symbol a root must explain. On a large repository holding
+ * every symbol over TRIVIAL_LINES to a leaf made coverage rounds, and trees,
+ * grow with the code; there only the sizeable ones are required.
+ * SLOP_COVER_LINES overrides.
+ */
+const LARGE_REPO = 400;
+export const coverLines = (inv: Inventory) =>
+  Number(process.env.SLOP_COVER_LINES) || (inv.files.filter(isSource).length > LARGE_REPO ? 20 : TRIVIAL_LINES);
+const needs = (inv: Inventory) => {
+  const min = coverLines(inv);
+  return (s: Sym) => required(s) && s.end - s.start + 1 > min;
+};
+
 /** At most this many rounds are spent on coverage alone; what is left is recorded, not hidden. */
 const COVER_ROUNDS = 2;
 
@@ -206,7 +220,7 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     `## Task
 Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
 Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", detailed: "Every level also has a one- or two-paragraph `explain` for a reader who knows a little of the field and none of this project. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", minimal: "Every level also has a one-sentence `explain` for a reader who knows the field and has used this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
-Cover the code: every symbol listed above of more than ${TRIVIAL_LINES} lines, in a file whose first owner is this root, must be opened by a leaf's \`code\` or a step's \`at\`. A few small related ones may share a leaf; a part with more pieces than fit gets another level, not a summary.
+Cover the code: every symbol listed above of more than ${coverLines(inv)} lines, in a file whose first owner is this root, must be opened by a leaf's \`code\` or a step's \`at\`. A few small related ones may share a leaf; a part with more pieces than fit gets another level, not a summary.
 ${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
 Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
   ].filter(Boolean).join("\n\n");
@@ -334,10 +348,11 @@ export async function authorRoot(
   // The last tree handed in, so a fix after a rejection resends only the nodes it changed.
   let last: Node | null = null;
   const owned = explains(root, cut, inv, sums);
+  const need = needs(inv);
   let coverRounds = 0;
   const gapsIn = (node: Node) => {
     const cited = citations([node]);
-    return owned.flatMap((f) => symbolsOf(cited, f.path, sums[f.path]).filter((s) => required(s) && !s.by.length).map((symbol) => ({ file: f.path, symbol })));
+    return owned.flatMap((f) => symbolsOf(cited, f.path, sums[f.path]).filter((s) => need(s) && !s.by.length).map((symbol) => ({ file: f.path, symbol })));
   };
 
   /** One tool call, answered the same way whichever backend made it. */
@@ -361,7 +376,7 @@ export async function authorRoot(
     // competes with a problem the map cannot be shown with.
     if (!problems.length) {
       const gaps = gapsIn(node);
-      res.coverage = { symbols: owned.reduce((a, f) => a + sums[f.path].symbols.filter(required).length, 0), gaps };
+      res.coverage = { symbols: owned.reduce((a, f) => a + sums[f.path].symbols.filter(need).length, 0), gaps };
       if (gaps.length && coverRounds < COVER_ROUNDS) {
         coverRounds++;
         const byFile = new Map<string, typeof gaps>();

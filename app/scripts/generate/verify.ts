@@ -180,11 +180,18 @@ async function screenMany(nodes: Node[], inv: Inventory): Promise<Map<string, Sc
   return out;
 }
 
-/** What the screen's flags come to: dismissed, rewritten, or the node marked partial. */
-async function settle(n: Node, screen: Screen | null, inv: Inventory, model: string): Promise<Verdict> {
+/** The claims a screen did not find supported, as the reviewer reads them. */
+const flagsOf = (screen: Screen) => screen.claims.filter((c) => c.verdict !== "supported").map((c) => `${c.claim} — ${c.verdict}${c.why ? `: ${c.why}` : ""}`);
+
+/**
+ * What the screen's flags come to: dismissed, rewritten, or the node marked
+ * partial. `reviewed` holds rulings already made in a batch (reviewMany); a
+ * node it has none for is reviewed on its own.
+ */
+async function settle(n: Node, screen: Screen | null, inv: Inventory, model: string, reviewed?: Map<string, Review>): Promise<Verdict> {
   const v: Verdict = { id: n.id, ok: true, flagged: 0, rewritten: false, downgraded: false, claims: [] };
   if (!screen) return { ...v, ok: false, claims: ["the verify screen gave no answer"] };
-  const flags = screen.claims.filter((c) => c.verdict !== "supported").map((c) => `${c.claim} — ${c.verdict}${c.why ? `: ${c.why}` : ""}`);
+  const flags = flagsOf(screen);
   v.flagged = flags.length;
   v.flags = flags;
   if (!flags.length) {
@@ -193,7 +200,7 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
   }
 
   // One failed review leaves this node unreviewed; it must not fail the whole stage.
-  const r = await review(n, flags, inv, model).catch(() => null);
+  const r = reviewed?.get(n.id) ?? (await review(n, flags, inv, model).catch(() => null));
   if (!r) return v;
   v.claims = r.real;
   n.verified = { claims: screen.claims.length, corrected: r.real.length };
@@ -224,11 +231,7 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
 
 interface Review { real: string[]; detail: string; issues: { title: string; detail: string; where?: string }[]; code_labels: string[]; add_refs: CodeRef[]; unresolvable: string }
 
-/** The second reader: may read and grep the repository before ruling. */
-async function review(n: Node, flags: string[], inv: Inventory, model: string): Promise<Review | null> {
-  const known = new Set(inv.files.map((f) => f.path));
-  const tools = [...TOOLS.filter((t) => t.name !== "submit"), REVIEW];
-  const system = `You rule on flags a first reader raised against an explanation of code. The first reader saw only the cited lines and a little around them, so many flags are false alarms or true claims that were simply not cited.
+const REVIEW_SYSTEM = `You rule on flags a first reader raised against an explanation of code. The first reader saw only the cited lines and a little around them, so many flags are false alarms or true claims that were simply not cited.
 - A false alarm: dismiss it.
 - A true claim whose lines were not cited: find them (read_file, grep) and add them in add_refs.
 - A wrong claim: correct the wording so every claim is shown by code — never add what the code does not show.
@@ -236,9 +239,16 @@ async function review(n: Node, flags: string[], inv: Inventory, model: string): 
 - Behaviour that only varies with the user's machine (an installed tool's version, what is on PATH) is not unresolvable when the code shows what it does: state what the code does.
 - An issue flagged intended: if the code shows the behaviour is deliberate (a docstring or comment saying so, an explicit raise for misuse, standard language behaviour), drop it from issues. Keep it only if it really makes something go wrong for whoever hits it.
 The detail must stay at most two sentences and 40 words. Finish by calling review.`;
+
+const tooLong = (out: Review) => out.real.length && (words(out.detail) > 40 || sentences(out.detail) > 2);
+const lengthError = (out: Review) => `The detail has ${words(out.detail)} words and ${sentences(out.detail)} sentences; the limit is 40 words and 2 sentences. Call review again.`;
+
+/** The second reader: may read and grep the repository before ruling. */
+async function review(n: Node, flags: string[], inv: Inventory, model: string): Promise<Review | null> {
+  const known = new Set(inv.files.map((f) => f.path));
+  const tools = [...TOOLS.filter((t) => t.name !== "submit"), REVIEW];
+  const system = REVIEW_SYSTEM;
   const prompt = `## The node\n${claims(n)}\n\n## Claims a first reader flagged\n- ${flags.join("\n- ")}\n\n## The cited code\n${evidence(n, inv)}`;
-  const tooLong = (out: Review) => out.real.length && (words(out.detail) > 40 || sentences(out.detail) > 2);
-  const lengthError = (out: Review) => `The detail has ${words(out.detail)} words and ${sentences(out.detail)} sentences; the limit is 40 words and 2 sentences. Call review again.`;
 
   if (BACKEND === "claude-code") {
     const r = await converse<Review>({
@@ -273,16 +283,77 @@ The detail must stay at most two sentences and 40 words. Finish by calling revie
   return null;
 }
 
+const REVIEWS = {
+  ...REVIEW,
+  description: "Your ruling on one node's flagged claims, and that node's corrected wording. Call it once per node shown.",
+  input_schema: { ...REVIEW.input_schema, required: ["id", ...REVIEW.input_schema.required], properties: { id: { type: "string", description: "The node's id, as shown." }, ...REVIEW.input_schema.properties } },
+};
+
+/** Evidence a batch of reviews may carry, in characters, and nodes per batch. */
+const REVIEW_CHARS = 80_000;
+const REVIEW_NODES = 8;
+
+/**
+ * The second reader on many flagged nodes at once, for Claude Code: one
+ * `claude -p` per node paid its own start-up and system prompt 83 times on
+ * this repository's map, mostly to dismiss false alarms. The nodes of a batch
+ * share one conversation, so a file read for one is already read for the
+ * next. A node it leaves unruled is reviewed on its own (settle).
+ */
+async function reviewMany(items: { n: Node; flags: string[] }[], inv: Inventory, model: string): Promise<Map<string, Review>> {
+  const known = new Set(inv.files.map((f) => f.path));
+  const tools = [...TOOLS.filter((t) => t.name !== "submit"), REVIEWS];
+  const parts = items.map(({ n, flags }) => ({ n, text: `# Node ${n.id}\n## The node\n${claims(n)}\n\n## Claims a first reader flagged\n- ${flags.join("\n- ")}\n\n## The cited code\n${evidence(n, inv)}` }));
+  const batches: (typeof parts)[] = [];
+  for (const p of parts) {
+    const b = batches[batches.length - 1];
+    if (b && b.length < REVIEW_NODES && b.reduce((a, x) => a + x.text.length, 0) + p.text.length <= REVIEW_CHARS) b.push(p);
+    else batches.push([p]);
+  }
+  const out = new Map<string, Review>();
+  await Promise.all(
+    batches.map(async (b) => {
+      // A batch of one is the single review, as it always was.
+      if (b.length < 2) return;
+      const ids = new Set(b.map((p) => p.n.id));
+      const left = () => [...ids].filter((id) => !out.has(id));
+      await converse<true>({
+        prompt: `${b.map((p) => p.text).join("\n\n")}\n\nRule on every node above: call review once per node, with its id.`,
+        model,
+        system: `${REVIEW_SYSTEM} Several nodes are shown, each with its own flags and cited code; a file you read for one counts for all. Call review once for each node, by its id.`,
+        tools,
+        stage: "verify-review",
+        maxTurns: 6 + 3 * b.length,
+        nudge: "Continue: call review for every node shown that you have not ruled on yet.",
+        handle: (name, input) => {
+          if (name !== "review") return { content: runTool({ name, input }, inv, known) };
+          const { id, ...r } = (input ?? {}) as Review & { id: string };
+          if (!ids.has(id)) return { content: `No node "${id}" here; the ids are ${[...ids].join(", ")}.`, isError: true };
+          if (tooLong(r)) return { content: lengthError(r), isError: true };
+          out.set(id, r);
+          const rest = left();
+          return rest.length ? { content: `Recorded ${id}. Still to rule on: ${rest.join(", ")}.` } : { content: "Recorded. Stop now.", done: true };
+        },
+      }).catch(() => null);
+    }),
+  );
+  return out;
+}
+
 export async function verifyTree(root: Node, inv: Inventory, model: string): Promise<Verdict[]> {
   const nodes: Node[] = [];
   const walk = (n: Node) => { nodes.push(n); (n.children ?? []).forEach(walk); };
   walk(root);
   const cited = nodes.filter((n) => n.code?.length);
   const screens = BACKEND === "claude-code" ? await screenMany(cited, inv) : null;
+  // Through Claude Code the flagged nodes are reviewed together; the API path
+  // reviews each alone, as the committed maps' caches replay.
+  const flagged = screens ? cited.flatMap((n) => { const s = screens.get(n.id); const flags = s ? flagsOf(s) : []; return flags.length ? [{ n, flags }] : []; }) : [];
+  const reviewed = flagged.length ? await reviewMany(flagged, inv, model) : undefined;
   return Promise.all(
     nodes.map(async (n) =>
       n.code?.length
-        ? settle(n, screens ? (screens.get(n.id) ?? null) : await screenOne(n, inv), inv, model)
+        ? settle(n, screens ? (screens.get(n.id) ?? null) : await screenOne(n, inv), inv, model, reviewed)
         : { id: n.id, ok: false, flagged: 0, rewritten: false, downgraded: false, claims: ["no code refs"] },
     ),
   );

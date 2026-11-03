@@ -333,14 +333,14 @@ export async function main(args: string[]) {
     Promise.all([
       ...cut.roots.map(async (r) => {
         const root = authored[r.id].root;
-        if (root && !(only && !only.includes(r.id))) verdicts[r.id] = await verifyTree(root, inv, models.author);
+        if (root && !(only && !only.includes(r.id))) verdicts[r.id] = await verifyTree(root, inv, models.review);
       }),
       // The overview's claims are read against its lines like any level's;
       // what the reviewer corrects lands back on it.
       (async () => {
         if (!drawn?.overview) return;
         const node = { ...drawn.overview, id: OVERVIEW_ID, title: "Overview", sub: drawn.overview.sub ?? "", col: 0, row: 0 };
-        verdicts[OVERVIEW_ID] = await verifyTree(node, inv, models.author);
+        verdicts[OVERVIEW_ID] = await verifyTree(node, inv, models.review);
         overview = toOverview(node);
       })(),
     ]),

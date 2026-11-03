@@ -4,7 +4,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Menu } from "@/components/menu";
-import { openClaude, pick, usePicked, type Target } from "@/lib/context";
+import { mention, openClaude, type Target } from "@/lib/context";
 import { PRESETS, hostOf, registerPreview, type Call } from "@/lib/preview";
 import { cn } from "@/lib/utils";
 
@@ -324,7 +324,7 @@ export function Preview({
         const text = p && server.current ? m.text.replaceAll(`http://localhost:${p.port}`, originOf(server.current)) : m.text;
         const target = { key: m.key, title: m.title, text };
         // A page from the web is a webview over the app, which would hide a menu.
-        if (onWeb.current) return pick(target);
+        if (onWeb.current) return mention(target);
         const r = frame.current?.getBoundingClientRect();
         const k = view.current.scale;
         setPicking({ x: (r?.x ?? 0) + m.x * k, y: (r?.y ?? 0) + m.y * k, target });
@@ -956,7 +956,6 @@ export function Preview({
 
 /** What a right-clicked element of the page offers, as the map's PickMenu (components/canvas.tsx) does. */
 function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
-  const status = usePicked(target.key);
   return (
     <Menu
       x={x}
@@ -964,13 +963,11 @@ function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Tar
       title={target.title}
       onClose={onClose}
       items={[
-        status === "queued"
-          ? { label: "Waiting for your next prompt", disabled: true }
-          : { label: status === "sent" ? "Send to Claude again" : "Add to Claude context", onClick: () => pick(target) },
+        { label: "Add to Claude", onClick: () => mention(target) },
         {
           label: "Add and open Claude",
           onClick: () => {
-            if (status !== "queued") pick(target);
+            mention(target);
             openClaude();
           },
         },

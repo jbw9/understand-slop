@@ -226,6 +226,8 @@ End on the answer itself.";
 pub struct Launch {
     path: String,
     model: Option<String>,
+    #[serde(default)]
+    voice: bool,
 }
 
 /// Runs Claude with the hook, and marks the tab live while it does. The marker,
@@ -616,7 +618,7 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
         std::fs::write(queue.with_extension("md.map"), format!("{text}\n"))?;
     }
     let hook = |c: &str| serde_json::json!({ "type": "command", "command": c });
-    let settings = serde_json::json!({
+    let mut settings = serde_json::json!({
         "hooks": {
             "SessionStart": [{ "hooks": [hook(ON_PATH), hook(SESSION)] }],
             "UserPromptSubmit": [{ "hooks": [hook(HOOK), status("working")] }],
@@ -642,6 +644,10 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             "deny": ["mcp__claude-in-chrome"]
         }
     });
+    // Only ever turned on here: with the setting off, the user's own `/voice` stands.
+    if launch.voice {
+        settings["voice"] = serde_json::json!({ "enabled": true });
+    }
     cmd.env("SLOP_CONTEXT", queue);
     cmd.env("SLOP_LAUNCHER", &path);
     cmd.env("SLOP_CLAUDE_BIN", &launch.path);

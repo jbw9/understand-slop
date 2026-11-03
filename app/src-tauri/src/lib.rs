@@ -1,6 +1,7 @@
 mod browser;
 mod claude;
 mod devices;
+mod dictate;
 mod mcp;
 mod preview;
 mod proc;
@@ -58,7 +59,14 @@ pub fn run() {
             devices::device_start,
             devices::device_frame,
             devices::device_input,
+            devices::device_describe,
             devices::device_run,
+            dictate::dictate_status,
+            dictate::dictate_download,
+            dictate::dictate_remove,
+            dictate::dictate_start,
+            dictate::dictate_stop,
+            dictate::dictate_cancel,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

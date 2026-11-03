@@ -14,7 +14,7 @@ import { PlanView, type Plan } from "@/components/plan";
 import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
-import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus, unpick, usePicks } from "@/lib/context";
+import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
 import { TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
@@ -1413,10 +1413,9 @@ function inFront(t: Tab): Agent | undefined {
 }
 
 /**
- * The line under the terminal. With Claude running: the map context handed to
- * it, waiting (◷) until the next prompt takes it, then sent (✓); only a
- * waiting one can still be taken back. With the shell at its prompt: the
- * agents to start here. With anything else in front, only waiting picks.
+ * The line under the terminal, with the shell at its prompt: the agents to
+ * start here. What is handed to Claude is named in its prompt instead
+ * (lib/context.ts `mention`).
  */
 function Strip({
   tab,
@@ -1429,75 +1428,36 @@ function Strip({
   agents: Agent[];
   onRun: (id: string) => void;
 }) {
-  const picks = usePicks(pty);
-  const idle = !tab.live && !tab.busy;
-  if (!tab.live && !idle && !picks.length) return null;
+  if (tab.live || tab.busy) return null;
   const run = (a: Agent) => {
     onRun(a.id);
     void invoke("pty_write", { id: pty, data: `${a.command}\r` });
   };
   return (
     <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-t border-torder-gray px-3 py-1.5 font-mono text-[11px] [scrollbar-width:none]">
-      {tab.live ? <span className="shrink-0 text-faint">context</span> : null}
-      {idle
-        ? agents.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => run(a)}
-              title={
-                a.id === CLAUDE.id
-                  ? "Runs slop-claude in this shell: your Claude Code, able to take map context"
-                  : `Runs ${a.command} in this shell`
-              }
-              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] border border-border-strong px-2 py-px text-ink hover:bg-surface-container"
-            >
-              <AgentIcon id={a.id} />
-              {a.id === CLAUDE.id ? "Claude" : a.label}
-            </button>
-          ))
-        : null}
-      {idle && tab.found === false ? (
+      {agents.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          onClick={() => run(a)}
+          title={
+            a.id === CLAUDE.id
+              ? "Runs slop-claude in this shell: your Claude Code, able to take map context"
+              : `Runs ${a.command} in this shell`
+          }
+          className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] border border-border-strong px-2 py-px text-ink hover:bg-surface-container"
+        >
+          <AgentIcon id={a.id} />
+          {a.id === CLAUDE.id ? "Claude" : a.label}
+        </button>
+      ))}
+      {tab.found === false ? (
         <span className="shrink-0 text-faint">
           Claude Code was not found.{" "}
           <button type="button" onClick={openSettings} className="cursor-pointer text-deep-green underline">
             Open Settings
           </button>
         </span>
-      ) : null}
-      {picks.map((p) => (
-        <span
-          key={p.key}
-          title={p.status === "queued" ? "Goes with the next prompt to Claude here" : "Sent to Claude"}
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-[2px] border px-2 py-px",
-            p.status === "queued" ? "border-deep-green/50 text-ink" : "border-border-gray text-faint",
-          )}
-        >
-          <span aria-hidden className={p.status === "queued" ? "text-deep-green" : undefined}>
-            {p.status === "queued" ? "◷" : "✓"}
-          </span>
-          {p.title}
-          <button
-            type="button"
-            onClick={() => void unpick(pty, p.key)}
-            aria-label={`Remove ${p.title}`}
-            className="cursor-pointer text-faint hover:text-ink"
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      {picks.length ? (
-        <button
-          type="button"
-          onClick={() => void clearPicks(pty)}
-          className="ml-1 shrink-0 cursor-pointer text-faint hover:text-ink"
-        >
-          clear
-        </button>
-      ) : tab.live ? (
-        <span className="truncate text-faint/80">right-click a card on the map to add it</span>
       ) : null}
     </div>
   );

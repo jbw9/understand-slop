@@ -9,6 +9,7 @@ import { ProjectsDialog } from "@/components/projects";
 import { AuditDialog } from "@/components/audit";
 import { HistoryDialog } from "@/components/history";
 import { SettingsDialog } from "@/components/settings";
+import { Dictation } from "@/components/dictation";
 import { Titlebar } from "@/components/titlebar";
 import { Workspace } from "@/components/workspace";
 import { NoProject } from "@/components/welcome";
@@ -94,6 +95,7 @@ export default async function Home({
           <Palette />
         </Suspense>
         <SettingsDialog />
+        {STATIC_MAP ? null : <Dictation />}
         <ProjectsDialog />
         <HistoryDialog />
         <AuditDialog />

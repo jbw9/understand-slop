@@ -184,13 +184,13 @@ export function Shell({
     (async () => {
       // Every tab can run Claude, so it is looked for every time; without it
       // the tab is still a shell.
-      const { claudePath, model } = readSettings();
+      const { claudePath, model, voice } = readSettings();
       const found = await invoke<{ path: string } | null>("claude_detect", {
         configured: claudePath || null,
       }).catch(() => null);
       if (gone) return;
       handlers.current.onClaude?.(!!found);
-      const launch = found ? { path: found.path, model: model || null } : null;
+      const launch = found ? { path: found.path, model: model || null, voice } : null;
       // xterm measures one glyph to size every cell, so it needs the face's
       // name (not a var()) and the face itself loaded: measured against the
       // fallback, the real font lands in cells of the wrong width once it
@@ -234,6 +234,8 @@ export function Shell({
         // Ctrl+` (Cmd+` too) and Ctrl+W belong to the workspace window, never the program in a tab.
         if (e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyW") return false;
         if ((e.ctrlKey || e.metaKey) && e.code === "Backquote") return false;
+        // Ctrl+Space is the app's on-device dictation (lib/dictate.ts).
+        if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.code === "Space") return false;
         const action = actionFor(e, term.hasSelection());
         if (!action) return true;
         e.preventDefault();

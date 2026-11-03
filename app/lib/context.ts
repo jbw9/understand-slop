@@ -74,6 +74,8 @@ let waiting: Target[] = [];
 let asking = new Map<string, string>();
 /** A prompt with nothing picked to carry it (sendBatch), sent once Claude is up. */
 let asked: string | null = null;
+/** Of those, the names to type into Claude's prompt (mention), once Claude is up. */
+let naming: string[] = [];
 
 /* ── tabs coming and going (components/workspace.tsx) ─────────── */
 
@@ -95,11 +97,17 @@ export function tabStarted(pty: number, claude: boolean) {
   if (!claude) return;
   const queued = waiting;
   const toAsk = [...queued.flatMap((p) => asking.get(p.key) ?? []), ...(asked ? [asked] : [])];
+  const toName = naming;
   waiting = [];
   asking = new Map();
   asked = null;
+  naming = [];
   for (const p of queued) void add(pty, p);
-  if (toAsk.length) void whenUp(pty).then(() => prompt(pty, toAsk.join(" ")), () => {});
+  if (toAsk.length || toName.length)
+    void whenUp(pty).then(() => {
+      if (toName.length) paste(pty, toName.join(""));
+      if (toAsk.length) prompt(pty, toAsk.join(" "));
+    }, () => {});
 }
 
 /**
@@ -139,6 +147,27 @@ export function pick(t: Target) {
     return;
   }
   void add(state.target, t);
+}
+
+/**
+ * Hand something to Claude by naming it in the prompt being typed, as a paste
+ * is: `[button "Sign up"]` goes in at the cursor, and what it stands for goes
+ * with that prompt through the hook, saying the name it goes by. Typed only
+ * while Claude is not asking the user something, which typing would answer.
+ * A published map's panel keeps its own list instead.
+ */
+export function mention(t: Target) {
+  if (WEB) return pick(t);
+  const name = `[${t.title}] `;
+  const named = { ...t, text: `Named in the prompt as [${t.title}]:\n${t.text}` };
+  if (state.target === null) {
+    naming.push(name);
+    return pick(named);
+  }
+  const pty = state.target;
+  void add(pty, named)
+    .then(() => whenFree(pty))
+    .then(() => paste(pty, name), () => {});
 }
 
 /**
@@ -209,8 +238,25 @@ function whenIdle(pty: number) {
 /** Typed into a program's prompt as a paste, then Enter, a moment later so it is not part of the paste. */
 export function prompt(pty: number, text: string) {
   if (WEB) return void window.dispatchEvent(new CustomEvent(PROMPT, { detail: text }));
-  void invoke("pty_write", { id: pty, data: `\x1b[200~${text}\x1b[201~` });
+  paste(pty, text);
   setTimeout(() => void invoke("pty_write", { id: pty, data: "\r" }), 150);
+}
+
+const paste = (pty: number, text: string) => void invoke("pty_write", { id: pty, data: `\x1b[200~${text}\x1b[201~` });
+
+/** Resolves once Claude in the tab is not waiting on the user (a question, a permission), which typing would answer. */
+async function whenFree(pty: number) {
+  while (statuses.get(pty) === "waiting") {
+    if (!(pty in state.picks)) throw new Error("tab closed");
+    await new Promise((done) => setTimeout(done, 500));
+  }
+}
+
+/** Pasted into the prompt of the tab picks go to, without Enter. False with no such tab. */
+export function insertPrompt(text: string): boolean {
+  if (WEB || state.target === null) return false;
+  paste(state.target, text);
+  return true;
 }
 
 /** Resolves once Claude runs in the tab and has had a moment to draw its prompt. */
@@ -246,11 +292,6 @@ export async function unpick(pty: number, key: string) {
   withPicks(pty, (state.picks[pty] ?? []).filter((p) => p.key !== key));
 }
 
-export async function clearPicks(pty: number) {
-  if (!WEB) await invoke("context_set", { id: pty, text: "" });
-  withPicks(pty, []);
-}
-
 /** The web panel's prompt hook: what is queued, as text for this prompt, and marked sent. */
 export function takePicks(pty: number): string[] {
   const mine = state.picks[pty] ?? [];
@@ -273,9 +314,9 @@ const HAND = "slop:hand";
 export function handTo(agent: string, t: Target, question?: string) {
   if (agent === "claude") {
     if (question) return ask(t, question);
-    // With no tab to take it, pick opens one; with one, bring it forward.
+    // With no tab to take it, mention opens one; with one, bring it forward.
     const had = state.target !== null;
-    pick(t);
+    mention(t);
     if (had) openClaude();
     return;
   }

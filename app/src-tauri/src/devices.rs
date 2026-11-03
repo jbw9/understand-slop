@@ -736,19 +736,7 @@ fn input(platform: &str, i: &Input) -> Result<(), String> {
         };
     }
     let idb = idb().ok_or("Tapping in the iOS Simulator needs Meta's idb: brew tap facebook/fb && brew install idb-companion && pipx install fb-idb")?;
-    let density = match density {
-        Some(d) => d,
-        None => {
-            let d = ok(crate::proc::command(&idb).args(["describe", "--udid", &id, "--json"]))
-                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-                .and_then(|v| v.get("screen_dimensions")?.get("density")?.as_f64())
-                .unwrap_or(3.0);
-            if let Some(r) = phones().lock().unwrap().ios.as_mut() {
-                r.density = Some(d);
-            }
-            d
-        }
-    };
+    let density = density.unwrap_or_else(|| ios_density(&idb, &id));
     let pt = |f: f64, of: u32| ((f.clamp(0.0, 1.0) * of as f64 / density) as u32).to_string();
     let ui = |args: &[&str]| run(crate::proc::command(&idb).arg("ui").args(args).args(["--udid", &id]));
     match i.kind.as_str() {
@@ -764,6 +752,140 @@ fn input(platform: &str, i: &Input) -> Result<(), String> {
         },
         k => Err(format!("No input called {k}.")),
     }
+}
+
+/// iOS: pixels per point, asked of idb once and kept.
+fn ios_density(idb: &Path, id: &str) -> f64 {
+    let d = ok(crate::proc::command(idb).args(["describe", "--udid", id, "--json"]))
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v.get("screen_dimensions")?.get("density")?.as_f64())
+        .unwrap_or(3.0);
+    if let Some(r) = phones().lock().unwrap().ios.as_mut() {
+        r.density = Some(d);
+    }
+    d
+}
+
+/* ── the user pointing Claude at something ───────────────────── */
+
+/// The element under a point of the phone's screen, for Claude: what the
+/// platform's own accessibility tree says of it, and where it is, as
+/// fractions of the screen so the tab can outline it.
+#[derive(serde::Serialize)]
+pub struct Picked {
+    key: String,
+    title: String,
+    text: String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+/// An attribute of one `<node …>` of a uiautomator dump, unescaped.
+fn attr(node: &str, name: &str) -> String {
+    let Some(at) = node.find(&format!(" {name}=\"")) else { return String::new() };
+    let rest = &node[at + name.len() + 3..];
+    rest[..rest.find('"').unwrap_or(0)].replace("&quot;", "\"").replace("&lt;", "<").replace("&gt;", ">").replace("&apos;", "'").replace("&amp;", "&")
+}
+
+/// `[0,63][1080,210]` as left, top, right, bottom.
+fn bounds(b: &str) -> Option<(f64, f64, f64, f64)> {
+    let n: Vec<f64> = b.split(|c: char| !c.is_ascii_digit()).filter(|s| !s.is_empty()).filter_map(|s| s.parse().ok()).collect();
+    (n.len() == 4).then(|| (n[0], n[1], n[2], n[3]))
+}
+
+fn describe_point(platform: &str, x: f64, y: f64) -> Result<Picked, String> {
+    let id = running_id(platform)?;
+    let (w, h) = match slot(&mut phones().lock().unwrap(), platform)?.as_ref().and_then(|r| r.size) {
+        Some(s) => s,
+        None => {
+            frame(platform)?;
+            return describe_point(platform, x, y);
+        }
+    };
+    let (w, h) = (w as f64, h as f64);
+    if platform == "android" {
+        let out = crate::proc::command(adb(&sdk()))
+            .args(["-s", &id, "exec-out", "uiautomator", "dump", "/dev/tty"])
+            .stderr(Stdio::null())
+            .output()
+            .map_err(|e| e.to_string())?;
+        let xml = String::from_utf8_lossy(&out.stdout);
+        let (px, py) = (x * w, y * h);
+        // The smallest thing there that takes a tap, else the smallest thing there.
+        let mut best: Option<(bool, f64, &str, (f64, f64, f64, f64))> = None;
+        for node in xml.split("<node ").skip(1) {
+            let node = &node[..node.find('>').unwrap_or(node.len())];
+            let Some(b) = bounds(&attr(node, "bounds")) else { continue };
+            if px < b.0 || px > b.2 || py < b.1 || py > b.3 {
+                continue;
+            }
+            let tap = attr(node, "clickable") == "true";
+            let area = (b.2 - b.0) * (b.3 - b.1);
+            if best.as_ref().is_none_or(|(t, a, ..)| (tap && !t) || (tap == *t && area < *a)) {
+                best = Some((tap, area, node, b));
+            }
+        }
+        let (_, _, node, b) = best.ok_or("The emulator did not say what is on its screen: it may be busy, try again.")?;
+        let class = attr(node, "class");
+        let short = class.rsplit('.').next().unwrap_or(&class).to_string();
+        let (text, desc, rid) = (attr(node, "text"), attr(node, "content-desc"), attr(node, "resource-id"));
+        let name = [&text, &desc, &rid].into_iter().find(|s| !s.is_empty()).cloned().unwrap_or_default();
+        let title = if name.is_empty() { short } else { format!("{short} \"{}\"", name.chars().take(60).collect::<String>()) };
+        let lines = [
+            format!("[Android element: {title}, in the app on the Android emulator"),
+            format!("Class: {class}"),
+            if rid.is_empty() { String::new() } else { format!("Id: {rid} (a React Native testID or nativeID shows here)") },
+            if text.is_empty() { String::new() } else { format!("Text: {text}") },
+            if desc.is_empty() { String::new() } else { format!("Description: {desc}") },
+            format!("Package: {}", attr(node, "package")),
+            format!("Bounds: {} on a {w}×{h} screen]", attr(node, "bounds")),
+        ];
+        return Ok(Picked {
+            key: format!("android:{class}@{}", attr(node, "bounds")),
+            title,
+            text: lines.into_iter().filter(|l| !l.is_empty()).collect::<Vec<_>>().join("\n"),
+            x: b.0 / w,
+            y: b.1 / h,
+            w: (b.2 - b.0) / w,
+            h: (b.3 - b.1) / h,
+        });
+    }
+    let idb = idb().ok_or("Reading the iOS Simulator's screen needs Meta's idb: brew tap facebook/fb && brew install idb-companion && pipx install fb-idb")?;
+    let density = phones().lock().unwrap().ios.as_ref().and_then(|r| r.density).unwrap_or_else(|| ios_density(&idb, &id));
+    let (pw, ph) = (w / density, h / density);
+    let out = ok(crate::proc::command(&idb).args(["ui", "describe-point", "--udid", &id, "--json"]).arg(((x * pw) as u32).to_string()).arg(((y * ph) as u32).to_string()))
+        .ok_or("The simulator did not say what is on its screen: try again.")?;
+    let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| e.to_string())?;
+    let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let (kind, label, value, uid) = (s("type"), s("AXLabel"), s("AXValue"), s("AXUniqueId"));
+    let f = |k: &str| v.get("frame").and_then(|fr| fr.get(k)).and_then(|n| n.as_f64()).unwrap_or(0.0);
+    let (fx, fy, fw, fh) = (f("x"), f("y"), f("width"), f("height"));
+    let name = [&label, &value, &uid].into_iter().find(|s| !s.is_empty()).cloned().unwrap_or_default();
+    let kind = if kind.is_empty() { "element".to_string() } else { kind };
+    let title = if name.is_empty() { kind.clone() } else { format!("{kind} \"{}\"", name.chars().take(60).collect::<String>()) };
+    let lines = [
+        format!("[iOS element: {title}, in the app on the iOS Simulator"),
+        if uid.is_empty() { String::new() } else { format!("Id: {uid} (accessibilityIdentifier, or a React Native testID)") },
+        if label.is_empty() { String::new() } else { format!("Label: {label}") },
+        if value.is_empty() { String::new() } else { format!("Value: {value}") },
+        format!("Frame: {fx},{fy} {fw}×{fh} points on a {pw}×{ph} screen]"),
+    ];
+    Ok(Picked {
+        key: format!("ios:{kind}@{fx},{fy},{fw},{fh}"),
+        title,
+        text: lines.into_iter().filter(|l| !l.is_empty()).collect::<Vec<_>>().join("\n"),
+        x: fx / pw,
+        y: fy / ph,
+        w: fw / pw,
+        h: fh / ph,
+    })
+}
+
+#[tauri::command]
+pub async fn device_describe(platform: String, x: f64, y: f64) -> Result<Picked, String> {
+    tauri::async_runtime::spawn_blocking(move || describe_point(&platform, x, y)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

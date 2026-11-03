@@ -223,9 +223,87 @@ export function SettingsDialog() {
               className={INPUT}
             />
           </Field>
+          <Field
+            label="Claude Code dictation"
+            hint="Hold Space in a Claude tab and speak. Transcribed by Anthropic at no cost; needs a claude.ai sign-in, not Bedrock or an API key."
+          >
+            <div role="radiogroup" aria-label="Claude Code dictation" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+              {[
+                { value: true, label: "On" },
+                { value: false, label: "As in Claude Code" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.voice === o.value}
+                  onClick={() => set({ voice: o.value })}
+                  className={cn(
+                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.voice === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </Field>
           <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
+          <Field
+            label="On-device dictation"
+            hint="Hold Ctrl+Space anywhere in the app and speak: the words go into the field you're in, or Claude's prompt. Runs on this machine, for any sign-in; nothing is sent anywhere."
+          >
+            <OnDevice />
+          </Field>
         </div>
       </form>
     </Overlay>
+  );
+}
+
+type ModelStatus = { model: "missing" | "downloading" | "ready"; bytes: number; total: number; error: string | null };
+
+/** The speech model for on-device dictation (src-tauri/src/dictate.rs): fetched once, kept until removed. */
+function OnDevice() {
+  const [s, setS] = useState<ModelStatus | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const read = useCallback(() => {
+    invoke<ModelStatus>("dictate_status").then(setS, (e) => setFailed(String(e)));
+  }, []);
+  useEffect(() => {
+    read();
+  }, [read]);
+  // Polled only while it downloads, for the progress and for when it lands.
+  useEffect(() => {
+    if (s?.model !== "downloading") return;
+    const t = setInterval(read, 1000);
+    return () => clearInterval(t);
+  }, [s?.model, read]);
+  const act = (cmd: string) => invoke(cmd).then(read, (e) => setFailed(String(e)));
+  const mb = (n: number) => Math.round(n / 1e6);
+  if (!s) return <span className="font-mono text-[11.5px] text-faint">{failed ?? "Looking…"}</span>;
+  return (
+    <div className="flex items-baseline gap-3 font-mono text-[11.5px]">
+      {s.model === "ready" ? (
+        <span className="text-deep-green">✓ Parakeet v3, {mb(s.total)} MB, on this machine</span>
+      ) : s.model === "downloading" ? (
+        <span className="text-ink">
+          Downloading… {mb(s.bytes)} of {mb(s.total)} MB
+        </span>
+      ) : (
+        <span className={s.error || failed ? "text-clay-ink" : "text-faint"}>
+          {s.error ?? failed ?? `Needs its speech model, ${mb(s.total)} MB, downloaded once.`}
+        </span>
+      )}
+      {s.model === "missing" ? (
+        <button type="button" onClick={() => act("dictate_download")} className="ml-auto shrink-0 cursor-pointer text-deep-green hover:underline">
+          {s.bytes ? "Resume download" : "Download"}
+        </button>
+      ) : (
+        <button type="button" onClick={() => act("dictate_remove")} className="ml-auto shrink-0 cursor-pointer text-faint hover:text-ink">
+          {s.model === "ready" ? "Remove" : "Stop"}
+        </button>
+      )}
+    </div>
   );
 }

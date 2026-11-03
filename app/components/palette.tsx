@@ -15,6 +15,7 @@ import { openFiles, useCitations, useFiles, useTrail } from "@/components/files"
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon, openDoc, useDocList } from "@/components/docs";
 import { openSettings, readSettings, saveSettings } from "@/lib/settings";
+import { startDictation } from "@/lib/dictate";
 import type { Node } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
@@ -198,6 +199,8 @@ export function Palette() {
       { key: "a:projects", label: "Projects", hint: "Your maps: open, regenerate, remove", kind: "action", run: () => openProjects() },
       { key: "a:maps", label: "Switch map…", kind: "action", run: () => setTimeout(() => openPalette("maps")) },
       { key: "a:settings", label: "Settings", kind: "action", run: openSettings },
+      // After the palette has closed, so the words go to Claude's prompt rather than the palette's field.
+      { key: "a:dictate", label: "Dictate on this machine", hint: "Speak, then done; or hold the key", kind: "action", kbd: "Ctrl+Space", run: () => setTimeout(startDictation) },
       { key: "a:light", label: "Theme: light", kind: "action", run: theme("light") },
       { key: "a:dark", label: "Theme: dark", kind: "action", run: theme("dark") },
       { key: "a:system", label: "Theme: follow the system", kind: "action", run: theme("system") },

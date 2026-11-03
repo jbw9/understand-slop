@@ -20,7 +20,7 @@ import { DocView, closeDoc, useOpenDoc } from "@/components/docs";
 import { TimelineView, closeTimeline, useTimelineOpen } from "@/components/timeline";
 import { FileView, closeFile, useOpenFile } from "@/components/code";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
-import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
+import { handTo, mention, openClaude, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { startNote } from "@/lib/notes";
 import { FixAndKeep, onAnswer } from "@/components/keep";
 import { SectionTabs, openInTab } from "@/components/tabs";
@@ -365,7 +365,6 @@ function PickMenu({
   onClose: () => void;
 }) {
   const { name } = useMap();
-  const status = usePicked(target.key);
   return (
     <Menu
       x={x}
@@ -374,13 +373,11 @@ function PickMenu({
       onClose={onClose}
       items={[
         ...(opens ? [{ label: "Open in new tab", onClick: () => openInTab(name, opens) }] : []),
-        status === "queued"
-          ? { label: "Waiting for your next prompt", disabled: true }
-          : { label: status === "sent" ? "Send to Claude again" : "Add to Claude context", onClick: () => pick(target) },
+        { label: "Add to Claude", onClick: () => mention(target) },
         {
           label: "Add and open Claude",
           onClick: () => {
-            if (status !== "queued") pick(target);
+            mention(target);
             openClaude();
           },
         },

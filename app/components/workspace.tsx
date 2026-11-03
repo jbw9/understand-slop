@@ -455,6 +455,9 @@ export function Workspace() {
     [select, show],
   );
 
+  // A plan whose tab was closed, by the Claude that wrote it: its line in
+  // that terminal (components/shell.tsx) opens it again.
+  const closedPlans = useRef<Record<number, Plan>>({});
   // Each terminal's screen, for a plan's tab to read Claude Code's question off.
   const screens = useRef<Record<number, (all?: boolean) => string[]>>({});
 
@@ -463,8 +466,14 @@ export function Workspace() {
   // A revised plan takes the last one's place, in the same tab.
   const showPlan = (from: number, cwd: string, got: { text: string; file: string | null }) => {
     const had = tabsNow.current.find((x) => x.kind === "plan" && x.of === from);
-    const asked = had?.plan?.state === "revising" ? had.plan.asked : undefined;
-    const plan: Plan = { ...got, version: (had?.plan?.version ?? 0) + 1, state: "open", after: asked };
+    const last = had?.plan ?? closedPlans.current[from];
+    const asked = last?.state === "revising" ? last.asked : undefined;
+    placePlan(from, cwd, { ...got, version: (last?.version ?? 0) + 1, state: "open", after: asked });
+  };
+  /** The plan's tab, in front: made again if it was closed. */
+  const placePlan = (from: number, cwd: string, plan: Plan) => {
+    const had = tabsNow.current.find((x) => x.kind === "plan" && x.of === from);
+    delete closedPlans.current[from];
     const main = had ? !!had.main : !tabsNow.current.find((x) => x.key === from)?.main;
     const key = had?.key ?? nextKey++;
     if (had) patch(key, { plan });
@@ -474,6 +483,17 @@ export function Workspace() {
       setActive((a) => ({ ...a, [cwd]: key }));
       if (cwd === latest.current.here) show(true);
     }
+  };
+  /** A plan's tab closing keeps its plan; its Claude's closing lets it go. */
+  const forgetPlan = (gone: Tab) => {
+    if (gone.kind === "plan" && gone.of !== undefined && gone.plan) closedPlans.current[gone.of] = gone.plan;
+    delete closedPlans.current[gone.key];
+  };
+  const reopenPlan = (from: number, cwd: string) => {
+    const open = tabsNow.current.find((x) => x.kind === "plan" && x.of === from);
+    if (open) return bring(open.key);
+    const plan = closedPlans.current[from];
+    if (plan) placePlan(from, cwd, plan);
   };
   const planning = useRef(showPlan);
   useEffect(() => {
@@ -508,8 +528,11 @@ export function Workspace() {
           .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved, session }) => {
             if (turn && cwd) void followTurn(cwd, turn);
             if (plan) planning.current(key, cwd, plan);
-            if (approved)
+            if (approved) {
+              const shut = closedPlans.current[key];
+              if (shut) closedPlans.current[key] = { ...shut, state: "approved", approvedAt: Date.now() };
               setTabs((all) => all.map((x) => (x.of === key && x.plan ? { ...x, plan: { ...x.plan, state: "approved", approvedAt: Date.now() } } : x)));
+            }
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
@@ -609,6 +632,7 @@ export function Workspace() {
       const dev = last ? tabs.find((x) => x.dev && x.cwd === gone.cwd) : undefined;
       const rest = tabs.filter((x) => x.key !== key && x !== dev);
       setTabs(rest);
+      forgetPlan(gone);
       if (gone.pty !== undefined) tabEnded(gone.pty);
       if (dev?.pty !== undefined) tabEnded(dev.pty);
       // The neighbour in the same place takes over: in the window, whose last
@@ -1195,6 +1219,7 @@ export function Workspace() {
             onTitle={(title) => patch(t.key, { title })}
             onScreen={(read) => (screens.current[t.key] = read)}
             onClaude={(found) => patch(t.key, { found })}
+            onOpenPlan={() => reopenPlan(t.key, t.cwd)}
             onSpawn={(pty) => {
               patch(t.key, { pty });
               tabStarted(pty, t.start === CLAUDE.id);

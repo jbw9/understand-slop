@@ -113,6 +113,9 @@ function zoom(by: number | null) {
  * `startClaude` it runs it first (src-tauri/src/claude.rs); quitting Claude
  * leaves the shell.
  */
+/** What Claude Code shows in place of a plan (src-tauri/src/claude.rs, HIDE). */
+const OPEN_PLAN = "▸ Open plan";
+
 export function Shell({
   startClaude = false,
   resume,
@@ -125,6 +128,7 @@ export function Shell({
   onOutput,
   onInput,
   onScreen,
+  onOpenPlan,
   onExit,
 }: {
   startClaude?: boolean;
@@ -146,6 +150,8 @@ export function Shell({
   /** How to read what is on screen now, line by line: how a plan's tab finds Claude Code's question.
    * With `all`, the whole scrollback: how an agent reads the dev server's logs. */
   onScreen?: (read: (all?: boolean) => string[]) => void;
+  /** The plan's line Claude Code shows in place of the plan (src-tauri/src/claude.rs, HIDE) was clicked. */
+  onOpenPlan?: () => void;
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -153,9 +159,9 @@ export function Shell({
   const show = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest callbacks, so the effect below runs once per shell, not per render.
-  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onExit });
+  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, onExit });
   useEffect(() => {
-    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onExit };
+    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, onExit };
   });
   // The map's sections, for `slop-map-list`. Through a ref for the same
   // reason: a map that updates must not restart the shell.
@@ -297,6 +303,23 @@ export function Shell({
         return;
       }
 
+      // Claude Code shows a plan as its title and this line; the plan itself
+      // is read in its tab, which the line opens again even once closed.
+      const planLinks = term.registerLinkProvider({
+        provideLinks(y, done) {
+          const line = term.buffer.active.getLine(y - 1)?.translateToString(true) ?? "";
+          const at = line.indexOf(OPEN_PLAN);
+          if (at < 0 || !handlers.current.onOpenPlan) return done(undefined);
+          done([
+            {
+              text: OPEN_PLAN,
+              range: { start: { x: at + 1, y }, end: { x: at + OPEN_PLAN.length, y } },
+              decorations: { pointerCursor: true, underline: true },
+              activate: () => handlers.current.onOpenPlan?.(),
+            },
+          ]);
+        },
+      });
       const input = term.onData((data) => {
         void invoke("pty_write", { id, data });
         handlers.current.onInput?.();
@@ -325,6 +348,7 @@ export function Shell({
         host.removeEventListener("mouseup", copySelected);
         seen.disconnect();
         input.dispose();
+        planLinks.dispose();
         term.dispose();
         if (id !== null) void invoke("pty_kill", { id });
       };

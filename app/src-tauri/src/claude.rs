@@ -60,10 +60,13 @@ const PLAN: &str = r#"f="$SLOP_CONTEXT"; cat > "$f.plan.part" && mv "$f.plan.par
 const APPROVED: &str = r#": > "$SLOP_CONTEXT.approved""#;
 
 /// Claude Code's own dialog shows the plan as its file reads once the hooks
-/// have run, and a ```diagram block's JSON is noise in a terminal; the plan's
-/// tab draws it. So the file goes without its diagrams while the dialog is up,
-/// and the whole plan waits beside the queue (`.hidden`) for RESTORE.
-const HIDE: &str = r#"h="$SLOP_CONTEXT.hidden"; p=$(sed -n 's/.*"planFilePath": *"\([^"]*\)".*/\1/p' | head -n 1); [ -f "$p" ] || exit 0; awk 'd { if (/^```[ \t]*$/) d = 0; next } /^```diagram[ \t]*$/ { d = 1; next } { print }' "$p" > "$h.shown" && ! cmp -s "$p" "$h.shown" && cp "$p" "$h" && printf '%s' "$p" > "$h.file" && cp "$h.shown" "$p"; exit 0"#;
+/// have run, and the plan's tab is where it is read: its diagrams are JSON in
+/// a terminal. So while the dialog is up the file is only the plan's title and
+/// OPEN_PLAN, which the terminal makes a link that opens (or reopens) the
+/// plan's tab (components/shell.tsx); it stays in the scrollback, so a closed
+/// plan can be found again. The whole plan waits beside the queue (`.hidden`)
+/// for RESTORE.
+const HIDE: &str = r#"h="$SLOP_CONTEXT.hidden"; p=$(sed -n 's/.*"planFilePath": *"\([^"]*\)".*/\1/p' | head -n 1); [ -f "$p" ] || exit 0; awk '/^# / && !t { print; print ""; t = 1 } END { print "`▸ Open plan`" }' "$p" > "$h.shown" && ! cmp -s "$p" "$h.shown" && cp "$p" "$h" && printf '%s' "$p" > "$h.file" && cp "$h.shown" "$p"; exit 0"#;
 /// The whole plan back in its file, at the first hook after the dialog is
 /// answered, accepted or not, so a revision starts from it. Unless the file
 /// changed meanwhile (the user edited it with ctrl+g): then it is theirs.
@@ -954,7 +957,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn the_terminal_sees_a_plan_without_its_diagram_and_the_file_gets_it_back() {
+    fn the_terminal_sees_only_a_link_to_the_plan_and_the_file_gets_it_back() {
         use std::io::Write as _;
         let dir = tempfile::tempdir().unwrap();
         let q = dir.path().join("context-1.md");
@@ -975,7 +978,7 @@ mod tests {
 
         std::fs::write(&file, whole).unwrap();
         hide();
-        assert_eq!(read(), "# Fix\n\nIt works.\n\n\n```screen\n{}\n```\n\n## Steps\n1. Do it\n");
+        assert_eq!(read(), "# Fix\n\n`\u{25b8} Open plan`\n");
         run(RESTORE, &q);
         assert_eq!(read(), whole);
         // Once: a later hook finds nothing waiting.
@@ -990,11 +993,12 @@ mod tests {
         run(RESTORE, &q);
         assert_eq!(read(), "# Mine\n");
 
-        // A plan with no diagram is left alone.
-        std::fs::write(&file, "# Plain\n").unwrap();
+        // A plan with no title still gets its link.
+        std::fs::write(&file, "Just do it.\n").unwrap();
         hide();
-        assert!(!q.with_extension("md.hidden.file").exists());
-        assert_eq!(read(), "# Plain\n");
+        assert_eq!(read(), "`\u{25b8} Open plan`\n");
+        run(RESTORE, &q);
+        assert_eq!(read(), "Just do it.\n");
     }
 
     #[cfg(unix)]

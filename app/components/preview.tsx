@@ -4,6 +4,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Menu } from "@/components/menu";
+import { openClaude, pick, usePicked, type Target } from "@/lib/context";
 import { PRESETS, hostOf, registerPreview, type Call } from "@/lib/preview";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +100,10 @@ type Said =
   | { type: "console"; level: string; text: string }
   | { type: "open"; url: string }
   | { type: "reply"; id: number; ok: boolean; value: unknown }
-  | { type: "loaded" };
+  | { type: "loaded" }
+  /** The user right-clicked something to hand to Claude, at (x, y) in the page. */
+  | { type: "pick"; x: number; y: number; key: string; title: string; text: string }
+  | { type: "unpick" };
 
 /** What a page from the web has said since it was last asked (agent.js). */
 const DRAIN = "window.__slop ? window.__slop.drain() : []";
@@ -152,6 +156,7 @@ export function Preview({
   const [badge, setBadge] = useState(false);
   const sizeBadge = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [picking, setPicking] = useState<{ x: number; y: number; target: Target } | null>(null);
   // A page from the web is in front, in the webview of this label.
   const [web, setWeb] = useState<string | null>(null);
   const [claude, setClaude] = useState(false);
@@ -313,6 +318,18 @@ export function Preview({
         else p.reject(new Error(String(m.value)));
       } else if (m.type === "loaded") {
         loaded();
+      } else if (m.type === "pick") {
+        // The page knows itself by the proxy's address; Claude knows the dev server's.
+        const p = proxy.current;
+        const text = p && server.current ? m.text.replaceAll(`http://localhost:${p.port}`, originOf(server.current)) : m.text;
+        const target = { key: m.key, title: m.title, text };
+        // A page from the web is a webview over the app, which would hide a menu.
+        if (onWeb.current) return pick(target);
+        const r = frame.current?.getBoundingClientRect();
+        const k = view.current.scale;
+        setPicking({ x: (r?.x ?? 0) + m.x * k, y: (r?.y ?? 0) + m.y * k, target });
+      } else if (m.type === "unpick") {
+        setPicking(null);
       }
     };
   });
@@ -834,6 +851,15 @@ export function Preview({
           <path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M11.5 9.5v4h-9v-9h4" />
         </Tool>
       </div>
+      {picking ? (
+        <PickMenu
+          {...picking}
+          onClose={() => {
+            setPicking(null);
+            void agent("unmark", {}).catch(() => {});
+          }}
+        />
+      ) : null}
       {menu ? (
         <Menu
           x={menu.x}
@@ -925,6 +951,31 @@ export function Preview({
         </div>
       </div>
     </div>
+  );
+}
+
+/** What a right-clicked element of the page offers, as the map's PickMenu (components/canvas.tsx) does. */
+function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
+  const status = usePicked(target.key);
+  return (
+    <Menu
+      x={x}
+      y={y}
+      title={target.title}
+      onClose={onClose}
+      items={[
+        status === "queued"
+          ? { label: "Waiting for your next prompt", disabled: true }
+          : { label: status === "sent" ? "Send to Claude again" : "Add to Claude context", onClick: () => pick(target) },
+        {
+          label: "Add and open Claude",
+          onClick: () => {
+            if (status !== "queued") pick(target);
+            openClaude();
+          },
+        },
+      ]}
+    />
   );
 }
 

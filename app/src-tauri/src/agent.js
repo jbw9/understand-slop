@@ -63,7 +63,7 @@
   let menuFor = 0;
   let pageMenu = false;
   addEventListener("contextmenu", (e) => {
-    if (performance.now() - menuFor > 2000) return;
+    if (!menuFor || performance.now() - menuFor > 2000) return;
     menuFor = 0;
     pageMenu = e.defaultPrevented;
     e.preventDefault();
@@ -429,6 +429,124 @@
     return `${role || el.tagName.toLowerCase()}${name ? ` "${name}"` : ""}`;
   };
 
+  /* ── the user pointing Claude at something ───────────────────── */
+
+  /** A short CSS path to an element, enough for Claude to find it in the code or the page. */
+  const selectorOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body && n.nodeType === 1 && parts.length < 5; n = n.parentElement) {
+      if (n.id && /^[A-Za-z][\w-]*$/.test(n.id)) {
+        parts.unshift(`#${n.id}`);
+        break;
+      }
+      let s = n.tagName.toLowerCase();
+      const cls = [...n.classList].filter((c) => /^[A-Za-z][\w-]*$/.test(c)).slice(0, 2);
+      if (cls.length) s += `.${cls.join(".")}`;
+      const same = n.parentElement ? [...n.parentElement.children].filter((c) => c.tagName === n.tagName) : [];
+      if (same.length > 1) s += `:nth-of-type(${same.indexOf(n) + 1})`;
+      parts.unshift(s);
+    }
+    return parts.join(" > ");
+  };
+
+  /**
+   * The component an element was rendered by, from what a dev build leaves on
+   * its nodes: React's fiber (its JSX's file and line up to React 18; the
+   * components' names in any), Vue's component file, Svelte's location.
+   */
+  const sourceOf = (el) => {
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const fiber = Object.keys(n).find((k) => k.startsWith("__reactFiber$"));
+      if (fiber) {
+        const names = [];
+        let file = null;
+        for (let f = n[fiber]; f && names.length < 4; f = f.return) {
+          if (!file && f._debugSource) file = `${f._debugSource.fileName}:${f._debugSource.lineNumber}`;
+          const t = f.type;
+          const name = typeof t === "function" ? t.displayName || t.name : t && typeof t === "object" ? t.displayName || t.render?.name || t.type?.name : null;
+          // Capitalised, as components are: not a minified name or React's own.
+          if (name && /^[A-Z]/.test(name) && names[0] !== name) names.unshift(name);
+        }
+        return names.length || file ? `${names.join(" › ")}${file ? ` (${file})` : ""}` : null;
+      }
+      const vue = n.__vueParentComponent?.type;
+      if (vue) return `${vue.__name || vue.name || "component"}${vue.__file ? ` (${vue.__file})` : ""}`;
+      const svelte = n.__svelte_meta?.loc;
+      if (svelte) return `${svelte.file}:${svelte.line + 1}`;
+    }
+    return null;
+  };
+
+  // The picked element outlined while its menu is open (components/preview.tsx),
+  // in the top layer like Claude's pointer. A page from the web has no menu
+  // over it: there the pick is taken at once, and the outline only flashes.
+  let mark = null;
+  const unmark = () => {
+    if (!mark) return;
+    mark.remove();
+    mark = null;
+    removeEventListener("scroll", unmark, true);
+    removeEventListener("pointerdown", dismiss, true);
+  };
+  // Clicking in the page closes the menu, which cannot hear a click in a frame.
+  const dismiss = () => {
+    unmark();
+    post({ type: "unpick" });
+  };
+  const outline = (el) => {
+    unmark();
+    const r = el.getBoundingClientRect();
+    mark = document.createElement("slop-mark");
+    mark.setAttribute("popover", "manual");
+    mark.style.cssText = `all:initial;position:fixed;left:${r.x - 2}px;top:${r.y - 2}px;width:${r.width}px;height:${r.height}px;margin:0;border:2px solid #d97757;border-radius:3px;background:rgba(217,119,87,.08);pointer-events:none;z-index:2147483647`;
+    (document.body || document.documentElement).appendChild(mark);
+    try {
+      mark.showPopover();
+    } catch {
+      /* no popover in this engine: fixed and z-indexed is near enough */
+    }
+    addEventListener("scroll", unmark, true);
+    if (native) setTimeout(unmark, 1200);
+    else addEventListener("pointerdown", dismiss, true);
+  };
+
+  // A person's right-click offers the thing under it to Claude, as the map's
+  // does: a control, or the nearest one it is inside, else what was hit. A
+  // page with a menu of its own keeps it, unless ⌥ is held. Claude's own
+  // right-click was kept closed above, so is passed over here.
+  addEventListener("contextmenu", (e) => {
+    if ((e.defaultPrevented && !e.altKey) || !(e.target instanceof Element)) return;
+    e.preventDefault();
+    let el = e.target;
+    for (let n = el, i = 0; n && n !== document.body && i < 6; n = n.parentElement, i++)
+      if (interactive(n, roleOf(n))) {
+        el = n;
+        break;
+      }
+    const selector = selectorOf(el);
+    const source = sourceOf(el);
+    const text = clip(el.innerText || el.textContent, 300);
+    outline(el);
+    post({
+      type: "pick",
+      x: e.clientX,
+      y: e.clientY,
+      key: `preview:${location.pathname}#${selector}`,
+      title: describe(el),
+      text: [
+        `[Preview element: ${describe(el)} on ${location.href}`,
+        `Selector: ${selector}`,
+        `Ref: ${refOf(el)} (for the preview tools while this page is open)`,
+        source ? `Component: ${source}` : "",
+        text ? `Text: ${text}` : "",
+        `HTML: ${clip(el.outerHTML, 600)}`,
+      ]
+        .filter(Boolean)
+        .join("\n")
+        .concat("]"),
+    });
+  });
+
   /** Typing into whatever has focus, as React and the rest expect to hear it. */
   const type = (text) => {
     const el = document.activeElement;
@@ -674,7 +792,12 @@
     },
     async veil() {
       veil();
+      unmark();
       await frames();
+      return "";
+    },
+    unmark() {
+      unmark();
       return "";
     },
     /** What typing would go into, if anything. */

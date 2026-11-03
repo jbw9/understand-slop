@@ -18,7 +18,7 @@
 import spawn from "cross-spawn";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,7 +34,19 @@ const ccModel = (model: string) => CC_MODEL[model] ?? model;
 
 /** An empty working directory: no project CLAUDE.md, no repository for Claude Code's own tools to wander. */
 let emptyDir: string | undefined;
-const cwd = () => (emptyDir ??= mkdtempSync(join(tmpdir(), "slop-cc-")));
+const cwd = () => {
+  if (emptyDir) return emptyDir;
+  emptyDir = mkdtempSync(join(tmpdir(), "slop-cc-"));
+  // Removed however the run ends: done, failed, or stopped by the app (SIGTERM).
+  const remove = () => rmSync(emptyDir!, { recursive: true, force: true });
+  process.once("exit", remove);
+  for (const sig of ["SIGTERM", "SIGINT"] as const)
+    process.once(sig, () => {
+      remove();
+      process.kill(process.pid, sig);
+    });
+  return emptyDir;
+};
 
 interface Result {
   is_error: boolean;

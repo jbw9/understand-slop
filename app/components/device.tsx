@@ -3,6 +3,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PickMenu } from "@/components/preview";
+import type { Target } from "@/lib/context";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,6 +21,15 @@ export const PLATFORM: Record<Platform, { label: string; device: string }> = {
   android: { label: "Android", device: "Android emulator" },
   ios: { label: "iOS", device: "iOS Simulator" },
 };
+
+/** The element under a right-click, as the phone's accessibility tree has it (devices.rs `Picked`). */
+interface Picked extends Target {
+  /** Its box, as fractions of the screen. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 interface Status {
   ready: boolean;
@@ -52,6 +63,7 @@ export function Device({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [screen, setScreen] = useState<string | null>(null);
+  const [picking, setPicking] = useState<{ x: number; y: number; target: Target; outline: React.CSSProperties } | null>(null);
 
   const check = useCallback(() => {
     invoke<Status>("device_status", { platform })
@@ -153,7 +165,7 @@ export function Device({
 
   // A touch: a tap where it went down and up, a swipe if it moved.
   const down = useRef<{ x: number; y: number; t: number } | null>(null);
-  const at = (e: React.PointerEvent<HTMLImageElement>) => {
+  const at = (e: React.MouseEvent<HTMLImageElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   };
@@ -303,6 +315,8 @@ export function Device({
             alt={`${device} screen`}
             draggable={false}
             onPointerDown={(e) => {
+              // A right-click is a pick, not a touch.
+              if (e.button !== 0) return;
               e.currentTarget.setPointerCapture(e.pointerId);
               (e.currentTarget.parentElement as HTMLElement).focus();
               down.current = { ...at(e), t: Date.now() };
@@ -315,11 +329,32 @@ export function Device({
               if (Math.hypot(to.x - from.x, to.y - from.y) < 0.015) send({ kind: "tap", x: from.x, y: from.y });
               else send({ kind: "swipe", x: from.x, y: from.y, x2: to.x, y2: to.y, ms: Math.min(1000, Math.max(100, Date.now() - from.t)) });
             }}
+            // Right-click hands Claude the element there, as on the map and a page.
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const { x, y } = at(e);
+              const menu = { x: e.clientX, y: e.clientY };
+              const r = e.currentTarget.getBoundingClientRect();
+              const box = e.currentTarget.parentElement!.getBoundingClientRect();
+              void invoke<Picked>("device_describe", { platform, x, y })
+                .then((t) =>
+                  setPicking({
+                    ...menu,
+                    target: t,
+                    outline: { left: r.left - box.left + t.x * r.width, top: r.top - box.top + t.y * r.height, width: t.w * r.width, height: t.h * r.height },
+                  }),
+                )
+                .catch((err) => setError(String(err)));
+            }}
             className="max-h-full max-w-full cursor-pointer select-none rounded-[22px] border-[5px] border-bezel object-contain"
           />
         ) : (
           <p className="text-[12px] text-faint">Waiting for the screen…</p>
         )}
+        {picking ? (
+          <div aria-hidden className="pointer-events-none absolute rounded-[3px] border-2 border-[#d97757] bg-[#d97757]/8" style={picking.outline} />
+        ) : null}
+        {picking ? <PickMenu x={picking.x} y={picking.y} target={picking.target} onClose={() => setPicking(null)} /> : null}
         <div ref={ring} aria-hidden className="pointer-events-none absolute -left-3.5 -top-3.5 size-6 rounded-full border-2 border-[#d97757] opacity-0" />
         <div
           ref={hand}

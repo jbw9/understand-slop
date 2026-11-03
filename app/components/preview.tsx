@@ -954,8 +954,8 @@ export function Preview({
   );
 }
 
-/** What a right-clicked element of the page offers, as the map's PickMenu (components/canvas.tsx) does. */
-function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
+/** What a right-clicked element of a page or a phone offers, as the map's PickMenu (components/canvas.tsx) does. */
+export function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
   return (
     <Menu
       x={x}

@@ -75,6 +75,7 @@ pub fn pty_spawn(
     on_data: Channel<InvokeResponseBody>,
     launch: Option<claude::Launch>,
     start_claude: bool,
+    resume: Option<String>,
     cwd: Option<String>,
     outline: Option<String>,
     ptys: tauri::State<Ptys>,
@@ -93,8 +94,13 @@ pub fn pty_spawn(
         claude::prepare(&mut cmd, launch, &context, outline.as_deref(), id).map_err(|e| e.to_string())?;
         if start_claude {
             if cfg!(unix) {
-                cmd.args(["-c", r#""$SLOP_LAUNCHER"; exec "$SHELL""#]);
+                // Unset after, so a `claude` typed later starts afresh.
+                cmd.args(["-c", r#""$SLOP_LAUNCHER" ${SLOP_RESUME:+--resume "$SLOP_RESUME"}; unset SLOP_RESUME; exec "$SHELL""#]);
                 cmd.env("SHELL", &program);
+                if let Some(id) = &resume {
+                    claude::resuming(&context, id).map_err(|e| e.to_string())?;
+                    cmd.env("SLOP_RESUME", id);
+                }
             } else if name.eq_ignore_ascii_case("cmd") {
                 cmd.args(["/k", "slop-claude"]);
             } else {
@@ -107,6 +113,10 @@ pub fn pty_spawn(
     if let Some(dir) = dir.or_else(crate::proc::home) {
         cmd.cwd(dir);
     }
+    // An app started from a Claude Code session would hand down its markers,
+    // and a Claude in a tab would then take itself for a child of that one.
+    cmd.env_remove("CLAUDECODE");
+    cmd.env_remove("CLAUDE_CODE_CHILD_SESSION");
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
@@ -243,6 +253,8 @@ pub struct State {
     plan: Option<claude::Plan>,
     /// The plan was accepted; reported once.
     approved: bool,
+    /// The conversation Claude is having, to resume it after a restart.
+    session: Option<String>,
 }
 
 #[tauri::command]
@@ -268,6 +280,7 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
         acts: claude::take_acts(&p.context),
         plan: claude::take_plan(&p.context),
         approved: claude::take_approved(&p.context),
+        session: claude::session_of(&p.context),
     })
 }
 

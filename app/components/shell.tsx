@@ -115,6 +115,7 @@ function zoom(by: number | null) {
  */
 export function Shell({
   startClaude = false,
+  resume,
   run,
   cwd,
   visible,
@@ -127,6 +128,8 @@ export function Shell({
   onExit,
 }: {
   startClaude?: boolean;
+  /** The conversation the started Claude picks up again, in a tab reopened after a restart. */
+  resume?: string;
   /** A command to type into the shell once it starts, as if the user had: another agent's CLI. */
   run?: string;
   /** Where it starts. A tab keeps the one it was opened with. */
@@ -266,6 +269,7 @@ export function Shell({
           onData: out,
           launch,
           startClaude: startClaude && !!launch,
+          resume: resume ?? null,
           cwd: cwd ?? null,
           outline: outline(sections.current),
         });

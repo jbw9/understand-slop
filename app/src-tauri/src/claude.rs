@@ -36,6 +36,11 @@ const HOOK: &str = r#"f="$SLOP_CONTEXT"; w="$f.where"; if [ -s "$w" ]; then head
 /// hook writes to `$CLAUDE_ENV_FILE` is what every command there starts with.
 const ON_PATH: &str = r#"[ -n "$CLAUDE_ENV_FILE" ] && [ -n "$SLOP_BIN" ] || exit 0; d="$SLOP_BIN"; command -v cygpath >/dev/null 2>&1 && d=$(cygpath -u "$d"); printf 'export PATH="%s:$PATH"\n' "$d" >> "$CLAUDE_ENV_FILE""#;
 
+/// The conversation Claude is having in this tab, from the hook's input, so
+/// the app can resume it in the tab it reopens after a restart. A `/clear`
+/// starts a new one, and this follows it.
+const SESSION: &str = r#"id=$(sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1); [ -n "$id" ] && printf '%s\n' "$id" > "$SLOP_CONTEXT.session"; exit 0"#;
+
 /// After a tool that can change files: this turn may have edited code.
 const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
 /// The tools EDITED follows. Bash among them, since a shell command can edit too.
@@ -220,14 +225,22 @@ pub struct Launch {
     model: Option<String>,
 }
 
-/// Runs Claude with the hook, and marks the tab live while it does. The marker
-/// goes on any exit — a quit, a crash, Ctrl+C — and the script's status is
-/// Claude's.
+/// Runs Claude with the hook, and marks the tab live while it does. The marker,
+/// and the conversation the tab would be reopened into, go on any exit — a
+/// quit, a crash, Ctrl+C — and the script's status is Claude's.
 const LAUNCHER: &str = r#"#!/bin/sh
 # Claude Code with Mira's map-context hook (src-tauri/src/claude.rs).
-trap 'rm -f "$SLOP_CONTEXT.live"' EXIT INT TERM HUP
+trap 'rm -f "$SLOP_CONTEXT.live" "$SLOP_CONTEXT.session"' EXIT INT TERM HUP
 : > "$SLOP_CONTEXT.live"
 "$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} ${SLOP_CLAUDE_MCP:+--mcp-config "$SLOP_CLAUDE_MCP"} "$@"
+"#;
+
+/// `claude` typed in a tab: the launcher, so it is in front and takes context
+/// like one the app started. Not from Claude's own Bash tool, where the
+/// launcher's exit would take the tab's live marker from the Claude still running.
+const CLAUDE_SHIM: &str = r#"#!/bin/sh
+[ -n "$CLAUDECODE" ] && exec "$SLOP_CLAUDE_BIN" "$@"
+exec "$SLOP_LAUNCHER" "$@"
 "#;
 
 #[derive(serde::Serialize)]
@@ -350,6 +363,7 @@ pub fn forget(queue: &Path) {
     let _ = std::fs::remove_file(queue.with_extension("md.status"));
     let _ = std::fs::remove_file(queue.with_extension("md.plan"));
     let _ = std::fs::remove_file(queue.with_extension("md.approved"));
+    let _ = std::fs::remove_file(session(queue));
 }
 
 /// A plan Claude is waiting to have accepted: its Markdown, and the file
@@ -484,6 +498,25 @@ pub fn running(queue: &Path) -> bool {
     live(queue).exists()
 }
 
+fn session(queue: &Path) -> PathBuf {
+    queue.with_extension("md.session")
+}
+
+/// The conversation Claude has in the tab that owns `queue`, while it runs.
+pub fn session_of(queue: &Path) -> Option<String> {
+    std::fs::read_to_string(session(queue)).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+/// A tab reopened into `id`: it counts as that conversation's from the start,
+/// so a restart before Claude is up does not lose it, and a resume that fails
+/// drops it when the launcher exits.
+pub fn resuming(queue: &Path, id: &str) -> std::io::Result<()> {
+    if let Some(dir) = queue.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(session(queue), format!("{id}\n"))
+}
+
 /// The last word a status hook wrote; none before Claude's first prompt.
 pub fn status_of(queue: &Path) -> Option<String> {
     std::fs::read_to_string(queue.with_extension("md.status")).ok().map(|s| s.trim().to_string())
@@ -500,6 +533,8 @@ fn launcher() -> std::io::Result<PathBuf> {
     install(&dir.join("slop-terminal"), TERMINAL)?;
     let path = dir.join("slop-claude");
     install(&path, LAUNCHER)?;
+    #[cfg(unix)]
+    install(&dir.join("claude"), CLAUDE_SHIM)?;
     #[cfg(windows)]
     let path = {
         let cmd = dir.join("slop-claude.cmd");
@@ -550,7 +585,7 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     let hook = |c: &str| serde_json::json!({ "type": "command", "command": c });
     let settings = serde_json::json!({
         "hooks": {
-            "SessionStart": [{ "hooks": [hook(ON_PATH)] }],
+            "SessionStart": [{ "hooks": [hook(ON_PATH), hook(SESSION)] }],
             "UserPromptSubmit": [{ "hooks": [hook(HOOK), status("working")] }],
             "PreToolUse": [
                 { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] },
@@ -994,6 +1029,35 @@ mod tests {
         // Gone after a failing exit too.
         assert!(!launch(&q, "/bin/false").success());
         assert!(!running(&q));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_tab_keeps_its_conversation_while_claude_runs() {
+        use std::io::Write as _;
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let start = |input: &str| {
+            let mut child = Command::new("sh")
+                .args(["-c", SESSION])
+                .env("SLOP_CONTEXT", &q)
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            assert!(child.wait().unwrap().success());
+        };
+        start(r#"{"session_id": "abc-1", "source": "startup"}"#);
+        assert_eq!(session_of(&q).as_deref(), Some("abc-1"));
+        // A /clear is a new conversation; input without one changes nothing.
+        start(r#"{"session_id":"abc-2","source":"clear"}"#);
+        start("{}");
+        assert_eq!(session_of(&q).as_deref(), Some("abc-2"));
+        // A reopened tab has it from the start, and loses it when Claude exits.
+        resuming(&q, "abc-3").unwrap();
+        assert_eq!(session_of(&q).as_deref(), Some("abc-3"));
+        assert!(!launch(&q, "/usr/bin/false").success());
+        assert!(session_of(&q).is_none());
     }
 
     #[test]

@@ -109,6 +109,10 @@ interface Tab {
   /** A plan's tab: the plan, and the tab of the Claude that wrote it. */
   plan?: Plan;
   of?: number;
+  /** The conversation Claude is having in it, to reopen it into after a restart. */
+  session?: string;
+  /** Reopened after a restart: the conversation its Claude picks up again. */
+  resume?: string;
 }
 
 type Status = "working" | "waiting" | "done";
@@ -121,6 +125,16 @@ interface Project {
 }
 
 const OFFER_KEY = "slop.offer:";
+/** The conversations Claude was having in the tabs, per project, so the app reopens them. */
+const SESSIONS_KEY = "slop.workspace.sessions";
+
+function storedSessions(): { cwd: string; session: string }[] {
+  try {
+    return JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
 
 function offered(root: string) {
   try {
@@ -216,6 +230,26 @@ export function Workspace() {
     },
     [here, show],
   );
+
+  // Before the restore below, so the empty first render never overwrites
+  // what is about to be reopened.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (!restored.current) return;
+    const open = tabs.flatMap((t) => (t.kind === "shell" && t.session ? [{ cwd: t.cwd, session: t.session }] : []));
+    try {
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(open));
+    } catch {
+      /* not kept: the tabs still work */
+    }
+  }, [tabs]);
+  useEffect(() => {
+    if (restored.current || !isTauri()) return;
+    restored.current = true;
+    // Once, from storage the server render cannot read: initial state would not hydrate.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    for (const { cwd, session } of storedSessions()) add(CLAUDE.id, { cwd, session, resume: session });
+  }, [add]);
 
   // Each project's dev server address, once it has printed one; and how each
   // project is run, read when it is first opened.
@@ -453,8 +487,9 @@ export function Workspace() {
           acts: Act[];
           plan: { text: string; file: string | null } | null;
           approved: boolean;
+          session: string | null;
         }>("pty_state", { id: pty })
-          .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved }) => {
+          .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved, session }) => {
             if (turn && cwd) void followTurn(cwd, turn);
             if (plan) planning.current(key, cwd, plan);
             if (approved)
@@ -478,8 +513,8 @@ export function Workspace() {
                       : "done"
                   : undefined;
             setTabs((all) =>
-              all.some((x) => x.key === key && (x.live !== live || x.busy !== busy || x.status !== statusOf(x)))
-                ? all.map((x) => (x.key === key ? { ...x, live, busy, status: statusOf(x) } : x))
+              all.some((x) => x.key === key && (x.live !== live || x.busy !== busy || x.status !== statusOf(x) || x.session !== (session ?? undefined)))
+                ? all.map((x) => (x.key === key ? { ...x, live, busy, status: statusOf(x), session: session ?? undefined } : x))
                 : all,
             );
           })
@@ -1075,6 +1110,7 @@ export function Workspace() {
           const shell = (
           <Shell
             startClaude={t.start === CLAUDE.id}
+            resume={t.resume}
             run={t.run ?? (t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined)}
             cwd={t.cwd || undefined}
             visible={visible}

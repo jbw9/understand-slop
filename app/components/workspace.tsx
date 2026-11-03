@@ -228,9 +228,14 @@ export function Workspace() {
     (start: string | null, extra?: Partial<Tab>) => {
       const key = nextKey++;
       const cwd = extra?.cwd ?? here;
-      setTabs((t) => [...t, { key, kind: "shell", start, ran: start, title: "terminal", cwd, live: false, busy: false, ...extra }]);
-      setActive((a) => ({ ...a, [cwd]: key }));
-      if (cwd === here) show(true);
+      // A Preview opens in the main view, not beside Claude in the window.
+      const main = extra?.main ?? extra?.kind === "preview";
+      setTabs((t) => [...t, { key, kind: "shell", start, ran: start, title: "terminal", cwd, live: false, busy: false, main, ...extra }]);
+      if (main) setFront((f) => ({ ...f, [cwd]: key }));
+      else {
+        setActive((a) => ({ ...a, [cwd]: key }));
+        if (cwd === here) show(true);
+      }
       return key;
     },
     [here, show],

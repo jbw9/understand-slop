@@ -275,21 +275,35 @@ const tryJson = (s: string) => {
   try { return JSON.parse(s); } catch { return null; }
 };
 
-/** `tree` with each fix put in place of the node with its id; ids with no such node go to `missing`. */
+/**
+ * A fix laid over the node it fixes: fields it leaves out are kept, one set to
+ * null is removed. Authors send only what they changed — replacing the node
+ * whole wiped its title and sub and cost a round of "title missing" (as many
+ * as 68 problems in one rejection). The tool's wording is left as it was, so
+ * the API path's requests still replay from the committed maps' caches.
+ */
+function merged(old: Node, fix: Node): Node {
+  const out: any = { ...old, ...fix, children: fix.children ?? old.children };
+  for (const k of Object.keys(out)) if (out[k] === null) delete out[k];
+  if (!out.children) delete out.children;
+  return out;
+}
+
+/** `tree` with each fix merged into the node with its id; ids with no such node go to `missing`. */
 export function patched(tree: Node, fixes: Node[], missing: string[]): Node {
-  const out = structuredClone(tree);
+  let out = structuredClone(tree);
   const swap = (n: Node, fix: Node): boolean => {
     const kids = n.children ?? [];
     const i = kids.findIndex((k) => k.id === fix.id);
     if (i >= 0) {
-      kids[i] = { ...fix, children: fix.children ?? kids[i].children };
+      kids[i] = merged(kids[i], fix);
       return true;
     }
     return kids.some((k) => swap(k, fix));
   };
   for (const fix of fixes) {
     if (!fix || typeof fix !== "object" || !fix.id) continue;
-    if (fix.id === out.id) Object.assign(out, { ...fix, children: fix.children ?? out.children });
+    if (fix.id === out.id) out = merged(out, fix);
     else if (!swap(out, fix)) missing.push(String(fix.id));
   }
   return out;

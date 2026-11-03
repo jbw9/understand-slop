@@ -163,7 +163,8 @@ function storedWidth() {
   } catch {
     /* storage blocked: the default is fine */
   }
-  return 640;
+  // Wide enough for a full Claude Code status line, about 105 columns.
+  return 900;
 }
 
 /** Tab keys, unique for the app's life. */

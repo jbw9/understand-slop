@@ -207,6 +207,8 @@ export function Shell({
         lineHeight: 1.2,
         cursorBlink: true,
         scrollback: 5000,
+        // Claude Code can take the mouse for itself; Option-drag still selects.
+        macOptionClickForcesSelection: true,
         allowProposedApi: true,
       });
       const fit = new FitAddon();
@@ -299,6 +301,12 @@ export function Shell({
         void invoke("pty_write", { id, data });
         handlers.current.onInput?.();
       });
+      // Selecting copies, as in herdr: no key to press after the drag.
+      const host = el.current;
+      const copySelected = () => {
+        if (term.hasSelection()) void writeText(term.getSelection());
+      };
+      host.addEventListener("mouseup", copySelected);
       const seen = new ResizeObserver(refit);
       seen.observe(el.current);
       show.current = () => {
@@ -314,6 +322,7 @@ export function Shell({
       window.addEventListener(ZOOMED, onZoom);
       cleanup = () => {
         window.removeEventListener(ZOOMED, onZoom);
+        host.removeEventListener("mouseup", copySelected);
         seen.disconnect();
         input.dispose();
         term.dispose();

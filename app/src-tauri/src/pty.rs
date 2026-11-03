@@ -127,16 +127,30 @@ pub fn pty_spawn(
     ptys.open.lock().unwrap().insert(id, Pty { master: pair.master, writer, child, context });
 
     let open = ptys.open.clone();
+    // Reads go to a second thread that sends them on. Claude Code redraws in
+    // many small writes; whatever piles up while one send is crossing to the
+    // webview goes in the next as one message, rather than a message per read.
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     std::thread::spawn(move || {
         let mut buf = [0u8; 16 * 1024];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    if on_data.send(InvokeResponseBody::Raw(buf[..n].to_vec())).is_err() {
+                    if tx.send(buf[..n].to_vec()).is_err() {
                         break;
                     }
                 }
+            }
+        }
+    });
+    std::thread::spawn(move || {
+        while let Ok(mut chunk) = rx.recv() {
+            while let Ok(more) = rx.try_recv() {
+                chunk.extend_from_slice(&more);
+            }
+            if on_data.send(InvokeResponseBody::Raw(chunk)).is_err() {
+                break;
             }
         }
         // Gone from the map already if it was killed from the UI.

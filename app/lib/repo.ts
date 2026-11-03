@@ -89,8 +89,8 @@ export type WriteSlice = (req: WriteRequest, root: RepoRoot) => Promise<WriteRes
 // satisfies it and adds nothing to it.
 // ---------------------------------------------------------------------------
 
-import { readFile, writeFile, realpath, stat } from "node:fs/promises";
-import { resolve, sep } from "node:path";
+import { readFile, writeFile, realpath, stat, unlink } from "node:fs/promises";
+import { basename, dirname, join, resolve, sep } from "node:path";
 
 /**
  * The entire security model, in one function.
@@ -256,4 +256,49 @@ function unified(file: string, start: number, before: string, after: string) {
     ...b.map((l) => `-${l}`),
     ...a.map((l) => `+${l}`),
   ].join("\n");
+}
+
+/**
+ * Puts files back as they were before an agent turn (app/api/undo), from the
+ * snapshot the map updater kept (scripts/generate/update.ts).
+ *
+ * All or nothing, and only over the turn's own work: a file whose contents
+ * are no longer what the turn left (`after`) has been changed since, by hand
+ * or by a later turn, and undoing would destroy that; any such file refuses
+ * the whole undo and is named. A file the turn created is deleted, one it
+ * deleted is written back.
+ *
+ * Paths come from a snapshot on disk, not the network, but go through
+ * `contain` all the same: a file that does not exist is checked by its
+ * folder, and refused if that folder is gone too.
+ */
+export async function restoreFiles(
+  root: RepoRoot,
+  files: { path: string; before: string | null; after: string | null }[],
+): Promise<{ ok: true; restored: string[] } | { ok: false; conflicts: string[]; refused: string[] }> {
+  const placed: { abs: string; before: string | null }[] = [];
+  const conflicts: string[] = [];
+  const refused: string[] = [];
+  for (const f of files) {
+    if (f.before === f.after) continue;
+    let at = await contain(root, f.path);
+    const now = at ? await readFile(at, "utf8").catch(() => null) : null;
+    if (!at) {
+      // Missing: checked by its folder, which must still exist inside the checkout.
+      const dir = await contain(root, dirname(f.path));
+      if (!dir || f.path.endsWith(sep) || basename(f.path) === "..") {
+        refused.push(f.path);
+        continue;
+      }
+      at = join(dir, basename(f.path));
+    }
+    if (now !== f.after) conflicts.push(f.path);
+    else placed.push({ abs: at, before: f.before });
+  }
+  if (conflicts.length || refused.length) return { ok: false, conflicts, refused };
+  for (const p of placed) {
+    if (p.before === null) await unlink(p.abs).catch(() => {});
+    else await writeFile(p.abs, p.before, "utf8");
+  }
+  return { ok: true, restored: files.filter((f) => f.before !== f.after).map((f) => f.path) };
 }

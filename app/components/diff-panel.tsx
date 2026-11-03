@@ -8,6 +8,7 @@ import { useMap } from "@/components/map-context";
 import { claudePath } from "@/components/projects";
 import { hunksOf, type HunkLines } from "@/lib/hunks";
 import { startNote, useNotes } from "@/lib/notes";
+import { undoTurn } from "@/lib/undo";
 import type { Target } from "@/lib/context";
 import { TOKEN_COLOR, highlight, langOf } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
@@ -444,10 +445,13 @@ function ReviewCard({ r, map, spec, onMapped }: { r: Review; map: string; spec?:
           {r.body ? <p className="mt-1 line-clamp-3 whitespace-pre-line text-[12px] leading-snug text-on-surface-variant">{r.body}</p> : null}
         </>
       ) : r.kind === "turn" ? (
-        <p className="text-[12.5px] text-ink">
-          The agent, asked: <span className="italic">{r.title || "to correct the map"}</span>
-          <span className="ml-1.5 text-[11.5px] text-muted-slate">· the map before and after it</span>
-        </p>
+        <>
+          <p className="text-[12.5px] text-ink">
+            The agent, asked: <span className="italic">{r.title || "to correct the map"}</span>
+            <span className="ml-1.5 text-[11.5px] text-muted-slate">· the map before and after it</span>
+          </p>
+          {spec ? <UndoTurn key={spec} map={map} turn={spec.slice(5)} onUndone={onMapped} /> : null}
+        </>
       ) : (
         <p className="text-[12.5px] text-ink">
           What <span className="font-mono">{r.head}</span> did since it left <span className="font-mono">{r.base}</span>
@@ -456,6 +460,57 @@ function ReviewCard({ r, map, spec, onMapped }: { r: Review; map: string; spec?:
           </span>
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Puts back every file the turn edited (lib/undo.ts), after asking once. Only
+ * when nothing has touched those files since: otherwise it names them, and
+ * changes nothing.
+ */
+function UndoTurn({ map, turn, onUndone }: { map: string; turn: string; onUndone: () => void }) {
+  const [stage, setStage] = useState<"idle" | "confirm" | "busy" | "done">("idle");
+  const [said, setSaid] = useState<string | null>(null);
+  const go = async () => {
+    setStage("busy");
+    const r = await undoTurn(map, turn);
+    if (r.ok) {
+      setStage("done");
+      setSaid(`Put back ${r.restored.length} file${r.restored.length === 1 ? "" : "s"}. The map is catching up.`);
+      onUndone();
+    } else {
+      setStage("idle");
+      setSaid(
+        r.conflicts?.length
+          ? `Not undone: changed since this turn — ${r.conflicts.join(", ")}.`
+          : r.refused?.length
+            ? `Not undone: cannot write ${r.refused.join(", ")}.`
+            : (r.error ?? "Not undone."),
+      );
+    }
+  };
+  const btn = "cursor-pointer rounded-[2px] px-2 py-0.5 text-[12px]";
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+      {stage === "idle" ? (
+        <button type="button" onClick={() => setStage("confirm")} className={cn(btn, "border border-border-gray text-ink hover:bg-surface-container-low")}>
+          ↶ Undo this turn
+        </button>
+      ) : stage === "confirm" ? (
+        <>
+          <span className="text-[12px] text-ink">Put every file this turn edited back as it was?</span>
+          <button type="button" onClick={() => void go()} className={cn(btn, "bg-deep-green text-pure-white hover:opacity-90")}>
+            Undo
+          </button>
+          <button type="button" onClick={() => setStage("idle")} className={cn(btn, "text-muted-slate hover:text-ink")}>
+            Cancel
+          </button>
+        </>
+      ) : stage === "busy" ? (
+        <span className="text-[12px] text-muted-slate">Undoing…</span>
+      ) : null}
+      {said ? <span className="text-[11.5px] text-muted-slate">{said}</span> : null}
     </div>
   );
 }

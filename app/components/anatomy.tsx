@@ -157,6 +157,10 @@ const PAIR_LABEL = "min-w-0 text-left @min-[267px]:max-w-[40%] @min-[267px]:shri
 /** The answer side. Floored, and it is the only side allowed to grow. */
 const PAIR_VALUE = "w-full min-w-0 text-left @min-[267px]:w-auto @min-[267px]:flex-1 @min-[267px]:min-w-[160px]";
 
+/** A schema row: name, type and key in fixed tracks, the note in what is left. */
+const SCHEMA_ROW =
+  "grid w-full grid-cols-[minmax(0,var(--name))_minmax(0,var(--type))_2.25rem] gap-x-4 px-3 text-left @min-[300px]:grid-cols-[minmax(0,var(--name))_minmax(0,var(--type))_2.25rem_minmax(0,1fr)]";
+
 /** Shared row chrome: lit fill, dimmed-when-others-are-lit, click to trace. */
 function rowClass(id: string, ctx: RowCtx, extra?: string) {
   const isLit = ctx.traced === id;
@@ -193,63 +197,63 @@ function Block({
             {block.rows.length} {/\.\w+$/.test(block.table) ? "fields" : "columns"}
           </span>
         </div>
-        {/* One grid for the whole table, each row a subgrid of it, so names,
-            types and keys line up down the page the way a table's columns do.
-            Under 300px the note leaves its column for a line of its own. */}
-        <div className="@container">
-          <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_max-content] gap-x-4 @min-[300px]:grid-cols-[minmax(0,max-content)_minmax(0,max-content)_max-content_minmax(0,1fr)]">
-            <div className="col-span-full grid grid-cols-subgrid border-b border-border-gray px-3 py-1 font-mono text-[9px] uppercase tracking-wide text-faint">
-              <span>{/\.\w+$/.test(block.table) ? "field" : "column"}</span>
-              <span>type</span>
-              <span>key</span>
-              <span className="hidden @min-[300px]:block">notes</span>
-            </div>
-            {block.rows.map((c) => {
-              const id = rowId(owner, c.name);
-              const isLit = ctx.traced === id;
-              return (
-                <button
-                  key={c.name}
-                  data-row={id}
-                  onClick={() => ctx.onTrace(id)}
-                  className={rowClass(
-                    id,
-                    ctx,
-                    "col-span-full grid grid-cols-subgrid items-baseline gap-y-0.5 border-b border-border-gray px-3 py-1.5 last:border-b-0",
+        {/* Every row shares one column template, sized in `ch` from the
+            longest name and type (both are monospace), so the columns line up
+            down the table. Under 300px the note takes a line of its own. */}
+        <div
+          className="@container"
+          style={{
+            ["--name" as string]: `${Math.max(6, ...block.rows.map((c) => c.name.length + (c.nullable ? 1 : 0)))}ch`,
+            ["--type" as string]: `${Math.max(4, ...block.rows.map((c) => c.type.length))}ch`,
+          }}
+        >
+          <div className={cn(SCHEMA_ROW, "border-b border-border-gray py-1 font-mono text-[9px] uppercase tracking-wide text-faint")}>
+            <span>{/\.\w+$/.test(block.table) ? "field" : "column"}</span>
+            <span>type</span>
+            <span>key</span>
+            <span className="hidden @min-[300px]:block">notes</span>
+          </div>
+          {block.rows.map((c) => {
+            const id = rowId(owner, c.name);
+            const isLit = ctx.traced === id;
+            return (
+              <button
+                key={c.name}
+                data-row={id}
+                onClick={() => ctx.onTrace(id)}
+                className={rowClass(id, ctx, cn(SCHEMA_ROW, "items-baseline gap-y-0.5 border-b border-border-gray py-1.5 last:border-b-0"))}
+              >
+                <span
+                  className={cn(
+                    "min-w-0 break-words font-mono text-[10.5px]",
+                    isLit ? "font-semibold text-deep-green" : "text-on-surface",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "min-w-0 break-words font-mono text-[10.5px]",
-                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
-                    )}
-                  >
-                    {c.name}
-                    {c.nullable ? <span className="text-faint" title="can be empty">?</span> : null}
-                  </span>
-                  <span className="min-w-0 break-words font-mono text-[10.5px] text-muted-slate">
-                    {c.type}
-                  </span>
-                  <span className="self-center">{c.key ? <KeyTag k={c.key} lit={isLit} /> : null}</span>
-                  <span className="col-span-full flex items-start gap-2 @min-[300px]:col-span-1">
-                    {c.note ? (
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 text-[10px] leading-snug",
-                          c.state === "derived" ? "text-faint" : "text-amber-ink",
-                        )}
-                      >
-                        {c.note}
-                      </span>
-                    ) : (
-                      <span className="min-w-0 flex-1" />
-                    )}
-                    <StateChip state={c.state} />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  {c.name}
+                  {c.nullable ? <span className="text-faint" title="can be empty">?</span> : null}
+                </span>
+                <span className="min-w-0 break-words font-mono text-[10.5px] text-muted-slate">
+                  {c.type}
+                </span>
+                <span className="self-center">{c.key ? <KeyTag k={c.key} lit={isLit} /> : null}</span>
+                <span className="col-span-full flex items-start gap-2 @min-[300px]:col-span-1">
+                  {c.note ? (
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 text-[10px] leading-snug",
+                        c.state === "derived" ? "text-faint" : "text-amber-ink",
+                      )}
+                    >
+                      {c.note}
+                    </span>
+                  ) : (
+                    <span className="min-w-0 flex-1" />
+                  )}
+                  <StateChip state={c.state} />
+                </span>
+              </button>
+            );
+          })}
         </div>
         {block.rel?.length ? (
           <div className="border-t border-border-gray bg-surface-container-low px-3 py-2">

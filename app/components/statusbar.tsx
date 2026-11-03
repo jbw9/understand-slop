@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AgentIcon } from "@/components/agents";
 import { Kbd } from "@/components/button";
 import { useMap } from "@/components/map-context";
@@ -158,6 +158,27 @@ interface Update {
 }
 
 /**
+ * The section ids an update is rewriting right now, for the open level to say
+ * so where the reader is looking (components/canvas.tsx): the status bar alone
+ * was missed, and a minute with nothing changing read as the update not working.
+ */
+let redoing: string[] = [];
+const redoListeners = new Set<() => void>();
+function setRedoing(next: string[]) {
+  if (next.join("\n") === redoing.join("\n")) return;
+  redoing = next;
+  redoListeners.forEach((l) => l());
+}
+const NONE: string[] = [];
+export function useRedoing(): string[] {
+  return useSyncExternalStore(
+    (l) => (redoListeners.add(l), () => redoListeners.delete(l)),
+    () => redoing,
+    () => NONE,
+  );
+}
+
+/**
  * Follows the open map while an agent changes its code: an update redoing
  * the touched sections (lib/vault.ts) shows here while it runs. The map takes
  * each section as it lands by itself (components/map-context.tsx); this only
@@ -191,9 +212,10 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
     const tick = () =>
       fetch(`/api/projects?id=${encodeURIComponent(id)}`)
         .then((r) => r.json())
-        .then((p: { update: Update | null } | null) => {
+        .then((p: { update: Update | null; redoing?: string[] } | null) => {
           const next = p?.update ?? null;
           setU(next);
+          setRedoing(next?.status === "running" ? (p?.redoing ?? []) : []);
           const done = next?.status !== "running" ? next?.finishedAt : undefined;
           if (!first && done && done !== seen.current) setFresh(true);
           if (done) seen.current = done;
@@ -202,7 +224,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
         .catch(() => {});
     void tick();
     const timer = setInterval(tick, 2000);
-    return () => clearInterval(timer);
+    return () => (clearInterval(timer), setRedoing([]));
   }, [id, local]);
 
   const [behind, setBehind] = useState<string[]>([]);

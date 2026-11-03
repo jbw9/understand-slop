@@ -16,6 +16,7 @@ import { Button, CodeIcon } from "@/components/button";
 import { Menu } from "@/components/menu";
 import { useMap } from "@/components/map-context";
 import { useFlash } from "@/components/flash";
+import { useRedoing } from "@/components/statusbar";
 import { DocView, closeDoc, useOpenDoc } from "@/components/docs";
 import { TimelineView, closeTimeline, useTimelineOpen } from "@/components/timeline";
 import { FileView, closeFile, useOpenFile } from "@/components/code";
@@ -1006,6 +1007,9 @@ function Header({
   actions?: React.ReactNode;
 }) {
   const stale = useMayBeStale(origin);
+  // This level, or the section it sits in, is being redone by an update.
+  const redoing = useRedoing();
+  const rewriting = path.some((id) => redoing.includes(id));
   return (
     <header data-path={JSON.stringify(path)} className="mb-8 border-b border-border-gray pb-7">
       {/* One toolbar row: the way back on the left, what you can do to this
@@ -1037,6 +1041,12 @@ function Header({
         ) : null}
         {actions}
       </div>
+      {rewriting ? (
+        <div role="status" className="shimmer mb-5 flex max-w-[720px] items-center gap-2 rounded-[3px] border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
+          <span aria-hidden className="size-[7px] shrink-0 animate-pulse rounded-full bg-amber-ink" />
+          Rewriting this section from your conversation. It usually takes a minute or two and updates here by itself.
+        </div>
+      ) : null}
       <div className="max-w-[720px]">
         <Eyebrow>{eyebrow}</Eyebrow>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">

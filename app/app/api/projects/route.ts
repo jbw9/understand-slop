@@ -1,7 +1,8 @@
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { auditOf } from "@/lib/maps";
-import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
  * The reader's projects (lib/vault.ts): list them, start or import one, regenerate,
@@ -31,6 +32,20 @@ function turnOf(v: unknown): Turn | undefined {
   return { transcript, corrections };
 }
 
+/**
+ * The section ids a running update is redoing, as its log names them
+ * (scripts/generate/update.ts, "N sections to redo: a, b"), so the open map can
+ * mark them while they are rewritten. None until the updater has picked them.
+ */
+function redoingOf(id: string): string[] {
+  try {
+    const line = readFileSync(join(projectDir(id), "update.log"), "utf8").match(/sections to redo: (.*)/)?.[1] ?? "";
+    return line.split(",").map((s) => s.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   // How one map was made, for the audit view: a project's or an example's.
@@ -40,7 +55,9 @@ export async function GET(request: Request) {
   const id = params.get("id");
   if (id) {
     const p = listProjects().find((x) => x.id === id);
-    return Response.json(p ? { id: p.id, update: p.update ?? null, progress: p.map.status === "generating" ? progressOf(p.id) : null } : null);
+    return Response.json(
+      p ? { id: p.id, update: p.update ?? null, redoing: p.update?.status === "running" ? redoingOf(p.id) : [], progress: p.map.status === "generating" ? progressOf(p.id) : null } : null,
+    );
   }
   const projects = listProjects().map((p) => {
     const head = headOf(p.root);

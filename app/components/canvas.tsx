@@ -21,6 +21,7 @@ import { TimelineView, closeTimeline, useTimelineOpen } from "@/components/timel
 import { FileView, closeFile, useOpenFile } from "@/components/code";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, openClaude, pick, section, sectionKey, usePicked, type Target } from "@/lib/context";
+import { startNote } from "@/lib/notes";
 import { FixAndKeep, onAnswer } from "@/components/keep";
 import { SectionTabs, openInTab } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
@@ -198,7 +199,7 @@ export function Canvas() {
   // a published map, whose Claude is its panel; a plain browser keeps its own menu.
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   const { ground } = useSettings();
-  const [menu, setMenu] = useState<{ x: number; y: number; target: Target; opens: string[] | null } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; target: Target; words: string; opens: string[] | null } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const onContextMenu = (e: React.MouseEvent) => {
     // Anything else on the level — a caption, the space between blocks — is
@@ -207,7 +208,7 @@ export function Canvas() {
     const target = el ? targetOf(map, el, path) : section(map, path);
     if (!target) return;
     e.preventDefault();
-    setMenu({ x: e.clientX, y: e.clientY, target, opens: opensAt(e.target as Element, path) });
+    setMenu({ x: e.clientX, y: e.clientY, target, words: wordsOf(map, el, path), opens: opensAt(e.target as Element, path) });
   };
 
   // A part opens in a new tab the way a link does: a middle click, or a click
@@ -335,16 +336,30 @@ function targetOf(map: BuiltMap, el: HTMLElement | SVGElement, level: string[]):
   };
 }
 
+/**
+ * The words a suggested edit starts from: what the thing says on screen. A
+ * section is its one line; an element, its own text.
+ */
+function wordsOf(map: BuiltMap, el: HTMLElement | SVGElement | null, level: string[]): string {
+  const at: string[] | null = el?.dataset.path !== undefined ? JSON.parse(el.dataset.path) : el ? null : level;
+  if (at) return map.nodeAt(at)?.sub ?? "";
+  const shown = el && "innerText" in el ? el.innerText : (el?.textContent ?? "");
+  return shown.trim().slice(0, 600);
+}
+
 function PickMenu({
   x,
   y,
   target,
+  words,
   opens,
   onClose,
 }: {
   x: number;
   y: number;
   target: Target;
+  /** What it says on screen, for a suggested edit to start from. */
+  words: string;
   /** The level the thing under the pointer opens, offered in a new tab. */
   opens: string[] | null;
   onClose: () => void;
@@ -369,6 +384,9 @@ function PickMenu({
             openClaude();
           },
         },
+        // A review, sent later as one turn (components/review-tray.tsx).
+        { label: "Comment…", separated: true, onClick: () => startNote({ x, y, kind: "comment", anchor: target }) },
+        ...(words ? [{ label: "Suggest an edit…", onClick: () => startNote({ x, y, kind: "suggest" as const, anchor: target, before: words }) }] : []),
       ]}
     />
   );

@@ -11,6 +11,8 @@ export function Overlay({ onClose, children }: { onClose: () => void; children: 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // A note being written over the dialog (components/review-tray.tsx) takes its own Escape.
+      if ((e.target as Element | null)?.closest?.("[data-note-editor]")) return;
       e.stopPropagation();
       onClose();
     };

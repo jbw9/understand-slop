@@ -7,6 +7,8 @@ import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { claudePath } from "@/components/projects";
 import { hunksOf, type HunkLines } from "@/lib/hunks";
+import { startNote, useNotes } from "@/lib/notes";
+import type { Target } from "@/lib/context";
 import { TOKEN_COLOR, highlight, langOf } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 import type { Commit, FileChange, MapDiff, SectionDiff, Verdict } from "@/lib/diff";
@@ -1008,15 +1010,45 @@ const BG = { "+": TINT.added.surface, "-": TINT.removed.surface, " ": undefined 
 // Where one side has no line, the other's is not stretched to meet it.
 const FILLER = "repeating-linear-gradient(-45deg, transparent 0 5px, var(--color-border-gray) 5px 6px)";
 
-/** The unchanged lines between two hunks, as one row both sides share. */
-function Gap({ h, prev }: { h: HunkLines; prev?: HunkLines }) {
+/**
+ * The unchanged lines between two hunks, as one row both sides share. On the
+ * side that carries it, the hunk below can be commented on, for the review
+ * (components/review-tray.tsx).
+ */
+function Gap({ h, prev, path }: { h: HunkLines; prev?: HunkLines; path?: string }) {
   const end = prev ? Math.max(...prev.lines.map((l) => l.old ?? 0), prev.oldStart - 1) : 0;
   const n = h.oldStart - end - 1;
+  const noted = useNotes().some((x) => x.status === "draft" && x.anchor.key === (path ? hunkKey(path, h) : ""));
   return (
-    <div className="sticky left-0 h-6 bg-surface-container-low px-3 font-sans text-[10.5px] leading-6 text-faint">
-      {n > 0 ? `⋯ ${n} unchanged ${n === 1 ? "line" : "lines"}` : "⋯"}
+    <div className="sticky left-0 flex h-6 w-max items-center gap-3 bg-surface-container-low px-3 font-sans text-[10.5px] leading-6 text-faint">
+      <span>{n > 0 ? `⋯ ${n} unchanged ${n === 1 ? "line" : "lines"}` : "⋯"}</span>
+      {path ? (
+        <button
+          type="button"
+          onClick={(e) => startNote({ x: e.clientX, y: e.clientY + 12, kind: "comment", anchor: hunkTarget(path, h) })}
+          className="cursor-pointer text-deep-green hover:underline"
+        >
+          {noted ? "✎ commented — add another" : "✎ Comment on this change"}
+        </button>
+      ) : null}
     </div>
   );
+}
+
+const hunkKey = (path: string, h: HunkLines) => `hunk:${path}:${h.oldStart}:${h.newStart}`;
+
+/** A hunk as Claude reads it in a review: where it is, and the lines, as a unified diff. */
+function hunkTarget(path: string, h: HunkLines): Target {
+  const news = h.lines.filter((l) => l.new !== undefined).map((l) => l.new!);
+  const span = news.length ? `${Math.min(...news)}-${Math.max(...news)}` : `${h.newStart}`;
+  const CAP = 80;
+  const lines = h.lines.slice(0, CAP).map((l) => `${l.kind}${l.text}`);
+  if (h.lines.length > CAP) lines.push(`… ${h.lines.length - CAP} more lines`);
+  return {
+    key: hunkKey(path, h),
+    title: `${path}:${span}`,
+    text: [`[Diff hunk: ${path}, now lines ${span}`, "```diff", ...lines, "```]"].join("\n"),
+  };
 }
 
 function Code({ text, lang }: { text: string; lang: ReturnType<typeof langOf> }) {
@@ -1043,7 +1075,7 @@ function SplitDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
       <div className="w-max min-w-full font-mono text-[12px]">
         {hunks.map((h, i) => (
           <Fragment key={i}>
-            <Gap h={h} prev={hunks[i - 1]} />
+            <Gap h={h} prev={hunks[i - 1]} path={s === 1 ? path : undefined} />
             {rows[i].map((r, j) => {
               const c = r[s];
               return (
@@ -1076,7 +1108,7 @@ function InlineDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
       <div className="w-max min-w-full font-mono text-[12px]">
         {hunks.map((h, i) => (
           <Fragment key={i}>
-            <Gap h={h} prev={hunks[i - 1]} />
+            <Gap h={h} prev={hunks[i - 1]} path={path} />
             {h.lines.map((l, j) => (
               <div key={j} className="flex h-5 leading-5" style={{ background: BG[l.kind] }}>
                 <span className="tnum w-11 shrink-0 select-none pr-2 text-right text-faint">{l.old ?? ""}</span>

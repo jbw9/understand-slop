@@ -14,7 +14,7 @@ import { PlanView, type Plan } from "@/components/plan";
 import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
-import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, unpick, usePicks } from "@/lib/context";
+import { clearPicks, onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus, unpick, usePicks } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
 import { TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
@@ -540,6 +540,11 @@ export function Workspace() {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [started]);
+
+  // A review waits for Claude to be idle before it is typed (lib/context.ts sendBatch).
+  useEffect(() => {
+    for (const t of tabs) if (t.pty !== undefined) tabStatus(t.pty, t.live ? t.status : undefined);
+  }, [tabs]);
 
   // A chime when an agent finishes or needs the user, heard wherever they are
   // looking: the dot alone is easy to miss with the workspace closed.

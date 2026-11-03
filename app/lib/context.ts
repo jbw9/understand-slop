@@ -72,6 +72,8 @@ const withPicks = (pty: number, picks: Pick[]) => set({ ...state, picks: { ...st
 let waiting: Target[] = [];
 /** Of those, what to ask about them once Claude is up (ask), by key. */
 let asking = new Map<string, string>();
+/** A prompt with nothing picked to carry it (sendBatch), sent once Claude is up. */
+let asked: string | null = null;
 
 /* ── tabs coming and going (components/workspace.tsx) ─────────── */
 
@@ -92,9 +94,10 @@ export function tabStarted(pty: number, claude: boolean) {
   set({ target: claude ? pty : state.target, picks: { ...state.picks, [pty]: [] } });
   if (!claude) return;
   const queued = waiting;
-  const toAsk = queued.flatMap((p) => asking.get(p.key) ?? []);
+  const toAsk = [...queued.flatMap((p) => asking.get(p.key) ?? []), ...(asked ? [asked] : [])];
   waiting = [];
   asking = new Map();
+  asked = null;
   for (const p of queued) void add(pty, p);
   if (toAsk.length) void whenUp(pty).then(() => prompt(pty, toAsk.join(" ")), () => {});
 }
@@ -110,13 +113,23 @@ export function retarget(pty: number | null) {
   if (state.target !== pty) set({ ...state, target: pty });
 }
 
+/** What Claude in each tab is doing, as its dot shows it (components/workspace.tsx). */
+const statuses = new Map<number, string | undefined>();
+export function tabStatus(pty: number, status: string | undefined) {
+  statuses.set(pty, status);
+}
+
 export function tabEnded(pty: number) {
+  statuses.delete(pty);
   const picks = { ...state.picks };
   delete picks[pty];
   set({ target: state.target === pty ? null : state.target, picks });
 }
 
 /* ── picking ──────────────────────────────────────────────────── */
+
+/** Whether a Claude tab would take a pick now, without one being opened for it. */
+export const hasClaude = () => state.target !== null;
 
 /** Hand something to Claude. Opens a tab first if none is running Claude. */
 export function pick(t: Target) {
@@ -142,6 +155,55 @@ export function ask(t: Target, question: string) {
   const pty = state.target;
   openClaude();
   void add(pty, t).then(() => prompt(pty, question));
+}
+
+/**
+ * Hand several things to Claude and ask about them as one turn (a review,
+ * lib/notes.ts). Unlike ask, it waits for Claude to be idle first: typed
+ * mid-turn, the prompt would only queue behind the running one, and typed
+ * into a question Claude asked, it would answer it. `now` skips the wait,
+ * as does hurry() while waiting. Resolves once the prompt is typed.
+ */
+export async function sendBatch(ts: Target[], question: string, now = false) {
+  if (state.target === null) {
+    for (const t of ts) if (!waiting.some((w) => w.key === t.key)) waiting.push(t);
+    asked = question;
+    openClaude();
+    return;
+  }
+  const pty = state.target;
+  openClaude();
+  if (!now) await whenIdle(pty);
+  for (const t of ts) await add(pty, t);
+  prompt(pty, question);
+}
+
+let hurried: (() => void) | null = null;
+/** Stop waiting for Claude to be idle, and send what is waiting now. */
+export const hurry = () => hurried?.();
+
+/**
+ * Resolves once Claude in the tab has finished its turn, or has not started
+ * one. Rejects if the tab goes. A turn stopped with Escape never reports done,
+ * which is what hurry is for.
+ */
+function whenIdle(pty: number) {
+  return new Promise<void>((done, fail) => {
+    const timer = setInterval(check, 500);
+    const finish = (ok: boolean) => {
+      clearInterval(timer);
+      hurried = null;
+      if (ok) done();
+      else fail(new Error("tab closed"));
+    };
+    hurried = () => finish(true);
+    function check() {
+      if (!(pty in state.picks)) return finish(false);
+      const s = statuses.get(pty);
+      if (s === undefined || s === "done") finish(true);
+    }
+    check();
+  });
 }
 
 /** Typed into a program's prompt as a paste, then Enter, a moment later so it is not part of the paste. */

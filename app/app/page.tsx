@@ -14,6 +14,7 @@ import { Workspace } from "@/components/workspace";
 import { NoProject } from "@/components/welcome";
 import { Palette } from "@/components/palette";
 import { StatusBar } from "@/components/statusbar";
+import { ReviewTray } from "@/components/review-tray";
 import { listMaps, loadDemo, loadMap, remoteOf, rootOf } from "@/lib/maps";
 import { ClaudeWeb } from "@/components/claude-web";
 import { STATIC_MAP } from "@/lib/source";
@@ -81,6 +82,7 @@ export default async function Home({
               <DiffPanel />
               <FilesPanel />
               <Acts />
+              <ReviewTray />
             </Suspense>
           </div>
         </DiffMode>

@@ -11,6 +11,7 @@ import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
 import { Preview } from "@/components/preview";
 import { PlanView, type Plan } from "@/components/plan";
+import { FileTab } from "@/components/file-tab";
 import { Device, PLATFORM, type Platform } from "@/components/device";
 import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
@@ -77,8 +78,8 @@ const STATUSBAR = 24;
 
 interface Tab {
   key: number;
-  /** A terminal, the project running (its web app, or a phone), or a plan. */
-  kind: "shell" | "preview" | "plan" | Platform;
+  /** A terminal, the project running (its web app, or a phone), a plan, or a file a terminal named. */
+  kind: "shell" | "preview" | "plan" | "file" | Platform;
   /** The agent it opened into, or null for a plain shell. */
   start: string | null;
   /** The agent last started in it, from the menu or the strip: what a busy shell is running. */
@@ -109,6 +110,9 @@ interface Tab {
   /** A plan's tab: the plan, and the tab of the Claude that wrote it. */
   plan?: Plan;
   of?: number;
+  /** A file's tab: its absolute path, and the line it was opened at. */
+  file?: string;
+  line?: number;
   /** The conversation Claude is having in it, to reopen it into after a restart. */
   session?: string;
   /** Reopened after a restart: the conversation its Claude picks up again. */
@@ -505,6 +509,13 @@ export function Workspace() {
     const plan = closedPlans.current[from];
     if (plan) placePlan(from, cwd, plan);
   };
+  /** A file a terminal named, in an editor tab in the main view: the one already open, or a new one. */
+  const openFile = (cwd: string, file: string, line?: number) => {
+    const open = tabsNow.current.find((x) => x.kind === "file" && x.cwd === cwd && x.file === file);
+    if (!open) return add(null, { kind: "file", title: file.slice(file.lastIndexOf("/") + 1), cwd, file, line, main: true });
+    patch(open.key, { line });
+    bring(open.key);
+  };
   const planning = useRef(showPlan);
   useEffect(() => {
     planning.current = showPlan;
@@ -829,6 +840,8 @@ export function Workspace() {
         : "Preview"
       : t.kind === "plan"
         ? "Plan"
+        : t.kind === "file"
+        ? t.title
         : t.kind !== "shell"
         ? PLATFORM[t.kind].label
         : front
@@ -841,6 +854,8 @@ export function Workspace() {
       <GlobeIcon />
     ) : t.kind === "plan" ? (
       <PlanIcon />
+    ) : t.kind === "file" ? (
+      <FileIcon />
     ) : t.kind !== "shell" ? (
       <PhoneIcon />
     ) : front ? (
@@ -1192,6 +1207,12 @@ export function Workspace() {
               </Held>
             );
           }
+          if (t.kind === "file")
+            return !t.file ? null : (
+              <Held key={t.key} slot={slot}>
+                <FileTab path={t.file} line={t.line} visible={visible} inset={t.main ? inset : undefined} />
+              </Held>
+            );
           if (t.kind !== "shell")
             return (
               <Held key={t.key} slot={slot}>
@@ -1222,6 +1243,8 @@ export function Workspace() {
             onScreen={(read) => (screens.current[t.key] = read)}
             onClaude={(found) => patch(t.key, { found })}
             onOpenPlan={() => reopenPlan(t.key, t.cwd)}
+            session={t.session}
+            onOpenFile={(file, line) => openFile(t.cwd, file, line)}
             onSpawn={(pty) => {
               patch(t.key, { pty });
               tabStarted(pty, t.start === CLAUDE.id);
@@ -1315,6 +1338,16 @@ function PlanIcon() {
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-3 shrink-0">
       <path d="M4 1.5h5.5L12 4v10.5H4z" />
       <path d="m6.2 9.2 1.4 1.4 2.4-2.8" />
+    </svg>
+  );
+}
+
+/** A page with a folded corner: a file's tab. */
+function FileIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-3 shrink-0">
+      <path d="M4 1.5h5.5L12 4v10.5H4z" />
+      <path d="M9.5 1.5V4H12" />
     </svg>
   );
 }

@@ -116,6 +116,8 @@ function zoom(by: number | null) {
  */
 /** What Claude Code shows in place of a plan (src-tauri/src/claude.rs, HIDE). */
 const OPEN_PLAN = "▸ Open plan";
+/** `[Image #4]`, or a path with an extension and an optional `:line`, as agents print them. */
+const FILE_REF = /\[Image #\d+\]|((?:~\/|\.{0,2}\/)?(?:[\w.@+-]+\/)*[\w@+-][\w.@+-]*\.[A-Za-z0-9]{1,10})(?::(\d+))?(?::\d+)?/g;
 
 export function Shell({
   startClaude = false,
@@ -130,6 +132,8 @@ export function Shell({
   onInput,
   onScreen,
   onOpenPlan,
+  session,
+  onOpenFile,
   onExit,
 }: {
   startClaude?: boolean;
@@ -153,6 +157,10 @@ export function Shell({
   onScreen?: (read: (all?: boolean) => string[]) => void;
   /** The plan's line Claude Code shows in place of the plan (src-tauri/src/claude.rs, HIDE) was clicked. */
   onOpenPlan?: () => void;
+  /** Claude Code's conversation in it, whose pasted images `[Image #N]` names. */
+  session?: string;
+  /** A file it printed was clicked: its absolute path, and the line it named. */
+  onOpenFile?: (path: string, line?: number) => void;
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -160,9 +168,9 @@ export function Shell({
   const show = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest callbacks, so the effect below runs once per shell, not per render.
-  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, onExit });
+  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, session, onOpenFile, onExit });
   useEffect(() => {
-    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, onExit };
+    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, session, onOpenFile, onExit };
   });
   // The map's sections, for `slop-map-list`. Through a ref for the same
   // reason: a map that updates must not restart the shell.
@@ -323,6 +331,30 @@ export function Shell({
           ]);
         },
       });
+      // A file an agent names, or an image pasted into Claude Code, opens in
+      // an editor tab. Only what is a file on disk is underlined.
+      const fileLinks = term.registerLinkProvider({
+        provideLinks(y, done) {
+          const line = term.buffer.active.getLine(y - 1)?.translateToString(true) ?? "";
+          const found = [...line.matchAll(FILE_REF)].filter((m) => m.index === 0 || !/[\w/:.~-]/.test(line[m.index - 1]));
+          if (!found.length || !handlers.current.onOpenFile) return done(undefined);
+          const { session } = handlers.current;
+          void Promise.all(
+            found.map(async (m) => {
+              const ref = m[1] ?? m[0];
+              const path = await invoke<string | null>("file_resolve", { text: ref, cwd: cwd ?? "", session: session ?? null }).catch(() => null);
+              if (!path) return null;
+              const at = Number(m[2]) || undefined;
+              return {
+                text: m[0],
+                range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
+                decorations: { pointerCursor: true, underline: true },
+                activate: () => handlers.current.onOpenFile?.(path, at),
+              };
+            }),
+          ).then((links) => done(links.filter((l) => l !== null)));
+        },
+      });
       const input = term.onData((data) => {
         void invoke("pty_write", { id, data });
         handlers.current.onInput?.();
@@ -352,6 +384,7 @@ export function Shell({
         seen.disconnect();
         input.dispose();
         planLinks.dispose();
+        fileLinks.dispose();
         term.dispose();
         if (id !== null) {
           screens.delete(id);

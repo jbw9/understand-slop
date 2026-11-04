@@ -231,6 +231,16 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
 
 interface Review { real: string[]; detail: string; issues: { title: string; detail: string; where?: string }[]; code_labels: string[]; add_refs: CodeRef[]; unresolvable: string }
 
+/**
+ * A review call's input with every field present. Through Claude Code a tool's
+ * input is not held to its schema, and a reply without `unresolvable` once
+ * threw in settle after a 36-minute run.
+ */
+const filled = (input: unknown): Review => {
+  const r = (input ?? {}) as Partial<Review>;
+  return { real: r.real ?? [], detail: r.detail ?? "", issues: r.issues ?? [], code_labels: r.code_labels ?? [], add_refs: r.add_refs ?? [], unresolvable: r.unresolvable ?? "" };
+};
+
 const REVIEW_SYSTEM = `You rule on flags a first reader raised against an explanation of code. The first reader saw only the cited lines and a little around them, so many flags are false alarms or true claims that were simply not cited.
 - A false alarm: dismiss it.
 - A true claim whose lines were not cited: find them (read_file, grep) and add them in add_refs.
@@ -255,7 +265,7 @@ async function review(n: Node, flags: string[], inv: Inventory, model: string): 
       prompt, model, system, tools, stage: "verify-review", maxTurns: 10, nudge: "Finish by calling review.",
       handle: (name, input) => {
         if (name !== "review") return { content: runTool({ name, input }, inv, known) };
-        const out = input as Review;
+        const out = filled(input);
         return tooLong(out) ? { content: lengthError(out), isError: true } : { content: "Recorded. Stop now.", done: out };
       },
     });
@@ -270,7 +280,7 @@ async function review(n: Node, flags: string[], inv: Inventory, model: string): 
     const calls = callsOf(r);
     const done = calls.find((c) => c.name === "review");
     if (done) {
-      const out = done.input as Review;
+      const out = filled(done.input);
       if (tooLong(out) && turn < 9) {
         messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: done.id, is_error: true, content: lengthError(out) }] });
         continue;
@@ -327,7 +337,8 @@ async function reviewMany(items: { n: Node; flags: string[] }[], inv: Inventory,
         nudge: "Continue: call review for every node shown that you have not ruled on yet.",
         handle: (name, input) => {
           if (name !== "review") return { content: runTool({ name, input }, inv, known) };
-          const { id, ...r } = (input ?? {}) as Review & { id: string };
+          const id = (input as { id?: string } | null)?.id ?? "";
+          const r = filled(input);
           if (!ids.has(id)) return { content: `No node "${id}" here; the ids are ${[...ids].join(", ")}.`, isError: true };
           if (tooLong(r)) return { content: lengthError(r), isError: true };
           out.set(id, r);

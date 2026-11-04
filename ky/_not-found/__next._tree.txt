@@ -1,2 +1,2 @@
-:HL["/understand-slop/ky/_next/static/chunks/24rizmo4yl9fm.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"uoDW2l1gqV4hYo6B7TlrQ"}
+:HL["/understand-slop/ky/_next/static/chunks/1vl49ltwqgx6l.css","style"]
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"yLOGmQzGeiP4NDLPQtn_b"}

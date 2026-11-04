@@ -239,7 +239,10 @@ export function Shell({
       } catch {
         /* no WebGL: the DOM renderer stays */
       }
+      // macOS shows the right-click menu on Ctrl+Return; in a terminal the key belongs to the program.
+      let ctrlEnter = 0;
       term.attachCustomKeyEventHandler((e) => {
+        if (e.type === "keydown" && e.key === "Enter" && e.ctrlKey) ctrlEnter = e.timeStamp;
         // Ctrl+` (Cmd+` too) and Ctrl+W belong to the workspace window, never the program in a tab.
         if (e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyW") return false;
         if ((e.ctrlKey || e.metaKey) && e.code === "Backquote") return false;
@@ -365,6 +368,10 @@ export function Shell({
         if (term.hasSelection()) void writeText(term.getSelection());
       };
       host.addEventListener("mouseup", copySelected);
+      const noKeyMenu = (e: MouseEvent) => {
+        if (e.timeStamp - ctrlEnter < 500) e.preventDefault();
+      };
+      host.addEventListener("contextmenu", noKeyMenu, true);
       const seen = new ResizeObserver(refit);
       seen.observe(el.current);
       show.current = () => {
@@ -381,6 +388,7 @@ export function Shell({
       cleanup = () => {
         window.removeEventListener(ZOOMED, onZoom);
         host.removeEventListener("mouseup", copySelected);
+        host.removeEventListener("contextmenu", noKeyMenu, true);
         seen.disconnect();
         input.dispose();
         planLinks.dispose();

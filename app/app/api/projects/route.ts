@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { auditOf } from "@/lib/maps";
-import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, setPaused, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
  * The reader's projects (lib/vault.ts): list them, start or import one, regenerate,
@@ -78,17 +78,17 @@ export async function POST(request: Request) {
   // asking, but a JSON one needs a CORS preflight this route never grants.
   if (!request.headers.get("content-type")?.startsWith("application/json")) return bad("bad request", 415);
   const body = (await request.json().catch(() => null)) ?? {};
-  const { action, id, root, name, claude, turn, explain, full } = body as Record<string, unknown>;
+  const { action, id, root, name, claude, turn, explain, full, paused } = body as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
   const level = (["none", "minimal", "brief", "detailed", "full"] as const).find((l) => l === explain);
   try {
     switch (action) {
       case "import":
         if (!str(root)) return bad("Choose a directory.");
-        return Response.json(importProject(root as string, str(name), str(claude), level));
+        return Response.json(importProject(root as string, str(name), str(claude), level, paused === true));
       case "create":
         if (!str(root) || !str(name)) return bad("Choose where it goes and what it is called.");
-        return Response.json(createProject(root as string, name as string));
+        return Response.json(createProject(root as string, name as string, paused === true));
       case "regenerate":
         if (!str(id)) return bad("bad request");
         return Response.json(generate(id as string, str(claude), level, full === true) ?? null);
@@ -96,6 +96,10 @@ export async function POST(request: Request) {
         if (!str(root)) return bad("bad request");
         // A checkout no project of the user's maps (an example's) cannot follow it.
         return Response.json(updateMap(root as string, str(claude), turnOf(turn)) ?? { skipped: true });
+      case "pause":
+        if (!str(id)) return bad("bad request");
+        setPaused(id as string, paused === true);
+        return Response.json({ ok: true });
       case "cancel":
         if (!str(id)) return bad("bad request");
         cancel(id as string);

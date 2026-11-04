@@ -58,6 +58,12 @@ export interface Project {
   git?: { remote?: string; branch?: string };
   /** How much its map explains, from what the reader said they know when they imported it (D70). Absent means full. */
   explain?: Explain;
+  /**
+   * The reader uses the app on this project without a map: none is made, and
+   * one already made is kept but no longer kept up with the code. Making it
+   * again by hand turns this off.
+   */
+  paused?: boolean;
   map: {
     status: MapStatus;
     startedAt: string;
@@ -224,7 +230,7 @@ export class ImportError extends Error {}
 /** Register a checkout and start mapping it. */
 export type Explain = NonNullable<Run["explain"]>;
 
-export function importProject(rootIn: string, nameIn: string | undefined, claude?: string, explain?: Explain): Project {
+export function importProject(rootIn: string, nameIn: string | undefined, claude?: string, explain?: Explain, paused?: boolean): Project {
   const root = resolve(rootIn.replace(/^~(?=$|[\\/])/, homedir()));
   if (!existsSync(root) || !statSync(root).isDirectory()) throw new ImportError("That is not a directory.");
   const v = readVault();
@@ -240,11 +246,12 @@ export function importProject(rootIn: string, nameIn: string | undefined, claude
     addedAt: now,
     git: { remote: git(root, "remote", "get-url", "origin"), branch: git(root, "rev-parse", "--abbrev-ref", "HEAD") },
     explain,
-    map: { status: "generating", startedAt: now },
+    ...(paused ? { paused } : {}),
+    map: { status: paused ? "empty" : "generating", startedAt: now },
   };
   v.projects.push(project);
   writeVault(v);
-  return generate(id, claude) ?? project;
+  return paused ? project : (generate(id, claude) ?? project);
 }
 
 /**
@@ -252,7 +259,7 @@ export function importProject(rootIn: string, nameIn: string | undefined, claude
  * checkout and register it. There is no code to map yet, so nothing runs;
  * the reader maps it from the list once there is.
  */
-export function createProject(parentIn: string, nameIn: string): Project {
+export function createProject(parentIn: string, nameIn: string, paused?: boolean): Project {
   const name = nameIn.trim();
   if (!name || /[\\/]/.test(name) || name === "." || name === "..") throw new ImportError("Give it a folder name, without slashes.");
   const parent = resolve(parentIn.replace(/^~(?=$|[\\/])/, homedir()));
@@ -272,6 +279,7 @@ export function createProject(parentIn: string, nameIn: string): Project {
     addedAt: now,
     // Its reader is the one writing it: a map of their own code needs no explaining.
     explain: "none",
+    ...(paused ? { paused } : {}),
     map: { status: "empty", startedAt: now },
   };
   v.projects.push(project);
@@ -285,6 +293,8 @@ export function createProject(parentIn: string, nameIn: string): Project {
  * this server and Cancel can end it and every `claude` it started at once.
  */
 export function generate(id: string, claude?: string, explain?: Explain, full?: boolean): Project | undefined {
+  // Asking for the map by hand is asking for it to be kept up again.
+  if (getProject(id)?.paused) update(id, (q) => (q.paused = undefined));
   const was = getProject(id);
   // A finished map asked again at the same depth only needs bringing up to
   // its code: an update redoes what changed and places what is new
@@ -348,6 +358,24 @@ export function cancel(id: string) {
   stop(p.map.pid);
 }
 
+/**
+ * Turn a project's map on or off. Off ends any run or update in flight, so
+ * nothing more is spent on it, and keeps whatever map is already there.
+ */
+export function setPaused(id: string, paused: boolean) {
+  const p = getProject(id);
+  if (!p) return;
+  if (paused) {
+    cancel(id);
+    // Forgotten before it is stopped, so its exit does not record it as failed.
+    if (p.update?.status === "running" && p.update.pid) {
+      update(id, (q) => (q.update = undefined));
+      stop(p.update.pid);
+    }
+  }
+  update(id, (q) => (q.paused = paused || undefined));
+}
+
 /** End a run started here and every `claude` it started: each is the leader of its own process group. */
 function stop(pid: number) {
   try {
@@ -407,7 +435,7 @@ export interface Turn {
  */
 export function updateMap(root: string, claude?: string, turn?: Turn): Project | undefined {
   const p = listProjects().find((x) => x.root === root);
-  if (!p || p.map.status !== "ready" || !mapFileOf(p.id)) return p;
+  if (!p || p.paused || p.map.status !== "ready" || !mapFileOf(p.id)) return p;
   if (turn) {
     const file = join(projectDir(p.id), "turns.json");
     let waiting: Turn[] = [];

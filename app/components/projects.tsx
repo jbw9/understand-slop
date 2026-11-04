@@ -144,19 +144,19 @@ export function ProjectsDialog() {
     if (dir) setRoot(dir);
   };
 
-  const start = async (explain?: Explain) => {
+  const start = async (explain: Explain | undefined, paused: boolean) => {
     try {
       const body =
         mode === "new"
-          ? { action: "create", root: root.trim(), name: label.trim() }
-          : { action: "import", root: root.trim(), name: label.trim(), claude: await claudePath(), explain };
+          ? { action: "create", root: root.trim(), name: label.trim(), paused }
+          : { action: "import", root: root.trim(), name: label.trim(), claude: paused ? undefined : await claudePath(), explain, paused };
       const made = await act(body);
       if (made) {
         setRoot("");
         setLabel("");
         setMode(null);
-        // A map is being made: watch it build (D69).
-        if (made.id && made.map?.status === "generating") openMap(made.id);
+        // A map being made opens to watch it build (D69); one without a map opens for its tabs.
+        if (made.id) openMap(made.id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -206,7 +206,7 @@ export function ProjectsDialog() {
               busy={busy}
               error={error}
               onBrowse={isTauri() ? () => void browse() : undefined}
-              onStart={(explain) => void start(explain)}
+              onStart={(explain, paused) => void start(explain, paused)}
               onCancel={() => {
                 setMode(null);
                 setRoot("");
@@ -239,6 +239,7 @@ export function ProjectsDialog() {
                     onOpen={(at) => openMap(p.id, at)}
                     onRegenerate={(explain, full) => void regenerate(p.id, explain, full)}
                     onCancel={() => void act({ action: "cancel", id: p.id })}
+                    onPause={(paused) => void act({ action: "pause", id: p.id, paused })}
                     onRemove={() => void remove(p.id)}
                   />
                 ))}
@@ -400,10 +401,11 @@ function StartProject({
   busy: boolean;
   error: string | null;
   onBrowse?: () => void;
-  onStart: (explain?: Explain) => void;
+  onStart: (explain: Explain | undefined, paused: boolean) => void;
   onCancel: () => void;
 }) {
   const fresh = mode === "new";
+  const [mapped, setMapped] = useState(true);
   const [understand, setUnderstand] = useState(2);
   const explain = UNDERSTAND[understand].explain;
   const name = label.trim() || (fresh ? "" : folderName(root));
@@ -413,11 +415,11 @@ function StartProject({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready) onStart(fresh ? undefined : explain);
+        if (ready) onStart(fresh || !mapped ? undefined : explain, !mapped);
       }}
       className="flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4"
     >
-      <h3 className="text-[13px] font-semibold text-ink">{fresh ? "New project" : `Map ${name || "a folder"}`}</h3>
+      <h3 className="text-[13px] font-semibold text-ink">{fresh ? "New project" : mapped ? `Map ${name || "a folder"}` : `Open ${name || "a folder"}`}</h3>
 
       <Field
         label={fresh ? "Location" : "Folder"}
@@ -451,10 +453,18 @@ function StartProject({
         />
       </Field>
 
-      {fresh ? null : <Understanding value={understand} onChange={setUnderstand} />}
+      <Field label="Map" hint="Without one the app is only your tabs on this folder, and no tokens go on mapping. Turn it on from the list any time.">
+        <MapSwitch on={mapped} onChange={setMapped} />
+      </Field>
+
+      {fresh || !mapped ? null : <Understanding value={understand} onChange={setUnderstand} />}
 
       <p className="text-[12px] text-muted-slate">
-        {fresh
+        {!mapped
+          ? fresh
+            ? "An empty folder is made there, as a git checkout, and opens without a map."
+            : "It opens without a map. Nothing is read or spent until you make one from the list."
+          : fresh
           ? "An empty folder is made there, as a git checkout. Map it from the list once it has code."
           : "The map is made right away with your Claude Code — about 20 minutes for a mid-sized repo, counted against your plan's usage. You can open each part as it finishes."}
       </p>
@@ -465,10 +475,37 @@ function StartProject({
           Cancel
         </button>
         <button type="submit" disabled={busy || !ready} className={PRIMARY}>
-          {fresh ? "Create project" : "Start mapping"}
+          {fresh ? "Create project" : mapped ? "Start mapping" : "Open project"}
         </button>
       </div>
     </form>
+  );
+}
+
+/** Whether the project has a map made and kept up with its code (lib/vault.ts, `paused`). */
+function MapSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
+  return (
+    <div role="radiogroup" aria-label="Map" className="inline-flex rounded-[3px] border border-border-gray bg-pure-white p-0.5">
+      {[
+        { value: true, label: "Map it" },
+        { value: false, label: "No map" },
+      ].map((o) => (
+        <button
+          key={o.label}
+          type="button"
+          role="radio"
+          aria-checked={on === o.value}
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "cursor-pointer rounded-[2px] px-2.5 py-0.5 text-[12px] transition-colors",
+            on === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -519,6 +556,7 @@ function ProjectRow({
   onOpen,
   onRegenerate,
   onCancel,
+  onPause,
   onRemove,
 }: {
   p: Listed;
@@ -527,6 +565,7 @@ function ProjectRow({
   onOpen: (at?: string) => void;
   onRegenerate: (explain: Explain, full?: boolean) => void;
   onCancel: () => void;
+  onPause: (paused: boolean) => void;
   onRemove: () => void;
 }) {
   // Forgetting a project takes a second click: it deletes the map, not the code.
@@ -543,7 +582,8 @@ function ProjectRow({
         <span className="truncate text-[14px] font-semibold text-ink">{p.name}</span>
         {current ? <span className="font-mono text-[10.5px] text-deep-green">open</span> : null}
         <span className="flex-1" />
-        {p.hasMap ? (
+        <MapSwitch on={!p.paused} onChange={(on) => onPause(!on)} disabled={busy} />
+        {p.hasMap || p.paused || status === "empty" ? (
           <button type="button" onClick={() => onOpen()} className={cn(QUIET, "py-1")}>
             Open
           </button>
@@ -600,10 +640,14 @@ function ProjectRow({
       <p
         className={cn(
           "font-mono text-[11.5px]",
-          status === "failed" ? "text-clay-ink" : status === "generating" ? "text-amber-ink" : "text-muted-slate",
+          p.paused ? "text-muted-slate" : status === "failed" ? "text-clay-ink" : status === "generating" ? "text-amber-ink" : "text-muted-slate",
         )}
       >
-        {status === "generating"
+        {p.paused
+          ? p.hasMap
+            ? `No map updates — the map from ${p.map.commit ?? "earlier"} is kept as it is.`
+            : "No map — the app without one. Map it any time."
+          : status === "generating"
           ? `◷ Mapping ${p.name}… ${minutes(p.map.startedAt)} min${stageLine(p.progress) ? ` — ${stageLine(p.progress)}` : ""}`
           : status === "ready"
             ? `✓ Mapped at ${p.map.commit ?? "?"}${p.map.seconds ? ` · ${Math.round(p.map.seconds / 60)} min` : ""}${p.stale ? " · the code has changed since" : ""}`
@@ -614,7 +658,7 @@ function ProjectRow({
                 : "✗ Mapping failed."}
       </p>
       {status === "generating" && p.progress?.roots.length ? <Roots roots={p.progress.roots} onOpen={onOpen} /> : null}
-      {status === "failed" && p.map.error ? (
+      {status === "failed" && !p.paused && p.map.error ? (
         <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-[2px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
           {p.map.error}
         </pre>

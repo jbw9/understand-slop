@@ -39,7 +39,10 @@ export function auditOf(id: string): string | null {
  * map still opens, on what went wrong.
  */
 const runFile = (id: string) => join(projectDir(id), "progress.json");
-const openable = (p: Project) => Boolean(mapFileOf(p.id)) || p.map.status === "generating" || existsSync(runFile(p.id));
+// A project without a map, by choice or because it has no code yet, still
+// opens for its tabs, over an empty map.
+const unmapped = (p: Project) => p.paused || p.map.status === "empty";
+const openable = (p: Project) => Boolean(mapFileOf(p.id)) || p.map.status === "generating" || unmapped(p) || existsSync(runFile(p.id));
 
 /**
  * How far the run making this map has got, while there is one to show: the
@@ -47,7 +50,7 @@ const openable = (p: Project) => Boolean(mapFileOf(p.id)) || p.map.status === "g
  */
 function progressFor(p: Project): Progress | undefined {
   if (p.map.status === "generating") return progressOf(p.id);
-  if (mapFileOf(p.id)) return undefined;
+  if (mapFileOf(p.id) || unmapped(p)) return undefined;
   return { ...progressOf(p.id), stage: p.map.status === "cancelled" ? "cancelled" : "failed" };
 }
 

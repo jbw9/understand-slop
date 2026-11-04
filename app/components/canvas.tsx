@@ -24,7 +24,7 @@ import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, mention, openClaude, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { startNote } from "@/lib/notes";
 import { FixAndKeep, onAnswer } from "@/components/keep";
-import { SectionTabs, openInTab } from "@/components/tabs";
+import { DragChip, SectionTabs, dropAt, dropInTab, openInTab, setPartDrag, type Drop } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
 import { DiffBar, HereChanges } from "@/components/diagram-diff";
 import type { Exchange } from "@/lib/keep";
@@ -223,14 +223,77 @@ export function Canvas() {
     openInTab(name, opens);
   };
 
+  // A part dragged off the map onto its strip of tabs opens there, as a link
+  // dragged onto Chrome's tabs does (components/tabs.tsx). A press that hardly
+  // moves is still a click, which opens the part in place.
+  const grab = (e: React.PointerEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const target = e.target as Element;
+    if (target.closest(":disabled")) return;
+    const part = opener(target, path);
+    if (!part) return;
+    const { el, at } = part;
+    const label = at.length ? (nodeAt(at)?.title ?? RUN.repo) : RUN.repo;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let moving = false;
+    const move = (m: PointerEvent) => {
+      if (!moving && Math.hypot(m.clientX - x0, m.clientY - y0) < 6) return;
+      if (!moving) {
+        moving = true;
+        document.body.dataset.dragging = "";
+        el.setAttribute("data-drag-source", "");
+        window.getSelection()?.removeAllRanges();
+      }
+      setPartDrag({ label, x: m.clientX, y: m.clientY, drop: dropAt(m.clientX, m.clientY) });
+    };
+    const end = (drop: Drop | null) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("keydown", key, true);
+      if (!moving) return;
+      delete document.body.dataset.dragging;
+      el.removeAttribute("data-drag-source");
+      setPartDrag(null);
+      // The click this press ends in would open the part in place too.
+      const swallow = (c: MouseEvent) => {
+        c.preventDefault();
+        c.stopPropagation();
+      };
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, true));
+      if (drop) dropInTab(name, at, drop);
+    };
+    const up = (u: PointerEvent) => end(dropAt(u.clientX, u.clientY));
+    const cancel = () => end(null);
+    // Esc lets go of the part, before it can take the map up a level.
+    const key = (k: KeyboardEvent) => {
+      if (k.key !== "Escape" || !moving) return;
+      k.preventDefault();
+      k.stopImmediatePropagation();
+      end(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("blur", cancel);
+    window.addEventListener("keydown", key, true);
+  };
+
   return (
     <div
       className="flex h-full w-full flex-col overflow-hidden bg-warm-cream"
       onContextMenu={desktop || STATIC_MAP ? onContextMenu : undefined}
       onClickCapture={(e) => (e.metaKey || e.ctrlKey ? toTab(e) : undefined)}
       onAuxClickCapture={(e) => (e.button === 1 ? toTab(e) : undefined)}
+      onPointerDown={grab}
+      // The browser's own drag of a link would take the pointer from ours.
+      onDragStart={(e) => (opensAt(e.target as Element, path) ? e.preventDefault() : undefined)}
     >
       {menu ? <PickMenu {...menu} onClose={closeMenu} /> : null}
+      <DragChip />
       <SectionTabs path={path} />
       <main
         ref={scrollRef}
@@ -300,20 +363,25 @@ function useLatestAnswer(): Exchange | null {
 const PICKABLE = "[data-path], [data-row], [data-pick]";
 
 /**
- * The level a clicked element leads to, if it leads anywhere but here: a part's
- * card (`data-path`) or a diagram box, whose href is that part's own URL.
+ * The level a clicked element leads to, if it leads anywhere but here, and the
+ * element that leads there: a part's card (`data-path`), a step of the way
+ * back (`data-opens-at`), or a diagram box, whose href is that part's own URL.
  */
-function opensAt(el: Element, here: string[]): string[] | null {
+function opener(el: Element, here: string[]): { el: Element; at: string[] } | null {
   const link = el.closest("a[href]");
   const href = link?.getAttribute("href");
-  const at = href?.startsWith("?")
-    ? new URLSearchParams(href).getAll("at")
-    : (() => {
-        const card = el.closest<HTMLElement | SVGElement>("[data-path]");
-        return card?.dataset.path ? (JSON.parse(card.dataset.path) as string[]) : null;
-      })();
-  return at && at.join("/") !== here.join("/") ? at : null;
+  if (link && href?.startsWith("?")) {
+    const at = new URLSearchParams(href).getAll("at");
+    return at.join("/") !== here.join("/") ? { el: link, at } : null;
+  }
+  const card = el.closest<HTMLElement | SVGElement>("[data-opens-at], [data-path]");
+  const raw = card?.dataset.opensAt ?? card?.dataset.path;
+  if (!card || !raw) return null;
+  const at = JSON.parse(raw) as string[];
+  return at.join("/") !== here.join("/") ? { el: card, at } : null;
 }
+
+const opensAt = (el: Element, here: string[]) => opener(el, here)?.at ?? null;
 
 /**
  * What a right-clicked element hands to Claude. An element's words are what
@@ -560,8 +628,11 @@ function Level({
           top
             ? undefined
             : path.slice(0, -1).reduce(
-                (crumbs, _, i) => [...crumbs, { label: nodeAt(path.slice(0, i + 1))?.title ?? "", onClick: () => onOpen(path.slice(0, i + 1)) }],
-                [{ label: RUN.repo, onClick: () => onOpen([]) }],
+                (crumbs, _, i) => [
+                  ...crumbs,
+                  { label: nodeAt(path.slice(0, i + 1))?.title ?? "", path: path.slice(0, i + 1), onClick: () => onOpen(path.slice(0, i + 1)) },
+                ],
+                [{ label: RUN.repo, path: [] as string[], onClick: () => onOpen([]) }],
               )
         }
         eyebrow={top ? "Repository" : `Inside ${parent?.title ?? RUN.repo}`}
@@ -990,7 +1061,7 @@ function Header({
   /** Where this level is, so it can be handed to Claude from its header. */
   path: string[];
   /** The level above, named — so "back" says where it goes. */
-  back?: { label: string; onClick: () => void }[];
+  back?: { label: string; path: string[]; onClick: () => void }[];
   eyebrow: string;
   title: string;
   state?: Node["state"];
@@ -1027,6 +1098,7 @@ function Header({
             {i > 0 ? <span aria-hidden className="text-muted-slate">›</span> : null}
             <Button
               variant="ghost"
+              data-opens-at={JSON.stringify(crumb.path)}
               onClick={crumb.onClick}
               className={`${i === 0 ? "-ml-2.5" : ""} text-muted-slate`}
               title={i === back.length - 1 ? "Back (Esc)" : undefined}

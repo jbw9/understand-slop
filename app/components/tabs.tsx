@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { goTo } from "@/components/chrome";
 import { useMap } from "@/components/map-context";
 import { openFile, useOpenFile } from "@/components/code";
-import { closeTab, follow, openTab, readTabs, selectTab, useTabs, type Tab } from "@/lib/tabs";
+import { closeTab, follow, insertTab, openTab, readTabs, replaceTab, selectTab, useTabs, type Tab } from "@/lib/tabs";
 import { Menu } from "@/components/menu";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,102 @@ export const show = (t: Tab) => (t.file ? openFile(t.path, t.file) : goTo(t.path
 export function openInTab(map: string, path: string[]) {
   openTab(map, path);
   goTo(path);
+}
+
+/**
+ * Where a part dragged off the map (components/canvas.tsx) goes on a strip of
+ * the map's tabs, as Chrome takes a dragged link: between two tabs, a new tab
+ * there (`at`, with `x` the gap's place on the strip); over a tab's middle,
+ * that tab. `strip` says which strip: the map's own, or the main view's
+ * (components/workspace.tsx), drawn over it while a workspace tab is there.
+ */
+export type Drop = { strip: string } & ({ at: number; x: number } | { on: number });
+
+/** Where on the strip in view a part let go at (x, y) lands, if on it at all. */
+export function dropAt(x: number, y: number): Drop | null {
+  const inside = (r: DOMRect) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  const strips = [...document.querySelectorAll<HTMLElement>("[data-section-tabs]")].filter(
+    (el) => el.checkVisibility() && inside(el.getBoundingClientRect()),
+  );
+  const strip = strips.find((el) => el.dataset.sectionTabs === "main") ?? strips[0];
+  if (!strip) return null;
+  const which = strip.dataset.sectionTabs!;
+  const s = strip.getBoundingClientRect();
+  const tabs = [...strip.querySelectorAll<HTMLElement>('[role="tab"][data-tab-id]')];
+  const gap = (left: number) => left - s.left + strip.scrollLeft;
+  for (const [i, el] of tabs.entries()) {
+    const r = el.getBoundingClientRect();
+    if (x < r.left + r.width / 4) return { strip: which, at: i, x: gap(r.left - 1) };
+    if (x <= r.right - r.width / 4) return { strip: which, on: Number(el.dataset.tabId) };
+  }
+  const last = tabs.at(-1)?.getBoundingClientRect();
+  return { strip: which, at: tabs.length, x: gap(last ? last.right + 1 : s.left + 6) };
+}
+
+/** A part being dragged: its name, where the pointer is, and where it would land. */
+export interface PartDrag {
+  label: string;
+  x: number;
+  y: number;
+  drop: Drop | null;
+}
+
+let dragged: PartDrag | null = null;
+const watchers = new Set<() => void>();
+const watch = (f: () => void) => {
+  watchers.add(f);
+  return () => void watchers.delete(f);
+};
+
+export function setPartDrag(next: PartDrag | null) {
+  dragged = next;
+  for (const f of watchers) f();
+}
+
+export const usePartDrag = () => useSyncExternalStore(watch, () => dragged, () => null);
+
+/** Where a part dragged over `strip` would land there, if it is over it. */
+export function useDropOn(strip: string) {
+  const drop = usePartDrag()?.drop;
+  return drop?.strip === strip ? drop : null;
+}
+
+/** A tab a dragged part would be let go into. */
+export const DROP_TARGET = "border-deep-green bg-deep-green/25 text-ink hover:bg-deep-green/25";
+
+/** The gap a dragged part would open a new tab in. */
+export function DropMarker({ drop }: { drop: Drop | null }) {
+  return drop && "at" in drop ? (
+    <span
+      aria-hidden
+      style={{ left: drop.x }}
+      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 rounded-full bg-deep-green"
+    />
+  ) : null;
+}
+
+/** A part let go on the strip: into a new tab between two, or into the tab it was dropped on. */
+export function dropInTab(map: string, path: string[], drop: Drop) {
+  if ("on" in drop) replaceTab(map, drop.on, path);
+  else insertTab(map, path, drop.at);
+  goTo(path);
+}
+
+/** What follows the pointer while a part is dragged: its name, and what letting go here does. */
+export function DragChip() {
+  const d = usePartDrag();
+  if (!d) return null;
+  const { label, x, y, drop } = d;
+  return (
+    <div
+      aria-hidden
+      style={{ left: x + 12, top: y + 10 }}
+      className="pointer-events-none fixed z-50 flex max-w-[320px] items-center gap-1.5 rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
+    >
+      <span className="truncate">{label}</span>
+      {drop ? <span className="shrink-0 text-faint">→ {"on" in drop ? "replace" : "new tab"}</span> : null}
+    </div>
+  );
 }
 
 /** A Preview tab asked for from the main view's `+`; the workspace (components/workspace.tsx) opens it. */
@@ -76,6 +172,7 @@ export function SectionTabs({ path }: { path: string[] }) {
   const tabs = state?.tabs ?? [{ id: 0, path }];
   const active = state?.active ?? 0;
   const many = tabs.length > 1;
+  const drop = useDropOn("map");
   const titleOf = (t: Tab) => (t.file ? t.file.split("/").pop()! : t.path.length ? (nodeAt(t.path)?.title ?? RUN.repo) : RUN.repo);
 
   const select = (id: number) => {
@@ -121,38 +218,48 @@ export function SectionTabs({ path }: { path: string[] }) {
     <div
       role="tablist"
       data-chrome
+      data-section-tabs="map"
       aria-label={`Open sections of ${name}`}
-      className={TAB_STRIP}
+      className={cn(TAB_STRIP, "relative")}
     >
       {tabs.map((t) => (
         <SectionTab
           key={t.id}
+          id={t.id}
           label={titleOf(t)}
           active={t.id === active}
+          target={drop !== null && "on" in drop && drop.on === t.id}
           onSelect={() => select(t.id)}
           onClose={many ? () => close(t.id) : undefined}
         />
       ))}
       <NewTab onMap={() => openInTab(name, [])} />
+      <DropMarker drop={drop} />
     </div>
   );
 }
 
 /** One tab: a click brings it to the front, × or a middle click closes it. */
 function SectionTab({
+  id,
   label,
   active,
+  target,
   onSelect,
   onClose,
 }: {
+  id: number;
   label: string;
   active: boolean;
+  /** A part is dragged over it, to be let go into it. */
+  target: boolean;
   onSelect: () => void;
   onClose?: () => void;
 }) {
   return (
     <div
       role="tab"
+      data-tab-id={id}
       aria-selected={active}
       tabIndex={0}
       title={label}
@@ -169,7 +276,11 @@ function SectionTab({
           onClose();
         }
       }}
-      className={cn(tabLook(active, !!onClose), !active && "cursor-pointer")}
+      className={cn(
+        tabLook(active, !!onClose),
+        !active && "cursor-pointer",
+        target && DROP_TARGET,
+      )}
     >
       <TabLabel>{label}</TabLabel>
       {onClose ? <TabClose label={label} active={active} onClose={onClose} /> : null}

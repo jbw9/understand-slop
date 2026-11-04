@@ -255,6 +255,18 @@
   body[data-dragging] iframe {
     pointer-events: none;
   }
+  /* Nor may a drag select the words it passes over. */
+  body[data-dragging] {
+    user-select: none;
+  }
+  /* A part dragged off the map toward its tabs (components/canvas.tsx), whose
+     strip shows only where it would land, not what the pointer hovers. */
+  [data-drag-source] {
+    opacity: 0.4;
+  }
+  body[data-dragging] [data-section-tabs] {
+    pointer-events: none;
+  }
   /* Numbers in chips and counts must not jitter as they change. */
   .tnum {
     font-variant-numeric: tabular-nums;

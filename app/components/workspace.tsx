@@ -17,7 +17,7 @@ import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
-import { NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
+import { DROP_TARGET, DropMarker, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, useDropOn } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, findQuestion, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
@@ -185,6 +185,8 @@ export function Workspace() {
   const mapState = useTabs(map.name);
   const mapTabs = mapState?.tabs ?? [{ id: 0, path }];
   const mapActive = mapState?.active ?? 0;
+  // A part dragged off the map onto this strip (components/canvas.tsx).
+  const drop = useDropOn("main");
   const titleOf = (p: string[], file?: string) =>
     file ? file.split("/").pop()! : p.length ? (map.nodeAt(p)?.title ?? map.RUN.repo) : map.RUN.repo;
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
@@ -1044,7 +1046,7 @@ export function Workspace() {
       {/* The map's own tabs, as its strip draws them (components/tabs.tsx),
           then the tabs dragged here, drawn the same way: with a tab here the
           strip reads as it does without one, just longer. */}
-      <header role="tablist" data-chrome className={cn(TAB_STRIP, "pointer-events-auto")}>
+      <header role="tablist" data-chrome data-section-tabs="main" className={cn(TAB_STRIP, "pointer-events-auto relative")}>
         {mapTabs.map((m) => {
           const label = titleOf(m.path, m.file);
           const selected = !upFront && m.id === mapActive;
@@ -1062,6 +1064,7 @@ export function Workspace() {
             <div
               key={`map-${m.id}`}
               role="tab"
+              data-tab-id={m.id}
               aria-selected={selected}
               tabIndex={0}
               title={label}
@@ -1078,7 +1081,7 @@ export function Workspace() {
                   closeMap();
                 }
               }}
-              className={cn(tabLook(selected, closable), !selected && "cursor-pointer")}
+              className={cn(tabLook(selected, closable), !selected && "cursor-pointer", drop !== null && "on" in drop && drop.on === m.id && DROP_TARGET)}
             >
               <TabLabel>{label}</TabLabel>
               {closable ? <TabClose label={label} active={selected} onClose={closeMap} /> : null}
@@ -1092,6 +1095,7 @@ export function Workspace() {
             openInTab(map.name, []);
           }}
         />
+        <DropMarker drop={drop} />
       </header>
       <div
         ref={setMainSlot}

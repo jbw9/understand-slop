@@ -77,6 +77,22 @@ export function openTab(map: string, path: string[], file?: string) {
   save(map, { tabs, active: id });
 }
 
+/** A new tab at `index` along the strip, holding `path`, brought to the front: a part dropped between two tabs. */
+export function insertTab(map: string, path: string[], index: number) {
+  const t = readTabs(map) ?? { tabs: [], active: 0 };
+  const id = Math.max(0, ...t.tabs.map((x) => x.id)) + 1;
+  const tabs = [...t.tabs];
+  tabs.splice(index, 0, { id, path });
+  save(map, { tabs, active: id });
+}
+
+/** A tab made to hold `path` instead of what it held, brought to the front: a part dropped onto it. */
+export function replaceTab(map: string, id: number, path: string[]) {
+  const t = readTabs(map);
+  if (!t?.tabs.some((x) => x.id === id)) return;
+  save(map, { tabs: t.tabs.map((x) => (x.id === id ? { id, path } : x)), active: id });
+}
+
 /** Brings a tab to the front, and says what it holds to open. */
 export function selectTab(map: string, id: number): Tab | null {
   const t = readTabs(map);

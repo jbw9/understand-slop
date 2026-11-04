@@ -13,6 +13,8 @@ export function Overlay({ onClose, children }: { onClose: () => void; children: 
       if (e.key !== "Escape") return;
       // A note being written over the dialog (components/review-tray.tsx) takes its own Escape.
       if ((e.target as Element | null)?.closest?.("[data-note-editor]")) return;
+      // A menu open over the dialog (components/menu.tsx) closes first.
+      if (document.querySelector('[role="menu"]')) return;
       e.stopPropagation();
       onClose();
     };

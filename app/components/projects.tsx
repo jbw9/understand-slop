@@ -3,9 +3,9 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DIALOG, Field, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
+import { DIALOG, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
 import { useMaybeMap } from "@/components/map-context";
-import { PanelHead } from "@/components/panel";
+import { Menu, type MenuItem } from "@/components/menu";
 import { readSettings } from "@/lib/settings";
 import type { Explain, Progress, Project } from "@/lib/vault";
 import { cn } from "@/lib/utils";
@@ -188,77 +188,81 @@ export function ProjectsDialog() {
     close();
   };
 
+  const home = list ? homeOf(list.vault) : undefined;
+
   return (
     <Overlay onClose={close}>
-      <div role="dialog" aria-label="Projects" className={cn(DIALOG, "max-w-[680px]")}>
-        <PanelHead
-          title="Projects"
-          note={list ? `Your projects stay on this machine, in ${list.vault}` : "Loading…"}
-        />
-        <div className="flex min-h-0 flex-col gap-6 overflow-y-auto px-5 py-5">
-          {mode ? (
-            <StartProject
-              mode={mode}
-              root={root}
-              setRoot={setRoot}
-              label={label}
-              setLabel={setLabel}
-              busy={busy}
-              error={error}
-              onBrowse={isTauri() ? () => void browse() : undefined}
-              onStart={(explain, paused) => void start(explain, paused)}
-              onCancel={() => {
-                setMode(null);
-                setRoot("");
-                setLabel("");
-                setError(null);
-              }}
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => void openFolder()} className={PRIMARY}>
-                Open Folder…
-              </button>
-              <button type="button" onClick={newProject} className={cn(QUIET, "border border-border-gray bg-pure-white")}>
+      <div role="dialog" aria-label="Projects" className={cn(DIALOG, "max-w-[600px]")}>
+        {mode ? (
+          <StartProject
+            mode={mode}
+            root={root}
+            setRoot={setRoot}
+            label={label}
+            setLabel={setLabel}
+            busy={busy}
+            error={error}
+            onBrowse={isTauri() ? () => void browse() : undefined}
+            onStart={(explain, paused) => void start(explain, paused)}
+            onCancel={() => {
+              setMode(null);
+              setRoot("");
+              setLabel("");
+              setError(null);
+            }}
+          />
+        ) : (
+          <>
+            <header className="flex items-center gap-1.5 border-b border-border-gray px-5 py-3">
+              <h2 className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-ink">Projects</h2>
+              <button type="button" onClick={newProject} className={cn(QUIET, "px-3 py-1 text-[12.5px]")}>
                 New Project…
               </button>
-              <p className="ml-auto text-[12px] text-faint">Map code on this machine, or start an empty folder.</p>
+              <button type="button" onClick={() => void openFolder()} className={cn(PRIMARY, "px-3 py-1 text-[12.5px]")}>
+                Open Folder…
+              </button>
+            </header>
+            <div className="min-h-0 overflow-y-auto px-2 py-2">
+              {list?.projects.length ? (
+                <ul className="flex flex-col">
+                  {list.projects.map((p) => (
+                    <ProjectRow
+                      key={p.id}
+                      p={p}
+                      home={home}
+                      current={p.id === current}
+                      busy={busy}
+                      onOpen={(at) => openMap(p.id, at)}
+                      onRegenerate={(explain, full) => void regenerate(p.id, explain, full)}
+                      onCancel={() => void act({ action: "cancel", id: p.id })}
+                      onPause={(paused) => void act({ action: "pause", id: p.id, paused })}
+                      onRemove={() => void remove(p.id)}
+                    />
+                  ))}
+                </ul>
+              ) : list ? (
+                <div className="px-3 py-10 text-center">
+                  <p className="text-[13.5px] font-medium text-ink">No projects yet</p>
+                  <p className="mt-1 text-[12.5px] text-muted-slate">Open a folder of code to map it, or start a new one.</p>
+                </div>
+              ) : (
+                <p className="px-3 py-10 text-center text-[12.5px] text-faint">Loading…</p>
+              )}
             </div>
-          )}
-
-          <section>
-            <h3 className="mb-2 text-[13px] font-semibold text-ink">Your projects</h3>
-            {list?.projects.length ? (
-              <ul className="flex flex-col divide-y divide-border-gray rounded-[3px] border border-border-gray">
-                {list.projects.map((p) => (
-                  <ProjectRow
-                    key={p.id}
-                    p={p}
-                    current={p.id === current}
-                    busy={busy}
-                    onOpen={(at) => openMap(p.id, at)}
-                    onRegenerate={(explain, full) => void regenerate(p.id, explain, full)}
-                    onCancel={() => void act({ action: "cancel", id: p.id })}
-                    onPause={(paused) => void act({ action: "pause", id: p.id, paused })}
-                    onRemove={() => void remove(p.id)}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[12.5px] text-faint">{list ? "None yet. Open a folder above." : "Loading…"}</p>
-            )}
-          </section>
-
-        </div>
-        <div className="flex justify-end border-t border-border-gray bg-surface px-5 py-3">
-          <button type="button" onClick={close} className={QUIET}>
-            Close
-          </button>
-        </div>
+            {error ? <p className="border-t border-border-gray px-5 py-2.5 text-[12.5px] text-clay-ink">{error}</p> : null}
+            <footer className="truncate border-t border-border-gray bg-surface px-5 py-2 text-[11.5px] text-faint" title={list?.vault}>
+              {list ? `Kept on this machine, in ${tilde(list.vault, home)}` : " "}
+            </footer>
+          </>
+        )}
       </div>
     </Overlay>
   );
 }
+
+/** The home folder, read off the vault's path: the browser has no other way to know it. */
+const homeOf = (vault: string) => vault.match(/^(\/Users\/[^/]+|\/home\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)/)?.[1];
+const tilde = (path: string, home?: string) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
 
 /**
  * How much the map explains (D70), from how well the reader says they
@@ -417,95 +421,110 @@ function StartProject({
         e.preventDefault();
         if (ready) onStart(fresh || !mapped ? undefined : explain, !mapped);
       }}
-      className="flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4"
+      className="flex min-h-0 flex-col"
     >
-      <h3 className="text-[13px] font-semibold text-ink">{fresh ? "New project" : mapped ? `Map ${name || "a folder"}` : `Open ${name || "a folder"}`}</h3>
+      <header className="flex items-center gap-1 border-b border-border-gray px-3 py-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Back to projects"
+          className="flex size-7 cursor-pointer items-center justify-center rounded-[3px] text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+        >
+          ←
+        </button>
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">{fresh ? "New Project" : "Open Folder"}</h2>
+      </header>
 
-      <Field
-        label={fresh ? "Location" : "Folder"}
-        hint={fresh ? `The new folder is made inside it${name ? `: ${joinPath(root || "…", name)}` : "."}` : "A project on this machine, usually a git checkout."}
-      >
-        <div className="flex gap-2">
+      <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-5">
+        <label className="block">
+          <span className={LABEL}>{fresh ? "Location" : "Folder"}</span>
+          <div className="flex gap-2">
+            <input
+              autoFocus={!root}
+              value={root}
+              onChange={(e) => setRoot(e.target.value)}
+              placeholder={fresh ? "~/code" : "~/code/my-app"}
+              spellCheck={false}
+              className={INPUT}
+            />
+            {onBrowse ? (
+              <button type="button" onClick={onBrowse} className={cn(QUIET, "shrink-0 border border-border-gray")}>
+                {root ? "Change…" : "Browse…"}
+              </button>
+            ) : null}
+          </div>
+        </label>
+
+        <label className="block">
+          <span className={LABEL}>
+            Name{fresh ? null : <span className="font-normal text-faint"> · optional</span>}
+          </span>
           <input
-            autoFocus={!root}
-            value={root}
-            onChange={(e) => setRoot(e.target.value)}
-            placeholder={fresh ? "~/code" : "~/code/my-app"}
+            autoFocus={Boolean(root) && fresh}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={(!fresh && folderName(root)) || "my-app"}
             spellCheck={false}
             className={INPUT}
           />
-          {onBrowse ? (
-            <button type="button" onClick={onBrowse} className={cn(QUIET, "shrink-0 border border-border-gray bg-pure-white")}>
-              {root ? "Change…" : "Browse…"}
-            </button>
+          {fresh && root.trim() && name ? (
+            <span className="mt-1.5 block truncate font-mono text-[11.5px] text-faint">Creates {joinPath(root, name)}</span>
           ) : null}
-        </div>
-      </Field>
+        </label>
 
-      <Field label="Name" hint={fresh ? "Also the new folder's name." : "Blank uses the folder's name."}>
-        <input
-          autoFocus={Boolean(root) && fresh}
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder={(!fresh && folderName(root)) || "my-app"}
-          spellCheck={false}
-          className={INPUT}
-        />
-      </Field>
+        {/* A new folder is empty, so there is nothing to map yet: it is mapped from Projects once it has code. */}
+        {fresh ? null : (
+          <div className="flex items-start gap-4 border-t border-border-gray pt-5">
+            <div className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-ink">Make a map</span>
+              <span className="mt-0.5 block text-[12px] leading-snug text-muted-slate">
+                {mapped
+                  ? "Your Claude Code reads it now. About 20 minutes for a mid-sized repo, on your plan's usage."
+                  : "It opens with just your tabs. Nothing is read or spent until you make a map."}
+              </span>
+            </div>
+            <Switch on={mapped} onChange={setMapped} label="Make a map" />
+          </div>
+        )}
 
-      <Field label="Map" hint="Without one the app is only your tabs on this folder, and no tokens go on mapping. Turn it on from the list any time.">
-        <MapSwitch on={mapped} onChange={setMapped} />
-      </Field>
+        {fresh || !mapped ? null : <Understanding value={understand} onChange={setUnderstand} />}
+      </div>
 
-      {fresh || !mapped ? null : <Understanding value={understand} onChange={setUnderstand} />}
-
-      <p className="text-[12px] text-muted-slate">
-        {!mapped
-          ? fresh
-            ? "An empty folder is made there, as a git checkout, and opens without a map."
-            : "It opens without a map. Nothing is read or spent until you make one from the list."
-          : fresh
-          ? "An empty folder is made there, as a git checkout. Map it from the list once it has code."
-          : "The map is made right away with your Claude Code — about 20 minutes for a mid-sized repo, counted against your plan's usage. You can open each part as it finishes."}
-      </p>
-
-      <div className="flex items-center justify-end gap-3">
+      <footer className="flex items-center justify-end gap-2 border-t border-border-gray bg-surface px-5 py-3">
         {error ? <p className="mr-auto text-[12.5px] text-clay-ink">{error}</p> : null}
         <button type="button" onClick={onCancel} className={QUIET}>
           Cancel
         </button>
         <button type="submit" disabled={busy || !ready} className={PRIMARY}>
-          {fresh ? "Create project" : mapped ? "Start mapping" : "Open project"}
+          {fresh ? "Create" : mapped ? "Start mapping" : "Open"}
         </button>
-      </div>
+      </footer>
     </form>
   );
 }
 
-/** Whether the project has a map made and kept up with its code (lib/vault.ts, `paused`). */
-function MapSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
+const LABEL = "mb-1.5 block text-[12.5px] font-semibold text-ink";
+
+function Switch({ on, onChange, label }: { on: boolean; onChange: (on: boolean) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label="Map" className="inline-flex rounded-[3px] border border-border-gray bg-pure-white p-0.5">
-      {[
-        { value: true, label: "Map it" },
-        { value: false, label: "No map" },
-      ].map((o) => (
-        <button
-          key={o.label}
-          type="button"
-          role="radio"
-          aria-checked={on === o.value}
-          disabled={disabled}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "cursor-pointer rounded-[2px] px-2.5 py-0.5 text-[12px] transition-colors",
-            on === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={cn(
+        "relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
+        on ? "bg-deep-green" : "bg-border-strong",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform duration-150",
+          on && "translate-x-4",
+        )}
+      />
+    </button>
   );
 }
 
@@ -549,8 +568,23 @@ function Roots({ roots, onOpen }: { roots: Progress["roots"]; onOpen: (at: strin
   );
 }
 
+/** The row's one-word state, and its tone; the detail is in the title. */
+function statusOf(p: Listed): { text: string; title?: string; tone: string } {
+  const { status, commit, seconds } = p.map;
+  if (status === "generating") return { text: `Mapping · ${minutes(p.map.startedAt)} min`, tone: "text-amber-ink" };
+  if (status === "failed" && !p.paused) return { text: "Mapping failed", tone: "text-clay-ink" };
+  if (p.paused) return p.hasMap ? { text: "Updates off", title: `The map from ${commit ?? "earlier"} is kept as it is.`, tone: "text-faint" } : { text: "No map", tone: "text-faint" };
+  if (status === "ready")
+    return p.stale
+      ? { text: "Out of date", title: `Mapped at ${commit ?? "?"}; the code has changed since.`, tone: "text-amber-ink" }
+      : { text: commit ? `Mapped · ${commit}` : "Mapped", title: seconds ? `Took ${Math.round(seconds / 60)} min` : undefined, tone: "text-faint" };
+  if (status === "cancelled") return { text: "Cancelled", tone: "text-faint" };
+  return { text: "Empty", title: "Map it once it has code.", tone: "text-faint" };
+}
+
 function ProjectRow({
   p,
+  home,
   current,
   busy,
   onOpen,
@@ -560,6 +594,7 @@ function ProjectRow({
   onRemove,
 }: {
   p: Listed;
+  home?: string;
   current: boolean;
   busy: boolean;
   onOpen: (at?: string) => void;
@@ -568,100 +603,124 @@ function ProjectRow({
   onPause: (paused: boolean) => void;
   onRemove: () => void;
 }) {
-  // Forgetting a project takes a second click: it deletes the map, not the code.
-  const [confirm, setConfirm] = useState(false);
-  // So does making a finished map again from scratch: it is a whole run's time and cost.
-  const [confirmFull, setConfirmFull] = useState(false);
-  // What the next run explains; changing it takes effect when the map is made again.
-  const [explain, setExplain] = useState<Explain>(p.explain ?? "full");
+  // What opens under the row: making the map (again), or confirming removal,
+  // which deletes the map but never the code.
+  const [panel, setPanel] = useState<"make" | "remove" | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [understand, setUnderstand] = useState(() => Math.max(0, UNDERSTAND.findIndex((u) => u.explain === (p.explain ?? "full"))));
   const { status } = p.map;
+  const generating = status === "generating";
+  const openable = p.hasMap || p.paused || status === "empty";
+  const s = statusOf(p);
+
+  const items: MenuItem[] = [];
+  if (openable) items.push({ label: "Open", onClick: () => onOpen() });
+  if (generating) items.push({ label: "Cancel mapping", onClick: onCancel, disabled: busy });
+  else {
+    if (status === "ready") items.push({ label: "Update map to the code", onClick: () => onRegenerate(p.explain ?? "full"), disabled: busy });
+    if (status === "failed" || status === "cancelled") items.push({ label: "Retry mapping", onClick: () => onRegenerate(p.explain ?? "full"), disabled: busy });
+    items.push({ label: p.hasMap ? "Remake map…" : "Make a map…", onClick: () => setPanel("make") });
+    if (p.hasMap) items.push({ label: p.paused ? "Keep the map updated" : "Stop updating the map", onClick: () => onPause(!p.paused), disabled: busy });
+  }
+  items.push({ label: "Remove from Projects…", onClick: () => setPanel("remove"), separated: true });
 
   return (
-    <li className="flex flex-col gap-1.5 px-4 py-3">
-      <div className="flex items-center gap-2">
-        <span className="truncate text-[14px] font-semibold text-ink">{p.name}</span>
-        {current ? <span className="font-mono text-[10.5px] text-deep-green">open</span> : null}
-        <span className="flex-1" />
-        <MapSwitch on={!p.paused} onChange={(on) => onPause(!on)} disabled={busy} />
-        {p.hasMap || p.paused || status === "empty" ? (
-          <button type="button" onClick={() => onOpen()} className={cn(QUIET, "py-1")}>
-            Open
-          </button>
-        ) : null}
-        {status === "generating" ? (
-          <button type="button" onClick={onCancel} disabled={busy} className={cn(QUIET, "py-1")}>
-            Cancel
-          </button>
-        ) : (
-          <>
-            <select
-              value={explain}
-              onChange={(e) => setExplain(e.target.value as Explain)}
-              disabled={busy}
-              title="How much the map explains, used the next time it is made"
-              className="cursor-pointer rounded-[2px] border border-border-gray bg-pure-white px-1.5 py-1 text-[12px] text-on-surface-variant"
-            >
-              {(Object.keys(EXPLAINS) as Explain[]).map((l) => (
-                <option key={l} value={l}>
-                  {EXPLAINS[l].label}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={() => onRegenerate(explain)} disabled={busy} className={cn(QUIET, "py-1")}>
-              {status === "ready" ? "Regenerate" : status === "empty" ? "Map it" : "Retry"}
-            </button>
-            {status === "ready" ? (
-              <button
-                type="button"
-                onClick={() => (confirmFull ? onRegenerate(explain, true) : setConfirmFull(true))}
-                onBlur={() => setConfirmFull(false)}
-                disabled={busy}
-                title="Make the whole map again, not only what changed since it was made"
-                className={cn(QUIET, "py-1", confirmFull && "text-clay-ink")}
-              >
-                {confirmFull ? "Rebuild all?" : "From scratch"}
-              </button>
-            ) : null}
-          </>
-        )}
+    <li className="flex flex-col">
+      <div className="group flex items-center gap-3 rounded-[3px] px-3 py-2 hover:bg-surface-container-low">
         <button
           type="button"
-          onClick={() => (confirm ? onRemove() : setConfirm(true))}
-          onBlur={() => setConfirm(false)}
-          disabled={busy}
-          className={cn(QUIET, "py-1", confirm && "text-clay-ink")}
+          onClick={() => openable && onOpen()}
+          disabled={!openable}
+          className="flex min-w-0 flex-1 cursor-pointer flex-col items-start text-left disabled:cursor-default"
         >
-          {confirm ? "Remove map?" : "Remove"}
+          <span className="flex max-w-full items-center gap-2">
+            <span className="truncate text-[13.5px] font-medium text-ink">{p.name}</span>
+            {current ? <span className="shrink-0 rounded-[2px] bg-mint-success px-1.5 text-[10.5px] font-medium text-deep-green">Open</span> : null}
+          </span>
+          <span className="max-w-full truncate font-mono text-[11.5px] text-faint" title={p.root}>
+            {tilde(p.root, home)}
+          </span>
+        </button>
+        <span className={cn("shrink-0 text-[12px]", s.tone)} title={s.title}>
+          {s.text}
+        </span>
+        {generating ? (
+          <button type="button" onClick={onCancel} disabled={busy} className={cn(QUIET, "shrink-0 px-2 py-0.5 text-[12px]")}>
+            Cancel
+          </button>
+        ) : null}
+        <button
+          type="button"
+          aria-label={`Actions for ${p.name}`}
+          aria-haspopup="menu"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({ x: r.right - 220, y: r.bottom + 4 });
+          }}
+          className={cn(
+            "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-[16px] leading-none text-faint hover:bg-surface-container hover:text-ink",
+            menu ? "bg-surface-container text-ink" : "opacity-60 group-hover:opacity-100",
+          )}
+        >
+          ⋯
         </button>
       </div>
-      <p className="truncate font-mono text-[11px] text-faint" title={p.root}>
-        {p.root}
-      </p>
-      <p
-        className={cn(
-          "font-mono text-[11.5px]",
-          p.paused ? "text-muted-slate" : status === "failed" ? "text-clay-ink" : status === "generating" ? "text-amber-ink" : "text-muted-slate",
-        )}
-      >
-        {p.paused
-          ? p.hasMap
-            ? `No map updates — the map from ${p.map.commit ?? "earlier"} is kept as it is.`
-            : "No map — the app without one. Map it any time."
-          : status === "generating"
-          ? `◷ Mapping ${p.name}… ${minutes(p.map.startedAt)} min${stageLine(p.progress) ? ` — ${stageLine(p.progress)}` : ""}`
-          : status === "ready"
-            ? `✓ Mapped at ${p.map.commit ?? "?"}${p.map.seconds ? ` · ${Math.round(p.map.seconds / 60)} min` : ""}${p.stale ? " · the code has changed since" : ""}`
-            : status === "cancelled"
-              ? "Cancelled."
-              : status === "empty"
-                ? "New and empty — map it once it has code."
-                : "✗ Mapping failed."}
-      </p>
-      {status === "generating" && p.progress?.roots.length ? <Roots roots={p.progress.roots} onOpen={onOpen} /> : null}
+
+      {menu ? <Menu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} /> : null}
+
+      {generating && (stageLine(p.progress) || p.progress?.roots.length) ? (
+        <div className="px-3 pb-2">
+          {stageLine(p.progress) ? <p className="font-mono text-[11.5px] text-amber-ink">◷ {stageLine(p.progress)}</p> : null}
+          {p.progress?.roots.length ? <Roots roots={p.progress.roots} onOpen={onOpen} /> : null}
+        </div>
+      ) : null}
+
       {status === "failed" && !p.paused && p.map.error ? (
-        <pre className="max-h-28 overflow-auto whitespace-pre-wrap rounded-[2px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
+        <pre className="mx-3 mb-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-[2px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
           {p.map.error}
         </pre>
+      ) : null}
+
+      {panel === "make" ? (
+        <div className="mx-3 mb-2 mt-1 flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4">
+          <Understanding value={understand} onChange={setUnderstand} />
+          <div className="flex items-center justify-end gap-2">
+            <p className="mr-auto text-[12px] text-muted-slate">About 20 min with your Claude Code, on your plan.</p>
+            <button type="button" onClick={() => setPanel(null)} className={cn(QUIET, "shrink-0")}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setPanel(null);
+                onRegenerate(UNDERSTAND[understand].explain, p.hasMap);
+              }}
+              className={cn(PRIMARY, "shrink-0 whitespace-nowrap")}
+            >
+              {p.hasMap ? "Remake map" : "Make map"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {panel === "remove" ? (
+        <div className="mx-3 mb-2 mt-1 flex items-center gap-2 rounded-[3px] border border-clay-line bg-clay-surface/40 px-4 py-2.5">
+          <p className="mr-auto text-[12.5px] text-ink">
+            Remove <span className="font-semibold">{p.name}</span>? This deletes its map, not the folder.
+          </p>
+          <button type="button" onClick={() => setPanel(null)} className={cn(QUIET, "px-2.5 py-1")}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onRemove}
+            className="cursor-pointer rounded-[2px] bg-clay-ink px-2.5 py-1 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+          >
+            Remove
+          </button>
+        </div>
       ) : null}
     </li>
   );

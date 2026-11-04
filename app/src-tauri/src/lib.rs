@@ -22,6 +22,8 @@ pub fn run() {
             mcp::start(app.handle().clone());
             // Tab files a crashed or killed Mira left in the temp folder.
             std::thread::spawn(claude::sweep_stale);
+            // Plans Claude Code wrote and nothing has touched in a month.
+            std::thread::spawn(claude::prune_plans);
             #[cfg(target_os = "linux")]
             if let Some(window) = app.get_webview_window("main") {
                 pinch_to_page(&window);

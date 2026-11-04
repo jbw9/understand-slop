@@ -387,6 +387,43 @@ pub fn sweep_stale() {
     });
 }
 
+/// How long a plan Claude Code wrote may sit untouched before it goes: the
+/// same as Claude Code's own default for keeping sessions.
+pub const PLAN_AGE: std::time::Duration = std::time::Duration::from_secs(30 * 24 * 3600);
+
+/// Where Claude Code keeps the plans it writes in plan mode.
+fn plans_dir() -> Option<PathBuf> {
+    let config = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from).or_else(|| crate::proc::home().map(|h| h.join(".claude")))?;
+    Some(config.join("plans"))
+}
+
+/// At startup: plans nothing has touched in `PLAN_AGE`. Nothing reads them
+/// once their session is over (a plan's tab holds its own copy), and Claude
+/// Code never removes them. A plan being shown right now was just rewritten
+/// by HIDE, so it is never old.
+pub fn prune_plans() {
+    if let Some(dir) = plans_dir() {
+        prune_older(&dir, PLAN_AGE);
+    }
+}
+
+fn prune_older(dir: &Path, age: std::time::Duration) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let path = e.path();
+        let old = e
+            .metadata()
+            .ok()
+            .filter(|m| m.is_file())
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|a| a > age);
+        if old && path.extension().is_some_and(|x| x == "md") {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
 #[cfg(unix)]
 fn alive(pid: u32, _file: &Path) -> bool {
     crate::proc::command("kill").args(["-0", &pid.to_string()]).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success())
@@ -1126,6 +1163,27 @@ printf '[%s]' \"$@\" > '{}'\n", args.display())).unwrap();
         assert!(!std::fs::read_to_string(&q).unwrap().contains("A]"));
         replace(&q, "").unwrap();
         assert!(!pending(&q) && !q.exists());
+    }
+
+    #[test]
+    fn prune_takes_only_old_plans() {
+        let dir = tempfile::tempdir().unwrap();
+        let at = |name: &str, days: u64| {
+            let p = dir.path().join(name);
+            std::fs::write(&p, "# Plan\n").unwrap();
+            let then = std::time::SystemTime::now() - std::time::Duration::from_secs(days * 24 * 3600);
+            std::fs::File::options().write(true).open(&p).unwrap().set_modified(then).unwrap();
+            p
+        };
+        let old = at("old.md", 40);
+        let fresh = at("fresh.md", 2);
+        let other = at("notes.txt", 40);
+        std::fs::create_dir(dir.path().join("sub.md")).unwrap();
+        prune_older(dir.path(), PLAN_AGE);
+        assert!(!old.exists());
+        assert!(fresh.exists() && other.exists() && dir.path().join("sub.md").is_dir());
+        // A folder that is not there is nothing to do.
+        prune_older(&dir.path().join("missing"), PLAN_AGE);
     }
 }
 

@@ -19,7 +19,7 @@
   /* ── ink ───────────────────────────────────────────────── */
   --color-ink: #111111;
   /* The veil behind a dialog, and a phone's notch: dark in either theme. */
-  --color-night: #1e1e1e;
+  --color-night: #0b0b0c;
   /* A phone's frame. Not `night`: in the dark theme that is the ground's own
      colour, and the bezel vanished into it. */
   --color-bezel: #252526;
@@ -156,18 +156,18 @@
 [data-chrome] {
   color-scheme: dark;
 
-  --color-warm-cream: #1e1e1e;
-  --color-pure-white: #2a2a2b;
-  --color-surface: #232324;
-  --color-surface-container-low: #252526;
-  --color-surface-container: #333333;
-  --color-surface-dim: #3c3c3c;
+  --color-warm-cream: #0b0b0c;
+  --color-pure-white: #19191b;
+  --color-surface: #101011;
+  --color-surface-container-low: #141415;
+  --color-surface-container: #1f1f21;
+  --color-surface-dim: #262628;
 
-  --color-ink: #e6e6e6;
-  --color-on-surface: #dedede;
-  --color-on-surface-variant: #c9c9c9;
-  --color-muted-slate: #a3a3a3;
-  --color-faint: #848484;
+  --color-ink: #f7f8f8;
+  --color-on-surface: #e8e8ea;
+  --color-on-surface-variant: #d6d6d8;
+  --color-muted-slate: #a8a8ad;
+  --color-faint: #84848a;
 
   --color-deep-green: #5e8f5e;
   --color-brand: #76a876;
@@ -183,10 +183,10 @@
   --color-clay-line: #6a3c3e;
 
 
-  --color-border-gray: #333333;
-  --color-border-strong: #474747;
-  --color-wire: #5a5a5a;
-  --color-bezel: #474747;
+  --color-border-gray: #26262a;
+  --color-border-strong: #36363a;
+  --color-wire: #4a4a4f;
+  --color-bezel: #36363a;
 
   --color-actor-1: #8fbf8f;
   --color-actor-1-surface: #1f2a1f;
@@ -212,7 +212,7 @@
   --color-sec-7-surface: #2e2419;
   --color-sec-7-ink: #c4996c;
 
-  --color-code: #1a1a1a;
+  --color-code: #070708;
   --color-code-plain: #dedede;
   --color-code-comment: #848484;
   --color-code-string: #d98a8c;

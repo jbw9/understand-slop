@@ -26,12 +26,12 @@ import { cn } from "@/lib/utils";
  * lifted for the dark.
  */
 const PALETTE = {
-  background: "#252526",
-  foreground: "#dedede",
-  cursor: "#e6e6e6",
-  cursorAccent: "#252526",
-  selectionBackground: "#474747",
-  black: "#1e1e1e",
+  background: "#141415",
+  foreground: "#e8e8ea",
+  cursor: "#f7f8f8",
+  cursorAccent: "#141415",
+  selectionBackground: "#36363a",
+  black: "#0b0b0c",
   red: "#d98a8c",
   green: "#8fbf8f",
   yellow: "#d8ae5b",

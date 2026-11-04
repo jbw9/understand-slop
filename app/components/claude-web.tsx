@@ -33,7 +33,7 @@ const PROSE =
   "min-w-0 flex-1 [&_p]:my-0 [&_p+*]:mt-2 [&_*+p]:mt-2 [&_strong]:font-semibold [&_strong]:text-white [&_em]:text-[#a9bfd4] " +
   "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 " +
   "[&_h1]:mt-3 [&_h1]:font-semibold [&_h1]:text-white [&_h2]:mt-3 [&_h2]:font-semibold [&_h2]:text-white [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-white " +
-  "[&_:not(pre)>code]:text-[#d8ae5b] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-[3px] [&_pre]:bg-[#1e1e1e] [&_pre]:px-3 [&_pre]:py-2 [&_pre]:text-[#dedede] " +
+  "[&_:not(pre)>code]:text-[#d8ae5b] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-[3px] [&_pre]:bg-[#0b0b0c] [&_pre]:px-3 [&_pre]:py-2 [&_pre]:text-[#e8e8ea] " +
   "[&_a]:text-[#86bab6] [&_a]:underline [&_table]:my-2 [&_td]:border [&_td]:border-[#3a3a3a] [&_td]:px-2 [&_th]:border [&_th]:border-[#3a3a3a] [&_th]:px-2 [&_th]:text-left";
 
 /** A question shows as asked; `sent` is it with the context that went along. */
@@ -167,7 +167,7 @@ export function ClaudeWeb() {
           type="button"
           onClick={() => setOpen(true)}
           title="Ask Claude about this code (Ctrl+`)"
-          className="fixed right-3 top-1.5 z-40 flex cursor-pointer items-center gap-1.5 rounded-full border border-[#D97757]/60 bg-[#252526] px-3 py-1 font-mono text-[12px] text-[#dedede] shadow-[0_0_12px_rgba(217,119,87,0.35)] transition-colors hover:border-[#D97757]"
+          className="fixed right-3 top-1.5 z-40 flex cursor-pointer items-center gap-1.5 rounded-full border border-[#D97757]/60 bg-[#141415] px-3 py-1 font-mono text-[12px] text-[#dedede] shadow-[0_0_12px_rgba(217,119,87,0.35)] transition-colors hover:border-[#D97757]"
         >
           {seen ? null : <span aria-hidden className="absolute inset-0 animate-ping rounded-full border border-[#D97757]/70" />}
           <AgentIcon id="claude" className="size-3.5" />
@@ -183,7 +183,7 @@ export function ClaudeWeb() {
         transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
         style={{ top: GAP, bottom: STATUSBAR + GAP, right: GAP, width: `min(${WIDTH}px, calc(100vw - ${2 * GAP}px))` }}
         data-chrome
-        className="fixed z-40 flex flex-col overflow-hidden rounded-[4px] border border-border-gray bg-[#252526] font-mono text-[12.5px] leading-relaxed text-[#dedede] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.35)]"
+        className="fixed z-40 flex flex-col overflow-hidden rounded-[4px] border border-border-gray bg-[#141415] font-mono text-[12.5px] leading-relaxed text-[#dedede] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.35)]"
       >
         <header className="flex h-7 shrink-0 items-center gap-2 bg-surface-container px-3 text-[11.5px] text-muted-slate">
           <AgentIcon id="claude" />

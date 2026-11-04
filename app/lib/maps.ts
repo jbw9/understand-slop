@@ -19,6 +19,8 @@ export interface MapEntry {
   label: string;
   /** One of the reader's projects, which follows edits; false only for the one map a static export serves. */
   local: boolean;
+  /** The checkout, which a workspace tab names as its `cwd`; absent for a static export. */
+  root?: string;
 }
 
 /**
@@ -60,7 +62,7 @@ export function listMaps(): MapEntry[] {
   return listProjects()
     .filter(openable)
     .sort((a, b) => opened(b) - opened(a))
-    .map((p) => ({ id: p.id, label: p.name, local: true }));
+    .map((p) => ({ id: p.id, label: p.name, local: true, root: p.root }));
 }
 
 /**

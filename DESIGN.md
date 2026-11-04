@@ -51,7 +51,7 @@ looks like level one.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ map ▾  ›  Sign Up  ›  Student Sign-Up      ◷ status   ▣ ± ✎ ⟲ >_ ⚙ – □ × │  Titlebar
+│ map● api◐ +  ›  Sign Up  ›  Student…     ◷ status   ▣ ± ✎ ⟲ >_ ⚙ – □ × │  Titlebar
 ├──────────────────────────────────────────────────────────────────────┤
 │  ← Sign Up                                           ┌──────────────┐│
 │  INSIDE SIGN UP                                      │ Claude │ zsh +││
@@ -70,12 +70,22 @@ looks like level one.
 ### Title bar — `components/titlebar.tsx`
 
 The window's own bar; the native one is off. It carries **where you are**: the
-map switcher (`MapSwitcher`) and the trail of levels (`Crumbs`,
+open projects, a tab each, and the trail of levels (`Crumbs`,
 `components/chrome.tsx`), which wraps instead of truncating (D35). On the right
 are one button per dialog, then the window buttons (D46: a Mac keeps its own
 traffic lights). Between them is a status line: a map update running, done or
 failed, or "This map doesn't follow edits" with an import link. Outside the
 desktop app no title bar is drawn, and the canvas draws the crumbs itself.
+
+A project gets a tab when it is opened, and the tabs are kept between
+launches (`lib/open-projects.ts`). Each tab carries the workspace's own status
+dot for the loudest Claude among that project's tabs: red needs you, then
+yellow working, then green done. Switching never ends a terminal; the
+workspace shows the tabs of the project switched to. Closing a project's tab
+only takes it off the strip. **+** lists every project, Import and Manage.
+Cmd+1–9 (Ctrl+1–9 off a Mac) picks a tab and Ctrl+Tab the last project; on a
+Mac they are menu-bar keys (`src-tauri/src/lib.rs`), so they work from inside
+a Preview's page too.
 
 ### Canvas — `components/canvas.tsx`
 
@@ -114,7 +124,7 @@ everything (Ctrl+K, Ctrl+`). Whatever level is open, this does not change.
 Ctrl+K (or Ctrl+P, or the box in the title bar) opens one input over the
 window. Typing matches every level in the map by name, with its trail beside
 it, and Enter opens it, however deep it is. A leading `>` (or Ctrl+Shift+P)
-lists the app's actions; clicking the map's name in the title bar lists the
+lists the app's actions; the title bar's **+** lists the
 maps. This is how you jump around the map without a sidebar (D35, D62).
 
 ### Dialogs

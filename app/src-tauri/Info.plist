@@ -4,5 +4,7 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Mira uses the microphone for voice dictation.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Mira pauses Music and Spotify while you dictate, and plays them again after.</string>
 </dict>
 </plist>

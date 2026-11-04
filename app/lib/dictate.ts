@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useSyncExternalStore } from "react";
 import { claudeTab, insertPrompt } from "@/lib/context";
-import { openSettings } from "@/lib/settings";
+import { openSettings, readSettings, saveSettings } from "@/lib/settings";
 
 /**
  * Hold Control+Option, speak, let go. Bound for Claude's prompt, it is Claude
@@ -19,6 +19,8 @@ export interface Dictation {
   phase: Phase;
   /** Why the last one put nothing in. */
   error?: string;
+  /** The first dictation asks, before it listens, whether to quiet media. */
+  ask?: boolean;
 }
 
 /** Past this, the recording is ended for the user, as Claude Code's own does. */
@@ -48,11 +50,29 @@ const PROBE_MS = 900;
 /** Whether each Claude tab answered with its own dictation, so it is asked only once. */
 const claudeVoice = new Map<number, boolean>();
 
+/** Media quiet while listening (src-tauri/src/dictate.rs), if chosen. Undoing is always sent; it undoes only what was done. */
+const hush = (on: boolean) => {
+  if (!on || readSettings().quietMedia) void invoke("dictate_hush", { on });
+};
+
+/** Puts the question up instead of listening, the first time. */
+function mustAsk() {
+  if (readSettings().quietMedia !== null) return false;
+  set({ phase: "idle", ask: true });
+  return true;
+}
+
+export function answerQuietMedia(quiet: boolean) {
+  saveSettings({ ...readSettings(), quietMedia: quiet });
+  set({ phase: "idle" });
+}
+
 let relay: { pty: number; sent: number; heard: boolean; timers: ReturnType<typeof setInterval>[] } | null = null;
 
 function startRelay(pty: number) {
   const r: NonNullable<typeof relay> = { pty, sent: 0, heard: claudeVoice.get(pty) === true, timers: [] };
   relay = r;
+  hush(true);
   const since = Date.now();
   r.timers.push(
     setInterval(() => {
@@ -84,6 +104,7 @@ function stopRelay() {
   if (!r) return;
   r.timers.forEach(clearInterval);
   relay = null;
+  hush(false);
   // Never listening, so the spaces were typed into the prompt: take them back.
   if (!r.heard && r.sent) void invoke("pty_write", { id: r.pty, data: "\x7f".repeat(r.sent) });
 }
@@ -93,14 +114,16 @@ let field: HTMLElement | null = null;
 let limit: ReturnType<typeof setTimeout> | undefined;
 
 export function startDictation() {
-  if (!isTauri() || started) return;
+  if (!isTauri() || started || mustAsk()) return;
   const focused = document.activeElement as HTMLElement | null;
   // xterm's own input is a textarea: the terminal means Claude's prompt, not a field.
   field = focused?.matches(EDITABLE) && !focused.closest(".xterm") ? focused : null;
   set({ phase: "listening" });
+  hush(true);
   started = invoke("dictate_start").then(
     () => true,
     (e) => {
+      hush(false);
       if (e === "missing") openSettings();
       set({ phase: "idle", error: e === "missing" ? "Download the speech model in Settings first." : String(e) });
       return false;
@@ -114,6 +137,7 @@ export async function stopDictation() {
   const was = started;
   if (!was) return;
   clearTimeout(limit);
+  hush(false);
   if (!(await was)) return void (started = null);
   set({ phase: "working" });
   try {
@@ -138,6 +162,7 @@ export function cancelDictation() {
   const was = started;
   if (!was) return;
   clearTimeout(limit);
+  hush(false);
   started = null;
   void was.then((ok) => ok && invoke("dictate_cancel"));
   set({ phase: "idle" });
@@ -159,6 +184,7 @@ const both = (e: KeyboardEvent) => e.ctrlKey && e.altKey && !e.metaKey && !e.shi
 
 /** Claude Code's dictation for Claude's prompt where it has it; on-device for the rest. */
 function begin() {
+  if (mustAsk()) return;
   const focused = document.activeElement as HTMLElement | null;
   const inField = focused?.matches(EDITABLE) && !focused.closest(".xterm");
   const pty = inField ? null : claudeTab();

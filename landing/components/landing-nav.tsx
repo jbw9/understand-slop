@@ -5,6 +5,7 @@ import s from "./landing.module.css";
 import { ThemeToggle } from "./landing-theme";
 
 const LINKS = [
+  { href: "#why", label: "Why" },
   { href: "#how", label: "How it works" },
   { href: "#start", label: "Your repo" },
   { href: "#questions", label: "Questions" },

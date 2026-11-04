@@ -17,6 +17,10 @@ const STEPS = [
 
 const QUESTIONS = [
   {
+    q: "Is this an IDE?",
+    a: "No. Keep the editor you use. An editor shows one file at a time and an agent panel one message at a time; Mira shows how the whole repository fits together and what a change did to it. It opens the code where you need it, and hands your questions to the agent beside it.",
+  },
+  {
     q: "Does my code leave my Mac?",
     a: "Only the way it does whenever you use Claude Code: your own Claude Code reads the files it needs to make the map. The map itself is saved on your Mac and nowhere else.",
   },

@@ -1,9 +1,10 @@
 "use client";
 
 import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openSettings } from "@/lib/settings";
 import { openPalette } from "@/components/palette";
 import { useMap } from "@/components/map-context";
@@ -13,7 +14,9 @@ import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff, useDiff } from "@/components/diff";
 import { openTimeline } from "@/components/timeline";
-import { toggleWorkspace } from "@/components/workspace";
+import { StatusDot, toggleWorkspace } from "@/components/workspace";
+import { TabClose } from "@/components/tabs";
+import { arrived, closeProject, keepOnly, useOpenProjects } from "@/lib/open-projects";
 import { DocIcon } from "@/components/docs";
 import { LOGOS } from "@/components/agents";
 import { STATIC_MAP } from "@/lib/source";
@@ -79,7 +82,7 @@ export function Titlebar({ bare }: { bare?: boolean }) {
             Mira
           </span>
         ) : (
-          <Where />
+          <Where mac={mac} />
         )}
       </div>
       <div data-tauri-drag-region className="flex h-full items-center justify-end">
@@ -133,18 +136,84 @@ export function Titlebar({ bare }: { bare?: boolean }) {
 }
 
 /**
- * The map's name, a dropdown of the reader's projects, the last opened first,
- * with importing another below them. Where you are inside the map is the
- * tabs' to say (components/tabs.tsx).
+ * The projects open in the window, a tab each, with the dot of the loudest
+ * Claude among its workspace tabs (components/workspace.tsx); + opens another,
+ * imports one, or manages them. Switching keeps every terminal running, and
+ * the workspace shows the tabs of the project switched to. Cmd+1–9 (Ctrl+1–9
+ * off a Mac) picks one, Ctrl+Tab the last. Where you are inside the map is
+ * the map tabs' to say (components/tabs.tsx).
  */
-function Where() {
+function Where({ mac }: { mac: boolean }) {
   const { name, maps } = useMap();
   const router = useRouter();
+  const { open, last, status } = useOpenProjects();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const current = maps.find((m) => m.id === name);
+  const shown = open.flatMap((id) => maps.filter((m) => m.id === id));
+  const go = useCallback((id: string | null | undefined) => id && id !== name && router.push(`/?map=${encodeURIComponent(id)}`), [name, router]);
+
+  const was = useRef<string | null>(null);
+  useEffect(() => {
+    arrived(name, was.current);
+    was.current = name;
+  }, [name]);
+  useEffect(() => keepOnly(maps.map((m) => m.id)), [maps]);
+
+  // Off a Mac here; on one the menu bar takes the keys (src-tauri/src/lib.rs),
+  // so they work from inside a Preview's page too.
+  const ids = shown.map((m) => m.id).join("\n");
+  useEffect(() => {
+    const pick = (n: string) => go(n === "last" ? last : ids.split("\n")[Number(n) - 1]);
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.metaKey || e.altKey) return;
+      const n = e.code === "Tab" && !e.shiftKey ? "last" : !e.shiftKey && /^Digit[1-9]$/.test(e.code) ? e.code.slice(5) : null;
+      if (!n) return;
+      e.preventDefault();
+      e.stopPropagation();
+      pick(n);
+    };
+    if (!mac) window.addEventListener("keydown", onKey, true);
+    const fromMenu = mac ? listen<string>("slop:project", (e) => pick(e.payload)) : undefined;
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      void fromMenu?.then((f) => f());
+    };
+  }, [mac, go, last, ids]);
+
+  const close = (id: string) => {
+    if (id === name) {
+      const at = shown.findIndex((m) => m.id === id);
+      go((shown[at + 1] ?? shown[at - 1])?.id);
+    }
+    closeProject(id);
+  };
+
   return (
     <>
-      {/* Outside the drag region, so a click opens it rather than moving the window. */}
+      <div role="tablist" aria-label="Open projects" className="flex min-w-0 items-center gap-0.5">
+        {shown.map((m, i) => {
+          const here = m.id === name;
+          const dot = m.root ? status[m.root] : undefined;
+          return (
+            // Outside the drag region, so a click switches rather than moving the window.
+            <div
+              key={m.id}
+              role="tab"
+              aria-selected={here}
+              title={`${m.label}${i < 9 ? ` (${mac ? "⌘" : "Ctrl+"}${i + 1})` : ""}`}
+              className={cn(
+                "group flex h-6 min-w-0 max-w-48 items-center gap-1.5 rounded-[2px] pl-2 pr-1 font-mono text-[11.5px] transition-colors",
+                here ? "bg-surface-container font-semibold text-ink" : "text-muted-slate hover:bg-surface-container hover:text-ink",
+              )}
+            >
+              <button type="button" onClick={() => go(m.id)} className="flex min-w-0 cursor-pointer items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-deep-green">
+                <span className="truncate">{m.label}</span>
+                {dot && <StatusDot status={dot} />}
+              </button>
+              {shown.length > 1 ? <TabClose label={m.label} active={here} onClose={() => close(m.id)} /> : <span className="w-1" />}
+            </div>
+          );
+        })}
+      </div>
       <button
         type="button"
         onClick={(e) => {
@@ -152,12 +221,11 @@ function Where() {
           setMenu({ x: r.left, y: r.bottom + 4 });
         }}
         aria-haspopup="menu"
-        title="Switch project"
-        className="flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] px-2 font-mono text-[11.5px] font-semibold text-ink transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-deep-green"
+        title="Open another project"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
       >
-        {current?.label ?? name}
-        <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-faint">
-          <path d="m2.5 4 2.5 2.5L7.5 4" />
+        <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+          <path d="M5 1.5v7M1.5 5h7" />
         </svg>
       </button>
       {menu ? (
@@ -168,8 +236,8 @@ function Where() {
           items={[
             ...maps.map((m) => ({
               label: m.label,
-              icon: <span className="w-3 text-deep-green">{m.id === name ? "✓" : ""}</span>,
-              onClick: () => m.id !== name && router.push(`/?map=${encodeURIComponent(m.id)}`),
+              icon: <span className="w-3 text-deep-green">{open.includes(m.id) ? "✓" : ""}</span>,
+              onClick: () => go(m.id),
             })),
             { label: "Import project…", icon: <span className="w-3 text-muted-slate">+</span>, onClick: () => void openFolder(), separated: true },
             { label: "Manage projects…", icon: <span className="w-3" />, onClick: () => openProjects() },

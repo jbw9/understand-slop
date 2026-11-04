@@ -83,6 +83,7 @@ pub fn run() {
             dictate::dictate_start,
             dictate::dictate_stop,
             dictate::dictate_cancel,
+            dictate::dictate_hush,
             files::file_resolve,
             files::file_read,
             files::file_write,
@@ -91,6 +92,7 @@ pub fn run() {
         .expect("error while building the app")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                dictate::unhush();
                 app.state::<pty::Ptys>().kill_all();
                 app.state::<preview::Previews>().close_all();
                 devices::stop_all();
@@ -120,10 +122,21 @@ fn terminal_menu(app: &tauri::App) -> tauri::Result<()> {
     let cmd = MenuItem::with_id(app, "terminal", "Toggle Terminal", true, Some("Cmd+`"))?;
     let ctrl = MenuItem::with_id(app, "terminal-ctrl", "Toggle Terminal", true, Some("Ctrl+`"))?;
     menu.append(&Submenu::with_items(app, "Terminal", true, &[&cmd, &ctrl])?)?;
+    // The title bar's project tabs (components/titlebar.tsx), for when focus is in a Preview's page.
+    let mut projects = Vec::new();
+    for n in 1..=9 {
+        projects.push(MenuItem::with_id(app, format!("project-{n}"), format!("Project {n}"), true, Some(&format!("Cmd+{n}")))?);
+    }
+    projects.push(MenuItem::with_id(app, "project-last", "Last Project", true, Some("Ctrl+Tab"))?);
+    let items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = projects.iter().map(|m| m as _).collect();
+    menu.append(&Submenu::with_items(app, "Projects", true, &items)?)?;
     app.set_menu(menu)?;
     app.on_menu_event(|app, e| {
-        if e.id() == "terminal" || e.id() == "terminal-ctrl" {
+        let id = e.id().as_ref();
+        if id == "terminal" || id == "terminal-ctrl" {
             let _ = app.emit_to("main", "slop:toggle-workspace", ());
+        } else if let Some(n) = id.strip_prefix("project-") {
+            let _ = app.emit_to("main", "slop:project", n.to_string());
         }
     });
     Ok(())

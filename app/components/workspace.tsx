@@ -23,6 +23,7 @@ import { findAddress, findQuestion, hostOf, previewOf, type Call } from "@/lib/p
 import { openSettings, readSettings } from "@/lib/settings";
 import { updateMap, type Turn } from "@/lib/update-map";
 import type { Exchange } from "@/lib/keep";
+import { reportStatus, type Status } from "@/lib/open-projects";
 import { cn } from "@/lib/utils";
 
 /**
@@ -118,8 +119,6 @@ interface Tab {
   /** Reopened after a restart: the conversation its Claude picks up again. */
   resume?: string;
 }
-
-type Status = "working" | "waiting" | "done";
 
 /** How a project is run, from its files (src-tauri/src/devices.rs). */
 interface Project {
@@ -598,6 +597,7 @@ export function Workspace() {
   // A review waits for Claude to be idle before it is typed (lib/context.ts sendBatch).
   useEffect(() => {
     for (const t of tabs) if (t.pty !== undefined) tabStatus(t.pty, t.live ? t.status : undefined);
+    reportStatus(tabs);
   }, [tabs]);
 
   // A chime when an agent finishes or needs the user, heard wherever they are
@@ -1425,7 +1425,7 @@ const DOT: Record<Status, { colour: string; label: string }> = {
 };
 
 /** Yellow while the agent works, red when it waits on the user, green when it is done. */
-function StatusDot({ status }: { status: Status }) {
+export function StatusDot({ status }: { status: Status }) {
   const { colour, label } = DOT[status];
   return (
     <span role="img" aria-label={label} title={label} className="relative flex size-2">

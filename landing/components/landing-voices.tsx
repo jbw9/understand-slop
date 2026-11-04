@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import s from "./landing.module.css";
+import type { Source } from "./landing-why";
 
 export interface Voice {
-  who: string;
-  role: string;
+  source: Source;
   quote: string;
 }
 
@@ -29,11 +29,11 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
     >
       <div className={`${s.voiceStage} ${s.reveal}`}>
         {voices.map((v, i) => (
-          <figure key={v.who} className={s.slide} data-on={i === at} aria-hidden={i !== at}>
+          <figure key={v.quote} className={s.slide} data-on={i === at} aria-hidden={i !== at}>
             <blockquote>{v.quote}</blockquote>
             <figcaption>
-              <b>{v.who}</b>
-              {v.role}
+              <b>{v.source.who}</b>
+              <a href={v.source.href}>{v.source.work}</a>
             </figcaption>
           </figure>
         ))}
@@ -41,7 +41,7 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
       <div className={s.progress} aria-hidden>
         {voices.map((v, i) => (
           // A new key each time a quote comes round restarts its bar.
-          <span key={i === at ? `now-${shown}` : v.who} data-done={i < at} data-now={i === at} />
+          <span key={i === at ? `now-${shown}` : v.quote} data-done={i < at} data-now={i === at} />
         ))}
       </div>
     </section>

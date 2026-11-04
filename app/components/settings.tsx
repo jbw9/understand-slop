@@ -254,6 +254,28 @@ export function SettingsDialog() {
           >
             <OnDevice />
           </Field>
+          <Field label="Media while dictating" hint="Pauses Music and Spotify, and mutes everything else, while you hold ⌃⌥; all of it comes back when you let go.">
+            <div role="radiogroup" aria-label="Media while dictating" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+              {[
+                { value: true, label: "Quiet it" },
+                { value: false, label: "Leave it" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.quietMedia === o.value}
+                  onClick={() => set({ quietMedia: o.value })}
+                  className={cn(
+                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.quietMedia === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </Field>
         </div>
       </form>
     </Overlay>

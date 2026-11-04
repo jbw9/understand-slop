@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cancelDictation, stopDictation, useDictation, useDictationKey } from "@/lib/dictate";
+import { answerQuietMedia, cancelDictation, stopDictation, useDictation, useDictationKey } from "@/lib/dictate";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,7 +19,7 @@ export function Dictation() {
     const t = setTimeout(() => setFaded(d), 4000);
     return () => clearTimeout(t);
   }, [d]);
-  if (d === faded || (d.phase === "idle" && !d.error)) return null;
+  if (d === faded || (d.phase === "idle" && !d.error && !d.ask)) return null;
   const listening = d.phase === "listening";
   return (
     <div
@@ -31,7 +31,17 @@ export function Dictation() {
           aria-hidden
           className={cn("h-2 w-2 rounded-full", listening ? "animate-pulse bg-clay-ink" : d.phase === "working" ? "bg-deep-green" : "bg-faint")}
         />
-        {listening ? "Listening… let go of ⌃⌥" : d.phase === "working" ? "Writing it out…" : d.error}
+        {d.ask ? (
+          <>
+            While you talk, pause Music and Spotify and mute other sound?
+            <button type="button" onClick={() => answerQuietMedia(true)} className="cursor-pointer text-deep-green hover:underline">
+              yes
+            </button>
+            <button type="button" onClick={() => answerQuietMedia(false)} className="cursor-pointer text-faint hover:text-ink">
+              no
+            </button>
+          </>
+        ) : listening ? "Listening… let go of ⌃⌥" : d.phase === "working" ? "Writing it out…" : d.error}
         {listening ? (
           <>
             <button type="button" onClick={() => void stopDictation()} className="cursor-pointer text-deep-green hover:underline">

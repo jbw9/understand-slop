@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use handy_recorder::{CollectingSink, Recorder, RecorderConfig};
@@ -155,4 +156,81 @@ pub fn dictate_cancel() {
     if let Some(recorder) = RECORDER.lock().unwrap().take() {
         let _ = recorder.stop();
     }
+}
+
+/// Whether the page wants media quiet: set at once, carried out on a thread,
+/// so a quick tap's restore can't land before its hush does.
+static HUSH: AtomicBool = AtomicBool::new(false);
+/// What we did to quiet things, so exactly that is undone; `Some` while ours is on.
+static HUSHED: Mutex<Option<Hushed>> = Mutex::new(None);
+
+struct Hushed {
+    was_muted: bool,
+    paused: Vec<&'static str>,
+}
+
+/// Players that say whether they are playing, so they can be paused and resumed
+/// without guessing. Everything else (a browser's video) is only muted: macOS no
+/// longer lets an app see what is playing, and a blind play/pause would start
+/// Music when nothing was.
+const PLAYERS: [&str; 2] = ["Spotify", "Music"];
+
+/// Quiets media while someone speaks, and puts it back as it was.
+#[tauri::command]
+pub fn dictate_hush(on: bool) {
+    HUSH.store(on, Ordering::SeqCst);
+    std::thread::spawn(settle);
+}
+
+/// Undoes a hush left on, as the app quits.
+pub fn unhush() {
+    HUSH.store(false, Ordering::SeqCst);
+    settle();
+}
+
+fn settle() {
+    let mut hushed = HUSHED.lock().unwrap();
+    match (HUSH.load(Ordering::SeqCst), hushed.is_some()) {
+        (true, false) => {
+            // Only a running player is asked: a tell to one that isn't launches it.
+            let paused = PLAYERS
+                .into_iter()
+                .filter(|app| {
+                    running(app)
+                        && osascript(&format!(
+                            "tell application \"{app}\"\nif player state is playing then\npause\nreturn true\nend if\nreturn false\nend tell"
+                        ))
+                        .as_deref()
+                            == Some("true")
+                })
+                .collect();
+            let was_muted = osascript("set m to output muted of (get volume settings)\nset volume with output muted\nm").as_deref() == Some("true");
+            *hushed = Some(Hushed { was_muted, paused });
+        }
+        (false, true) => {
+            let h = hushed.take().unwrap();
+            if !h.was_muted {
+                osascript("set volume without output muted");
+            }
+            for app in h.paused {
+                osascript(&format!("tell application \"{app}\" to play"));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn running(app: &str) -> bool {
+    Command::new("pgrep").args(["-xq", app]).status().is_ok_and(|s| s.success())
+}
+
+#[cfg(target_os = "macos")]
+fn osascript(script: &str) -> Option<String> {
+    let out = Command::new("osascript").args(["-e", script]).output().ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn osascript(_: &str) -> Option<String> {
+    None
 }

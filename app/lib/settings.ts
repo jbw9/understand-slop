@@ -22,12 +22,14 @@ export interface Settings {
   devServer: boolean;
   /** Claude Code's own dictation (hold Space) in Claude tabs; it needs a claude.ai sign-in. */
   voice: boolean;
+  /** Pause Music and Spotify and mute the rest while dictating; null until the first dictation asks. */
+  quietMedia: boolean | null;
 }
 
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "plain", devServer: true, voice: true };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "plain", devServer: true, voice: true, quietMedia: null };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));

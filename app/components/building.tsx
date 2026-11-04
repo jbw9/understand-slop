@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/state";
+import { Button } from "@/components/button";
+import { claudePath, post } from "@/components/projects";
 import { useMap } from "@/components/map-context";
 import type { Progress } from "@/lib/vault";
 
@@ -309,6 +311,90 @@ function Skeleton({ progress, onOpen }: { progress: Progress; onOpen: (path: str
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ── no map yet ──────────────────────────────────────────────── */
+
+/**
+ * A project opened without a map: the shape of what its page will hold, drawn
+ * empty, and the button that makes it. Starting the run turns the project's
+ * map back on (lib/vault.ts, generate); the map's poll then brings the run in,
+ * which replaces this.
+ */
+export function Unmapped({ id }: { id: string }) {
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const start = async () => {
+    setStarting(true);
+    setError(null);
+    try {
+      await post({ action: "regenerate", id, claude: await claudePath() });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStarting(false);
+    }
+  };
+  return (
+    <section data-pick="No map yet" className="flex flex-col gap-8">
+      <div className="flex max-w-[720px] flex-col items-start gap-3">
+        <Eyebrow>No map yet</Eyebrow>
+        <p className="text-[13.5px] leading-relaxed text-on-surface-variant">
+          This project is open without a map. Generate one and the code is read, divided into the parts someone does
+          something with, and drawn here as the picture of how they connect.
+        </p>
+        <Button variant="primary" onClick={() => void start()} disabled={starting}>
+          {starting ? "Starting…" : "Generate map"}
+        </Button>
+        {error ? <p className="text-[12.5px] text-clay-ink">{error}</p> : null}
+      </div>
+      <Wireframe />
+    </section>
+  );
+}
+
+const WIRE_BOXES = [
+  { x: 20, y: 30 },
+  { x: 250, y: 30 },
+  { x: 480, y: 30 },
+  { x: 710, y: 30 },
+  { x: 250, y: 190 },
+  { x: 480, y: 190 },
+];
+const WIRE_ARROWS = ["M190 70 H244", "M420 70 H474", "M650 70 H704", "M335 110 V184", "M565 110 V184", "M420 230 H474"];
+
+/** The page a map makes, as an empty wireframe: a diagram of parts, then the parts. */
+function Wireframe() {
+  return (
+    <div aria-hidden className="flex max-w-[1100px] flex-col gap-8 opacity-80">
+      <svg viewBox="0 0 900 270" className="block h-auto w-full text-border-strong">
+        <defs>
+          <marker id="wire-head" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" />
+          </marker>
+        </defs>
+        {WIRE_ARROWS.map((d) => (
+          <path key={d} d={d} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="5 4" markerEnd="url(#wire-head)" />
+        ))}
+        {WIRE_BOXES.map(({ x, y }) => (
+          <g key={`${x}-${y}`}>
+            <rect x={x} y={y} width={170} height={80} rx={3} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="6 4" />
+            <rect x={x + 16} y={y + 20} width={96} height={9} rx={2} fill="currentColor" opacity={0.6} />
+            <rect x={x + 16} y={y + 40} width={128} height={6} rx={2} fill="currentColor" opacity={0.35} />
+            <rect x={x + 16} y={y + 54} width={80} height={6} rx={2} fill="currentColor" opacity={0.35} />
+          </g>
+        ))}
+      </svg>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="flex min-h-[86px] flex-col gap-2 rounded-[3px] border border-dashed border-border-strong px-4 py-3">
+            <span className="h-2.5 w-2/5 rounded-[2px] bg-border-gray" />
+            <span className="h-1.5 w-4/5 rounded-[2px] bg-border-gray" />
+            <span className="h-1.5 w-3/5 rounded-[2px] bg-border-gray" />
+          </div>
+        ))}
       </div>
     </div>
   );

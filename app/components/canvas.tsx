@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
 import { DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
-import { Building, DraftNote, Stages, isBuilding, useDrawIn } from "@/components/building";
+import { Building, DraftNote, Stages, Unmapped, isBuilding, useDrawIn } from "@/components/building";
 import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, type CodeFocus } from "@/components/explain";
 import { InlineMarks } from "@/components/shapes";
 import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
@@ -549,6 +549,8 @@ function Level({
   const column = useRef<HTMLDivElement>(null);
   useDrawIn(column, top && watched && !run);
   const draft = !top && Boolean(nodeAt(path.slice(0, 1))?.draft);
+  // A project opened without a map, and no run making one (lib/maps.ts, unmapped).
+  const unmapped = top && !STATIC_MAP && !map.progress && !node.children?.length && !blocks.length;
 
   return (
     <Glossary.Provider value={explainOn ? (map.OVERVIEW?.glossary ?? []) : []}>
@@ -606,6 +608,7 @@ function Level({
         className={cn("flex flex-col [&>*+*]:mt-10 [&>*+*]:border-t [&>*+*]:border-border-gray [&>*+*]:pt-10", draft && "opacity-60")}
       >
         {run ? <Building progress={run} onOpen={onOpen} /> : null}
+        {unmapped ? <Unmapped id={map.name} /> : null}
         {top && !run && map.progress && map.progress.stage !== "done" ? <Stages progress={map.progress} /> : null}
         {/* For a reader new to all of this: the level in plain words, before
             any of the terse parts. */}

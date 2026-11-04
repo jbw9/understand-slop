@@ -55,7 +55,7 @@ interface List {
   projects: Listed[];
 }
 
-async function post(body: Record<string, unknown>) {
+export async function post(body: Record<string, unknown>) {
   const res = await fetch("/api/projects", {
     method: "POST",
     headers: { "content-type": "application/json" },

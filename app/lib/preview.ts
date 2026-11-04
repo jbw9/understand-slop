@@ -53,6 +53,26 @@ export function findAddress(text: string): string | null {
   return m ? m[0].replace("0.0.0.0", "localhost") : null;
 }
 
+const YES_NO = /\s*›?\s*\(\s*y\s*\/\s*n\s*\)\s*$/i;
+
+/**
+ * A yes-or-no question the dev server is waiting on, as the last thing it
+ * printed: Create React App's "run on another port instead? (Y/n)" when the
+ * port is taken. From its `?` (prompts, inquirer), else its last line.
+ */
+export function findQuestion(text: string): string | null {
+  const t = text.replace(ANSI, "").replace(/\x1b./g, "").replace(/\r/g, "").trimEnd();
+  if (!YES_NO.test(t)) return null;
+  const lines = t.split("\n");
+  const at = lines.findLastIndex((l) => /^\s*\?\s/.test(l));
+  return lines
+    .slice(at < 0 ? -1 : at)
+    .join("\n")
+    .replace(/^\s*\?\s*/, "")
+    .replace(YES_NO, "")
+    .trim();
+}
+
 /** `host:port` of an address, for telling one server from another. */
 export function hostOf(url: string): string | null {
   const m = url.match(/^(?:https?:\/\/)?((?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):\d+)/);

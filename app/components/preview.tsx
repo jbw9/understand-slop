@@ -121,6 +121,8 @@ export function Preview({
   target,
   visible,
   waiting,
+  asking,
+  onAnswer,
   onTarget,
   serverShown,
   onServer,
@@ -134,6 +136,9 @@ export function Preview({
   visible: boolean;
   /** The command starting the dev server, until it prints an address. */
   waiting?: string;
+  /** A yes-or-no question the dev server is waiting on, and its answer typed into it. */
+  asking?: string;
+  onAnswer?: (yes: boolean) => void;
   /** The preview was pointed at another server: from the address bar, or by Claude. */
   onTarget: (url: string) => void;
   /** The dev server's terminal is shown in the page's place (components/workspace.tsx). */
@@ -917,6 +922,27 @@ export function Preview({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-8 text-center">
             {error ? (
               <p className="font-mono text-[11.5px] text-clay-ink">{error}</p>
+            ) : waiting && asking ? (
+              <>
+                <p className="text-[13px] text-ink">The dev server is asking</p>
+                <p className="max-w-full whitespace-pre-wrap font-mono text-[11.5px] text-muted-slate">{asking}</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onAnswer?.(true)}
+                    className="cursor-pointer rounded-md bg-deep-green px-3 py-1 text-[12px] text-white hover:opacity-90"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAnswer?.(false)}
+                    className="cursor-pointer rounded-md px-3 py-1 text-[12px] text-muted-slate ring-1 ring-current hover:text-ink"
+                  >
+                    No
+                  </button>
+                </div>
+              </>
             ) : waiting ? (
               <>
                 <p className="text-[13px] text-ink">Starting the dev server…</p>

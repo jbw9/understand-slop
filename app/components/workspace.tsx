@@ -19,7 +19,7 @@ import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, 
 import { useLocation } from "@/components/chrome";
 import { NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
-import { findAddress, hostOf, previewOf, type Call } from "@/lib/preview";
+import { findAddress, findQuestion, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
 import { updateMap, type Turn } from "@/lib/update-map";
 import type { Exchange } from "@/lib/keep";
@@ -270,6 +270,8 @@ export function Workspace() {
   const [servers, setServers] = useState<Record<string, string>>({});
   // The projects whose Preview shows the dev server's terminal, not the page.
   const [serverShown, setServerShown] = useState<Record<string, boolean>>({});
+  // A yes-or-no question each project's dev server is waiting on, asked in its Preview.
+  const [asking, setAsking] = useState<Record<string, string | undefined>>({});
   const [projects, setProjects] = useState<Record<string, Project>>({});
   const [offers, setOffers] = useState<Record<string, boolean>>({});
   const tabsNow = useRef(tabs);
@@ -304,10 +306,16 @@ export function Workspace() {
     [add, here, show],
   );
   useEffect(() => {
-    const open = () => add(null, { kind: "preview", title: "Preview", cwd: here });
+    const open = () => {
+      // The dev server stops with a project's last Preview, so a new one starts it again.
+      const web = projects[here]?.web;
+      if (web && readSettings().devServer && !tabsNow.current.some((x) => x.dev && x.cwd === here))
+        add(null, { run: web, dev: true, label: "dev server", cwd: here });
+      add(null, { kind: "preview", title: "Preview", cwd: here });
+    };
     window.addEventListener(OPEN_PREVIEW, open);
     return () => window.removeEventListener(OPEN_PREVIEW, open);
-  }, [add, here]);
+  }, [add, here, projects]);
 
   /** This project's phone of a kind: brought to the front, or opened. */
   const phone = (platform: Platform) => {
@@ -359,6 +367,8 @@ export function Workspace() {
   const heard = (t: Tab, text: string) => {
     if (tails.current[t.key] === null) return;
     const tail = ((tails.current[t.key] ?? "") + text).slice(-4000);
+    const q = findQuestion(tail) ?? undefined;
+    setAsking((all) => (all[t.cwd] === q ? all : { ...all, [t.cwd]: q }));
     const url = findAddress(tail.slice(0, tail.lastIndexOf("\n") + 1));
     if (!url) {
       tails.current[t.key] = tail;
@@ -1178,6 +1188,11 @@ export function Workspace() {
                 target={servers[t.cwd]}
                 visible={visible}
                 waiting={servers[t.cwd] ? undefined : dev?.run}
+                asking={dev ? asking[t.cwd] : undefined}
+                onAnswer={(yes) => {
+                  if (dev?.pty !== undefined) void invoke("pty_write", { id: dev.pty, data: yes ? "y\r" : "n\r" });
+                  setAsking((all) => ({ ...all, [t.cwd]: undefined }));
+                }}
                 onTarget={(url) => setServers((all) => ({ ...all, [t.cwd]: url }))}
                 serverShown={owns && serverShown[t.cwd]}
                 onServer={owns ? (on) => setServerShown((s) => ({ ...s, [t.cwd]: on })) : undefined}

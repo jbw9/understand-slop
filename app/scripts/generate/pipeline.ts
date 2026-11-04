@@ -12,7 +12,7 @@ import type { Progress } from "@/lib/vault";
 import { parseArgs } from "./args";
 import { auditMarkdown } from "./audit";
 import { coverage } from "@/lib/coverage";
-import { authorRoot, authorSplit, tooBig, type Authored } from "./author";
+import { authorRoot, authorSplit, submitLine, tooBig, type Authored, type OnSubmit } from "./author";
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
@@ -151,8 +151,9 @@ export async function main(args: string[]) {
   const say = (s: string) => console.log(`  ${s}`);
   // Each submit's verdict is the one in-flight fact an author reports, so
   // "revising" is all the app can say of a root being drafted.
-  const submitted = (id: string, prefix: string) => (n: number, problems: number, draft: unknown) => {
-    say(`${id}: submit ${n} — ${problems ? `${problems} problems` : "clean"}`);
+  const submitted = (id: string, prefix: string): OnSubmit => (n, list, draft, fixed) => {
+    const problems = list.length;
+    say(submitLine(id, n, list, fixed));
     if (problems) mark(id, "drafting", `revising — ${problems} problem${problems === 1 ? "" : "s"}`);
     // Only a tree the page can draw: one whose shape holds, whatever its claims.
     if (problems && draft && !shapeProblems(structuredClone(draft), prefix).length) {
@@ -263,6 +264,31 @@ export async function main(args: string[]) {
     return writing;
   };
 
+  // A root is verified as soon as it is accepted, while the others are still
+  // being written: verifying waited on the slowest root before, and then took
+  // a tenth of the run on its own. The overview is drawn from each root as it
+  // was accepted (`asAccepted`), as it was when verifying came after it, so
+  // what it is asked does not depend on which verification finished first.
+  const verdicts: Record<string, Verdict[]> = {};
+  const verifying: Promise<void>[] = [];
+  const asAccepted: Record<string, Node> = {};
+  // A failure is held until the verify stage, where it was raised before: a
+  // promise nothing awaits yet would take the process down mid-authoring.
+  let verifyFailed: unknown = null;
+  const verifyOnAccept = (id: string, root: Node) => {
+    if (only && !only.includes(id)) return;
+    asAccepted[id] = structuredClone(root);
+    verifying.push(
+      verifyTree(root, inv, models.review)
+        .then(async (v) => {
+          verdicts[id] = v;
+          say(`${id}: verified, ${v.filter((x) => x.flagged).length} flagged, ${v.filter((x) => x.rewritten).length} corrected`);
+          await partial();
+        })
+        .catch((e) => { verifyFailed ??= e; }),
+    );
+  };
+
   await lap("author", () =>
     Promise.all(
       cut.roots.map(async (r) => {
@@ -303,6 +329,7 @@ export async function main(args: string[]) {
         if (authored[r.id].root) {
           mark(r.id, "done", "explorable now");
           await partial();
+          verifyOnAccept(r.id, authored[r.id].root!);
         } else mark(r.id, "failed", `${authored[r.id].problems.length} problems unresolved`);
       }),
     ),
@@ -313,7 +340,7 @@ export async function main(args: string[]) {
 
   // The top level is drawn last, from the roots as accepted (D60). A repair
   // that leaves the same roots standing keeps the overview it had.
-  const accepted = cut.roots.flatMap((r) => (authored[r.id].root ? [authored[r.id].root!] : []));
+  const accepted = cut.roots.flatMap((r) => (authored[r.id].root ? [asAccepted[r.id] ?? authored[r.id].root!] : []));
   const same = (o: MapFile | null) => o?.OVERVIEW && o.AUTHORED.map((n) => n.id).join() === accepted.map((n) => n.id).join();
   let drawn: Overviewed | null = null;
   if (same(prev)) overview = prev!.OVERVIEW;
@@ -328,13 +355,11 @@ export async function main(args: string[]) {
   progress.stage = "verify";
   flush();
 
-  const verdicts: Record<string, Verdict[]> = {};
+  // What is left of the roots' verifying once the overview is in: its time
+  // here is only what it adds to the run, not what it took beside authoring.
   await lap("verify", () =>
     Promise.all([
-      ...cut.roots.map(async (r) => {
-        const root = authored[r.id].root;
-        if (root && !(only && !only.includes(r.id))) verdicts[r.id] = await verifyTree(root, inv, models.review);
-      }),
+      ...verifying,
       // The overview's claims are read against its lines like any level's;
       // what the reviewer corrects lands back on it.
       (async () => {
@@ -345,6 +370,7 @@ export async function main(args: string[]) {
       })(),
     ]),
   );
+  if (verifyFailed) throw verifyFailed;
 
   // A stage replayed wholly from cache took seconds and cost nothing, not what
   // generating it costs; the last report's time and bill for it stand, so the

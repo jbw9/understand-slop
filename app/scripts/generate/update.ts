@@ -40,12 +40,12 @@ import type { Node } from "@/lib/data";
 import { lastExchange } from "@/lib/keep";
 import type { MapFile } from "@/lib/map";
 import { parseArgs } from "./args";
-import { authorRoot, converse, runTool } from "./author";
+import { authorRoot, converse, runTool, submitLine } from "./author";
 import { catalogOf } from "./catalog";
 import { changes, diffOf, moved, readText, refs, touches, type Base, type Change } from "./gitdiff";
 import { bill, cacheIn, MODELS } from "./bedrock";
 import { ccClose, type Handled } from "./claude-code";
-import { check } from "./check";
+import { check, fixedNote, tally } from "./check";
 import { owners, place, unclaimed, type Cut, type Root } from "./cut";
 import { inventory, isSource, type Inventory } from "./inventory";
 import { plain, redrawOverview } from "./pipeline";
@@ -269,10 +269,11 @@ async function redo(
     }
     if (node && typeof node === "object") node.id = t.node.id;
     // The whole root with this section in it, checked as a full run checks it.
-    const problems = submitProblems(node, root.prefix, inv.repo, { isRoot: t.path.length === 1, taken: elsewhere, within: (n) => spliced(rootNode, t, n) });
-    say(`${t.node.id}: submit ${submits} — ${problems.length ? `${problems.length} problems` : "clean"}`);
+    const fixed: string[] = [];
+    const problems = submitProblems(node, root.prefix, inv.repo, { isRoot: t.path.length === 1, taken: elsewhere, within: (n) => spliced(rootNode, t, n), fixed });
+    say(`${t.node.id}: submit ${submits} — ${problems.length ? `${problems.length} problems (${tally(problems)})` : "clean"}${fixed.length ? `, ${fixed.length} fixed` : ""}`);
     if (!problems.length) return { content: "Accepted. This section is done; stop now.", done: { node } };
-    return { content: `Not accepted. Fix every one of these and submit the whole section again:\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
+    return { content: `Not accepted. Fix every one of these and submit the whole section again:\n- ${problems.slice(0, 80).join("\n- ")}${fixedNote(fixed)}`, isError: true };
   };
   const r = await converse<{ node: Node | Removed }>({ prompt: brief(t, root, cut, inv, sums, mine, list, told), handle, model, stage: "update", maxTurns: 30 });
   return r.value?.node ?? null;
@@ -470,7 +471,7 @@ export async function update(args: string[]) {
     }),
     // A root the placing added is written whole, as a full run writes one.
     ...added.map(async (r) => {
-      const a = await authorRoot(r, cut, inv, sums, model, (n, problems) => say(`${r.id}: submit ${n} — ${problems ? `${problems} problems` : "clean"}`));
+      const a = await authorRoot(r, cut, inv, sums, model, (n, problems, _draft, fixed) => say(submitLine(r.id, n, problems, fixed)));
       if (!a.root) {
         failed.push(r.id);
         fresh.push({ id: r.id, title: r.title, ok: false });

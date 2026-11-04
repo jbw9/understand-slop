@@ -159,7 +159,11 @@ export async function ccAsk<T>(req: { model: string; system: string | { type: st
   const hit = cached<{ value: T }>(key, req.stage, req.model);
   if (hit) return hit.value;
   // Two built-in turns at least: the answer, then the structured-output call.
-  const r = await claude([...base(req.model, system), "--tools", "", "--json-schema", schema, "--max-turns", "4", "--no-session-persistence"], prompt, req.stage, effort);
+  const run = (turns: number) => claude([...base(req.model, system), "--tools", "", "--json-schema", schema, "--max-turns", String(turns), "--no-session-persistence"], prompt, req.stage, effort);
+  let r = await run(4);
+  // An answer that failed the schema until the turns ran out (a root's split
+  // cut did, and took the whole run with it) gets one more try with more room.
+  if (r.structured_output === undefined && r.subtype === "error_max_turns") r = await run(8);
   if (r.structured_output === undefined) throw new Error(`${req.stage}: claude -p returned no structured output (${r.subtype})`);
   const usage = usageOf(r);
   chargeUsage(req.stage, req.model, usage, false);

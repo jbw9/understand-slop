@@ -19,8 +19,8 @@ import { ccAgent, type Handled } from "./claude-code";
 import type { Cut, Root } from "./cut";
 import { cutRepo, excludedBy, owners, place, unclaimed } from "./cut";
 import { isSource, numbered, type Inventory } from "./inventory";
-import { EXPLAIN_LEVEL } from "./check";
-import { submitProblems, typeReference } from "./schema";
+import { CAPTION_WORDS, EXPLAIN_LEVEL, fixedNote, LEAF, SUB_WORDS, tally } from "./check";
+import { shapeProblems, submitProblems, typeReference } from "./schema";
 import { fit, full, oneLine, type FileSummary } from "./summarize";
 
 export interface Authored {
@@ -54,6 +54,13 @@ function stepOf(name: string, input: any, content: string, problems?: string[]):
   return { tool: name, what, result: problems?.length ? `rejected — ${problems.length} problems: ${problems.slice(0, 8).join("; ")}${problems.length > 8 ? "; …" : ""}` : "accepted" };
 }
 
+/**
+ * Every limit a submit is counted against, said where the author writes.
+ * Naming only the detail's left `sub` and caption overruns to be found by
+ * the check, one per node: up to 14 SUB problems in a single rejection.
+ */
+const LIMITS = `every detail at most two sentences and 40 words, every \`sub\` at most ${SUB_WORDS} words, every block caption at most ${CAPTION_WORDS} words, and every leaf at most ${LEAF.refs} code ranges in ${LEAF.files} files and ${LEAF.lines} lines`;
+
 export const TOOLS: Tool[] = [
   {
     name: "read_file",
@@ -72,7 +79,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "submit",
-    description: "Hand in the complete root node, with every descendant. It is checked — every detail at most two sentences and 40 words — and if anything fails you get the list back. Then send `replace` instead of `root`: only the nodes you changed.",
+    description: `Hand in the complete root node, with every descendant. It is checked — ${LIMITS} — and if anything fails you get the list back. Then send \`replace\` instead of \`root\`: only the nodes you changed.`,
     input_schema: {
       type: "object",
       properties: {
@@ -211,8 +218,33 @@ function contentKey(root: Root, cut: Cut, inv: Inventory): string {
   return createHash("sha256").update(lines.join("\n")).digest("hex");
 }
 
+/**
+ * How many lines of its own files a root's brief shows whole, and the longest
+ * file shown. One agent spent 52 of its 66 turns reading, a file a turn,
+ * although which files it would read was known before it started: its own.
+ * In the brief they are read once and cached with it for every later turn.
+ */
+const SHOWN_LINES = Number(process.env.SLOP_SHOWN_LINES ?? 3500);
+const SHOWN_FILE = 400;
+
+/** The root's own short files, those with the most to cover first, as `read_file` would return them. */
+function shownFiles(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>) {
+  const need = needs(inv);
+  const picked: string[] = [];
+  let lines = 0;
+  for (const f of explains(root, cut, inv, sums)
+    .filter((f) => f.lines <= SHOWN_FILE)
+    .sort((a, b) => sums[b.path].symbols.filter(need).length - sums[a.path].symbols.filter(need).length || a.path.localeCompare(b.path))) {
+    if (lines + f.lines > SHOWN_LINES) continue;
+    picked.push(`${f.path} (lines 1-${f.lines} of ${f.lines})\n${numbered(inv.repo, f.path)}`);
+    lines += f.lines;
+  }
+  return picked;
+}
+
 function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
   const { mine, near } = neighbourhood(root, cut, inv);
+  const shown = SHOWN_LINES > 0 ? shownFiles(root, cut, inv, sums) : [];
   return [
     `# Repository: ${inv.name}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
@@ -235,12 +267,13 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
       fit(mine, sums, (f) => (sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`), OWNED_BUDGET),
     ),
     near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
+    shown.length ? `## Its files, already read (${shown.length})\nThese are shown whole, numbered as read_file returns them. Do not read them again.\n\n${shown.join("\n\n")}` : "",
     `## Task
-Read the code you need, then submit this root with its full subtree. Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
+${shown.length ? "Your files above are already read. Read only what else you need — the longer files, by the symbol line ranges listed for them, and code across the boundary — then submit this root with its full subtree." : "Read the code you need, then submit this root with its full subtree."} Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
 Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", detailed: "Every level also has a one- or two-paragraph `explain` for a reader who knows a little of the field and none of this project. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", minimal: "Every level also has a one-sentence `explain` for a reader who knows the field and has used this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
 Cover the code: every symbol listed above of more than ${coverLines(inv)} lines, in a file whose first owner is this root, must be opened by a leaf's \`code\` or a step's \`at\`. A few small related ones may share a leaf; a part with more pieces than fit gets another level, not a summary.
 ${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
-Budget: about 25 tool calls before you submit. Before you submit, count each detail: two sentences and 40 words at most.`,
+Budget: about 25 tool calls before you submit. Before you submit, count them: ${LIMITS}.`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -349,6 +382,13 @@ function withCacheMark(messages: Message[]): Message[] {
   return out;
 }
 
+/** What a submit's caller hears: its number, its problems, the tree as checked, and how many breaks were fixed in code. */
+export type OnSubmit = (submit: number, problems: string[], draft: unknown, fixed: number) => void;
+
+/** One submit as the run's log keeps it: which rules it broke, so a run shows what its retries were for. */
+export const submitLine = (id: string, n: number, problems: string[], fixed = 0) =>
+  `${id}: submit ${n} — ${problems.length ? `${problems.length} problems (${tally(problems)})` : "clean"}${fixed ? `, ${fixed} fixed` : ""}`;
+
 /**
  * `onSubmit` hears each submit's verdict as it comes, with the tree handed
  * in, so the run's progress can show the draft while it is being checked.
@@ -359,7 +399,7 @@ export async function authorRoot(
   inv: Inventory,
   sums: Record<string, FileSummary>,
   model: string,
-  onSubmit: (submit: number, problems: number, draft: unknown) => void,
+  onSubmit: OnSubmit,
 ): Promise<Authored> {
   const known = new Set(inv.files.map((f) => f.path));
   const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
@@ -386,28 +426,33 @@ export async function authorRoot(
     const missing: string[] = [];
     const node = Array.isArray(fixes) && last && !input?.root ? patched(last, fixes, missing) : input?.root;
     if (node && typeof node === "object" && node.id !== root.id) node.id = root.id;
-    if (node && typeof node === "object") last = structuredClone(node);
+    const fixed: string[] = [];
     let problems = missing.length
       ? missing.map((id) => `REPLACE no node "${id}" in your last submit — send it with its parent, or send the whole root`)
-      : submitProblems(node, root.prefix, inv.repo);
-    // Coverage is asked only of a tree that is otherwise clean, so it never
-    // competes with a problem the map cannot be shown with.
-    if (!problems.length) {
+      : submitProblems(node, root.prefix, inv.repo, { fixed });
+    // Kept after the fixes, so a `replace` patches the tree as they left it.
+    if (node && typeof node === "object") last = structuredClone(node);
+    // Coverage is asked beside the other problems as soon as the tree's shape
+    // holds: held back until a tree was down to ten, it took a round of its
+    // own after the last fix in most roots. A tree whose shape is broken is
+    // not asked yet; the map cannot be shown with it.
+    const sound = !missing.length && (!problems.length || !shapeProblems(structuredClone(node), root.prefix).length);
+    if (sound) {
       const gaps = gapsIn(node);
       res.coverage = { symbols: owned.reduce((a, f) => a + sums[f.path].symbols.filter(need).length, 0), gaps };
       if (gaps.length && coverRounds < COVER_ROUNDS) {
         coverRounds++;
         const byFile = new Map<string, typeof gaps>();
         for (const g of gaps) byFile.set(g.file, [...(byFile.get(g.file) ?? []), g]);
-        problems = [...byFile].map(([file, gs]) => `COVER ${file}: ${gs.map((g) => `${g.symbol.name} (${g.symbol.start}-${g.symbol.end})`).join(", ")} — no leaf or step opens these lines; give each a leaf, or a step that cites it`);
+        problems = [...problems, ...[...byFile].map(([file, gs]) => `COVER ${file}: ${gs.map((g) => `${g.symbol.name} (${g.symbol.start}-${g.symbol.end})`).join(", ")} — no leaf or step opens these lines; give each a leaf, or a step that cites it`)];
       }
     }
     res.problems = problems;
     res.trail.push(stepOf(name, input, "", problems));
-    onSubmit(res.submits, problems.length, node);
+    onSubmit(res.submits, problems, node, fixed.length);
     // The whole result rides on `done`: Claude Code caches it, and a replay calls no tools.
     if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: { ...res, root: node } };
-    return { content: `Not accepted. Fix every one of these, then submit with \`replace\`: only the nodes you changed.\n- ${problems.slice(0, 80).join("\n- ")}`, isError: true };
+    return { content: `Not accepted. Fix every one of these, then submit with \`replace\`: only the nodes you changed.\n- ${problems.slice(0, 80).join("\n- ")}${fixedNote(fixed)}`, isError: true };
   };
 
   const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 40, salt: contentKey(root, cut, inv) });
@@ -471,7 +516,7 @@ export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: n
 
 /** A root owning more than this many source files, or required symbols, is split. SLOP_SPLIT_FILES / SLOP_SPLIT_SYMBOLS override. */
 const SPLIT_FILES = Number(process.env.SLOP_SPLIT_FILES ?? 40);
-const SPLIT_SYMBOLS = Number(process.env.SLOP_SPLIT_SYMBOLS ?? 150);
+const SPLIT_SYMBOLS = Number(process.env.SLOP_SPLIT_SYMBOLS ?? 80);
 
 /**
  * Whether one agent should not write this root alone. One that did reached
@@ -519,7 +564,7 @@ export async function authorSplit(
   sums: Record<string, FileSummary>,
   models: { cut: string; part: string; join: string },
   keep: Cut | null,
-  on: { submit: (submit: number, problems: number, draft: unknown) => void; part: (draft: Node) => void; say: (s: string) => void },
+  on: { submit: OnSubmit; part: (draft: Node) => void; say: (s: string) => void },
 ): Promise<Split | null> {
   const inner = scoped(root, cut, inv);
   let sub: Cut;
@@ -538,7 +583,7 @@ export async function authorSplit(
   };
   await Promise.all(
     parts.roots.map(async (p) => {
-      done[p.id] = await authorRoot(p, parts, inv, sums, models.part, () => {});
+      done[p.id] = await authorRoot(p, parts, inv, sums, models.part, (n, problems, _draft, fixed) => on.say(submitLine(p.id, n, problems, fixed)));
       on.say(`${p.id}: ${done[p.id].root ? "accepted" : "FAILED"} after ${done[p.id].turns + 1} turns`);
       if (done[p.id].root) on.part(provisional());
     }),
@@ -568,7 +613,7 @@ export async function authorSplit(
 }
 
 /** The root's own level over parts already written: its words and the diagram whose boxes open them. */
-async function joinParts(root: Root, kids: Node[], inv: Inventory, model: string, onSubmit: (submit: number, problems: number, draft: unknown) => void) {
+async function joinParts(root: Root, kids: Node[], inv: Inventory, model: string, onSubmit: OnSubmit) {
   const known = new Set(inv.files.map((f) => f.path));
   const out = { node: null as Node | null, turns: 0, submits: 0, problems: [] as string[] };
   const describe = (n: Node) => `- ${n.id}: ${n.title} — ${n.sub}\n  ${n.detail ?? ""}\n  its parts: ${(n.children ?? []).map((c) => c.title).join(", ")}`;
@@ -587,11 +632,12 @@ Read only what you need to draw those arrows. Budget: about 10 tool calls before
     if (!top || typeof top !== "object") return { content: "Send `root`: this root's own level, without children.", isError: true };
     const node = { ...top, id: root.id, children: structuredClone(kids) };
     // The parts were checked as they were written; what is asked of this agent is its own level.
-    const problems = submitProblems(node, root.prefix, inv.repo).filter((p) => p.includes(root.id) || !kids.some((k) => p.includes(k.id)));
+    const fixed: string[] = [];
+    const problems = submitProblems(node, root.prefix, inv.repo, { fixed }).filter((p) => p.includes(root.id) || !kids.some((k) => p.includes(k.id)));
     out.problems = problems;
-    onSubmit(out.submits, problems.length, node);
+    onSubmit(out.submits, problems, node, fixed.length);
     if (!problems.length) return { content: "Accepted. This root is done; stop now.", done: node };
-    return { content: `Not accepted. Fix every one of these, then submit the whole level again as \`root\`:\n- ${problems.slice(0, 60).join("\n- ")}`, isError: true };
+    return { content: `Not accepted. Fix every one of these, then submit the whole level again as \`root\`:\n- ${problems.slice(0, 60).join("\n- ")}${fixedNote(fixed)}`, isError: true };
   };
   const r = await converse<Node>({ prompt, handle, model, stage: "author-join", maxTurns: 16, salt: createHash("sha256").update(JSON.stringify(kids)).digest("hex") });
   out.turns = r.turns;

@@ -8,7 +8,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- validates untrusted model output */
 import { readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
-import { check } from "./check";
+import { autofix, check } from "./check";
 
 /** lib/data.ts from `State` to its end. */
 export function typeReference(): string {
@@ -115,10 +115,12 @@ export function submitProblems(
   node: any,
   prefix: string,
   repo: string,
-  opts: { isRoot?: boolean; taken?: Set<string>; within?: (node: Node) => Node } = {},
+  opts: { isRoot?: boolean; taken?: Set<string>; within?: (node: Node) => Node; fixed?: string[] } = {},
 ): string[] {
   const shape = shapeProblems(node, prefix, opts.isRoot ?? true);
   if (shape.length) return shape;
+  // Once the shape holds, what has one right answer is fixed, not sent back.
+  opts.fixed?.push(...autofix(node, repo));
   const mine = idsOf(node);
   const clash = [...mine].filter((id) => opts.taken?.has(id));
   if (clash.length) return clash.map((id) => `${id}: already used elsewhere in the map`);

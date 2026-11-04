@@ -356,3 +356,97 @@ export function layoutProblems(block: Extract<Anatomy, { kind: "diagram" }>) {
   });
   return { problems: [...new Set(problems)], crossings };
 }
+
+/**
+ * The rule breaks with one right answer, fixed in place before `check` sees
+ * them: a range run past the end of its file, a step citing more lines than a
+ * step may, an arrow label over its length, two boxes in one grid cell, an
+ * explainer's box that opens something. Sent back, each cost the author a
+ * turn to make the edit this makes. Only what is certain is touched: never a
+ * file, never which child a box opens. What was fixed is returned as notes,
+ * so the author's next `replace` starts from the tree as it now stands.
+ */
+export function autofix(node: any, repo: string): string[] {
+  const linesOf = fileReader(repo);
+  const notes: string[] = [];
+  const clampAt = (at: string, max?: number) => {
+    const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(at);
+    const lines = m && linesOf(m[1]);
+    if (!m || !lines) return at;
+    const start = +m[2];
+    let end = +(m[3] ?? m[2]);
+    if (start < 1 || start > lines.length || start > end) return at;
+    end = Math.min(end, lines.length, max ? start + max - 1 : Infinity);
+    return end === start ? `${m[1]}:${start}` : `${m[1]}:${start}-${end}`;
+  };
+  const blocks = (owner: string, list: any[] = [], explain = false) => {
+    for (const b of list) {
+      if (!b || typeof b !== "object") continue;
+      if (b.kind === "diagram" && Array.isArray(b.boxes)) {
+        const cells = new Set<string>();
+        const free = (col: number) => { let row = 0; while (cells.has(`${col},${row}`)) row++; return row; };
+        for (const x of b.boxes) {
+          if (explain && x.opens) { notes.push(`${owner}: box "${x.id}" in the explain picture no longer opens "${x.opens}"`); delete x.opens; }
+          if (cells.has(`${x.col},${x.row}`)) {
+            const row = free(x.col);
+            notes.push(`${owner}: box "${x.id}" moved from col ${x.col} row ${x.row} to row ${row}, a cell it had to itself`);
+            x.row = row;
+          }
+          cells.add(`${x.col},${x.row}`);
+        }
+        for (const a of b.arrows ?? []) {
+          if (typeof a.label === "string" && a.label.length > 24) {
+            // Whole words from the front, up to the first that does not fit.
+            let cut = "";
+            for (const w of a.label.split(/\s+/)) {
+              if (`${cut} ${w}`.trim().length > 24) break;
+              cut = `${cut} ${w}`.trim();
+            }
+            if (cut) { notes.push(`${owner}: arrow ${a.from}→${a.to} label "${a.label}" cut to "${cut}"`); a.label = cut; }
+          }
+          if (typeof a.at === "string") {
+            const at = clampAt(a.at);
+            if (at !== a.at) { notes.push(`${owner}: arrow ${a.from}→${a.to} at ${a.at} clamped to ${at}`); a.at = at; }
+          }
+        }
+      }
+      if (b.kind === "flow" || b.kind === "sequence")
+        for (const [i, r] of (b.rows ?? []).entries()) {
+          if (typeof r?.at !== "string") continue;
+          const at = clampAt(r.at, STEP_LINES);
+          if (at !== r.at) { notes.push(`${owner}: ${b.kind} row ${i + 1} at ${r.at} clamped to ${at}`); r.at = at; }
+        }
+      for (const r of b.rows ?? []) if (r?.under) blocks(owner, r.under, explain);
+    }
+  };
+  const walk = (n: any) => {
+    if (!n || typeof n !== "object" || n.origin) return;
+    for (const list of [n.code, n.docs])
+      for (const c of Array.isArray(list) ? list : []) {
+        const lines = linesOf(c.file);
+        if (lines && c.start >= 1 && c.start <= lines.length && c.end > lines.length) {
+          notes.push(`${n.id}: ${c.file}:${c.start}-${c.end} clamped to end at ${lines.length}, the file's last line`);
+          c.end = lines.length;
+        }
+      }
+    blocks(n.id, n.anatomy);
+    blocks(n.id, n.explain?.blocks, true);
+    (n.children ?? []).forEach(walk);
+  };
+  walk(node);
+  return notes;
+}
+
+/** A submit's problems by rule, most first: "LEAF 3, DIAGRAM 2". What the log keeps of each retry. */
+export function tally(problems: string[]): string {
+  const by = new Map<string, number>();
+  for (const p of problems) {
+    const code = /^[A-Z]{3,}\b/.exec(p)?.[0] ?? (p.includes("already used elsewhere") ? "TAKEN" : "SHAPE");
+    by.set(code, (by.get(code) ?? 0) + 1);
+  }
+  return [...by].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", ");
+}
+
+/** The fixes, as the author is told them after its problems: already made, so it keeps them rather than undoing them. */
+export const fixedNote = (fixed: string[]) =>
+  fixed.length ? `\n\nAlready fixed for you (keep these; do not send them again):\n- ${fixed.slice(0, 30).join("\n- ")}` : "";

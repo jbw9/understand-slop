@@ -250,6 +250,29 @@ const CLAUDE_SHIM: &str = r#"#!/bin/sh
 exec "$SLOP_LAUNCHER" "$@"
 "#;
 
+/// zsh in a tab starts from here (`ZDOTDIR`), so the shim stays first on PATH
+/// after the user's own startup files: a `.zshrc` that puts `~/.local/bin`
+/// first would otherwise find the real `claude`, and a `claude` typed in the tab
+/// would run without the hooks (no plan tab, no status, no map context).
+/// Each file loads the user's own from where zsh would have read it.
+#[cfg(unix)]
+const ZSHENV: &str = r#"# Mira's zsh startup (src-tauri/src/claude.rs).
+_slop_dot=$ZDOTDIR
+ZDOTDIR=${SLOP_ZDOTDIR:-$HOME}
+[ -f "$ZDOTDIR/.zshenv" ] && source "$ZDOTDIR/.zshenv"
+# Their .zshenv may move ZDOTDIR: that is where their .zshrc is.
+SLOP_ZDOTDIR=$ZDOTDIR
+ZDOTDIR=$_slop_dot
+unset _slop_dot
+"#;
+#[cfg(unix)]
+const ZSHRC: &str = r#"# Mira's zsh startup (src-tauri/src/claude.rs).
+ZDOTDIR=$SLOP_ZDOTDIR
+[ "$ZDOTDIR" = "$HOME" ] && unset ZDOTDIR
+[ -f "${ZDOTDIR:-$HOME}/.zshrc" ] && source "${ZDOTDIR:-$HOME}/.zshrc"
+[ -n "$SLOP_BIN" ] && PATH="$SLOP_BIN:$PATH"
+"#;
+
 #[derive(serde::Serialize)]
 pub struct Detected {
     path: String,
@@ -606,7 +629,11 @@ fn launcher() -> std::io::Result<PathBuf> {
     let path = dir.join("slop-claude");
     install(&path, LAUNCHER)?;
     #[cfg(unix)]
-    install(&dir.join("claude"), CLAUDE_SHIM)?;
+    {
+        install(&dir.join("claude"), CLAUDE_SHIM)?;
+        install(&zdotdir().join(".zshenv"), ZSHENV)?;
+        install(&zdotdir().join(".zshrc"), ZSHRC)?;
+    }
     #[cfg(windows)]
     let path = {
         let cmd = dir.join("slop-claude.cmd");
@@ -614,6 +641,11 @@ fn launcher() -> std::io::Result<PathBuf> {
         cmd
     };
     Ok(path)
+}
+
+#[cfg(unix)]
+fn zdotdir() -> PathBuf {
+    std::env::temp_dir().join("mira").join("zsh")
 }
 
 /// What cmd and PowerShell find as `slop-claude` on Windows: the launcher,
@@ -709,6 +741,14 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
         let joined = std::env::join_paths(std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&rest)))
             .map_err(std::io::Error::other)?;
         cmd.env("PATH", joined);
+    }
+    // Other shells ignore it.
+    #[cfg(unix)]
+    {
+        if let Some(theirs) = std::env::var_os("ZDOTDIR") {
+            cmd.env("SLOP_ZDOTDIR", theirs);
+        }
+        cmd.env("ZDOTDIR", zdotdir());
     }
     Ok(path)
 }

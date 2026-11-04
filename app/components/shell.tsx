@@ -5,6 +5,7 @@ import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useRef, useState } from "react";
 import { useMap } from "@/components/map-context";
+import { screens } from "@/lib/dictate";
 import { outline } from "@/lib/map";
 import { readSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -292,11 +293,13 @@ export function Shell({
         if (run) void invoke("pty_write", { id, data: `${run}\r` });
         handlers.current.onTitle?.(spawned.shell);
         handlers.current.onSpawn?.(spawned.id);
-        handlers.current.onScreen?.((all) => {
+        const read = (all?: boolean) => {
           const b = term.buffer.active;
           const from = all ? 0 : b.baseY;
           return Array.from({ length: all ? b.length : term.rows }, (_, i) => b.getLine(from + i)?.translateToString(true) ?? "");
-        });
+        };
+        handlers.current.onScreen?.(read);
+        screens.set(spawned.id, () => read());
       } catch (e) {
         term.dispose();
         setError(`Could not start a shell: ${String(e)}`);
@@ -350,7 +353,10 @@ export function Shell({
         input.dispose();
         planLinks.dispose();
         term.dispose();
-        if (id !== null) void invoke("pty_kill", { id });
+        if (id !== null) {
+          screens.delete(id);
+          void invoke("pty_kill", { id });
+        }
       };
     })();
 

@@ -138,6 +138,8 @@ export function tabEnded(pty: number) {
 
 /** Whether a Claude tab would take a pick now, without one being opened for it. */
 export const hasClaude = () => state.target !== null;
+/** The pty of that tab, for writing to Claude Code directly (lib/dictate.ts). */
+export const claudeTab = () => (WEB ? null : state.target);
 
 /** Hand something to Claude. Opens a tab first if none is running Claude. */
 export function pick(t: Target) {

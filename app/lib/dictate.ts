@@ -1,14 +1,15 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useSyncExternalStore } from "react";
-import { insertPrompt } from "@/lib/context";
+import { claudeTab, insertPrompt } from "@/lib/context";
 import { openSettings } from "@/lib/settings";
 
 /**
- * On-device dictation (src-tauri/src/dictate.rs): hold Control+Option, speak,
- * let go. The words go where the cursor was — a text field in the app if one
- * had focus, else Claude's prompt in the tab picks go to, without Enter, so
- * they can be read before they are sent. Esc while holding throws it away.
- * Plain Space stays Claude Code's own dictation (claude.rs). Not Ctrl+Space:
+ * Hold Control+Option, speak, let go. Bound for Claude's prompt, it is Claude
+ * Code's own dictation when that session has it (claude.rs turns it on; it
+ * needs a claude.ai sign-in), held as Space would hold it. Otherwise, or for a
+ * text field in the app, it is on-device (src-tauri/src/dictate.rs), and the
+ * words go where the cursor was, without Enter, so they can be read before
+ * they are sent. Esc while holding throws it away. Not Ctrl+Space:
  * macOS keeps that for switching input source, and takes it before the page does.
  * Modifiers alone type nothing, so neither a field nor the terminal needs keeping from them.
  */
@@ -37,6 +38,56 @@ export const useDictation = () => useSyncExternalStore(subscribe, () => state, (
 
 const EDITABLE = "input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea, [contenteditable]";
 
+/** Each tab's visible screen, by pty (components/shell.tsx). */
+export const screens = new Map<number, () => string[]>();
+
+/** Faster than any key repeat, so Claude Code takes it for Space held down. */
+const REPEAT_MS = 30;
+/** How long Claude Code has to show it is listening before on-device takes over. */
+const PROBE_MS = 900;
+/** Whether each Claude tab answered with its own dictation, so it is asked only once. */
+const claudeVoice = new Map<number, boolean>();
+
+let relay: { pty: number; sent: number; heard: boolean; timers: ReturnType<typeof setInterval>[] } | null = null;
+
+function startRelay(pty: number) {
+  const r: NonNullable<typeof relay> = { pty, sent: 0, heard: claudeVoice.get(pty) === true, timers: [] };
+  relay = r;
+  const since = Date.now();
+  r.timers.push(
+    setInterval(() => {
+      r.sent++;
+      void invoke("pty_write", { id: pty, data: " " });
+      if (Date.now() - since > LIMIT_MS) stopRelay();
+    }, REPEAT_MS),
+  );
+  if (r.heard) return;
+  r.timers.push(
+    setInterval(() => {
+      const footer = (screens.get(pty)?.() ?? []).slice(-8).join("\n");
+      if (/listening…|keep holding…/.test(footer)) {
+        r.heard = true;
+        claudeVoice.set(pty, true);
+        clearInterval(r.timers.pop());
+      } else if (Date.now() - since > PROBE_MS) {
+        claudeVoice.set(pty, false);
+        stopRelay();
+        startDictation();
+      }
+    }, 100),
+  );
+}
+
+/** Letting go of the held Space is what ends Claude Code's recording. */
+function stopRelay() {
+  const r = relay;
+  if (!r) return;
+  r.timers.forEach(clearInterval);
+  relay = null;
+  // Never listening, so the spaces were typed into the prompt: take them back.
+  if (!r.heard && r.sent) void invoke("pty_write", { id: r.pty, data: "\x7f".repeat(r.sent) });
+}
+
 let started: Promise<boolean> | null = null;
 let field: HTMLElement | null = null;
 let limit: ReturnType<typeof setTimeout> | undefined;
@@ -59,6 +110,7 @@ export function startDictation() {
 }
 
 export async function stopDictation() {
+  if (relay) return stopRelay();
   const was = started;
   if (!was) return;
   clearTimeout(limit);
@@ -76,6 +128,13 @@ export async function stopDictation() {
 }
 
 export function cancelDictation() {
+  const r = relay;
+  if (r) {
+    stopRelay();
+    // Esc is Claude Code's own cancel; it puts the prompt back as it was.
+    if (r.heard) void invoke("pty_write", { id: r.pty, data: "\x1b" });
+    return;
+  }
   const was = started;
   if (!was) return;
   clearTimeout(limit);
@@ -98,6 +157,15 @@ const MODIFIER = new Set(["Control", "Alt", "Meta", "Shift"]);
 /** Control and Option down together, and nothing else. */
 const both = (e: KeyboardEvent) => e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey;
 
+/** Claude Code's dictation for Claude's prompt where it has it; on-device for the rest. */
+function begin() {
+  const focused = document.activeElement as HTMLElement | null;
+  const inField = focused?.matches(EDITABLE) && !focused.closest(".xterm");
+  const pty = inField ? null : claudeTab();
+  if (pty !== null && claudeVoice.get(pty) !== false) startRelay(pty);
+  else startDictation();
+}
+
 /** Mounted once: the hold-to-talk keys, anywhere in the window. */
 export function useDictationKey() {
   useEffect(() => {
@@ -106,7 +174,7 @@ export function useDictationKey() {
     let held = false;
     // Capture phase, so it is seen before xterm or a field takes the key.
     const down = (e: KeyboardEvent) => {
-      if (e.code === "Escape" && started) {
+      if (e.code === "Escape" && (started || relay)) {
         e.preventDefault();
         e.stopPropagation();
         held = false;
@@ -120,9 +188,9 @@ export function useDictationKey() {
         }
         return;
       }
-      if (both(e) && !e.repeat && !started) {
+      if (both(e) && !e.repeat && !started && !relay) {
         held = true;
-        startDictation();
+        begin();
       }
     };
     // Letting go of either key ends it.

@@ -224,7 +224,7 @@ export function SettingsDialog() {
           </Field>
           <Field
             label="Claude Code dictation"
-            hint="Hold Space in a Claude tab and speak. Transcribed by Anthropic at no cost; needs a claude.ai sign-in, not Bedrock or an API key."
+            hint="Hold Control+Option (⌃⌥), or Space in a Claude tab, and speak into Claude's prompt. Transcribed by Anthropic at no cost to your usage; needs a claude.ai sign-in, not Bedrock or an API key."
           >
             <div role="radiogroup" aria-label="Claude Code dictation" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {[
@@ -250,7 +250,7 @@ export function SettingsDialog() {
           <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
           <Field
             label="On-device dictation"
-            hint="Hold Control+Option (⌃⌥) anywhere in the app and speak: the words go into the field you're in, or Claude's prompt. Runs on this machine, for any sign-in; nothing is sent anywhere."
+            hint="Hold Control+Option (⌃⌥) in a field in the app, or for Claude's prompt where Claude Code dictation isn't available. Runs on this machine, for any sign-in; nothing is sent anywhere."
           >
             <OnDevice />
           </Field>

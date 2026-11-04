@@ -103,7 +103,7 @@ export function ProjectsDialog() {
     const show = (e: Event) => {
       const asked = (e as CustomEvent<Asked>).detail;
       setRoot(asked.root ?? "");
-      setLabel("");
+      setLabel(asked.mode === "open" && asked.root ? folderName(asked.root) : "");
       setMode(asked.mode ?? null);
       setOpen(true);
       setError(null);
@@ -139,9 +139,15 @@ export function ProjectsDialog() {
     }
   };
 
+  // The name starts as the folder's and follows it, until the reader names it something else.
+  const changeRoot = (next: string) => {
+    if (mode === "open") setLabel((l) => (!l.trim() || l === folderName(root) ? folderName(next) : l));
+    setRoot(next);
+  };
+
   const browse = async () => {
     const dir = await pickFolder(mode === "new" ? "Choose where the new folder goes" : "Open a folder to map");
-    if (dir) setRoot(dir);
+    if (dir) changeRoot(dir);
   };
 
   const start = async (explain: Explain | undefined, paused: boolean) => {
@@ -197,7 +203,7 @@ export function ProjectsDialog() {
           <StartProject
             mode={mode}
             root={root}
-            setRoot={setRoot}
+            setRoot={changeRoot}
             label={label}
             setLabel={setLabel}
             busy={busy}
@@ -457,7 +463,7 @@ function StartProject({
 
         <label className="block">
           <span className={LABEL}>
-            Name{fresh ? null : <span className="font-normal text-faint"> · optional</span>}
+            Name
           </span>
           <input
             autoFocus={Boolean(root) && fresh}

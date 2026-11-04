@@ -1,2 +1,2 @@
-:HL["/understand-slop/fastapi/_next/static/chunks/1koy3gpmihgyi.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"ak6_1W4zo_LmkjryuewEZ"}
+:HL["/understand-slop/fastapi/_next/static/chunks/1rz0ecxxor2wa.css","style"]
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"/_not-found","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"lDu2cUtAhvpzE-L-ZixAX"}

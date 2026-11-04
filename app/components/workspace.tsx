@@ -569,9 +569,7 @@ export function Workspace() {
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
-            acts?.forEach((a) =>
-              a.verb === "web" ? void answering.current({ id: 0, tab: pty, cmd: { op: "navigate", url: a.to } }) : announceAct(a),
-            );
+            acts?.forEach(announceAct);
             // Same array when nothing moved: a new one every tick would reset
             // the paste effect's timer below before it could ever fire.
             const statusOf = (x: Tab): Status | undefined =>

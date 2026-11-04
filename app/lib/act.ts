@@ -32,8 +32,6 @@ import type { Node } from "@/lib/data";
 export type Act =
   | { verb: "section"; section: string }
   | { verb: "diff"; from: string; to: string | null }
-  /** What WebFetch or WebSearch read: an address or a search, for the Preview. */
-  | { verb: "web"; to: string }
   | { verb: "timeline" };
 
 /** A node and the id path that reaches it. */

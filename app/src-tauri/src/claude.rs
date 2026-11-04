@@ -46,11 +46,6 @@ const EDITED: &str = r#": > "$SLOP_CONTEXT.dirty""#;
 /// The tools EDITED follows. Bash among them, since a shell command can edit too.
 const EDITING_TOOLS: &str = "Edit|Write|MultiEdit|NotebookEdit|Bash";
 
-/// After Claude Code's own WebFetch or WebSearch: the hook's input as one act,
-/// so the page it read opens in the Preview, where the user can see it. JSON
-/// only has raw newlines and tabs as spacing, so flattening them keeps it whole.
-const WEB: &str = r#"{ printf 'web\t'; tr '\n\t' '  '; printf '\n'; } >> "$SLOP_CONTEXT.act""#;
-
 /// A plan Claude asks to start on: the hook's input, which carries the plan's
 /// Markdown, kept whole for the app to draw (components/plan.tsx). Renamed
 /// into place, so a plan is never read half written.
@@ -201,8 +196,8 @@ as a person would (screenshot, click, type, read the page, navigate, resize); us
 that a change you made works, or when the user asks about what the app shows; `read_terminal` \
 reads the dev server's logs (and the project's other terminals) when something fails. They are also \
 your browser: to search the web or read a page as the user would see it, navigate the preview \
-there, never another browser. WebSearch and WebFetch are fine for reading docs: what they read \
-opens in the preview too, so the user sees it beside you. \
+there, never another browser. WebSearch and WebFetch are fine for reading docs as text; they \
+stay out of the preview. \
 A plan you finish in plan mode opens beside you as a short visual design doc, drawn from its \
 Markdown, and is accepted from there. Most people skip a long plan, so write one they will read: \
 `# <what will be built>`, then one sentence on what the user gets. Then the picture, as a fenced \
@@ -496,9 +491,6 @@ pub fn take_approved(queue: &Path) -> bool {
 pub enum Act {
     Section { section: String },
     Diff { from: String, to: Option<String> },
-    /// An address or a search, for the Preview to open: what WebFetch or
-    /// WebSearch just read.
-    Web { to: String },
     /// The history of the code, drawn over the map's sections.
     Timeline,
 }
@@ -524,12 +516,6 @@ pub fn take_acts(queue: &Path) -> Vec<Act> {
                     to: (!to.is_empty()).then(|| to.to_string()),
                 }),
                 ("timeline", _, _) => Some(Act::Timeline),
-                ("web", hook, _) => {
-                    let input = serde_json::from_str::<serde_json::Value>(hook).ok()?;
-                    let input = input.get("tool_input")?;
-                    let to = input.get("url").or_else(|| input.get("query"))?.as_str()?.trim();
-                    (!to.is_empty()).then(|| Act::Web { to: to.to_string() })
-                }
                 _ => None,
             }
         })
@@ -700,7 +686,6 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             "PostToolUse": [
                 { "matcher": EDITING_TOOLS, "hooks": [hook(EDITED)] },
                 { "matcher": "ExitPlanMode", "hooks": [hook(APPROVED)] },
-                { "matcher": "WebFetch|WebSearch", "hooks": [hook(WEB)] },
                 { "hooks": [hook(RESTORE), status("working")] }
             ],
             "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [status("waiting")] }],
@@ -962,32 +947,6 @@ mod tests {
         // Taken once, and nothing left behind.
         assert!(take_acts(&q).is_empty());
         assert!(!q.with_extension("md.act").exists());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn what_claude_reads_on_the_web_opens_in_the_preview() {
-        use std::io::Write as _;
-        let dir = tempfile::tempdir().unwrap();
-        let q = dir.path().join("context-1.md");
-        let hook = |input: &str| {
-            let mut c = Command::new("sh")
-                .args(["-c", WEB])
-                .env("SLOP_CONTEXT", &q)
-                .stdin(std::process::Stdio::piped())
-                .spawn()
-                .unwrap();
-            c.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
-            assert!(c.wait().unwrap().success());
-        };
-        // Pretty-printed, with a tab, as a hook's input may be.
-        hook("{\n\t\"tool_name\": \"WebFetch\",\n  \"tool_input\": { \"url\": \"https://nextjs.org/docs\", \"prompt\": \"a\\tb\" }\n}");
-        hook(r#"{"tool_name":"WebSearch","tool_input":{"query":"tauri webview"}}"#);
-        hook(r#"{"tool_name":"WebSearch","tool_input":{"query":"  "}}"#);
-        assert_eq!(
-            take_acts(&q),
-            vec![Act::Web { to: "https://nextjs.org/docs".into() }, Act::Web { to: "tauri webview".into() }]
-        );
     }
 
     #[cfg(unix)]

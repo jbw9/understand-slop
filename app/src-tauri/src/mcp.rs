@@ -137,7 +137,7 @@ to check that what you built works: take a screenshot, then click, type and read
 you would in a browser. They are your browser here: to look something up or read a page on \
 the web, navigate the preview there (an address, or words to search for) instead of opening \
 another browser, so the user sees it beside you. WebFetch and WebSearch are fine for reading \
-docs as text; what they read opens in the preview as well. `device` does the same on an iOS Simulator or \
+docs as text; they stay out of the preview. `device` does the same on an iOS Simulator or \
 Android emulator running in the app. `read_terminal` reads the project's terminals, the dev \
 server's logs by default: read it when the page misbehaves, a build fails or a request errors. `map_search`, `map_section` and `map_where` read the project's \
 map in Mira: what each part of the code is for and which section explains it. Ask `map_where` about a \

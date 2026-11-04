@@ -16,6 +16,15 @@ npm run dev
 
 Open http://localhost:3000.
 
+### Use Mira while working on it (macOS)
+
+```bash
+cd app
+npm run app:install   # build the checkout as it is now into /Applications/Mira.app
+```
+
+Open Mira like any app. It starts its own server and stops it when you quit. Work on Mira with `npm run app:dev`, which opens a second window that can rebuild and restart without touching the installed one. When you want the new version, run `npm run app:install` again, then quit and reopen Mira.
+
 ## Layout
 
 - `app/` - the app (Next.js)

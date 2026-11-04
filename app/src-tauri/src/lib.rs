@@ -7,6 +7,7 @@ mod mcp;
 mod preview;
 mod proc;
 mod pty;
+mod server;
 
 use tauri::Manager;
 
@@ -18,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(pty::Ptys::default())
         .manage(preview::Previews::default())
+        .manage(server::Server::default())
         .setup(|app| {
             // Claude's way into the preview, for every Claude tab (mcp.rs).
             mcp::start(app.handle().clone());
@@ -25,9 +27,20 @@ pub fn run() {
             std::thread::spawn(claude::sweep_stale);
             // Plans Claude Code wrote and nothing has touched in a month.
             std::thread::spawn(claude::prune_plans);
-            #[cfg(target_os = "linux")]
-            if let Some(window) = app.get_webview_window("main") {
-                pinch_to_page(&window);
+            // `app:dev` serves the page itself; the installed app starts its
+            // snapshot's server first (server.rs), so the window never opens
+            // onto a page that isn't there yet.
+            if cfg!(debug_assertions) {
+                open_main(app.handle())?;
+            } else {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = server::start(&handle).and_then(|()| open_main(&handle).map_err(|e| e.to_string())) {
+                        use tauri_plugin_dialog::DialogExt;
+                        handle.dialog().message(e).title("Mira couldn't start").blocking_show();
+                        handle.exit(1);
+                    }
+                });
             }
             #[cfg(target_os = "macos")]
             terminal_menu(app)?;
@@ -81,8 +94,18 @@ pub fn run() {
                 app.state::<pty::Ptys>().kill_all();
                 app.state::<preview::Previews>().close_all();
                 devices::stop_all();
+                server::stop(app);
             }
         });
+}
+
+/// The main window, as `tauri.conf.json` describes it (`create: false` there,
+/// so it opens only once there is a page to show).
+fn open_main(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let _window = tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?.build()?;
+    #[cfg(target_os = "linux")]
+    pinch_to_page(&_window);
+    Ok(())
 }
 
 /// Cmd+` and Ctrl+` from the menu bar as well as the page: a key pressed in

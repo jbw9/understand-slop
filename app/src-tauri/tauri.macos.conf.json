@@ -3,6 +3,7 @@
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Mira",
         "width": 1512,
         "height": 900,

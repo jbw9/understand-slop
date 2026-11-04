@@ -5,13 +5,14 @@
   "identifier": "dev.mira.app",
   "build": {
     "devUrl": "http://localhost:3000",
-    "frontendDist": "../out",
+    "frontendDist": "http://localhost:3123",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": ""
   },
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Mira",
         "width": 1512,
         "height": 900,
@@ -35,7 +36,8 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "entitlements": "Entitlements.plist"
+      "entitlements": "Entitlements.plist",
+      "minimumSystemVersion": "11.0"
     }
   }
 }

@@ -180,7 +180,7 @@ export default function Landing() {
           changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
         />
         <div className={s.wrap}>
-          <LandingStart github={GITHUB} />
+          <LandingStart />
           <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">
             <h2 id="close-title">
               Start broad. <em>End at the line.</em>

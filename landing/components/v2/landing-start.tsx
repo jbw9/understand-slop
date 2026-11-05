@@ -43,7 +43,7 @@ const QUESTIONS = [
 ];
 
 /** How to get a map of your own repository, then what people ask before they do. */
-export function LandingStart({ github }: { github: string }) {
+export function LandingStart() {
   return (
     <>
       <section id="start" className={s.section} aria-labelledby="start-title">
@@ -58,10 +58,6 @@ export function LandingStart({ github }: { github: string }) {
             </li>
           ))}
         </ol>
-        <p className={`${s.cap} ${s.reveal}`}>
-          It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The script is{" "}
-          <a href={`${github}/blob/main/install.sh`}>install.sh</a>.
-        </p>
       </section>
       <section id="questions" className={s.section} aria-labelledby="questions-title">
         <h2 id="questions-title" className={s.reveal}>Questions.</h2>

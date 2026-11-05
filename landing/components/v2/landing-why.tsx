@@ -51,8 +51,7 @@ export function LandingWhy({ problems, reading }: { problems: Problem[]; reading
         ))}
       </div>
       <div className={`${s.reading} ${s.reveal}`}>
-        <h3>Worth reading</h3>
-        <ul>
+        <ul aria-label="Worth reading">
           {reading.map((r) => (
             <li key={r.href}>
               <a href={r.href}>

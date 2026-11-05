@@ -1278,11 +1278,6 @@
   padding-top: 24px;
   border-top: 1px solid var(--line);
 }
-.reading h3 {
-  margin: 0 0 14px;
-  font: 12px var(--mono);
-  text-transform: uppercase;
-}
 .reading ul {
   display: grid;
   gap: 10px;

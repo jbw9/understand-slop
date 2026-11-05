@@ -2,7 +2,7 @@ import s from "./v2.module.css";
 
 /** A box of the map's top-level picture, and an arrow between two, as the map file has them. */
 export interface Diagram {
-  boxes: { id: string; label: string; col: number; row: number }[];
+  boxes: { id: string; label: string; sub?: string; col: number; row: number }[];
   arrows: { from: string; to: string; label: string }[];
 }
 

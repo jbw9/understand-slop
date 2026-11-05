@@ -1056,40 +1056,58 @@
   opacity: 1;
   transform: none;
 }
-.list,
-.parts {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+/* A map's diagram, small, as the app draws it, in the page's one ink. */
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 18px;
+  overflow: visible;
 }
-.list {
-  display: grid;
-  gap: 8px;
-}
-.list li {
+/* A diagram on its own fills the window's height, centred, as a level does in the app. */
+.view:has(> .chart:only-child),
+.pane:has(> .chart:only-child) {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  background: var(--paper);
+}
+.chart:only-child {
+  margin-top: 0;
+}
+.chart path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.3;
+}
+.chart marker path {
+  fill: var(--ink);
+  stroke: none;
+}
+.chart text {
+  font: 12px var(--font-body), sans-serif;
+  fill: var(--muted);
+}
+.chart rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+  transition: fill 0.2s ease-out;
+}
+.chart [data-box] text {
   font-size: 15px;
-  transition: border-color 0.2s ease-out, background-color 0.2s ease-out, color 0.2s ease-out;
+  font-weight: 500;
+  fill: var(--ink);
+  transition: fill 0.2s ease-out;
 }
-.n {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid currentColor;
-  font: 500 11px var(--mono);
+.chart [data-box] text + text {
+  font-size: 13px;
+  font-weight: 400;
+  fill: var(--muted);
 }
-.list li[data-hit="true"] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--on-ink);
+.chart [data-hit="true"] rect {
+  fill: var(--ink);
+}
+.chart [data-hit="true"] text,
+.chart [data-hit="true"] text + text {
+  fill: var(--on-ink);
 }
 .head b {
   display: block;
@@ -1101,40 +1119,6 @@
   font-size: 14px;
   line-height: 1.45;
   color: var(--muted);
-}
-.parts {
-  display: grid;
-  gap: 8px;
-  margin: 14px 0 0 11px;
-  padding: 8px 0 0 18px;
-  border-left: 1px solid var(--ink);
-}
-.parts li {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  font-size: 14.5px;
-}
-.parts li::before {
-  content: "";
-  position: absolute;
-  left: -19px;
-  top: 50%;
-  width: 18px;
-  border-top: 1px solid var(--ink);
-}
-.parts li:last-child::after {
-  content: "";
-  position: absolute;
-  left: -21px;
-  top: calc(50% + 1px);
-  bottom: -10px;
-  width: 4px;
-  background: var(--paper);
 }
 .codeBtn {
   display: inline-flex;
@@ -1677,14 +1661,6 @@
   .pane {
     inset: 16px 18px;
   }
-  .list li {
-    height: 34px;
-    font-size: 13.5px;
-  }
-  .parts li {
-    height: 30px;
-    font-size: 13px;
-  }
   .code {
     font-size: 11.5px;
     line-height: 2;
@@ -1796,7 +1772,7 @@
   .pane,
   .in,
   .cur,
-  .list li,
+  .chart rect,
   .codeBtn,
   .rail::after,
   .rail i {

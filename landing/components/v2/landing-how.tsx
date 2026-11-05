@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Diagram } from "./landing-agent";
 import s from "./v2.module.css";
 
 interface HowProps {
   /** The map the little windows show. */
   name: string;
-  steps: string[];
-  /** The step the cursor opens, and its parts. */
-  opened: { title: string; sub: string; parts: string[] };
+  /** The map's first level: its steps, as the app draws them. */
+  roots: Diagram;
+  /** The step the cursor opens, and the diagram it opens onto. */
+  opened: { id: string; title: string; sub: string; diagram: Diagram };
   /** The part the cursor follows to its code. */
   cited: { title: string; sub: string; file: string; start: number; lines: string[] };
 }
 
 const TABS = [
   { title: "Start with the steps", body: "The steps the program takes, in order." },
-  { title: "Click a step to open it", body: "Only that step's parts appear." },
+  { title: "Click a step to open it", body: "It opens onto a diagram of its parts." },
   { title: "Keep going to the code", body: "A part cites the lines it describes." },
 ];
 
@@ -26,7 +28,7 @@ const KEYWORDS = /\b(if|else|return|def|for|in|not|None|True|False)\b/;
  * the steps appear, a cursor opens one, then follows a part to its code. The
  * tabs advance on their own while the box is on screen.
  */
-export function LandingHow({ name, steps, opened, cited }: HowProps) {
+export function LandingHow({ name, roots, opened, cited }: HowProps) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => play(box.current!), []);
 
@@ -45,17 +47,6 @@ export function LandingHow({ name, steps, opened, cited }: HowProps) {
       <path d="M2.5 1.5v12l3.2-3 2.2 4.7 2.1-1-2.2-4.6h4.4z" />
     </svg>
   );
-  const list = (cls?: string, target?: number) => (
-    <ol className={s.list}>
-      {steps.map((t, i) => (
-        <li key={t} className={cls} data-in={cls ? "" : undefined} data-target={i === target ? "" : undefined}>
-          <span className={s.n}>{i + 1}</span>
-          {t}
-        </li>
-      ))}
-    </ol>
-  );
-
   return (
     <section id="how" className={s.how} aria-labelledby="how-title">
       <p className={`${s.eyebrow} ${s.reveal}`}>How it works</p>
@@ -83,25 +74,21 @@ export function LandingHow({ name, steps, opened, cited }: HowProps) {
             <div className={s.win} data-win="steps">
               {bar}
               <div className={s.view} data-view>
-                {list(s.in)}
+                <Chart d={roots} />
               </div>
             </div>
             <div className={s.win} data-win="open" hidden>
               {bar}
               <div className={s.view} data-view>
-                <div className={`${s.pane} ${s.paneA}`}>{list(undefined, steps.indexOf(opened.title))}</div>
+                <div className={`${s.pane} ${s.paneA}`}>
+                  <Chart d={roots} still target={opened.id} />
+                </div>
                 <div className={`${s.pane} ${s.paneB}`}>
                   <div className={s.head}>
                     <b>{opened.title}</b>
                     <span>{opened.sub}</span>
                   </div>
-                  <ul className={s.parts}>
-                    {opened.parts.map((p) => (
-                      <li key={p} className={s.in} data-in>
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
+                  <Chart d={opened.diagram} />
                 </div>
                 {cursor}
               </div>
@@ -141,6 +128,81 @@ export function LandingHow({ name, steps, opened, cited }: HowProps) {
         </div>
       </div>
     </section>
+  );
+}
+
+const GY = 46;
+
+/**
+ * A diagram as the app's map draws it: boxes on a grid, joined by labelled
+ * arrows, in the page's one ink. Boxes and arrows fade in one by one unless
+ * `still`; `target` marks the box the cursor clicks.
+ */
+function Chart({ d, still, target }: { d: Diagram; still?: boolean; target?: string }) {
+  // Boxes with a second line are wider, as the app draws them; plain ones pack closer.
+  const subs = d.boxes.some((b) => b.sub);
+  const BW = subs ? 190 : 160;
+  const GX = subs ? 96 : 100;
+  const bh = subs ? 58 : 50;
+  const cols = Math.max(...d.boxes.map((b) => b.col)) + 1;
+  const rows = Math.max(...d.boxes.map((b) => b.row)) + 1;
+  const at = new Map(d.boxes.map((b) => [b.id, { x: 1 + b.col * (BW + GX), y: 1 + b.row * (bh + GY) }]));
+  const w = cols * BW + (cols - 1) * GX + 2;
+  const h = rows * bh + (rows - 1) * GY + 2;
+  const fade = still ? {} : { className: s.in, "data-in": "" };
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className={s.chart}>
+      <defs>
+        <marker id="how-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M1 1.2L7 4 1 6.8z" />
+        </marker>
+      </defs>
+      {d.arrows.map((a) => {
+        const f = at.get(a.from)!;
+        const t = at.get(a.to)!;
+        let path: string;
+        let label: { x: number; y: number; anchor: "start" | "middle" };
+        if (f.y === t.y) {
+          const [x1, x2] = f.x < t.x ? [f.x + BW, t.x - 3] : [f.x, t.x + BW + 3];
+          path = `M${x1} ${f.y + bh / 2}H${x2}`;
+          label = { x: (x1 + x2) / 2, y: f.y + bh / 2 - 8, anchor: "middle" };
+        } else if (f.x === t.x) {
+          path = `M${f.x + BW / 2} ${f.y + bh}V${t.y - 3}`;
+          label = { x: f.x + BW / 2 + 8, y: (f.y + bh + t.y) / 2 + 4, anchor: "start" };
+        } else {
+          // Out of the side, down the gap beside the target, and into its side.
+          const left = t.x < f.x;
+          const gx = left ? t.x + BW + GX / 2 : t.x - GX / 2;
+          const sy = f.y + bh / 2 + (left ? 9 : 0);
+          path = `M${left ? f.x : f.x + BW} ${sy}H${gx}V${t.y + bh / 2}H${left ? t.x + BW + 3 : t.x - 3}`;
+          label = { x: gx + 7, y: f.y + bh + GY / 2 + 4, anchor: "start" };
+        }
+        return (
+          <g key={a.from + a.to} {...fade}>
+            <path d={path} markerEnd="url(#how-arrow)" />
+            <text x={label.x} y={label.y} textAnchor={label.anchor}>
+              {a.label}
+            </text>
+          </g>
+        );
+      })}
+      {d.boxes.map((b) => {
+        const { x, y } = at.get(b.id)!;
+        return (
+          <g key={b.id} {...fade} data-box="" data-target={b.id === target ? "" : undefined}>
+            <rect x={x} y={y} width={BW} height={bh} />
+            <text x={x + BW / 2} y={b.sub ? y + 25 : y + bh / 2 + 5} textAnchor="middle">
+              {b.label}
+            </text>
+            {b.sub ? (
+              <text x={x + BW / 2} y={y + 44} textAnchor="middle">
+                {b.sub}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -225,13 +287,13 @@ function play(box: HTMLElement) {
   };
   const plays: Record<string, (win: HTMLElement, id: number) => Promise<void>> = {
     async steps(win, id) {
-      const rows = ins(win);
       await wait(id, 300);
-      for (const r of rows) {
+      for (const r of ins(win)) {
         r.dataset.on = "true";
-        await wait(id, 150);
+        await wait(id, 110);
       }
       await wait(id, 300);
+      const rows = [...win.querySelectorAll<HTMLElement>("[data-box]")];
       for (const r of rows) {
         rows.forEach((x) => (x.dataset.hit = String(x === r)));
         await wait(id, 520);
@@ -242,7 +304,7 @@ function play(box: HTMLElement) {
       await open(win, id);
       for (const p of ins(win)) {
         p.dataset.on = "true";
-        await wait(id, 160);
+        await wait(id, 110);
       }
       await wait(id, 2600);
     },

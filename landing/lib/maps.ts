@@ -7,6 +7,7 @@ export interface DemoNode {
   title: string;
   sub?: string;
   children?: DemoNode[];
+  anatomy?: ({ kind: string } & Diagram)[];
 }
 
 /** What the page reads of a committed map: its run, and its tree's titles. */

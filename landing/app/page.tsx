@@ -107,11 +107,12 @@ export default function Landing() {
           <LandingVoices voices={VOICES} />
           <LandingHow
             name="flask"
-            steps={flask.AUTHORED.map((r) => r.title)}
+            roots={flask.OVERVIEW.anatomy.find((a) => a.kind === "diagram")!}
             opened={{
+              id: first.id,
               title: first.title,
               sub: sentence(first.sub ?? ""),
-              parts: first.children!.map((c) => c.title),
+              diagram: first.anatomy!.find((a) => a.kind === "diagram")!,
             }}
             cited={{
               title: config.title,

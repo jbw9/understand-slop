@@ -618,6 +618,12 @@ export function Workspace() {
     reportStatus(tabs);
   }, [tabs]);
 
+  // The Dock icon's badge (src-tauri/src/lib.rs attention_count).
+  const attention = tabs.filter((t) => t.live && (t.status === "done" || t.status === "waiting")).length;
+  useEffect(() => {
+    if (desktop) void invoke("attention_count", { n: attention }).catch(() => {});
+  }, [desktop, attention]);
+
   // A chime when an agent finishes or needs the user, heard wherever they are
   // looking: the dot alone is easy to miss with the workspace closed.
   const was = useRef<Record<number, Status | undefined>>({});

@@ -48,6 +48,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            attention_count,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
@@ -113,6 +114,15 @@ fn open_main(app: &tauri::AppHandle) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
     pinch_to_page(&_window);
     Ok(())
+}
+
+/// The Dock icon's badge: how many Claude tabs have finished or are waiting on
+/// the user (components/workspace.tsx), so it shows from any app, as Discord's does.
+#[tauri::command]
+fn attention_count(app: tauri::AppHandle, n: i64) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_badge_count(if n == 0 { None } else { Some(n) });
+    }
 }
 
 /// Cmd+` and Ctrl+` from the menu bar as well as the page: a key pressed in

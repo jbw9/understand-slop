@@ -160,13 +160,18 @@ export default function Landing() {
         <div className={s.top}>
           <div className={s.wrap}>
             <header id="app" className={s.appHead}>
-              <h2>And now there&rsquo;s you.</h2>
+              <h2>
+                And now there&rsquo;s you{" "}
+                {/* Uncle Sam's fist, from the 1917 poster, pointing out of the page at the reader. */}
+                <span className={s.inline} style={{ "--r": "0.8" } as React.CSSProperties}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- the site is a static export, which next/image cannot optimize. */}
+                  <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/point.png`} alt="A hand pointing out of the page at you" />
+                </span>
+                .
+              </h2>
               <a className={s.kicker} href="#agent">
                 Works with most coding agents <span aria-hidden>&rarr;</span>
               </a>
-              {/* Adam's hand from the cover, turned to point down at the app. */}
-              {/* eslint-disable-next-line @next/next/no-img-element -- the site is a static export, which next/image cannot optimize. */}
-              <img className={s.point} src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/point.png`} alt="" />
             </header>
             <section aria-label="Live demo" className={s.demo}>
               <LandingDemo maps={maps} />

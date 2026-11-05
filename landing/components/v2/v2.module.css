@@ -1624,7 +1624,7 @@
 }
 .evoField {
   position: relative;
-  height: clamp(1700px, 190vw, 2400px);
+  height: clamp(1150px, 125vw, 1600px);
   margin-top: 24px;
   text-align: left;
 }

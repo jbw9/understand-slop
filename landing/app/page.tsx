@@ -235,9 +235,9 @@ export default function Landing() {
           </div>
         </dl>
         <p className={s.credits}>
-          Pictures, all public domain, from Wikimedia Commons: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
+          Pictures from Wikimedia Commons, public domain unless noted: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
           ENIAC, U.S. Army; Grace Hopper, U.S. Navy; Margaret Hamilton with the Apollo flight software, Draper Laboratory;
-          Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; Michelangelo&rsquo;s{" "}
+          Linus Torvalds by Krd, CC BY-SA 4.0; Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; Michelangelo&rsquo;s{" "}
           <i>The Creation of Adam</i>.
         </p>
       </footer>

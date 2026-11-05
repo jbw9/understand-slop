@@ -6,19 +6,21 @@ import s from "./v2.module.css";
 
 const img = (name: string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/${name}.png`;
 
-// Where each stop sits on the line, in the drawing's own units (1000 wide, 2400 tall).
+// Where each stop sits on the line, in the drawing's own units (1000 wide, H tall).
+const H = 1600;
 const STOPS = [
-  { x: 270, y: 380, pic: "tl-ada", who: "Ada Lovelace", year: "1843", did: "Wrote what is often called the first program, for a machine that was never built.", tilt: -2 },
-  { x: 730, y: 1000, pic: "tl-turing", who: "Alan Turing", year: "1936", did: "Described a machine that could run any program written as steps.", tilt: 1.5 },
-  { x: 290, y: 1620, pic: "tl-hamilton", who: "Margaret Hamilton", year: "1969", did: "Led the team that wrote Apollo’s flight software. It was printed out, and people read it.", tilt: -1 },
+  { x: 270, y: 250, pic: "tl-ada", who: "Ada Lovelace", year: "1843", did: "Wrote what is often called the first program, for a machine that was never built.", tilt: -2 },
+  { x: 730, y: 600, pic: "tl-turing", who: "Alan Turing", year: "1936", did: "Described a machine that could run any program written as steps.", tilt: 1.5 },
+  { x: 270, y: 950, pic: "tl-hamilton", who: "Margaret Hamilton", year: "1969", did: "Led the team that wrote Apollo’s flight software. It was printed out, and people read it.", tilt: -1 },
+  { x: 730, y: 1300, pic: "tl-torvalds", who: "Linus Torvalds", year: "1991", did: "Put Linux online for anyone to read. It grew past what one person could, so many people each read a part.", tilt: 1 },
 ];
 
 const PATH =
-  "M500 0C500 190 270 190 270 380S730 760 730 1000 290 1380 290 1620 500 2150 500 2400";
+  "M500 0C500 125 270 125 270 250S730 460 730 600 270 810 270 950 730 1160 730 1300 500 1500 500 1600";
 
 /**
- * How we got here: one line drawn down the page as it scrolls, through three
- * people who wrote code by hand, and on into the app below.
+ * How we got here: one line drawn down the page as it scrolls, through four
+ * people who read code by hand, and on into the app below.
  */
 export function LandingEvolution() {
   const box = useRef<HTMLElement>(null);
@@ -45,14 +47,14 @@ export function LandingEvolution() {
     };
   }, []);
 
-  const at = (x: number, y: number) => ({ left: `${x / 10}%`, top: `${y / 24}%` });
+  const at = (x: number, y: number) => ({ left: `${x / 10}%`, top: `${(y / H) * 100}%` });
 
   return (
     <section ref={box} className={s.evo} aria-labelledby="evo-title">
       <p className={s.bracket}>[ How we got here ]</p>
       <h2 id="evo-title">People used to read every line.</h2>
       <div className={s.evoField}>
-        <svg className={s.evoLine} viewBox="0 0 1000 2400" preserveAspectRatio="none" aria-hidden>
+        <svg className={s.evoLine} viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" aria-hidden>
           <path d={PATH} className={s.evoGhost} />
           <path d={PATH} className={s.evoInk} pathLength={1} />
         </svg>
@@ -61,7 +63,7 @@ export function LandingEvolution() {
             key={st.who}
             className={s.stop}
             data-side={st.x < 500 ? "left" : "right"}
-            data-at={st.y / 2400}
+            data-at={st.y / H}
             style={{ ...at(st.x, st.y), "--tilt": `${st.tilt}deg` } as React.CSSProperties}
           >
             <img src={img(st.pic)} alt={st.who} loading="lazy" />

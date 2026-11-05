@@ -31,9 +31,8 @@ export const openFiles = (filter: FilesFilter = "all") => window.dispatchEvent(n
 
 interface Files {
   index: MapIndex | null;
-  /** New files of a kind the map explains, and explained files now gone. */
+  /** New files of a kind the map explains. */
   added: string[];
-  gone: string[];
 }
 
 const fetched = new Map<string, Files>();

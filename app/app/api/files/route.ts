@@ -30,21 +30,20 @@ export async function GET(request: Request) {
   if (!open) return Response.json({ error: "No such map." }, { status: 404 });
   const f = join(projectDir(open.name), "index.json");
   const index: MapIndex | null = existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null;
+  const root = rootOf(open.file.RUN);
   let present: string[] = [];
   try {
-    present = execFileSync("git", ["-C", rootOf(open.file.RUN), "ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] })
+    present = execFileSync("git", ["-C", root, "ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] })
       .split("\n")
       .filter(Boolean);
   } catch {
     // Not a git checkout: the index alone is what there is.
   }
-  // New code files and explained files now gone, judged as an update judges
-  // them (scripts/generate/inventory.ts): a lockfile, a test or a type stub
+  // New code files, judged as an update judges them
+  // (scripts/generate/inventory.ts): a lockfile, a test or a type stub
   // appearing is not something the map would add.
-  const root = rootOf(open.file.RUN);
   const files = index?.files ?? {};
   const added = present.filter((p) => !files[p] && sourcePath(p));
-  const gone = present.length ? Object.keys(files).filter((p) => files[p].status === "source" && !existsSync(join(root, p))) : [];
   if (q.get("behind")) {
     const b = join(projectDir(open.name), "base.json");
     const base: Base = existsSync(b) ? JSON.parse(readFileSync(b, "utf8")) : {};
@@ -64,5 +63,5 @@ export async function GET(request: Request) {
     });
     return Response.json({ behind });
   }
-  return Response.json({ index, added, gone });
+  return Response.json({ index, added });
 }

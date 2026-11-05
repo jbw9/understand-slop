@@ -162,7 +162,7 @@ export default function Landing() {
             <header id="app" className={s.appHead}>
               <h2>Now nobody has to.</h2>
               <a className={s.kicker} href="#agent">
-                Works beside Claude Code, Codex and OpenCode <span aria-hidden>&rarr;</span>
+                Works with most coding agents <span aria-hidden>&rarr;</span>
               </a>
             </header>
             <section aria-label="Live demo" className={s.demo}>

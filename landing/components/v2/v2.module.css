@@ -1224,54 +1224,23 @@
   text-transform: uppercase;
   color: var(--muted);
 }
+.scale cite {
+  display: block;
+  margin-top: 12px;
+  font: normal 11px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
 .scale p {
   margin: 12px 0 0;
   font: 300 clamp(22px, 2vw, 30px) / 1.2 var(--display);
   letter-spacing: -0.01em;
   text-wrap: balance;
 }
-/* Each problem is a column under a hairline: the problem, what someone said about it, then what Bluprint does. */
-.problems {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 40px;
-  margin-top: 64px;
-}
-.problems article {
-  display: flex;
-  flex-direction: column;
-  padding-top: 18px;
-  border-top: 1px solid var(--ink);
-}
-.problems h3 {
-  margin: 0;
-  font: 400 clamp(21px, 1.7vw, 26px) / 1.15 var(--display);
-  letter-spacing: -0.01em;
-}
-.problems blockquote {
-  margin: 16px 0 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-.problems cite {
-  display: block;
-  margin-top: 8px;
-  font: normal 11px var(--mono);
-  text-transform: uppercase;
-  color: var(--faint);
-}
-.problems cite a,
 .slide figcaption a {
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: var(--strong);
-}
-.answer {
-  margin: auto 0 0;
-  padding-top: 24px;
-  font-size: 15px;
-  line-height: 1.5;
 }
 
 /* ── beside your agent ───────────────────────────────── */
@@ -1646,9 +1615,6 @@
 }
 
 @media (max-width: 1180px) {
-  .problems {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .canvas[data-drawn="true"] {
     height: auto;
     min-height: 0;
@@ -1740,8 +1706,7 @@
   }
   .agent,
   .steps,
-  .scale,
-  .problems {
+  .scale {
     grid-template-columns: minmax(0, 1fr);
   }
   .steps::before {

@@ -8,8 +8,8 @@ import { LandingHow } from "@/components/v2/landing-how";
 import { LandingInstall } from "@/components/v2/landing-install";
 import { LandingNav } from "@/components/v2/landing-nav";
 import { LandingStart } from "@/components/v2/landing-start";
-import { LandingVoices, type Voice } from "@/components/v2/landing-voices";
-import { LandingWhy, type Problem, type Source } from "@/components/v2/landing-why";
+import { LandingVoices, type Source, type Voice } from "@/components/v2/landing-voices";
+import { LandingWhy } from "@/components/v2/landing-why";
 import s from "@/components/v2/v2.module.css";
 import { loadMap } from "@/lib/maps";
 
@@ -51,49 +51,12 @@ const OSMANI: Source = {
   work: "“The 70% problem: Hard truths about AI-assisted coding”",
   href: "https://addyo.substack.com/p/the-70-problem-hard-truths-about",
 };
-const SO_SURVEY: Source = {
-  who: "Stack Overflow",
-  work: "Developer Survey 2025",
-  href: "https://survey.stackoverflow.co/2025/ai",
-};
 
 // Said in public, word for word, and linked to where.
 const VOICES: Voice[] = [
   { source: WITTEVEEN, quote: "The writing part has gotten cheap. The verification hasn’t." },
   { source: LEVIN, quote: "If you can’t see what it’s seeing, you’re not actually steering it." },
   { source: OSMANI, quote: "You’re essentially playing whack-a-mole with code you don’t fully understand." },
-];
-
-const PROBLEMS: Problem[] = [
-  {
-    title: "You can’t see what the agent changed.",
-    said: <>One task &ldquo;could be touching 10, 15 different files.&rdquo;</>,
-    by: WITTEVEEN,
-    answer: "Bluprint draws every change on the map, down to the lines.",
-  },
-  {
-    title: "Reviewing takes longer than writing.",
-    said: <>66% of developers say AI answers are &ldquo;almost right, but not quite.&rdquo;</>,
-    by: SO_SURVEY,
-    answer: "Read the steps first, then only what changed.",
-  },
-  {
-    title: "You own what you ship, whoever typed it.",
-    said: <>&ldquo;Accountability doesn&rsquo;t transfer just because the authorship did.&rdquo;</>,
-    by: LEVIN,
-    answer: "Every sentence is checked against the code it cites. What isn’t proven is marked.",
-  },
-  {
-    title: "Your agent is working blind too.",
-    said: (
-      <>
-        &ldquo;An agent that can only grep through files &hellip; is often an agent that&rsquo;s kind of working
-        blind.&rdquo;
-      </>
-    ),
-    by: WITTEVEEN,
-    answer: "Pick a section and it goes into Claude’s next prompt.",
-  },
 ];
 
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.
@@ -156,7 +119,7 @@ export default function Landing() {
 
         <div className={s.wrap}>
           <LandingVoices voices={VOICES} />
-          <LandingWhy problems={PROBLEMS} />
+          <LandingWhy />
           <LandingHow
             name="flask"
             steps={flask.AUTHORED.map((r) => r.title)}

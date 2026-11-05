@@ -1624,7 +1624,7 @@
 }
 .evoField {
   position: relative;
-  height: clamp(1150px, 125vw, 1600px);
+  height: clamp(900px, 98vw, 1250px);
   margin-top: 24px;
   text-align: left;
 }
@@ -1905,7 +1905,7 @@
 }
 @media (max-width: 700px) {
   .evoField {
-    height: 1500px;
+    height: 1250px;
   }
   .stop,
   .stop[data-side="right"] {

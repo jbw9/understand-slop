@@ -2,7 +2,7 @@ import s from "./v2.module.css";
 
 // The same problem at every size. The first is the page's own voice, said to anyone; the other two are people the team spoke with, by role.
 const SCALE: { who: string; line: string; by?: string; to?: string }[] = [
-  { who: "Solo developers", line: "You built it in a weekend. I bet you can’t explain how it works.", to: "To John Doe, solo developer" },
+  { who: "Solo developers", line: "You built it in a weekend. I bet you can’t explain how it works.", to: "John Doe, solo developer" },
   { who: "Startups", line: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
   {
     who: "Big tech",

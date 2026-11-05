@@ -1,4 +1,4 @@
-# Mira
+# bluprint
 
 A visual map of a codebase. Start with the product's features, then go deeper, down to the line of code.
 
@@ -16,7 +16,7 @@ npm run dev
 
 Open http://localhost:3000.
 
-### Use Mira while working on it (macOS)
+### Use bluprint while working on it (macOS)
 
 ```bash
 cd app

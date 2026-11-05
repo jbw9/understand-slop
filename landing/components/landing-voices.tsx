@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import s from "./landing.module.css";
-import type { Source } from "./landing-why";
+export interface Source {
+  who: string;
+  work: string;
+  href: string;
+}
 
 export interface Voice {
   source: Source;

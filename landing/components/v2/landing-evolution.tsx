@@ -11,8 +11,8 @@ const H = 1600;
 const STOPS = [
   { x: 270, y: 250, pic: "tl-ada", who: "Ada Lovelace", year: "1843", did: "Wrote what is often called the first program, for a machine that was never built.", tilt: -2 },
   { x: 730, y: 600, pic: "tl-turing", who: "Alan Turing", year: "1936", did: "Described a machine that could run any program written as steps.", tilt: 1.5 },
-  { x: 270, y: 950, pic: "tl-hamilton", who: "Margaret Hamilton", year: "1969", did: "Led the team that wrote Apollo’s flight software. It was printed out, and people read it.", tilt: -1 },
-  { x: 730, y: 1300, pic: "tl-torvalds", who: "Linus Torvalds", year: "1991", did: "Put Linux online for anyone to read. It grew past what one person could, so many people each read a part.", tilt: 1 },
+  { x: 270, y: 950, pic: "tl-torvalds", who: "Linus Torvalds", year: "1991", did: "Put Linux online for anyone to read. It grew past what one person could, so many people each read a part.", tilt: -1 },
+  { x: 730, y: 1300, pic: "tl-hinton", who: "Geoffrey Hinton", year: "2012", did: "His students’ network taught itself to see from examples. Programs began doing what nobody wrote down.", tilt: 1 },
 ];
 
 const PATH =
@@ -20,7 +20,7 @@ const PATH =
 
 /**
  * How we got here: one line drawn down the page as it scrolls, through four
- * people who read code by hand, and on into the app below.
+ * people, from code read by hand to code nobody wrote, and on into the app below.
  */
 export function LandingEvolution() {
   const box = useRef<HTMLElement>(null);

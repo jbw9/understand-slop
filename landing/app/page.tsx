@@ -236,7 +236,7 @@ export default function Landing() {
         <p className={s.credits}>
           Pictures from Wikimedia Commons, public domain unless noted: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
           ENIAC, U.S. Army; Grace Hopper, U.S. Navy; Margaret Hamilton with the Apollo flight software, Draper Laboratory;
-          Linus Torvalds by Krd, CC BY-SA 4.0; Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; Michelangelo&rsquo;s{" "}
+          Linus Torvalds by Krd, CC BY-SA 4.0; Geoffrey Hinton by Cmichel67, CC BY-SA 4.0; Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; Michelangelo&rsquo;s{" "}
           <i>The Creation of Adam</i>.
         </p>
       </footer>

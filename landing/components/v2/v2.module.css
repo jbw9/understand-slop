@@ -808,6 +808,7 @@
 /* ── what people say ──────────────────────────────────── */
 .voices {
   margin-top: var(--gap);
+  text-align: center;
   padding: clamp(64px, 8vw, 104px) 0;
   border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
@@ -828,8 +829,8 @@
   transition: opacity 0.35s var(--ease) 0.12s, visibility 0s;
 }
 .slide blockquote {
-  max-width: 30ch;
-  margin: 0;
+  max-width: 28ch;
+  margin: 0 auto;
   font: 300 clamp(32px, 4.4vw, 68px) / 1.04 var(--display);
   letter-spacing: -0.012em;
   text-wrap: balance;
@@ -837,6 +838,7 @@
 .slide figcaption {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 4px 10px;
   margin-top: 24px;
   font: 12px var(--mono);
@@ -853,7 +855,7 @@
   grid-template-columns: repeat(var(--n), 1fr);
   gap: 6px;
   width: min(240px, 60%);
-  margin-top: 40px;
+  margin: 40px auto 0;
 }
 .progress span {
   position: relative;

@@ -41,7 +41,7 @@ const VOICES: Voice[] = [
   { who: "Startups", quote: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
   {
     who: "Big tech",
-    quote: "Code review is the new bottleneck. Engineers are drowning in reviews, and some have ten or more changes waiting in their queue.",
+    quote: "Code review is the new bottleneck. Some engineers have ten waiting.",
     by: "Software Development Manager, Amazon",
   },
 ];

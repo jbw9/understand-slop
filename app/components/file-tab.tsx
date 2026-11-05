@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { CodeEditor } from "@/components/editor";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { langOf } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
  * since agents name files outside the project and Claude's pasted images.
  */
 
+const MARKDOWN = /\.(md|mdx|markdown)$/i;
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp|ico|svg)$/i;
 /** Past this the editor's one-div-per-line drawing gets slow; such a file is named, not drawn. */
 const TOO_BIG = 2_000_000;
@@ -30,6 +32,8 @@ export function FileTab({ path, line, visible, inset }: { path: string; line?: n
   const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState<"saved" | string | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const [source, setSource] = useState(false);
+  const md = MARKDOWN.test(path);
 
   const load = () =>
     invoke<ArrayBuffer>("file_read", { path }).then((buf): Read => {
@@ -108,7 +112,17 @@ export function FileTab({ path, line, visible, inset }: { path: string; line?: n
             />
           </div>
         ) : null}
-        {read?.kind === "text" ? (
+        {read?.kind === "text" && md && !source ? (
+          <MarkdownEditor
+            key={path}
+            file={path}
+            value={draft ?? text}
+            onChange={(next) => (setDraft(next), setSaved(null))}
+            onSave={() => void save()}
+            lit={line}
+            className="absolute inset-0"
+          />
+        ) : read?.kind === "text" ? (
           <CodeEditor
             key={path}
             file={path}
@@ -127,7 +141,13 @@ export function FileTab({ path, line, visible, inset }: { path: string; line?: n
           <>
             {line ? <span>Ln {line}</span> : null}
             <span className="tnum">{(draft ?? text).split("\n").length.toLocaleString()} lines</span>
-            <span>{LANG[langOf(path)]}</span>
+            {md ? (
+              <button type="button" onClick={() => setSource((v) => !v)} className="hover:text-ink" title="Switch between the drawn page and its Markdown">
+                {source ? "Markdown source · show page" : "Live preview · show source"}
+              </button>
+            ) : (
+              <span>{LANG[langOf(path)]}</span>
+            )}
             <span>UTF-8</span>
             <span className="ml-auto">
               {saved && saved !== "saved" ? (

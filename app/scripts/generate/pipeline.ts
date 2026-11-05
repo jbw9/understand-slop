@@ -16,6 +16,7 @@ import { authorRoot, authorSplit, inParts, submitLine, tooBig, type Authored, ty
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose, type Turn } from "./claude-code";
+import { fastMap } from "./fast";
 import { arrowStats, check, dedupeIssues, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, place, unclaimed, type Cut } from "./cut";
 import { activeGraph, buildGraph, setGraph, withSummaries } from "./graph";
@@ -219,6 +220,26 @@ export async function main(args: string[]) {
   withSummaries(activeGraph()!, sums);
   writeFileSync(`${out}/graph.json`, JSON.stringify(activeGraph()) + "\n");
   if (stopAfter === "summarize") return;
+  // --fast: the four-phase map (fast.ts) in place of the cut, the authors and the overview.
+  if (has("--fast")) {
+    progress.stage = "author";
+    flush();
+    const run: Run = { command: `bluprint map ${inv.name} --fast`, repo: inv.scope ? name : inv.name, commit: inv.commit, files: code.length, elapsed: "", root: repo, explain: "none", models };
+    const r = await lap("fast", () => fastMap(inv, sums, activeGraph()!, models.author, run, say));
+    const total = Math.round((Date.now() - t0) / 1000);
+    r.map.RUN.elapsed = `${Math.max(1, Math.round(total / 60))} min`;
+    atomic(`${out}/map.json`, JSON.stringify(r.map, null, 1) + "\n");
+    writeFileSync(`${out}/arch.json`, JSON.stringify(r.arch, null, 1) + "\n");
+    const usd = Object.values(bill).reduce((a, b) => a + b.usd, 0);
+    writeFileSync(`${out}/report.json`, JSON.stringify({ repo: inv.name, commit: inv.commit, backend: BACKEND, mode: "fast", models, elapsed: { ...elapsed, ...r.timing, total }, usd: Math.round(usd * 100) / 100, bill, components: r.arch.components.map((c) => ({ id: c.id, dir: c.dir, files: c.files.length })), discrepancies: r.discrepancies, check: { problems: r.checkProblems } }, null, 1) + "\n");
+    progress.stage = "done";
+    flush();
+    console.log(`\n${out}/map.json — ${r.map.AUTHORED.length} components, ${r.checkProblems.length} check problems, ${r.discrepancies.length} discrepancies, $${usd.toFixed(2)}, ${total}s`);
+    for (const d of r.discrepancies) console.log(`  discrepancy: ${d}`);
+    for (const p of r.checkProblems.slice(0, 30)) console.log(`  check: ${p}`);
+    await ccClose();
+    return;
+  }
   progress.stage = "cut";
   flush();
 

@@ -673,7 +673,7 @@ function Level({
                 [{ label: RUN.repo, path: [] as string[], onClick: () => onOpen([]) }],
               )
         }
-        eyebrow={top ? "Repository" : `Inside ${parent?.title ?? RUN.repo}`}
+        eyebrow={top ? undefined : `Inside ${parent?.title ?? RUN.repo}`}
         title={node.title}
         state={node.state}
         origin={node.origin}
@@ -1149,7 +1149,7 @@ function Header({
   path: string[];
   /** The level above, named — so "back" says where it goes. */
   back?: { label: string; path: string[]; onClick: () => void }[];
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   state?: Node["state"];
   /** Set where the reader rewrote this level's own words (lib/overlay.ts). */
@@ -1210,8 +1210,8 @@ function Header({
         </div>
       ) : null}
       <div className="max-w-[720px]">
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
+        <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-2", eyebrow && "mt-2")}>
           <h1 className="font-display text-[clamp(32px,3.2vw,46px)] font-normal leading-[1.02] tracking-[-0.018em] text-ink">
             {title}
           </h1>

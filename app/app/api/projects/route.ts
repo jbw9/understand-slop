@@ -106,7 +106,7 @@ export async function POST(request: Request) {
         return Response.json({ ok: true });
       case "remove":
         if (!str(id)) return bad("bad request");
-        removeProject(id as string);
+        await removeProject(id as string);
         return Response.json({ ok: true });
       default:
         return bad("bad request");

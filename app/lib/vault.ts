@@ -309,6 +309,8 @@ export function generate(id: string, claude?: string, explain?: Explain, full?: 
   // An update still running would write its map over this one when it ends,
   // and it reads the files cleared below: the new map replaces it, so it stops.
   if (p.update?.status === "running" && p.update.pid && alive(p.update.pid)) stop(p.update.pid);
+  // So do review runs, whose folders are cleared below.
+  reviewPids(id).forEach(stop);
   const dir = projectDir(id);
   mkdirSync(dir, { recursive: true });
   // A fresh map starts from the code as it is; what earlier updates saw goes.
@@ -359,20 +361,60 @@ export function cancel(id: string) {
 }
 
 /**
- * Turn a project's map on or off. Off ends any run or update in flight, so
- * nothing more is spent on it, and keeps whatever map is already there.
+ * End every run on a project: the map, an update, the story and any reviews.
+ * Returns their pids, to wait on before removing what they write into.
+ */
+function stopAll(id: string): number[] {
+  const p = getProject(id);
+  if (!p) return [];
+  const pids: number[] = [];
+  if (p.map.pid) {
+    cancel(id);
+    pids.push(p.map.pid);
+  }
+  // Forgotten before it is stopped, so its exit does not record it as failed.
+  if (p.update?.status === "running" && p.update.pid) {
+    update(id, (q) => (q.update = undefined));
+    stop(p.update.pid);
+    pids.push(p.update.pid);
+  }
+  const story = pidIn(join(projectDir(id), "story.pid"));
+  if (story && alive(story)) {
+    stop(story);
+    pids.push(story);
+  }
+  for (const pid of reviewPids(id)) {
+    stop(pid);
+    pids.push(pid);
+  }
+  return pids;
+}
+
+const pidIn = (file: string) => {
+  try {
+    return Number(readFileSync(file, "utf8")) || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Review runs still going (mapReview). */
+function reviewPids(id: string): number[] {
+  const dir = join(projectDir(id), "reviews");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .map((c) => pidIn(join(dir, c, "review.pid")))
+    .filter((pid): pid is number => !!pid && alive(pid));
+}
+
+/**
+ * Turn a project's map on or off. Off ends any run, update, story or review
+ * in flight, so nothing more is spent on it, and keeps whatever map is
+ * already there.
  */
 export function setPaused(id: string, paused: boolean) {
-  const p = getProject(id);
-  if (!p) return;
-  if (paused) {
-    cancel(id);
-    // Forgotten before it is stopped, so its exit does not record it as failed.
-    if (p.update?.status === "running" && p.update.pid) {
-      update(id, (q) => (q.update = undefined));
-      stop(p.update.pid);
-    }
-  }
+  if (!getProject(id)) return;
+  if (paused) stopAll(id);
   update(id, (q) => (q.paused = paused || undefined));
 }
 
@@ -386,13 +428,37 @@ function stop(pid: number) {
   }
 }
 
-/** Forget a project and its map. The checkout itself is never touched. */
-export function removeProject(id: string) {
-  cancel(id);
+/**
+ * Forget a project and its map. The checkout itself is never touched, except
+ * to unregister the review worktrees made in it. Its runs are stopped and
+ * waited on first: one still ending would recreate the folder it writes into.
+ */
+export async function removeProject(id: string) {
+  const root = getProject(id)?.root;
+  const pids = stopAll(id);
   const v = readVault();
   v.projects = v.projects.filter((p) => p.id !== id);
   writeVault(v);
+  // Polled, not blocked on: this server reaps the runs it started only while its loop turns.
+  for (const end = Date.now() + 5000; pids.some(alive) && Date.now() < end; ) await new Promise((r) => setTimeout(r, 50));
+  pids.filter(alive).forEach(kill);
+  const trees = join(projectDir(id), "worktrees");
+  if (root && existsSync(trees)) {
+    for (const c of readdirSync(trees)) git(root, "worktree", "remove", "--force", join(trees, c));
+    rmSync(trees, { recursive: true, force: true });
+    git(root, "worktree", "prune");
+  }
   rmSync(projectDir(id), { recursive: true, force: true });
+}
+
+/** The last word for a run that did not end when asked. */
+function kill(pid: number) {
+  try {
+    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+    else process.kill(-pid, "SIGKILL");
+  } catch {
+    /* already gone */
+  }
 }
 
 /** What a finished update left in update.json. */

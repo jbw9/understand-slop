@@ -9,6 +9,21 @@ import { Menu } from "@/components/menu";
 import { cn } from "@/lib/utils";
 
 /** What a tab holds, opened: its level, and its file over it. */
+/** A tab's name: its file, else its level's title. The top level is "Bluprint": the project's own tab above already names the repository. */
+export const tabTitle = (nodeAt: (path: string[]) => { title: string } | null | undefined, path: string[], file?: string) =>
+  file ? file.split("/").pop()! : path.length ? (nodeAt(path)?.title ?? "Bluprint") : "Bluprint";
+
+/** A floor plan: the Bluprint tab, the top of the map. Drawn like the workspace's tab glyphs. */
+export function BlueprintIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="mr-0.5 size-3 shrink-0">
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1" />
+      <path d="M7.5 2.5v6h6" />
+      <path d="M2.5 10.5h3" />
+    </svg>
+  );
+}
+
 export const show = (t: Tab) => (t.file ? openFile(t.path, t.file) : goTo(t.path));
 
 /** Opens a level of the open map in a new tab, in front. */
@@ -159,7 +174,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
  * Ctrl+Shift+Tab step through them; Ctrl+W (⌘W on a Mac) closes the one in front.
  */
 export function SectionTabs({ path }: { path: string[] }) {
-  const { name, nodeAt, RUN } = useMap();
+  const { name, nodeAt } = useMap();
   const state = useTabs(name);
   const file = useOpenFile()?.file;
   const key = `${path.join("/")}|${file ?? ""}`;
@@ -173,7 +188,7 @@ export function SectionTabs({ path }: { path: string[] }) {
   const active = state?.active ?? 0;
   const many = tabs.length > 1;
   const drop = useDropOn("map");
-  const titleOf = (t: Tab) => (t.file ? t.file.split("/").pop()! : t.path.length ? (nodeAt(t.path)?.title ?? RUN.repo) : RUN.repo);
+  const titleOf = (t: Tab) => tabTitle(nodeAt, t.path, t.file);
 
   const select = (id: number) => {
     const p = selectTab(name, id);
@@ -227,6 +242,7 @@ export function SectionTabs({ path }: { path: string[] }) {
           key={t.id}
           id={t.id}
           label={titleOf(t)}
+          home={!t.path.length && !t.file}
           active={t.id === active}
           target={drop !== null && "on" in drop && drop.on === t.id}
           onSelect={() => select(t.id)}
@@ -243,6 +259,7 @@ export function SectionTabs({ path }: { path: string[] }) {
 function SectionTab({
   id,
   label,
+  home,
   active,
   target,
   onSelect,
@@ -250,6 +267,8 @@ function SectionTab({
 }: {
   id: number;
   label: string;
+  /** The top of the map, marked with a floor plan. */
+  home: boolean;
   active: boolean;
   /** A part is dragged over it, to be let go into it. */
   target: boolean;
@@ -282,6 +301,7 @@ function SectionTab({
         target && DROP_TARGET,
       )}
     >
+      {home ? <BlueprintIcon /> : null}
       <TabLabel>{label}</TabLabel>
       {onClose ? <TabClose label={label} active={active} onClose={onClose} /> : null}
     </div>

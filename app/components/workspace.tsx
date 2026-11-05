@@ -17,7 +17,7 @@ import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
-import { DROP_TARGET, DropMarker, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, useDropOn } from "@/components/tabs";
+import { DROP_TARGET, DropMarker, BlueprintIcon, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, tabTitle, useDropOn } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, findQuestion, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
@@ -186,8 +186,7 @@ export function Workspace() {
   const mapActive = mapState?.active ?? 0;
   // A part dragged off the map onto this strip (components/canvas.tsx).
   const drop = useDropOn("main");
-  const titleOf = (p: string[], file?: string) =>
-    file ? file.split("/").pop()! : p.length ? (map.nodeAt(p)?.title ?? map.RUN.repo) : map.RUN.repo;
+  const titleOf = (p: string[], file?: string) => tabTitle(map.nodeAt, p, file);
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   // Hidden once it has slid away, so it takes no clicks and no focus.
   const [settled, setSettled] = useState(true);
@@ -1100,6 +1099,7 @@ export function Workspace() {
               }}
               className={cn(tabLook(selected, closable), !selected && "cursor-pointer", drop !== null && "on" in drop && drop.on === m.id && DROP_TARGET)}
             >
+              {!m.path.length && !m.file ? <BlueprintIcon /> : null}
               <TabLabel>{label}</TabLabel>
               {closable ? <TabClose label={label} active={selected} onClose={closeMap} /> : null}
             </div>

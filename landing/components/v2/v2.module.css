@@ -1392,50 +1392,7 @@
   fill: var(--ink);
 }
 
-/* ── your own repo, and questions ─────────────────────── */
-.steps {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
-  margin: 48px 0 0;
-  padding: 0;
-  list-style: none;
-}
-/* A dimension line across the three steps. */
-.steps::before {
-  content: "";
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  right: calc((100% - 64px) / 3);
-  border-top: 1px dashed var(--ink);
-}
-.steps li {
-  position: relative;
-}
-.steps i {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-bottom: 18px;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  background: var(--ink);
-  font: normal 500 12px var(--mono);
-  color: var(--on-ink);
-}
-.steps b {
-  font: 400 24px/1.2 var(--display);
-}
-.steps p {
-  max-width: 30em;
-  margin: 8px 0 0;
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--muted);
-}
+/* ── questions ─────────────────────── */
 .section .cap {
   margin-top: 28px;
 }
@@ -1743,12 +1700,8 @@
     flex-direction: column-reverse;
     align-items: stretch;
   }
-  .agent,
-  .steps {
+  .agent {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .steps::before {
-    display: none;
   }
   .end {
     grid-template-columns: repeat(2, minmax(0, 1fr));

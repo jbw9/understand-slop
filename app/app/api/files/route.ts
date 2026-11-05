@@ -43,7 +43,8 @@ export async function GET(request: Request) {
   // (scripts/generate/inventory.ts): a lockfile, a test or a type stub
   // appearing is not something the map would add.
   const files = index?.files ?? {};
-  const added = present.filter((p) => !files[p] && sourcePath(p));
+  // A map made before index.json says nothing about which files it saw, so none is new to it.
+  const added = index ? present.filter((p) => !files[p] && sourcePath(p)) : [];
   if (q.get("behind")) {
     const b = join(projectDir(open.name), "base.json");
     const base: Base = existsSync(b) ? JSON.parse(readFileSync(b, "utf8")) : {};

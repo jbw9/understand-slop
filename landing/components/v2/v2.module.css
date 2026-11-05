@@ -499,6 +499,8 @@
 /* ── the app, live ─────────────────────────────────────── */
 /* The line from How we got here lands here, on a node in the middle. */
 .appHead {
+  position: relative;
+  isolation: isolate;
   display: grid;
   justify-items: center;
   gap: 12px;
@@ -517,6 +519,16 @@
   margin: 0;
   font: 300 clamp(32px, 4vw, 60px) / 1.02 var(--display);
   letter-spacing: -0.01em;
+}
+.you {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  height: clamp(220px, 24vw, 340px);
+  translate: -50% -46%;
+  opacity: 0.45;
+  pointer-events: none;
 }
 .kicker {
   font: 12px var(--mono);

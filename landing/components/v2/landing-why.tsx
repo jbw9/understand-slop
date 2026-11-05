@@ -7,7 +7,7 @@ const SCALE: { who: string; line: string; by?: string; to?: string }[] = [
   {
     who: "Big tech",
     line: "Code review is the new bottleneck. Engineers are drowning in reviews, and some have ten or more changes waiting in their queue.",
-    by: "SDM at Amazon",
+    by: "Software Development Manager, Amazon",
   },
 ];
 /** Why Bluprint exists: the same problem, from one person to a big company. */

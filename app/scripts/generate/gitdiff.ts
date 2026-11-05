@@ -11,7 +11,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- walks map JSON, typed or not */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Node } from "@/lib/data";
@@ -47,7 +47,7 @@ export const git = (repo: string, ...args: string[]) => {
 export type Base = Record<string, string | null>;
 
 export function readText(path: string): string | null {
-  if (!existsSync(path)) return null;
+  if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return null;
   const buf = readFileSync(path);
   return buf.includes(0) ? null : buf.toString("utf8");
 }

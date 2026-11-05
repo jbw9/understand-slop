@@ -18,7 +18,7 @@
 import spawn from "cross-spawn";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,21 +32,38 @@ const CC_MODEL: Record<string, string> = {
 };
 const ccModel = (model: string) => CC_MODEL[model] ?? model;
 
-/** An empty working directory: no project CLAUDE.md, no repository for Claude Code's own tools to wander. */
-let emptyDir: string | undefined;
-const cwd = () => {
-  if (emptyDir) return emptyDir;
-  emptyDir = mkdtempSync(join(tmpdir(), "slop-cc-"));
+/**
+ * The run's scratch directory: an empty `work` folder to run in (no project
+ * CLAUDE.md, no repository for Claude Code's own tools to wander) and, beside
+ * it, the system prompts handed over as files.
+ */
+let scratchDir: string | undefined;
+const scratch = () => {
+  if (scratchDir) return scratchDir;
+  scratchDir = mkdtempSync(join(tmpdir(), "slop-cc-"));
+  mkdirSync(join(scratchDir, "work"));
   // Removed however the run ends: done, failed, or stopped by the app (SIGTERM).
-  const remove = () => rmSync(emptyDir!, { recursive: true, force: true });
+  const remove = () => rmSync(scratchDir!, { recursive: true, force: true });
   process.once("exit", remove);
   for (const sig of ["SIGTERM", "SIGINT"] as const)
     process.once(sig, () => {
       remove();
       process.kill(process.pid, sig);
     });
-  return emptyDir;
+  return scratchDir;
 };
+const cwd = () => join(scratch(), "work");
+
+/**
+ * A system prompt as a file. On the command line the author's (rules and
+ * exemplar, ~43k characters) passes Windows' 32,767-character limit and the
+ * spawn fails with ENAMETOOLONG.
+ */
+function systemFile(system: string): string {
+  const file = join(scratch(), `system-${createHash("sha256").update(system).digest("hex").slice(0, 16)}.md`);
+  if (!existsSync(file)) writeFileSync(file, system);
+  return file;
+}
 
 interface Result {
   is_error: boolean;
@@ -120,7 +137,7 @@ async function claude(args: string[], prompt: string, stage: string, effort?: st
 }
 
 /** The flags every run shares: the model and our system prompt in place of Claude Code's. */
-const base = (model: string, system: string) => ["--model", ccModel(model), "--system-prompt", system];
+const base = (model: string, system: string) => ["--model", ccModel(model), "--system-prompt-file", systemFile(system)];
 
 /** A conversation as one prompt. The API path's retries carry the previous answer and what was wrong with it; so does this. */
 function transcript(messages: Message[]): string {

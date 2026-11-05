@@ -160,8 +160,7 @@ export default function Landing() {
         <div className={s.top}>
           <div className={s.wrap}>
             <header id="app" className={s.appHead}>
-              <p className={s.bracket}>[ The app, live ]</p>
-              <h2>Six real repositories, mapped. Open one.</h2>
+              <h2>Now nobody has to.</h2>
               <a className={s.kicker} href="#agent">
                 Works beside Claude Code, Codex and OpenCode <span aria-hidden>&rarr;</span>
               </a>

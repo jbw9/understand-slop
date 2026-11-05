@@ -1644,12 +1644,11 @@
   stroke-width: 1;
   stroke-dasharray: 2 5;
 }
-/* The ink follows the reader: drawn as far as they have scrolled. */
+/* The ink follows the reader: drawn as far down as they have scrolled. */
 .evoInk {
   stroke: var(--ink);
   stroke-width: 1.5;
-  stroke-dasharray: 1 1;
-  stroke-dashoffset: calc(1 - var(--p, 0));
+  clip-path: inset(0 0 calc((1 - var(--p, 0)) * 100%) 0);
 }
 .stop {
   position: absolute;

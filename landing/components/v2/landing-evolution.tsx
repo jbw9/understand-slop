@@ -56,7 +56,10 @@ export function LandingEvolution() {
       <div className={s.evoField}>
         <svg className={s.evoLine} viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" aria-hidden>
           <path d={PATH} className={s.evoGhost} />
-          <path d={PATH} className={s.evoInk} pathLength={1} />
+        </svg>
+        {/* The ink is the same line, clipped to how far the reader has scrolled. */}
+        <svg className={`${s.evoLine} ${s.evoInk}`} viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" aria-hidden>
+          <path d={PATH} />
         </svg>
         {STOPS.map((st) => (
           <figure

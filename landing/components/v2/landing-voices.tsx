@@ -13,7 +13,7 @@ export interface Voice {
 // Long enough to read the longest quote.
 const DUR = 5000;
 
-/** Why Bluprint exists, then the same problem said at every size: one quote at a time, with a bar per quote that fills while it shows. */
+/** The same problem at every size: one quote at a time, with a bar per quote that fills while it shows. */
 export function LandingVoices({ voices }: { voices: Voice[] }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {
@@ -27,13 +27,9 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
       id="why"
       className={s.voices}
       aria-roledescription="carousel"
-      aria-labelledby="why-title"
+      aria-label="Who this happens to"
       style={{ "--n": voices.length, "--dur": `${DUR}ms` } as React.CSSProperties}
     >
-      <p className={`${s.eyebrow} ${s.reveal}`}>From big tech to solo developers</p>
-      <h2 id="why-title" className={s.reveal}>
-        Code got cheap. Understanding didn&rsquo;t.
-      </h2>
       <div className={`${s.voiceStage} ${s.reveal}`}>
         {voices.map((v, i) => (
           <figure key={v.quote} className={s.slide} data-on={i === at} aria-hidden={i !== at}>

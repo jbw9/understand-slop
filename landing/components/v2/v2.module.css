@@ -813,12 +813,6 @@
   border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
 }
-.voices h2 {
-  margin: 0 0 clamp(48px, 6vw, 80px);
-  font: 300 clamp(36px, 4.6vw, 72px) / 1 var(--display);
-  letter-spacing: -0.012em;
-  text-wrap: balance;
-}
 .voiceStage {
   display: grid;
 }
@@ -837,7 +831,7 @@
 .slide blockquote {
   max-width: 28ch;
   margin: 0 auto;
-  font: 300 clamp(26px, 3vw, 46px) / 1.15 var(--display);
+  font: 300 clamp(32px, 4.4vw, 68px) / 1.04 var(--display);
   letter-spacing: -0.012em;
   text-wrap: balance;
 }

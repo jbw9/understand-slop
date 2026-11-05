@@ -1,13 +1,13 @@
 ---
 name: demo-gif
-description: After a commit to jbw9/understand-slop that changes what a person sees in Bluprint (app/) or on the landing page (landing/) is pushed, record a short GIF of the change, add it to the `demos` prerelease, and post it as a comment on that commit. Use when a UI commit has been pushed, when the user asks for a demo or GIF of a change, or when they invoke /demo-gif. Skip commits that change only logic.
+description: After a commit to jbw9/bluprint that changes what a person sees in Bluprint (app/) or on the landing page (landing/) is pushed, record a short GIF of the change, add it to the `demos` prerelease, and post it as a comment on that commit. Use when a UI commit has been pushed, when the user asks for a demo or GIF of a change, or when they invoke /demo-gif. Skip commits that change only logic.
 ---
 
 # Demo GIF
 
 Each pushed UI change gets one GIF. The GIF plays in two places:
 - on the commit's page, as a commit comment
-- on the [`demos` prerelease](https://github.com/jbw9/understand-slop/releases/tag/demos), under the commit's title
+- on the [`demos` prerelease](https://github.com/jbw9/bluprint/releases/tag/demos), under the commit's title
 
 The repo stays small, because the GIF is a release asset and not a file in git. Use GIFs only. An MP4 release asset downloads instead of playing.
 

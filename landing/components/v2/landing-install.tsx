@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import s from "./v2.module.css";
 
-const CMD = "curl -fsSL https://raw.githubusercontent.com/jbw9/understand-slop/main/install.sh | sh";
+const CMD = "curl -fsSL https://raw.githubusercontent.com/jbw9/bluprint/main/install.sh | sh";
 
 /** The one-line install, the same on macOS and Linux, with a button that copies it. */
 export function LandingInstall() {

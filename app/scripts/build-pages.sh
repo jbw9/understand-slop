@@ -7,7 +7,7 @@ set -e
 site=$(cd "$1" && pwd)
 base=
 keep="kafka kafka-control-plane understand-slop"
-demos="fastapi:fastapi/full-stack-fastapi-template flask:pallets/flask ky:sindresorhus/ky bluprint:jbw9/understand-slop umami:umami-software/umami"
+demos="fastapi:fastapi/full-stack-fastapi-template flask:pallets/flask ky:sindresorhus/ky bluprint:jbw9/bluprint umami:umami-software/umami"
 
 for d in $demos; do
   map=${d%%:*}

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "A visual way to explore a codebase: start broad, go deeper, down to the line.",
 };
 
-const REPO = "jbw9/understand-slop";
+const REPO = "jbw9/bluprint";
 const GITHUB = `https://github.com/${REPO}`;
 
 // This repo first: the demo opens on the project explaining itself.

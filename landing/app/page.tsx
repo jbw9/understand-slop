@@ -22,7 +22,7 @@ const display = Zilla_Slab({ variable: "--font-display", subsets: ["latin"], wei
 const sans = IBM_Plex_Sans({ variable: "--font-body", subsets: ["latin"], display: "swap" });
 const mono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
-const REPO = "jbw9/understand-slop";
+const REPO = "jbw9/bluprint";
 const GITHUB = `https://github.com/${REPO}`;
 
 // This repo first: the demo opens on the project explaining itself.

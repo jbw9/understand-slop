@@ -1,12 +1,12 @@
 #!/bin/sh
 # Installs Bluprint on macOS or Linux, built from source:
-#   curl -fsSL https://raw.githubusercontent.com/jbw9/understand-slop/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/jbw9/bluprint/main/install.sh | sh
 # The source is kept in ~/.bluprint/src (BLUPRINT_DIR moves it); running this again updates and rebuilds.
 set -e
 
 # Everything happens inside main, called on the last line, so a download cut short runs nothing.
 main() {
-  repo=${BLUPRINT_REPO:-https://github.com/jbw9/understand-slop.git}
+  repo=${BLUPRINT_REPO:-https://github.com/jbw9/bluprint.git}
   ref=${BLUPRINT_REF:-main}
   dir=${BLUPRINT_DIR:-$HOME/.bluprint}/src
   os=$(uname)

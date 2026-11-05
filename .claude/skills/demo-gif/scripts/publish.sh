@@ -8,7 +8,7 @@ tag=demos
 [ -f "$gif" ] || { echo "no such file: $gif" >&2; exit 1; }
 case "$gif" in *.gif) ;; *) echo "only .gif files: $gif" >&2; exit 1 ;; esac
 
-repo=jbw9/understand-slop
+repo=jbw9/bluprint
 full=$(git rev-parse "$sha")
 short=$(git rev-parse --short "$sha")
 title=$(git log -1 --format=%s "$full")

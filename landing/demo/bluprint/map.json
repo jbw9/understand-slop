@@ -5,7 +5,7 @@
   "commit": "c0c5eac",
   "files": 109,
   "elapsed": "28 min",
-  "root": "/Users/jonathanmacmini/Desktop/Code/understand-slop",
+  "root": "/Users/jonathanmacmini/Desktop/Code/bluprint",
   "models": {
    "summarize": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
    "cut": "global.anthropic.claude-opus-4-6-v1",

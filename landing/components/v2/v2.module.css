@@ -618,7 +618,8 @@
   gap: 14px;
   height: 36px;
   padding: 0 8px 0 10px;
-  background: var(--ink);
+  /* The app's Classic bars, so the title bar runs on into the framed app's black tab strip. */
+  background: #0a0a0b;
   color: var(--on-ink);
 }
 /* The window's three buttons, as the sheet draws them: empty squares. */

@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # unstable: the preview opens pages from the web in a webview of their own (src/browser.rs).
-tauri = { version = "2", features = ["unstable", "tray-icon"] }
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

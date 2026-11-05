@@ -2,7 +2,6 @@
 # Installs Mira on macOS or Linux, built from source:
 #   curl -fsSL https://raw.githubusercontent.com/jbw9/understand-slop/main/install.sh | sh
 # The source is kept in ~/.mira/src (MIRA_DIR moves it); running this again updates and rebuilds.
-# On Windows, install.ps1 does the same.
 set -e
 
 # Everything happens inside main, called on the last line, so a download cut short runs nothing.
@@ -13,8 +12,7 @@ main() {
   os=$(uname)
   case $os in
   Darwin | Linux) ;;
-  *) die "This installs Mira on macOS and Linux. On Windows, run in PowerShell:
-  powershell -ExecutionPolicy Bypass -c \"iex (curl.exe -fsSL https://raw.githubusercontent.com/jbw9/understand-slop/main/install.ps1 | Out-String)\"" ;;
+  *) die "Mira installs on macOS and Linux." ;;
   esac
   # rustup's default place, for a shell opened before Rust was installed.
   [ -x "$HOME/.cargo/bin/cargo" ] && PATH="$HOME/.cargo/bin:$PATH"

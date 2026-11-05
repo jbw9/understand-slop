@@ -186,7 +186,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  /* The install line's systems hang below it; the buttons line up with its box. */
+  /* The install line's note hangs below it; the buttons line up with its box. */
   align-items: flex-start;
   gap: 12px;
 }
@@ -223,7 +223,7 @@
 .ghost:hover {
   border-color: var(--faint);
 }
-/* The install line: the command, its Copy button, then the systems under it. */
+/* The install line: the command and its Copy button, then a note under it. */
 .install {
   display: flex;
   flex-direction: column;
@@ -241,7 +241,7 @@
   border-radius: 12px;
   background: var(--white);
 }
-/* The Windows line is long: it scrolls in place, and Copy takes all of it. */
+/* At phone width the line scrolls in place, and Copy takes all of it. */
 .installBox code {
   flex: 1;
   min-width: 0;
@@ -265,31 +265,11 @@
   font-size: 14px;
 }
 .installOs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  margin: 0;
   padding-left: 4px;
   font-size: 13px;
+  text-align: left;
   color: var(--muted);
-}
-.installOs button {
-  padding: 3px 9px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-.installOs button:hover {
-  color: var(--ink);
-}
-.installOs button[aria-pressed="true"] {
-  background: var(--low);
-  color: var(--ink);
-}
-.installOs span {
-  margin-left: auto;
 }
 .startInstall {
   margin-top: 40px;

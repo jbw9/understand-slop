@@ -4,7 +4,7 @@ import s from "./landing.module.css";
 const STEPS = [
   {
     title: "Install the app.",
-    body: "One line in a terminal, on macOS, Linux or Windows. It builds Mira from source, and works through the Claude Code you already use, signed in with your Claude plan.",
+    body: "One line in a terminal, on macOS or Linux. It builds Mira from source, and works through the Claude Code you already use, signed in with your Claude plan.",
   },
   {
     title: "Import a folder.",
@@ -27,7 +27,7 @@ const QUESTIONS = [
   },
   {
     q: "What do I need?",
-    a: "A Mac, a Linux desktop or Windows, and Claude Code signed in with a Claude plan. Making a map counts against that plan's usage, like any other Claude Code session.",
+    a: "A Mac or a Linux desktop, and Claude Code signed in with a Claude plan. Making a map counts against that plan's usage, like any other Claude Code session.",
   },
   {
     q: "Which languages does it read?",
@@ -63,9 +63,8 @@ export function LandingStart({ github }: { github: string }) {
           <LandingInstall />
         </div>
         <p className={`${s.cap} ${s.reveal}`}>
-          It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The scripts are{" "}
-          <a href={`${github}/blob/main/install.sh`}>install.sh</a> and{" "}
-          <a href={`${github}/blob/main/install.ps1`}>install.ps1</a>, in <a href={github}>the source on GitHub</a>.
+          It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The script is{" "}
+          <a href={`${github}/blob/main/install.sh`}>install.sh</a>, in <a href={github}>the source on GitHub</a>.
         </p>
       </section>
       <section id="questions" className={s.section} aria-labelledby="questions-title">

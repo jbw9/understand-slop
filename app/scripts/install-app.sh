@@ -3,7 +3,7 @@
 #   builds the checkout as it is now (uncommitted changes too) into the installed Mira and the
 #   server it starts (src-tauri/src/server.rs), so `npm run app:dev` can rebuild and restart freely
 #   beside it. The snapshot is built next to the running one and swapped in at the end, so a Mira
-#   open while this runs keeps working until then. macOS and Linux; Windows is ../../install.ps1.
+#   open while this runs keeps working until then. macOS and Linux.
 set -e
 os=$(uname)
 case $os in

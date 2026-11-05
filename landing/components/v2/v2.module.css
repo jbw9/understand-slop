@@ -638,14 +638,6 @@
   font: 11.5px var(--mono);
   text-transform: uppercase;
 }
-.meta {
-  margin-left: auto;
-  padding-right: 4px;
-  font: 11px var(--mono);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.85;
-}
 .replay {
   height: 38px;
 }
@@ -1726,9 +1718,6 @@
   }
   .canvas {
     height: 600px;
-  }
-  .meta {
-    display: none;
   }
   .win {
     height: 330px;

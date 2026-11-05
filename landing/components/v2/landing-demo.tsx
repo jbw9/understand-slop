@@ -200,19 +200,17 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
         style={{ "--i": 4 } as React.CSSProperties}
       >
         <div className={s.canvas} data-drawn={!exploring}>
-          <div className={s.bar}>
-            <div aria-hidden className={s.lights}>
-              <span />
-              <span />
-              <span />
+          {/* The app brings its own strip along the top; only a drawing needs a bar to name its map. */}
+          {exploring ? null : (
+            <div className={s.bar}>
+              <div aria-hidden className={s.lights}>
+                <span />
+                <span />
+                <span />
+              </div>
+              <span className={s.project}>{shown.project}</span>
             </div>
-            {exploring ? null : <span className={s.project}>{shown.project}</span>}
-            {exploring ? (
-              <span className={s.meta}>
-                {current.files.toLocaleString("en-US")} files · {current.commit}
-              </span>
-            ) : null}
-          </div>
+          )}
           <div ref={stage} className={s.stage} data-ready={loaded === open}>
             {exploring && loaded !== open ? <p className={s.loading}>loading {current.id}…</p> : null}
             {/* Kept while another tab is open, so coming back finds the map where it was left. */}

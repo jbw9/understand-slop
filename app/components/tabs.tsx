@@ -256,7 +256,8 @@ export function SectionTabs({ path }: { path: string[] }) {
 
   if (framed)
     return (
-      <div role="tablist" data-chrome="bar" aria-label="Repository" className={TAB_STRIP}>
+      // On the landing page the strip is the sheet's, white with a line of its ink, not one of the app's black bars.
+      <div role="tablist" data-chrome aria-label="Repository" className={cn(TAB_STRIP, "shadow-[inset_0_-1px_0_var(--color-ink)]")}>
         {framed.repos.map((r, i) => (
           <SectionTab
             key={r.id}

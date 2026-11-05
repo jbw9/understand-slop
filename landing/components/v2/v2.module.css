@@ -326,12 +326,26 @@
 }
 .card {
   width: min(100%, 470px);
+  margin-top: 32px;
 }
 .card .install {
   width: 100%;
 }
 /* The cover keeps only the line and its button. */
-.card .installOs {
+.card .installBox .copy {
+  width: 44px;
+  padding: 0;
+}
+.copy svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.installOs {
   display: none;
 }
 .down {
@@ -1690,31 +1704,6 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* On a big screen the cover is tall, and a card in its far corner sits a long way from the claim it acts on.
-   There the card goes under the claim, and the two sit centred together beside the plate. */
-@media (min-width: 1600px) {
-  .cover {
-    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) auto;
-  }
-  .plate {
-    grid-row: 1 / 5;
-  }
-  .claim {
-    grid-row: 2;
-  }
-  .coverFoot {
-    display: contents;
-  }
-  .card {
-    grid-column: 2;
-    grid-row: 3;
-    margin-top: 32px;
-  }
-  .down {
-    grid-column: 1;
-    grid-row: 5;
-  }
-}
 @media (max-width: 1180px) {
   .canvas[data-drawn="true"] {
     height: auto;

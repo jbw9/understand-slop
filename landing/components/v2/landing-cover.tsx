@@ -53,15 +53,15 @@ export function LandingCover() {
           </span>{" "}
           until you reach the code.
         </p>
+        <div className={s.card}>
+          <LandingInstall />
+        </div>
       </div>
 
       <div className={s.coverFoot}>
         <a className={s.down} href="#app">
           Scroll to open the app <span aria-hidden>↓</span>
         </a>
-        <div className={s.card}>
-          <LandingInstall />
-        </div>
       </div>
     </section>
   );

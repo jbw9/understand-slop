@@ -769,6 +769,14 @@
   font-weight: 600;
   color: var(--ink);
 }
+.slide figcaption a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--strong);
+}
+.slide figcaption a:hover {
+  color: var(--ink);
+}
 .progress {
   display: grid;
   grid-template-columns: repeat(var(--n), 1fr);
@@ -1207,98 +1215,6 @@
   color: var(--variant);
 }
 
-/* ── why ──────────────────────────────────────────────── */
-.story {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 56px;
-  margin-top: 14px;
-}
-.story .intro {
-  max-width: none;
-}
-/* Each problem: what developers say, who said it, then what Mira does about it. */
-.problems {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 56px;
-  margin-top: 64px;
-}
-.problems article {
-  padding: 28px 0 36px;
-  border-top: 1px solid var(--border);
-}
-.problems h3 {
-  margin: 0;
-  font-size: clamp(20px, 1.8vw, 26px);
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-  font-weight: 500;
-}
-.problems blockquote {
-  margin: 16px 0 0;
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--variant);
-}
-.problems cite {
-  display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  font-style: normal;
-  color: var(--muted);
-}
-.problems cite a,
-.reading a,
-.slide figcaption a {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--strong);
-}
-.problems cite a:hover,
-.reading a:hover,
-.slide figcaption a:hover {
-  color: var(--ink);
-}
-.answer {
-  margin: 20px 0 0;
-  padding-left: 14px;
-  border-left: 2px solid var(--green);
-  font-size: 16px;
-  line-height: 1.6;
-}
-.answer b {
-  margin-right: 5px;
-  font-weight: 600;
-}
-.reading {
-  margin-top: 40px;
-  padding-top: 28px;
-  border-top: 1px solid var(--border);
-}
-.reading h3 {
-  margin: 0 0 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-}
-.reading ul {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.reading li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  font-size: 15px;
-}
-.reading span {
-  color: var(--muted);
-}
-
 /* ── beside your agent ───────────────────────────────── */
 .section {
   margin-top: var(--gap);
@@ -1580,13 +1496,8 @@
     display: none;
   }
   .agent,
-  .steps,
-  .story,
-  .problems {
+  .steps {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .problems {
-    margin-top: 40px;
   }
   .steps::before {
     display: none;

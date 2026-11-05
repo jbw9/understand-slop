@@ -1570,8 +1570,12 @@
 .end {
   display: grid;
   grid-template-columns: 2fr 2fr 1fr 1.2fr 0.8fr;
-  margin: var(--gap) 0 var(--gutter);
+  margin: var(--gap) 0 0;
   border: 1px solid var(--ink);
+}
+/* Padding, not the block's margin, which would collapse through the sheet's edge. */
+.paper > footer {
+  padding-bottom: var(--gutter);
 }
 .end > div {
   min-width: 0;
@@ -1700,11 +1704,13 @@
   font: 11.5px var(--mono);
   letter-spacing: 0.04em;
 }
+/* Under the sheet, on the desk. */
 .credits {
   max-width: 80em;
-  margin: 0 0 var(--gutter);
+  margin: 0;
+  padding: var(--edge) var(--gutter) 0;
   font: 10.5px/1.6 var(--mono);
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 @media (max-width: 1180px) {

@@ -233,14 +233,14 @@ export default function Landing() {
             <dd>1 of 1</dd>
           </div>
         </dl>
-        <p className={s.credits}>
-          Pictures, all public domain, from Wikimedia Commons: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
-          ENIAC, U.S. Army; Grace Hopper, U.S. Navy; Margaret Hamilton with the Apollo flight software, Draper Laboratory;
-          Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; James Montgomery Flagg&rsquo;s <i>I Want You</i>, 1917; Michelangelo&rsquo;s{" "}
-          <i>The Creation of Adam</i>.
-        </p>
       </footer>
       </div>
+      <p className={s.credits}>
+        Pictures, all public domain, from Wikimedia Commons: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
+        ENIAC, U.S. Army; Grace Hopper, U.S. Navy; Margaret Hamilton with the Apollo flight software, Draper Laboratory;
+        Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; James Montgomery Flagg&rsquo;s <i>I Want You</i>, 1917; Michelangelo&rsquo;s{" "}
+        <i>The Creation of Adam</i>.
+      </p>
     </div>
   );
 }

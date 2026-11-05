@@ -7,7 +7,7 @@
  * the graph resolved them by name (inferred).
  */
 import type { Tool } from "./bedrock";
-import type { Def, Edge, Graph } from "./graph";
+import { unparsedSource, type Def, type Edge, type Graph } from "./graph";
 
 export const GRAPH_TOOLS: Tool[] = [
   {
@@ -27,7 +27,7 @@ export const GRAPH_TOOLS: Tool[] = [
   },
   {
     name: "graph_file",
-    description: "Outline one file: what it is for, every function, method and class in it with line ranges and what each does, then which files it uses and which files use it.",
+    description: "Outline one file: what it is for, every function, method and class in it with line ranges and what each does, then which files it uses and which files use it. For a file the graph cannot parse (an Astro, Vue or Svelte file, or a language it has no grammar for) it shows the file's numbered lines instead, so you can cite one.",
     input_schema: { type: "object", required: ["path"], properties: { path: { type: "string" } } },
   },
   {
@@ -67,6 +67,8 @@ function index(g: Graph): Index {
     ix.out.set(e.from, [...(ix.out.get(e.from) ?? []), e]);
     ix.in.set(e.to, [...(ix.in.get(e.to) ?? []), e]);
     if (e.kind === "imports") ix.files.add(e.from).add(e.to);
+    // A link found by name in a file with no grammar starts or ends at the file itself.
+    for (const end of [e.from, e.to]) if (!ix.byId.has(end)) ix.files.add(end);
   }
   indexes.set(g, ix);
   return ix;
@@ -107,10 +109,13 @@ function find(g: Graph, ix: Index, name: string): string {
   return hits.slice(0, 30).map((d) => `${d.id}  ${d.kind}  ${d.file}:${d.start}-${d.end}  ← ${ix.in.get(d.id)?.length ?? 0} callers, → ${ix.out.get(d.id)?.length ?? 0} callees${d.does ? `\n    ${d.does}` : ""}`).join("\n") + (hits.length > 30 ? `\n… ${hits.length - 30} more; narrow the name` : "");
 }
 
+/** How much of a file with no grammar graph_file shows: a page or component, not a dump. */
+const SOURCE_LINES = 300;
+
 function outline(g: Graph, ix: Index, path: string): string {
   const p = path.trim().replace(/^\.?\//, "");
   const defs = g.defs.filter((d) => d.file === p);
-  if (!defs.length && !ix.files.has(p)) return `No code file ${p} in the graph.`;
+  if (!defs.length && !ix.files.has(p) && unparsedSource(g, p) === null) return `No code file ${p} in the graph.`;
   const depth = (d: Def): number => (d.parent ? 1 + depth(ix.byId.get(d.parent)!) : 0);
   const body = defs.map((d) => `${"  ".repeat(depth(d))}${d.start}-${d.end} ${d.name} (${d.kind})${d.does ? ` — ${d.does}` : ""}`).join("\n");
   const outFiles = new Map<string, number>();
@@ -121,7 +126,11 @@ function outline(g: Graph, ix: Index, path: string): string {
     for (const e of ix.in.get(id) ?? []) if (fileOf(ix, e.from) !== p) inFiles.set(fileOf(ix, e.from), (inFiles.get(fileOf(ix, e.from)) ?? 0) + 1);
   }
   const list = (m: Map<string, number>) => [...m].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([f, n]) => `  ${f} (${n})`).join("\n") || "  nothing";
-  return `${p}${g.about?.[p] ? `\n${g.about[p]}` : ""}\n${body || "  (no functions or classes)"}\nUses:\n${list(outFiles)}\nUsed by:\n${list(inFiles)}`;
+  // No grammar read it, so its lines are the outline: the only way to see where it uses what.
+  const src = unparsedSource(g, p);
+  const shown = src && src.split("\n").slice(0, SOURCE_LINES);
+  const text = shown ? `\nThe graph cannot parse this file, so here are its lines${src!.split("\n").length > SOURCE_LINES ? ` (the first ${SOURCE_LINES})` : ""}; a link from it was found by name and is inferred:\n${shown.map((l, i) => `${String(i + 1).padStart(4)}  ${l}`).join("\n")}` : "";
+  return `${p}${g.about?.[p] ? `\n${g.about[p]}` : ""}\n${body || (src ? "" : "  (no functions or classes)")}${text}\nUses:\n${list(outFiles)}\nUsed by:\n${list(inFiles)}`;
 }
 
 function neighbours(g: Graph, ix: Index, name: string, dir: "in" | "out"): string {

@@ -56,8 +56,8 @@ export interface Graph {
   about?: Record<string, string>;
   defs: Def[];
   edges: Edge[];
-  /** Files parsed, calls left out because their name had several candidates, and how long the build took. */
-  stats: { files: number; parsed: number; calls: number; resolved: number; ambiguous: number; ms: number };
+  /** Files parsed, calls left out because their name had several candidates, links found by name in files with no grammar, and how long the build took. */
+  stats: { files: number; parsed: number; calls: number; resolved: number; ambiguous: number; mentions?: number; ms: number };
 }
 
 /** Which grammar and which tags query each extension reads with. */
@@ -105,9 +105,12 @@ function language(name: string): Promise<Language> {
   if (!languages.has(name)) languages.set(name, Language.load(req.resolve(`tree-sitter-wasms/out/tree-sitter-${name}.wasm`)));
   return languages.get(name)!;
 }
+/** Grammars that parse JSX: their tags query also reads a component used in markup as a call to it (tags/jsx.scm). */
+const JSX = new Set(["tsx", "javascript"]);
+const tagsOf = (name: string) => readFileSync(join(process.cwd(), "scripts/generate/tags", `${name}.scm`), "utf8");
 function query(lang: Language, wasm: string, tags: string): Query {
   const key = `${wasm}:${tags}`;
-  if (!queries.has(key)) queries.set(key, new Query(lang, readFileSync(join(process.cwd(), "scripts/generate/tags", `${tags}.scm`), "utf8")));
+  if (!queries.has(key)) queries.set(key, new Query(lang, tagsOf(tags) + (JSX.has(wasm) ? `\n${tagsOf("jsx")}` : "")));
   return queries.get(key)!;
 }
 
@@ -234,6 +237,37 @@ function describe(lines: string[], start: number, end: number): { head?: string;
   return { ...(head ? { head } : {}), ...(doc ? { doc: doc.slice(0, DOC_CHARS) } : {}) };
 }
 
+/** Lines that bring names in rather than use them, in any language: `import`, `from x import`, `use`, `#include`, `require(...)`. */
+const IMPORT_LINE = /^\s*(import\b|from\s+\S+\s+import\b|export\s+(\*|\{[^}]*\})\s+from\b|use\s+[\w:]|#include\b|(const|let|var)\s+[\w{},\s]+=\s*require\()/;
+
+/**
+ * Which lines of a file only import: IMPORT_LINE, and the lines a JavaScript
+ * `import {` spans until its `from`. Names on them are not uses.
+ */
+function importLines(lines: string[]): boolean[] {
+  const out: boolean[] = [];
+  let open = false;
+  for (const l of lines) {
+    const starts = IMPORT_LINE.test(l);
+    out.push(open || starts);
+    if (starts && /^\s*import\b/.test(l) && !/\bfrom\b|["'];?\s*$/.test(l)) open = true;
+    else if (open && /\bfrom\b/.test(l)) open = false;
+  }
+  return out;
+}
+
+/** The names code calls a file by: `image-zoom.astro` → image_zoom, imageZoom, ImageZoom; `base.astro` → Base. */
+function namesOfFile(path: string): string[] {
+  const base = stem(path);
+  const words = base.split(/[-_.\s]+/).filter(Boolean);
+  if (!words.length) return [];
+  const pascal = words.map((w) => w[0].toUpperCase() + w.slice(1)).join("");
+  // A plain lowercase word (`base`, `article`) is as likely prose as a use; only its other spellings count.
+  return [...new Set([base, words.join("_"), pascal[0].toLowerCase() + pascal.slice(1), pascal])].filter((n) => /^[A-Za-z_$][\w$]*$/.test(n) && n.length >= 3 && !/^[a-z]+$/.test(n));
+}
+
+const escape = (s: string) => s.replace(/[$]/g, "\\$");
+
 /**
  * Lays the summarize stage's reading onto the graph: what each file is for,
  * and what each symbol it named does, onto the definition of that name whose
@@ -254,6 +288,14 @@ export function withSummaries(g: Graph, sums: Record<string, { purpose: string; 
   }
   return g;
 }
+
+/**
+ * The text of each code file the graph found no grammar for, so graph_file
+ * can show its numbered lines: there is no other way for an author to see a
+ * line in it. Kept beside the graph, not in graph.json.
+ */
+const unparsedText = new WeakMap<Graph, Map<string, string>>();
+export const unparsedSource = (g: Graph, path: string) => unparsedText.get(g)?.get(path) ?? null;
 
 let active: Graph | null = null;
 /** The graph this run draws from: authors' graph tools answer from it, and the checker proves arrows against it. */
@@ -284,9 +326,17 @@ async function compile(inv: Inventory): Promise<Graph> {
   const tests = new Set(code.filter((f) => f.test).map((f) => f.path));
   let parsed = 0;
   const parsedFiles: string[] = [];
+  const unparsed = new Map<string, string>();
   for (const f of code) {
     const g = GRAMMAR[extname(f.path).toLowerCase()];
-    if (!g) continue;
+    if (!g) {
+      try {
+        unparsed.set(f.path, readFileSync(join(inv.repo, f.path), "utf8"));
+      } catch {
+        /* unreadable: left out, as a parsed file would be */
+      }
+      continue;
+    }
     let text: string;
     try {
       text = readFileSync(join(inv.repo, f.path), "utf8");
@@ -415,16 +465,55 @@ async function compile(inv: Inventory): Promise<Graph> {
     }
   }
 
+  // Mentions. A file with no grammar (an Astro page, a Vue or Svelte
+  // component, a language not listed) is still read: each name of a thing it
+  // imports, used on a line that is not an import, is a link from it on that
+  // line — and so is any file's use of a grammarless file it imports, by the
+  // names code calls that file (<Base> for base.astro). Matched by name, not
+  // parsed, so every such link is `inferred`.
+  let mentions = 0;
+  for (const f of code) {
+    const text = unparsed.get(f.path) ?? perFile.get(f.path)?.text;
+    if (text === undefined) continue;
+    const near = (inv.imports[f.path] ?? []).filter((p) => p !== f.path);
+    const targets = new Map<string, Set<string>>();
+    const want = (name: string, to: string) => {
+      if (GENERIC.has(name)) return;
+      targets.set(name, (targets.get(name) ?? new Set()).add(to));
+    };
+    if (unparsed.has(f.path)) for (const d of defs) if (!d.parent && near.includes(d.file) && d.name.length >= 2) want(d.name, d.id);
+    for (const p of near) if (unparsed.has(p)) for (const n of namesOfFile(p)) want(n, p);
+    if (!targets.size) continue;
+    const spans = perFile.get(f.path)?.spans ?? [];
+    const lines = text.split("\n");
+    const skip = importLines(lines);
+    const pattern = new RegExp(`(?<![\\w$.])(${[...targets.keys()].sort((a, b) => b.length - a.length).map(escape).join("|")})(?![\\w$])`, "g");
+    let offset = 0;
+    for (let i = 0; i < lines.length; offset += lines[i].length + 1, i++) {
+      if (skip[i] || COMMENT.test(lines[i])) continue;
+      for (const m of lines[i].matchAll(pattern)) {
+        const tos = targets.get(m[1])!;
+        // A name two imported things share is left out, as an ambiguous call is.
+        if (tos.size !== 1) continue;
+        const from = within(spans, offset + m.index!) ?? f.path;
+        add(from, [...tos][0], "calls", "inferred", i + 1);
+        mentions++;
+      }
+    }
+  }
+
   for (const [a, bs] of Object.entries(inv.imports)) {
     const lang = langOf(a);
     for (const b of bs) add(a, b, "imports", lang && PARSED_IMPORTS.has(lang) ? "extracted" : "inferred");
   }
 
-  return {
+  const graph: Graph = {
     commit: inv.commit,
     files: parsedFiles,
     defs,
     edges: [...edges.values()],
-    stats: { files: code.length, parsed, calls, resolved, ambiguous, ms: Date.now() - t0 },
+    stats: { files: code.length, parsed, calls, resolved, ambiguous, mentions, ms: Date.now() - t0 },
   };
+  unparsedText.set(graph, unparsed);
+  return graph;
 }

@@ -14,7 +14,7 @@ const count = (k: string, h: string) => g.edges.filter((e) => e.kind === k && e.
 console.log(`${inv.name} @ ${g.commit}: ${g.stats.parsed}/${g.stats.files} code files parsed in ${g.stats.ms} ms`);
 console.log(`  ${g.defs.length} definitions`);
 for (const k of ["calls", "inherits", "imports"]) console.log(`  ${k}: ${count(k, "extracted")} extracted, ${count(k, "inferred")} inferred`);
-console.log(`  calls: ${g.stats.resolved} of ${g.stats.calls} call sites resolved, ${g.stats.ambiguous} left out as ambiguous`);
+console.log(`  calls: ${g.stats.resolved} of ${g.stats.calls} call sites resolved, ${g.stats.ambiguous} left out as ambiguous, ${g.stats.mentions ?? 0} found by name in files with no grammar`);
 if (opt("--out")) writeFileSync(opt("--out")!, JSON.stringify(g) + "\n");
 const q = opt("--ask");
 if (q) {

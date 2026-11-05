@@ -35,7 +35,7 @@ export function LandingCover({ github }: { github: string }) {
       <div className={s.claim}>
         <h1 id="cover-title" className={s.coverTitle}>
           Understand <Spark /> the code{" "}
-          <span className={s.inline} style={{ "--r": "0.8" } as React.CSSProperties}>
+          <span className={s.inline} style={{ "--r": "0.63" } as React.CSSProperties}>
             <img src={img("hamilton")} alt="Margaret Hamilton beside the printed source code of the Apollo guidance software" />
           </span>{" "}
           <span className={s.boxed}>

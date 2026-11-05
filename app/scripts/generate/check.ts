@@ -42,6 +42,40 @@ export function fileReader(repo: string) {
   };
 }
 
+// An import, package line, comment or lone bracket, in any language the inventory reads.
+const IMPORT = /^\s*(import\b|export\s+(\*|\{[^}]*\}|type\s*\{[^}]*\})\s*from\b|from\s+\S+\s+import\b|package\s+[\w.]+\s*;?\s*$|using\s+(static\s+)?[\w.]+(\s*=\s*[\w.<>]+)?\s*;|namespace\s+[\w.\\]+\s*[;{]?\s*$|use\s+[\w:\\{]|(pub(\([\w:]+\))?\s+)?mod\s+\w+\s*;|extern\s+crate\b|#\s*(include|import)\b|require(_relative|_once)?[\s(]+['"]|(const|let|var)\s+[\w{}\s,]+=\s*require\(['"][^'"]+['"]\);?\s*$|alias\s+[A-Z]|part\s+(of\s+)?['"])/;
+const COMMENT = /^\s*(\/\/|\/\*|\*|#(?!\s*(include|import|define|if|else|endif|pragma)\b)(?![[!])|--|;;)/;
+const BRACKETS = /^[\s{}()[\];,]*(end)?[\s;]*$/;
+const OPEN_BLOCK = /^\s*(import\s+(type\s+)?\{[^}]*$|export\s+(type\s+)?\{[^}]*$|import\s*\($|from\s+\S+\s+import\s*\($|use\s+[\w:]+::\{[^}]*$)/;
+const CLOSES_BLOCK = /[)}]/;
+const bareMemo = new WeakMap<string[], boolean[]>();
+
+/**
+ * Per line: true when it does nothing — an import, comment or bracket. An
+ * arrow citing one of these points at where a file names the other, not where
+ * it calls it, which is what the reader clicks the arrow to see.
+ */
+export function bareLines(lines: string[]): boolean[] {
+  const memo = bareMemo.get(lines);
+  if (memo) return memo;
+  const out: boolean[] = [];
+  let block: "import" | "comment" | "doc" | "string" | null = null;
+  const quotes = (l: string) => (l.match(/"""|'''/g) ?? []).length;
+  for (const l of lines) {
+    if (block === "comment") { out.push(true); if (l.includes("*/")) block = null; continue; }
+    // A docstring is bare; a string assigned with `x = """` is data, and its closing quotes open nothing.
+    if (block === "doc" || block === "string") { out.push(block === "doc"); if (quotes(l) % 2) block = null; continue; }
+    if (block === "import") { out.push(true); if (CLOSES_BLOCK.test(l)) block = null; continue; }
+    const t = l.trim();
+    if (t.startsWith("/*") && !t.includes("*/")) block = "comment";
+    else if (quotes(l) % 2) block = /^("""|''')/.test(t) ? "doc" : "string";
+    else if (OPEN_BLOCK.test(l)) block = "import";
+    out.push(block === "doc" || block === "comment" || block === "import" || IMPORT.test(l) || COMMENT.test(l) || BRACKETS.test(l) || /^("""|''').*("""|''')$/.test(t));
+  }
+  bareMemo.set(lines, out);
+  return out;
+}
+
 /**
  * `generated` adds the rules a generated map lives under (D45): no hand-drawn
  * figures, no screenshots, no pasted source, only brand marks that have a
@@ -108,6 +142,11 @@ export function check(
           cells.add(c);
           if (explain && x.opens) problems.push(`EXPLAIN ${owner} box "${x.id}" opens "${x.opens}" — an explainer's picture opens nothing; the level's own diagram is the way down`);
           else if (x.opens && !built.get(owner)?.has(x.opens)) problems.push(`DIAGRAM ${owner} box "${x.id}" opens "${x.opens}", which is not a child of ${owner}`);
+          if (x.ref !== undefined) {
+            const m = /^(.+?)(?::(\d+)(?:-(\d+))?)?$/.exec(x.ref);
+            if (x.opens) problems.push(`DIAGRAM ${owner} box "${x.id}" has both opens and ref — a box opens its child, or points at code another section explains`);
+            else if (!m || !linesOf(m[1]) || (m[2] && !inRange(m[1], +m[2], +(m[3] ?? m[2])))) problems.push(`DIAGRAM ${owner} box "${x.id}" ref "${x.ref}" is not a file:line in the repository`);
+          }
         }
         for (const a of b.arrows) {
           for (const e of [a.from, a.to])
@@ -117,6 +156,8 @@ export function check(
             const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(a.at ?? "");
             if (!m) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites no line — give \`at\` as file:line where this path happens`);
             else if (!inRange(m[1], +m[2], +(m[3] ?? m[2]))) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites ${a.at}, which does not exist`);
+            else if (bareLines(linesOf(m[1])!).slice(+m[2] - 1, +(m[3] ?? m[2])).every(Boolean))
+              problems.push(`ARROW ${owner} ${a.from}→${a.to} cites ${a.at}, which is only imports, comments or brackets — cite the line where ${a.from} calls, writes or sends to ${a.to}`);
           }
         }
         if (gen && b.arrows.every((a: any) => b.boxes.some((x: any) => x.id === a.from) && b.boxes.some((x: any) => x.id === a.to)))
@@ -198,7 +239,7 @@ export function check(
   if (!opts.only) {
     // The repository's own level (D60) is held to what any level is.
     if (map.OVERVIEW) walk({ ...map.OVERVIEW, id: OVERVIEW_ID, title: "Overview", sub: map.OVERVIEW.sub ?? "", children: [] }, 0);
-    if (gen && map.OVERVIEW) problems.push(...startProblems(map.OVERVIEW, (p) => p.length > 0 && tree.nodeAt(p) !== null, level));
+    if (gen && map.OVERVIEW) problems.push(...startProblems(map.OVERVIEW, (p) => p.length > 0 && tree.nodeAt(p) !== null, level, L0.length));
   }
   return { problems, roots, refs, sources };
 }
@@ -302,25 +343,38 @@ function stepProblems(n: any): string[] {
   return out;
 }
 
-/** The repository level's way in for a first-time reader: a glossary and one walkthrough whose steps open real parts. */
-function startProblems(o: any, resolves: (path: string[]) => boolean, level: ExplainLevel): string[] {
+/** Walkthroughs on the top level, and steps in each. */
+export const WALKS = [2, 3];
+export const WALK_STEPS = [3, 8];
+
+/**
+ * The repository level's way in: a glossary for a first-time reader, and at
+ * every explain level 2-3 walkthroughs whose steps open real parts. They are
+ * the map's answer to "what happens end to end", so none is left to one root.
+ */
+function startProblems(o: any, resolves: (path: string[]) => boolean, level: ExplainLevel, roots: number): string[] {
   const out: string[] = [];
-  if (level === "none") return out;
-  const { terms, steps, words: who } = BOUNDS[level];
-  const g: any[] = o.glossary ?? [];
-  if (g.length < terms[0] || g.length > terms[1]) out.push(`GLOSSARY ${OVERVIEW_ID} has ${g.length} terms (want ${terms[0]}-${terms[1]}) — the words ${who}`);
-  for (const t of g)
-    if (typeof t?.term !== "string" || typeof t?.meaning !== "string" || !t.meaning.trim()) out.push(`GLOSSARY ${OVERVIEW_ID} term needs term and meaning`);
-    else if (words(t.meaning) > 25) out.push(`GLOSSARY ${OVERVIEW_ID} "${t.term}" — ${words(t.meaning)} words (max 25)`);
-  const w = o.walkthrough;
-  if (!w || typeof w.title !== "string" || !Array.isArray(w.steps)) out.push(`WALK ${OVERVIEW_ID} has no walkthrough — one concrete thing followed through the roots, each step opening the part where it happens`);
-  else {
-    if (w.steps.length < steps[0] || w.steps.length > steps[1]) out.push(`WALK ${OVERVIEW_ID} has ${w.steps.length} steps (want ${steps[0]}-${steps[1]})`);
-    w.steps.forEach((s: any, i: number) => {
-      if (typeof s?.title !== "string" || typeof s?.detail !== "string") out.push(`WALK ${OVERVIEW_ID} step ${i + 1} needs title and detail`);
-      if (!Array.isArray(s?.path) || !resolves(s.path)) out.push(`WALK ${OVERVIEW_ID} step ${i + 1} path ${JSON.stringify(s?.path)} is not a part of the map — ids from a root down`);
-    });
+  if (level !== "none") {
+    const { terms, words: who } = BOUNDS[level];
+    const g: any[] = o.glossary ?? [];
+    if (g.length < terms[0] || g.length > terms[1]) out.push(`GLOSSARY ${OVERVIEW_ID} has ${g.length} terms (want ${terms[0]}-${terms[1]}) — the words ${who}`);
+    for (const t of g)
+      if (typeof t?.term !== "string" || typeof t?.meaning !== "string" || !t.meaning.trim()) out.push(`GLOSSARY ${OVERVIEW_ID} term needs term and meaning`);
+      else if (words(t.meaning) > 25) out.push(`GLOSSARY ${OVERVIEW_ID} "${t.term}" — ${words(t.meaning)} words (max 25)`);
   }
+  const ws: any[] = Array.isArray(o.walkthroughs) ? o.walkthroughs : [];
+  if (ws.length < WALKS[0] || ws.length > WALKS[1])
+    out.push(`WALK ${OVERVIEW_ID} has ${ws.length} walkthroughs (want ${WALKS[0]}-${WALKS[1]}) — the core things this system does, each followed through the roots, each step opening the part where it happens`);
+  ws.forEach((w, k) => {
+    if (typeof w?.title !== "string" || !Array.isArray(w?.steps)) return out.push(`WALK ${OVERVIEW_ID} walkthrough ${k + 1} needs title and steps`);
+    if (w.steps.length < WALK_STEPS[0] || w.steps.length > WALK_STEPS[1]) out.push(`WALK ${OVERVIEW_ID} "${w.title}" has ${w.steps.length} steps (want ${WALK_STEPS[0]}-${WALK_STEPS[1]})`);
+    w.steps.forEach((s: any, i: number) => {
+      if (typeof s?.title !== "string" || typeof s?.detail !== "string") out.push(`WALK ${OVERVIEW_ID} "${w.title}" step ${i + 1} needs title and detail`);
+      if (!Array.isArray(s?.path) || !resolves(s.path)) out.push(`WALK ${OVERVIEW_ID} "${w.title}" step ${i + 1} path ${JSON.stringify(s?.path)} is not a part of the map — ids from a root down`);
+    });
+    const crossed = new Set(w.steps.map((s: any) => (Array.isArray(s?.path) ? s.path[0] : undefined)).filter(Boolean));
+    if (crossed.size < Math.min(2, roots)) out.push(`WALK ${OVERVIEW_ID} "${w.title}" stays inside one root — a walkthrough follows one thing across the roots it passes through`);
+  });
   return out;
 }
 

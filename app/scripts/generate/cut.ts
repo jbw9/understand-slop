@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import { ask, type Message } from "./bedrock";
 import { SUB_WORDS, words } from "./check";
-import { isSource, type Inventory } from "./inventory";
+import { isSource, type Inventory, type RepoFile } from "./inventory";
 import { fit, oneLine, type FileSummary } from "./summarize";
 
 export interface Root {
@@ -134,10 +134,13 @@ export async function cutRepo(inv: Inventory, sums: Record<string, FileSummary>,
   // each change would otherwise re-cut every repository and rename its roots.
   const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
   const rules = all.slice(0, all.indexOf("## What a level shows"));
+  // How many files import each: the shared code Foundations is for, seen rather than guessed from names.
+  const fanIn = new Map<string, number>();
+  for (const tos of Object.values(inv.imports)) for (const to of tos) fanIn.set(to, (fanIn.get(to) ?? 0) + 1);
   const listing = fit(
     inv.files.filter(isSource),
     sums,
-    (f) => (sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`),
+    (f) => `${sums[f.path] ? oneLine(sums[f.path]) : `${f.path} (${f.lines} lines)`}${(fanIn.get(f.path) ?? 0) >= 3 ? ` · imported by ${fanIn.get(f.path)} files` : ""}`,
     LISTING_BUDGET,
   );
   const other = inv.files.filter((f) => (!f.code || f.test) && !f.outside).map((f) => f.path);
@@ -240,6 +243,8 @@ export async function place(
 ): Promise<{ cut: Cut; gained: Map<string, string[]>; added: Root[] }> {
   const all = readFileSync("scripts/generate/prompts/rules.md", "utf8");
   const rules = all.slice(0, all.indexOf("## What a level shows"));
+  const byPath = new Map(inv.files.map((f) => [f.path, f]));
+  const dirs = new Set(files.map((p) => p.slice(0, p.lastIndexOf("/") + 1)));
   const messages: Message[] = [
     {
       role: "user",
@@ -248,8 +253,12 @@ export async function place(
         `## The map's top level — ${cut.about}\n${cut.roots
           .map((r) => `- ${r.id} (prefix ${r.prefix}): ${r.title} — ${r.sub}\n  ${r.why}\n  owns: ${r.files.slice(0, 25).join(", ")}${r.files.length > 25 ? `, … ${r.files.length - 25} more` : ""}`)
           .join("\n")}`,
-        `## New source files (${files.length}), in no root yet\n${files.map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}`,
-        `## Other files beside them (markup, styles, config) — a directory claim takes these too\n${inv.files.filter((f) => !f.code && files.some((p) => p.slice(0, p.lastIndexOf("/") + 1) === f.path.slice(0, f.path.lastIndexOf("/") + 1))).map((f) => f.path).join("\n") || "(none)"}`,
+        ((listed) => `## New source files (${files.length}), in no root yet${listed.folded ? "\nToo many to list one by one, so the deepest directories are folded into a line each; place a folded directory whole by its path ending in '/'." : ""}\n${listed.text}`)(
+          fit(files.map((p) => byPath.get(p)).filter((f): f is RepoFile => !!f), sums, (f) => (sums[f.path] ? oneLine(sums[f.path]) : f.path), LISTING_BUDGET / 2),
+        ),
+        ((others) => `## Other files beside them (markup, styles, config) — a directory claim takes these too\n${others.slice(0, 400).join("\n") || "(none)"}${others.length > 400 ? `\n… and ${others.length - 400} more` : ""}`)(
+          inv.files.filter((f) => !f.code && dirs.has(f.path.slice(0, f.path.lastIndexOf("/") + 1))).map((f) => f.path),
+        ),
         `Give every new file a root. Put it in the existing root whose work it does — a file a feature uses goes with that feature, shared code in Foundations if there is one. Add a new root only for files that are a new thing someone does, which no root covers now: a new page, a new command, a new flow. Its id must not match an existing root's and its prefix must be new. Exclude only what a full cut would: generated, vendored, dead, or config with no logic of its own.
 Call the place tool once.`,
       ].join("\n\n"),
@@ -271,7 +280,7 @@ Call the place tool once.`,
     }
     for (const x of p.placed) if (!ids.has(x.root)) out.push(`${x.path}: no root "${x.root}"`);
     const missing = files.filter((f) => ![...p.placed, ...p.excluded].some((x) => covers(x.path, f)));
-    if (missing.length) out.push(`${missing.length} new files are placed nowhere:\n${missing.join("\n")}`);
+    if (missing.length) out.push(`${missing.length} new files are placed nowhere:\n${missing.slice(0, 200).join("\n")}${missing.length > 200 ? `\n… and ${missing.length - 200} more` : ""}`);
     return out;
   };
 

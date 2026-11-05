@@ -47,7 +47,7 @@ import { bill, cacheIn, MODELS } from "./bedrock";
 import { ccClose, type Handled } from "./claude-code";
 import { check, fixedNote, tally } from "./check";
 import { owners, place, unclaimed, type Cut, type Root } from "./cut";
-import { inventory, isSource, type Inventory } from "./inventory";
+import { inventory, isSource, scopeTo, type Inventory } from "./inventory";
 import { plain, redrawOverview } from "./pipeline";
 import { idsOf, submitProblems } from "./schema";
 import { full, oneLine, summarize, type FileSummary } from "./summarize";
@@ -362,6 +362,14 @@ export async function update(args: string[]) {
   if (corrections.length) console.log(`${corrections.length} corrections from the agent${unmatched.length ? `; no section named ${unmatched.join(", ")}` : ""}`);
 
   const inv = inventory(repo);
+  // A scoped map keeps to its part. One made before the scope was saved covers
+  // far fewer files than the checkout holds; what its cut claims is its part.
+  // Without this, an update of a map of Kafka's controller tried to place the
+  // other 3,490 files of Kafka, and failed on the prompt's length.
+  const legacy = !map.RUN.scope && map.RUN.files < inv.files.length / 2;
+  const scope = map.RUN.scope ?? (legacy ? { paths: [...new Set(cut.roots.flatMap((r) => r.files))], focus: "" } : undefined);
+  if (scope) scopeTo(inv, scope);
+  if (legacy) console.log(`a scoped map from before scopes were saved: keeping to the ${scope!.paths.length} paths its roots claim`);
   const isCode = new Map(inv.files.map((f) => [f.path, isSource(f)]));
   const citedAnywhere = new Set(walk(map.AUTHORED).flatMap((p) => refs(p.node).map((r) => r.file)));
   // Only code the map covers or could, and docs it cites: a lockfile or a test changing moves nothing.
@@ -489,7 +497,7 @@ export async function update(args: string[]) {
   ]);
   // The top level draws how the roots connect, so a new one needs it drawn again.
   if (fresh.some((f) => f.ok)) {
-    const problems = await redrawOverview(map, cut, inv, model);
+    const problems = await redrawOverview(map, cut, inv, model, sums);
     say(problems ? `overview: kept as it was — ${problems.slice(0, 3).join("; ")}` : "overview: redrawn");
   }
 

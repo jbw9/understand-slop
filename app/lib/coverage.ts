@@ -35,6 +35,8 @@ export interface IndexFile {
 export interface MapIndex {
   commit: string;
   files: Record<string, IndexFile>;
+  /** Which code file uses which, every language (scripts/generate/imports.ts). Absent on maps made before it. */
+  imports?: Record<string, string[]>;
 }
 
 /** One span the reader can open, and the level that opens it. */
@@ -107,4 +109,66 @@ export function coverage(index: MapIndex, roots: Node[]) {
   }
   const files = Object.values(index.files);
   return { symbols, explained, gaps, excluded: files.filter((f) => f.status === "excluded").length, cited };
+}
+
+/** One link across a section's edge: the section that explains the other side (null when none does), and an import that makes it. */
+export interface Link {
+  path: string[] | null;
+  /** The other side's file when no section explains it. */
+  file: string;
+  /** `from → to`, one import behind the link. */
+  via: string;
+  /** How many imports make it. */
+  count: number;
+}
+
+/**
+ * What a section's code uses and what uses it, by the import graph, each
+ * named by the section that explains the other side: what a change here
+ * reaches, and what it rests on. Empty on a map whose index has no imports.
+ */
+export function neighbours(roots: Node[], index: MapIndex | null, path: string[]): { uses: Link[]; usedBy: Link[] } {
+  const imports = index?.imports;
+  if (!imports || !path.length) return { uses: [], usedBy: [] };
+  const cited = citations(roots);
+  const under = (p: string[]) => p.length >= path.length && path.every((x, i) => p[i] === x);
+  const mine = new Set<string>();
+  for (const [file, cs] of cited) if (cs.some((c) => under(c.path))) mine.add(file);
+  if (path.length === 1) for (const [file, f] of Object.entries(index.files)) if (f.roots.includes(path[0]) && f.status === "source") mine.add(file);
+  // The section that explains a file whole: in the root citing it most, the deepest level over all its citations there.
+  const explainer = (file: string): string[] | null => {
+    const outside = (cited.get(file) ?? []).filter((c) => !under(c.path));
+    if (!outside.length) {
+      const root = index.files[file]?.roots.find((r) => r !== path[0] && roots.some((n) => n.id === r));
+      return root ? [root] : null;
+    }
+    const by = new Map<string, Citation[]>();
+    for (const c of outside) by.set(c.path[0], [...(by.get(c.path[0]) ?? []), c]);
+    const most = [...by.values()].sort((a, b) => b.length - a.length)[0];
+    return most.reduce((common, c) => {
+      let i = 0;
+      while (i < common.length && i < c.path.length && common[i] === c.path[i]) i++;
+      return common.slice(0, i);
+    }, most[0].path);
+  };
+  const collect = (pairs: [string, string, string][]): Link[] => {
+    const out = new Map<string, Link>();
+    for (const [other, from, to] of pairs) {
+      const p = explainer(other);
+      if (p && under(p)) continue;
+      const key = p ? p.join("/") : other;
+      const l = out.get(key);
+      if (l) l.count++;
+      else out.set(key, { path: p, file: other, via: `${from} → ${to}`, count: 1 });
+    }
+    return [...out.values()].sort((a, b) => b.count - a.count);
+  };
+  const uses: [string, string, string][] = [];
+  const usedBy: [string, string, string][] = [];
+  for (const [a, bs] of Object.entries(imports))
+    for (const b of bs) {
+      if (mine.has(a) && !mine.has(b)) uses.push([b, a, b]);
+      if (mine.has(b) && !mine.has(a)) usedBy.push([a, a, b]);
+    }
+  return { uses: collect(uses), usedBy: collect(usedBy) };
 }

@@ -30,5 +30,5 @@ export function catalogOf(inv: Inventory, sums: Record<string, FileSummary>, cut
       symbols: (s?.symbols ?? []).map(({ name, start, end, does }) => ({ name, start, end, does })),
     };
   }
-  return { commit: inv.commit, files };
+  return { commit: inv.commit, files, imports: inv.imports };
 }

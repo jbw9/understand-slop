@@ -20,7 +20,9 @@ import { share } from "@/lib/share";
 export type Overview = Pick<Node, "sub" | "detail" | "anatomy" | "issues" | "code" | "state" | "unsure" | "explain"> & {
   /** The words the whole map leans on, defined once (the Explain layer). */
   glossary?: Term[];
-  /** One thing followed through every root, for a first-time reader. */
+  /** The core things the system does, each followed through the roots it crosses: 2-3, at every explain level. */
+  walkthroughs?: Walkthrough[];
+  /** Maps made before `walkthroughs`: one, under the Explain layer. */
   walkthrough?: Walkthrough;
 };
 

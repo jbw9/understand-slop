@@ -11,7 +11,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
@@ -242,9 +242,48 @@ function shownFiles(root: Root, cut: Cut, inv: Inventory, sums: Record<string, F
   return picked;
 }
 
+/** Stems too common to say which file a doc means. */
+const GENERIC_STEMS = /^(index|utils?|helpers?|config|types?|constants|common|layout|page|route|main|mod|lib|init|server|client|app|base|core|models?|schema|errors?|tests?)$/i;
+const PASSAGES = 8;
+const PASSAGE_CHARS = 5000;
+
+/**
+ * The lines of the repository's docs that name this root's files: a design
+ * note's why, handed over rather than left as a heading the author must think
+ * to open (most never did: one root in ten cited a doc).
+ */
+function docPassages(mine: { path: string }[], inv: Inventory): string[] {
+  const stems = [...new Set(mine.map((f) => basename(f.path, extname(f.path))).filter((x) => x.length >= 6 && !GENERIC_STEMS.test(x)))];
+  if (!stems.length) return [];
+  const named = new RegExp(`\\b(${stems.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`);
+  const out: string[] = [];
+  let chars = 0;
+  for (const d of [...inv.docs].sort((a, b) => Number(/changelog|history|release/i.test(a.path)) - Number(/changelog|history|release/i.test(b.path)))) {
+    const lines = readFileSync(join(inv.repo, d.path), "utf8").split("\n");
+    for (let i = 0; i < lines.length && out.length < PASSAGES; i++) {
+      if (!named.test(lines[i])) continue;
+      const [a, b] = [Math.max(0, i - 2), Math.min(lines.length, i + 4)];
+      const text = `${d.path}:${a + 1}-${b}\n${lines.slice(a, b).join("\n")}`;
+      if (chars + text.length > PASSAGE_CHARS) return out;
+      out.push(text);
+      chars += text.length;
+      i = b;
+    }
+  }
+  return out;
+}
+
 function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
   const { mine, near } = neighbourhood(root, cut, inv);
   const shown = SHOWN_LINES > 0 ? shownFiles(root, cut, inv, sums) : [];
+  const titleOf = new Map(cut.roots.map((r) => [r.id, r.title]));
+  const elsewhere = (p: string) => owners(cut, p).filter((r) => r !== root.id).map((r) => titleOf.get(r)).join(", ");
+  // Who imports each of its files from outside it: the files other roots rest on, which a change here reaches.
+  const users = new Map<string, Set<string>>();
+  for (const [from, tos] of Object.entries(inv.imports))
+    for (const to of tos) for (const r of owners(cut, from)) if (r !== root.id && !owners(cut, to).includes(r)) users.set(to, (users.get(to) ?? new Set()).add(titleOf.get(r) ?? r));
+  const usedBy = (p: string) => (users.get(p)?.size ? `\n    imported from: ${[...users.get(p)!].join(", ")}` : "");
+  const passages = docPassages(mine, inv);
   return [
     `# Repository: ${inv.name}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
@@ -264,9 +303,10 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     }`,
     ((owned) =>
       `## Files this root owns (${mine.length}), with what each does${owned.folded ? "\nToo many to list one by one, so the deepest directories are folded into a line each (`dir/ (N files …)`); list or grep a folded directory to see its files." : ""}\n${owned.text}`)(
-      fit(mine, sums, (f) => (sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`), OWNED_BUDGET),
+      fit(mine, sums, (f) => `${sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`}${usedBy(f.path)}`, OWNED_BUDGET),
     ),
-    near.size ? `## Files just outside it that it talks to\n${[...near].sort().slice(0, 60).map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}` : "",
+    near.size ? `## Files just outside it that it talks to, with the root that explains each\n${[...near].sort().slice(0, 60).map((p) => `${sums[p] ? oneLine(sums[p]) : p}${elsewhere(p) ? ` — ${elsewhere(p)}` : ""}`).join("\n")}` : "",
+    passages.length ? `## What its docs say about these files\nPassages that name them. Where one says why a part is built as it is, cite it in \`docs\` on that node.\n\n${passages.join("\n\n")}` : "",
     shown.length ? `## Its files, already read (${shown.length})\nThese are shown whole, numbered as read_file returns them. Do not read them again.\n\n${shown.join("\n\n")}` : "",
     `## Task
 ${shown.length ? "Your files above are already read. Read only what else you need — the longer files, by the symbol line ranges listed for them, and code across the boundary — then submit this root with its full subtree." : "Read the code you need, then submit this root with its full subtree."} Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
@@ -308,7 +348,8 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
     }
   }
   if (call.name === "list") {
-    const dir = String(i.dir ?? "").replace(/^\.?\//, "").replace(/\/?$/, "/");
+    // "." is the root: as "./" it matched no path, and agents read "Nothing there." as an empty repository.
+    const dir = String(i.dir ?? "").replace(/^\.(\/|$)/, "").replace(/^\//, "").replace(/\/?$/, "/");
     const hits = inv.files.filter((f) => (dir === "/" || f.path.startsWith(dir)) && (!reach || known.has(f.path)));
     if (!hits.length && !reach) {
       const abs = resolve(inv.repo, dir);
@@ -492,7 +533,7 @@ export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: n
   const messages: Message[] = [{ role: "user", content: a.prompt }];
   let turns = 0;
   for (; turns < a.maxTurns; turns++) {
-    const r = await invoke({ model: a.model, stage: a.stage, effort: "high", maxTokens: 64000, system: system(), messages: withCacheMark(messages), tools: TOOLS });
+    const r = await invoke({ model: a.model, stage: a.stage, effort: "high", maxTokens: 64000, system: a.system ?? system(), messages: withCacheMark(messages), tools: a.tools ?? TOOLS });
     messages.push({ role: "assistant", content: r.content });
     const calls = callsOf(r);
     if (!calls.length) {

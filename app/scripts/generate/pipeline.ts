@@ -18,10 +18,10 @@ import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock"
 import { ccClose } from "./claude-code";
 import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, place, unclaimed, type Cut } from "./cut";
-import { inventory, isSource, type Inventory } from "./inventory";
+import { inventory, isSource, scopeTo, type Inventory } from "./inventory";
 import { overviewOf, toOverview, type Overviewed } from "./overview";
 import { shapeProblems } from "./schema";
-import { summarize } from "./summarize";
+import { summarize, type FileSummary } from "./summarize";
 import { verifyTree, type Verdict } from "./verify";
 
 /** Written whole and renamed into place, so the app never parses half a file. */
@@ -56,13 +56,13 @@ async function redraw(out: string, inv: ReturnType<typeof inventory>, model: str
 }
 
 /** Draws `map`'s top level again from its roots as they are, in place; the checker's last word if it was not accepted. */
-export async function redrawOverview(map: MapFile, cut: Cut, inv: Inventory, model: string): Promise<string[] | null> {
-  const drawn = await overviewOf(map.AUTHORED, cut, inv, model, (n, problems) => console.log(`  overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`));
+export async function redrawOverview(map: MapFile, cut: Cut, inv: Inventory, model: string, sums: Record<string, FileSummary> = {}): Promise<string[] | null> {
+  const drawn = await overviewOf(map.AUTHORED, cut, inv, model, (n, problems) => console.log(`  overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`), sums);
   if (!drawn.overview) return drawn.problems;
   const node = { ...drawn.overview, id: OVERVIEW_ID, title: "Overview", sub: drawn.overview.sub ?? "", col: 0, row: 0 };
   await verifyTree(node, inv, model);
   const top = toOverview(node);
-  if (EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary", "walkthrough"] as const) delete top[k];
+  if (EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary"] as const) delete top[k];
   map.OVERVIEW = top;
   return null;
 }
@@ -89,10 +89,7 @@ export async function main(args: string[]) {
   const name = opt("--name") ?? inv.name.toLowerCase();
   // --scope maps part of a large repo; the rest stays readable to the authors.
   const scope = opt("--scope")?.split(",");
-  if (scope) {
-    inv.scope = { paths: scope, focus: opt("--focus") ?? "" };
-    for (const f of inv.files) if (!scope.some((p) => f.path === p || f.path.startsWith(p.replace(/\/?$/, "/")))) Object.assign(f, { code: false, outside: true });
-  }
+  if (scope) scopeTo(inv, { paths: scope, focus: opt("--focus") ?? "" });
   const only = opt("--roots")?.split(",");
   const stopAfter = opt("--stop-after");
   const pick = (env: string | undefined, fallback: keyof typeof MODELS = "opus") => MODELS[(env ?? fallback) as keyof typeof MODELS] ?? MODELS[fallback];
@@ -228,7 +225,7 @@ export async function main(args: string[]) {
       return n ? [{ ...plain(n), col: 0, row: i }] : [];
     });
     const top = overview && { ...overview };
-    if (top && EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary", "walkthrough"] as const) delete top[k];
+    if (top && EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary"] as const) delete top[k];
     return { RUN: run, ...(top ? { OVERVIEW: top } : {}), AUTHORED };
   };
 
@@ -251,6 +248,7 @@ export async function main(args: string[]) {
     root: repo,
     explain: EXPLAIN_LEVEL,
     models,
+    ...(inv.scope ? { scope: inv.scope } : {}),
   });
 
   // The roots are authored concurrently, so their partial writes are chained:
@@ -347,7 +345,7 @@ export async function main(args: string[]) {
   else if (accepted.length) {
     progress.stage = "overview";
     flush();
-    drawn = await lap("overview", () => overviewOf(accepted, cut, inv, models.author, (n, problems) => say(`overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`)));
+    drawn = await lap("overview", () => overviewOf(accepted, cut, inv, models.author, (n, problems) => say(`overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`), sums));
     overview = drawn.overview ?? undefined;
     say(`overview: ${overview ? "accepted" : "FAILED"} after ${drawn.turns + 1} turns`);
     await partial();

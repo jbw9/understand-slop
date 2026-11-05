@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const line = Number(q.get("line")) || undefined;
   const text =
     tool === "search" ? mapSearch(m, index, q.get("q") ?? "")
-    : tool === "section" ? mapSection(m, q.get("name") ?? "")
+    : tool === "section" ? mapSection(m, q.get("name") ?? "", index)
     : tool === "where" ? mapWhere(m, index, q.get("file") ?? "", line)
     : `No map tool called ${tool}.`;
   return Response.json({ text });

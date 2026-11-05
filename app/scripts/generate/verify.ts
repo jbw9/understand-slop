@@ -14,10 +14,10 @@
  * flagged `intended` and dropped: on flask, a mature library with few real
  * bugs, a third of the issues were documented rules written up as defects.
  */
-import type { CodeRef, Node } from "@/lib/data";
+import type { Anatomy, CodeRef, Node } from "@/lib/data";
 import { ask, BACKEND, callsOf, invoke, MODELS, type Block, type Message } from "./bedrock";
 import { converse, runTool, TOOLS } from "./author";
-import { fileReader, LEAF, sentences, words } from "./check";
+import { bareLines, fileReader, LEAF, sentences, STEP_LINES, words } from "./check";
 import { numbered, type Inventory } from "./inventory";
 
 export interface Verdict {
@@ -64,7 +64,7 @@ const REVIEW = {
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["real", "detail", "issues", "code_labels", "add_refs", "unresolvable"],
+    required: ["real", "detail", "issues", "code_labels", "add_refs", "lines", "unresolvable"],
     properties: {
       real: { type: "array", items: { type: "string" }, description: "The flags that are right. Empty if every flag is a false alarm." },
       detail: { type: "string", description: "The node's detail, corrected if needed. At most two sentences and 40 words." },
@@ -74,6 +74,11 @@ const REVIEW = {
         type: "array",
         description: "Code refs to add for true claims whose lines were not cited — lines you have read.",
         items: { type: "object", additionalProperties: false, required: ["file", "start", "end", "label"], properties: { file: { type: "string" }, start: { type: "integer" }, end: { type: "integer" }, label: { type: "string" } } },
+      },
+      lines: {
+        type: "array",
+        description: "For each flagged entry of `lines` (A1, S2, M3) that is wrong: where it really happens, as file:start-end you have read, or an empty `at` when it happens nowhere; and, for an arrow or message whose words are wrong, the corrected words (an arrow's at most 24 characters).",
+        items: { type: "object", additionalProperties: false, required: ["ref", "at"], properties: { ref: { type: "string" }, at: { type: "string" }, says: { type: "string" } } },
       },
       unresolvable: { type: "string", description: "Only when a claim the node depends on cannot be shown from anything in this repository (it lives in an external service, a deploy setting, an unchecked-in schema): one plain sentence saying what is not certain and why. Otherwise empty." },
     },
@@ -92,26 +97,64 @@ const AROUND = 30;
  */
 export function evidence(n: Node, inv: Inventory): string {
   const shown = new Set<string>();
-  return (n.code ?? [])
-    .map((c, i) => {
-      const head = `[${i}] ${c.label} — ${c.file}:${c.start}-${c.end}`;
-      const total = inv.files.find((f) => f.path === c.file)?.lines ?? c.end;
-      if (total > WHOLE) return `${head}, with the lines around it\n${numbered(inv.repo, c.file, Math.max(1, c.start - AROUND), Math.min(c.end, c.start + 150) + AROUND)}`;
-      if (shown.has(c.file)) return `${head} (the whole file is shown above)`;
-      shown.add(c.file);
-      return `${head}, in the whole file\n${numbered(inv.repo, c.file)}`;
-    })
-    .join("\n\n");
+  const windows: { file: string; start: number; end: number }[] = [];
+  const refs = (n.code ?? []).map((c, i) => {
+    const head = `[${i}] ${c.label} — ${c.file}:${c.start}-${c.end}`;
+    const total = inv.files.find((f) => f.path === c.file)?.lines ?? c.end;
+    if (total > WHOLE) {
+      const w = { file: c.file, start: Math.max(1, c.start - AROUND), end: Math.min(c.end, c.start + 150) + AROUND };
+      windows.push(w);
+      return `${head}, with the lines around it\n${numbered(inv.repo, c.file, w.start, w.end)}`;
+    }
+    if (shown.has(c.file)) return `${head} (the whole file is shown above)`;
+    shown.add(c.file);
+    return `${head}, in the whole file\n${numbered(inv.repo, c.file)}`;
+  });
+  // The lines each arrow, step, message and issue points at, unless a ref above already shows them.
+  const seen = new Set<string>();
+  const pointed = [...entries(n).map((e) => ({ ref: e.ref, at: e.at })), ...(n.issues ?? []).flatMap((x, i) => (x.where ? [{ ref: `issue ${i + 1}`, at: x.where }] : []))].flatMap(({ ref, at }) => {
+    const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(at);
+    const f = m && inv.files.find((x) => x.path === m[1]);
+    if (!m || !f || seen.has(at)) return [];
+    seen.add(at);
+    const start = +m[2], end = Math.min(+(m[3] ?? m[2]), start + STEP_LINES);
+    if (shown.has(f.path) || windows.some((w) => w.file === f.path && w.start <= start && w.end >= end)) return [];
+    return [`[${ref}] at ${at}\n${numbered(inv.repo, f.path, Math.max(1, start - 5), end + 5)}`];
+  });
+  return [...refs, ...pointed].join("\n\n");
+}
+
+/** A line the node points at and says something about: an arrow, a step, a message. */
+interface Entry { ref: string; says: string; at: string; kind: "arrow" | "step" | "message"; target: { at?: string; label?: string; state?: string }; list?: unknown[] }
+
+/** Every arrow, step and message of a node that cites a line, numbered A1, S1, M1 in reading order. */
+function entries(n: Node): Entry[] {
+  const out: Entry[] = [];
+  const count = { A: 0, S: 0, M: 0 };
+  const walk = (bs: Anatomy[] = []) => {
+    for (const b of bs) {
+      if (b.kind === "diagram") {
+        const label = (id: string) => b.boxes.find((x) => x.id === id)?.label ?? id;
+        for (const a of b.arrows) if (a.at) out.push({ ref: `A${++count.A}`, kind: "arrow", says: `${label(a.from)} → ${label(a.to)}${a.label ? `: ${a.label}` : ""}`, at: a.at, target: a, list: b.arrows });
+      }
+      if (b.kind === "flow") for (const r of b.rows) if (r.at) out.push({ ref: `S${++count.S}`, kind: "step", says: `${r.title} — ${r.detail}`, at: r.at, target: r });
+      if (b.kind === "sequence") for (const r of b.rows) if (r.at) out.push({ ref: `M${++count.M}`, kind: "message", says: `${r.from} → ${r.to}: ${r.label}`, at: r.at, target: r });
+      if ("rows" in b && Array.isArray(b.rows)) for (const r of b.rows as { under?: Anatomy[] }[]) walk(r?.under);
+    }
+  };
+  walk(n.anatomy);
+  return out;
 }
 
 function claims(n: Node): string {
-  return JSON.stringify({ title: n.title, sub: n.sub, detail: n.detail, issues: n.issues ?? [], code_labels: (n.code ?? []).map((c) => c.label) }, null, 1);
+  const lines = entries(n).map(({ ref, says, at }) => ({ ref, says, at }));
+  return JSON.stringify({ title: n.title, sub: n.sub, detail: n.detail, issues: n.issues ?? [], code_labels: (n.code ?? []).map((c) => c.label), ...(lines.length ? { lines } : {}) }, null, 1);
 }
 
 
 type Screen = { claims: { claim: string; verdict: string; why?: string }[] };
 
-const SCREEN_SYSTEM = "You check a short explanation of code against the code it cites, shown with the code around it; anything in what you are shown counts. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not. An issue must be something going wrong; one that describes deliberate behaviour is intended, even when it is accurate.";
+const SCREEN_SYSTEM = "You check a short explanation of code against the code it cites, shown with the code around it; anything in what you are shown counts. List every factual claim in the detail, issues and code labels, and give each a verdict. Reasonable summary and wording are supported; a fact, behaviour, name or number the lines do not show is not. An issue must be something going wrong; one that describes deliberate behaviour is intended, even when it is accurate. Each entry of `lines` is one claim, quoted with its ref first (\"A2: …\"): the code at its `at` must show it happening — an arrow, the call, write or send from one box to the other; a step, that step; a message, it being sent or answered. A line that only names it in an import, a comment or a declaration is not_shown.";
 
 /** The first reader on one node. Null when it gave no answer. */
 async function screenOne(n: Node, inv: Inventory): Promise<Screen | null> {
@@ -201,7 +244,12 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
 
   // One failed review leaves this node unreviewed; it must not fail the whole stage.
   const r = reviewed?.get(n.id) ?? (await review(n, flags, inv, model).catch(() => null));
-  if (!r) return v;
+  // Unreviewed, the flags stand: passing the node would call questioned claims derived.
+  if (!r) {
+    n.state = "partial";
+    n.unsure = `Not confirmed against the code: ${screen.claims.find((c) => c.verdict !== "supported")!.claim}`.slice(0, 300);
+    return { ...v, ok: false, downgraded: true, claims: ["the review gave no ruling"] };
+  }
   v.claims = r.real;
   n.verified = { claims: screen.claims.length, corrected: r.real.length };
   if (!r.real.length) return v;
@@ -210,6 +258,21 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
   n.issues = r.issues.length ? r.issues : undefined;
   (n.code ?? []).forEach((c, i) => { if (r.code_labels[i]) c.label = r.code_labels[i]; });
   const linesOf = fileReader(inv.repo);
+  const byRef = new Map(entries(n).map((e) => [e.ref, e]));
+  for (const l of r.lines) {
+    const e = byRef.get(l.ref);
+    if (!e) continue;
+    const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(l.at.trim());
+    const lines = m && linesOf(m[1]);
+    const [s, t] = m ? [+m[2], +(m[3] ?? m[2])] : [0, 0];
+    if (lines && s >= 1 && s <= t && t <= lines.length && (e.kind === "arrow" || t - s < STEP_LINES) && !bareLines(lines).slice(s - 1, t).every(Boolean)) e.target.at = l.at.trim();
+    else if (!l.at.trim()) {
+      // An arrow is a path in the code (D19): one that happens nowhere is not drawn. A step stays, unconfirmed.
+      if (e.kind === "arrow") e.list!.splice(e.list!.indexOf(e.target), 1);
+      else { delete e.target.at; e.target.state = "partial"; }
+    }
+    if (l.says?.trim() && e.kind !== "step" && (e.kind === "message" || l.says.trim().length <= 24)) e.target.label = l.says.trim();
+  }
   // A leaf's refs are its code drawer, held to one piece of code (LEAF); a ref
   // that would push it past that backs the claim at the cost of the drawer, so
   // the claim stands on the review instead.
@@ -229,7 +292,7 @@ async function settle(n: Node, screen: Screen | null, inv: Inventory, model: str
   return v;
 }
 
-interface Review { real: string[]; detail: string; issues: { title: string; detail: string; where?: string }[]; code_labels: string[]; add_refs: CodeRef[]; unresolvable: string }
+interface Review { real: string[]; detail: string; issues: { title: string; detail: string; where?: string }[]; code_labels: string[]; add_refs: CodeRef[]; lines: { ref: string; at: string; says?: string }[]; unresolvable: string }
 
 /**
  * A review call's input with every field present. Through Claude Code a tool's
@@ -238,7 +301,7 @@ interface Review { real: string[]; detail: string; issues: { title: string; deta
  */
 const filled = (input: unknown): Review => {
   const r = (input ?? {}) as Partial<Review>;
-  return { real: r.real ?? [], detail: r.detail ?? "", issues: r.issues ?? [], code_labels: r.code_labels ?? [], add_refs: r.add_refs ?? [], unresolvable: r.unresolvable ?? "" };
+  return { real: r.real ?? [], detail: r.detail ?? "", issues: r.issues ?? [], code_labels: r.code_labels ?? [], add_refs: r.add_refs ?? [], lines: r.lines ?? [], unresolvable: r.unresolvable ?? "" };
 };
 
 const REVIEW_SYSTEM = `You rule on flags a first reader raised against an explanation of code. The first reader saw only the cited lines and a little around them, so many flags are false alarms or true claims that were simply not cited.
@@ -247,6 +310,7 @@ const REVIEW_SYSTEM = `You rule on flags a first reader raised against an explan
 - A wrong claim: correct the wording so every claim is shown by code — never add what the code does not show.
 - A claim nothing in this repository can show: say so in unresolvable — but only after you have searched for it. Grep the whole repository (config, CI workflows under .github, other parts of the code) and the installed source of any dependency it hinges on (grep with under: "node_modules/<pkg>" or the Python site-packages). Code explained elsewhere in the map is not unresolvable.
 - Behaviour that only varies with the user's machine (an installed tool's version, what is on PATH) is not unresolvable when the code shows what it does: state what the code does.
+- A flagged entry of lines (an arrow, step or message): find where it really happens and give that in lines; if it happens nowhere, give it an empty at.
 - An issue flagged intended: if the code shows the behaviour is deliberate (a docstring or comment saying so, an explicit raise for misuse, standard language behaviour), drop it from issues. Keep it only if it really makes something go wrong for whoever hits it.
 The detail must stay at most two sentences and 40 words. Finish by calling review.`;
 
@@ -361,11 +425,20 @@ export async function verifyTree(root: Node, inv: Inventory, model: string): Pro
   // reviews each alone, as the committed maps' caches replay.
   const flagged = screens ? cited.flatMap((n) => { const s = screens.get(n.id); const flags = s ? flagsOf(s) : []; return flags.length ? [{ n, flags }] : []; }) : [];
   const reviewed = flagged.length ? await reviewMany(flagged, inv, model) : undefined;
-  return Promise.all(
+  const verdicts = await Promise.all(
     nodes.map(async (n) =>
       n.code?.length
         ? settle(n, screens ? (screens.get(n.id) ?? null) : await screenOne(n, inv), inv, model, reviewed)
         : { id: n.id, ok: false, flagged: 0, rewritten: false, downgraded: false, claims: ["no code refs"] },
     ),
   );
+  // After the review, which rewrites issues. The same problem told on a level and again on the part it is in: the part keeps it, where its line is.
+  const below = (n: Node): Set<string> => new Set((n.children ?? []).flatMap((c) => [...(c.issues ?? []).flatMap((x) => (x.where ? [x.where] : [])), ...below(c)]));
+  for (const n of nodes)
+    if (n.issues?.length && n.children?.length) {
+      const deeper = below(n);
+      const kept = n.issues.filter((x) => !x.where || !deeper.has(x.where));
+      n.issues = kept.length ? kept : undefined;
+    }
+  return verdicts;
 }

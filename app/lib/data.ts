@@ -297,6 +297,12 @@ export interface DiagramBox {
    * stays inert scenery rather than promising a click it cannot honour.
    */
   opens?: string;
+  /**
+   * `file:line` of the code a scenery box stands for, when it is this
+   * repository's but another section explains it. The page opens that
+   * section (nodesAt), so the box leads somewhere without this level owning it.
+   */
+  ref?: string;
 }
 
 export interface DiagramArrow {
@@ -511,6 +517,8 @@ export interface Run {
   explain?: "none" | "minimal" | "brief" | "detailed" | "full";
   /** Which model ran each generator stage. Absent on hand-authored maps. */
   models?: Record<string, string>;
+  /** The part of the repository a scoped map covers (`--scope`), and who reads it; an update keeps to it. */
+  scope?: { paths: string[]; focus: string };
   /** Web address of the repository, read from the checkout's git remote when the page is built. */
   url?: string;
 }

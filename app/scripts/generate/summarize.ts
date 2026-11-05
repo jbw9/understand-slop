@@ -55,7 +55,7 @@ const SYSTEM = `You read one source file from a repository and record what it do
 Be concrete and literal: real table names, real routes, real env var names, real line numbers as shown in the left margin.
 Never guess at code you cannot see. Call the summary tool once.`;
 
-/** Larger files are read in their first part only; the summary says so. */
+/** A file is read this many lines at a time; a longer one in parts, each adding the symbols and data in its lines. */
 const MAX_LINES = 1500;
 
 const shown = (inv: Inventory, f: RepoFile) =>
@@ -63,15 +63,18 @@ const shown = (inv: Inventory, f: RepoFile) =>
 
 async function one(inv: Inventory, f: RepoFile): Promise<FileSummary> {
   try {
-    const s = await ask<Omit<FileSummary, "path">>({
-      model: MODELS.haiku,
-      stage: "summarize",
-      maxTokens: 4000,
-      system: SYSTEM,
-      messages: [{ role: "user", content: `Repository: ${inv.name}\n${shown(inv, f)}` }],
-      tool: TOOL,
-    });
-    return { path: f.path, ...s };
+    const read = (content: string) => ask<Omit<FileSummary, "path">>({ model: MODELS.haiku, stage: "summarize", maxTokens: 4000, system: SYSTEM, messages: [{ role: "user", content }], tool: TOOL });
+    const s = await read(`Repository: ${inv.name}\n${shown(inv, f)}`);
+    // The rest of a long file, part by part: a 4,000-line class's later methods are as much the map's as its first.
+    const parts = await Promise.all(
+      Array.from({ length: Math.ceil(f.lines / MAX_LINES) - 1 }, (_, i) => {
+        const start = (i + 1) * MAX_LINES + 1;
+        const end = Math.min(f.lines, start + MAX_LINES - 1);
+        return read(`Repository: ${inv.name}\nFile: ${f.path} (${f.lines} lines)\nIts lines 1-${start - 1} were read already: ${s.purpose}\nLines ${start}-${end} are shown. Record the symbols, reads, writes and outside calls in these lines; purpose and user_sees may be left empty.\n\n${numbered(inv.repo, f.path, start, end)}`);
+      }),
+    );
+    const union = (k: "reads" | "writes" | "external") => [...new Set([s, ...parts].flatMap((p) => p[k] ?? []))];
+    return { path: f.path, ...s, symbols: [s, ...parts].flatMap((p) => p.symbols ?? []), reads: union("reads"), writes: union("writes"), external: union("external") };
   } catch (e) {
     // One unreadable file is a gap the cut is told about, not a failed run.
     return { path: f.path, purpose: `(not summarised: ${(e as Error).message.slice(0, 120)})`, kind: "other", symbols: [], reads: [], writes: [], external: [], user_sees: "" };
@@ -127,7 +130,7 @@ export async function summarize(
   for (const f of todo) {
     const b = batches[batches.length - 1];
     const lines = (x: RepoFile) => Math.min(x.lines, MAX_LINES);
-    if (BACKEND === "claude-code" && b && b.length < BATCH_FILES && b.reduce((a, x) => a + lines(x), 0) + lines(f) <= BATCH_LINES) b.push(f);
+    if (BACKEND === "claude-code" && f.lines <= MAX_LINES && b && b.length < BATCH_FILES && b.every((x) => x.lines <= MAX_LINES) && b.reduce((a, x) => a + lines(x), 0) + lines(f) <= BATCH_LINES) b.push(f);
     else batches.push([f]);
   }
   const out: Record<string, FileSummary> = {};

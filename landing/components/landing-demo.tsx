@@ -32,8 +32,8 @@ const FEATURES: { id: "explore" | Drawing; label: string; project?: string; cap?
   {
     id: "plan",
     label: "Read the plan",
-    project: "flask",
-    cap: "In the desktop app, a plan from Claude’s plan mode opens as a short doc, with what it will change drawn on the map before a line is written. Accept it right there.",
+    project: "mira",
+    cap: "In the desktop app, a plan from Claude’s plan mode opens as a short doc: a picture of what it will change, the screen you’ll see, then the steps and files, before a line is written. Accept it right there.",
   },
   {
     id: "review",

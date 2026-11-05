@@ -12,7 +12,7 @@ const img = (name: string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/${n
  */
 export function LandingCover() {
   return (
-    <section className={s.cover} aria-labelledby="cover-title">
+    <section id="install" className={s.cover} aria-labelledby="cover-title">
       <div className={s.plate} aria-hidden>
         <div className={s.note}>
           <Rows />

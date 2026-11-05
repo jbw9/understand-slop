@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Diagram } from "@/components/v2/landing-agent";
 
 export interface DemoNode {
   id: string;
@@ -12,6 +13,7 @@ export interface DemoNode {
 export interface DemoFile {
   RUN: { files?: number; commit?: string };
   AUTHORED: DemoNode[];
+  OVERVIEW: { anatomy: ({ kind: string } & Diagram)[] };
 }
 
 /**

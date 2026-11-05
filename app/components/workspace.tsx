@@ -618,6 +618,12 @@ export function Workspace() {
     reportStatus(tabs);
   }, [tabs]);
 
+  // The menu bar's count of finished Claude tabs (src-tauri/src/lib.rs done_tray).
+  const done = tabs.filter((t) => t.live && t.status === "done").length;
+  useEffect(() => {
+    if (desktop) void invoke("done_count", { n: done }).catch(() => {});
+  }, [desktop, done]);
+
   // A chime when an agent finishes or needs the user, heard wherever they are
   // looking: the dot alone is easy to miss with the workspace closed.
   const was = useRef<Record<number, Status | undefined>>({});
@@ -702,8 +708,8 @@ export function Workspace() {
   );
 
   useEffect(() => {
-    // Opening an empty panel gives a plain terminal; an agent is one menu pick or Ctrl+Shift+T away.
-    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(null));
+    // Opening an empty panel starts the default agent; a plain terminal is one menu pick or Ctrl+T away.
+    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(main));
     // Asked for from the map: a tab running Claude, shown; or a new one.
     const toClaude = () => {
       const last = (current?.live ? current : undefined) ?? (upFront?.live ? upFront : undefined) ?? mine.findLast((t) => t.live);

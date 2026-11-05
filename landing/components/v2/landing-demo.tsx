@@ -84,11 +84,29 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const shownMap = useRef(open);
 
   // The page is always the white sheet, so the app in it is always Classic, the sheet's own cobalt, whatever the reader picked in the app.
+  // The frame shows the demos as its own tabs, one per repository (app/components/tabs.tsx).
   const light = () => {
     try {
       frame.current!.contentDocument!.documentElement.dataset.theme = "classic";
     } catch {}
+    tell();
   };
+  const tell = () =>
+    frame.current?.contentWindow?.postMessage(
+      { type: "slop:repos", repos: maps.map(({ id, label }) => ({ id, label })), open },
+      location.origin,
+    );
+
+  // The frame asks for its tabs once it listens, and a tab picked there points it at that repository.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== location.origin || e.source !== frame.current?.contentWindow) return;
+      if (e.data?.type === "slop:ready") tell();
+      if (e.data?.type === "slop:open") setOpen(e.data.id);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  });
 
   // The first frame is server-rendered and can finish loading before React
   // hydrates, so its load event is missed. Read the document instead.
@@ -188,25 +206,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
               <span />
               <span />
             </div>
-            {exploring ? (
-              // The app's own tabs, one per project: which map the frame shows.
-              <div role="tablist" aria-label="Repository" className={s.repos} onKeyDown={(e) => walk(e, maps.map((m) => m.id), open, setOpen)}>
-                {maps.map((m) => (
-                  <button
-                    key={m.id}
-                    role="tab"
-                    data-id={m.id}
-                    aria-selected={m.id === open}
-                    tabIndex={m.id === open ? 0 : -1}
-                    onClick={() => setOpen(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className={s.project}>{shown.project}</span>
-            )}
+            {exploring ? null : <span className={s.project}>{shown.project}</span>}
             {exploring ? (
               <span className={s.meta}>
                 {current.files.toLocaleString("en-US")} files · {current.commit}
@@ -581,7 +581,7 @@ function tour(frame: HTMLIFrameElement, stage: HTMLElement, replay: HTMLButtonEl
     mode = "done";
     show(ring, false);
     ringAt.forget();
-    text.textContent = "That's the whole loop. Keep exploring, or pick another repository above.";
+    text.textContent = "That's the whole loop. Keep exploring, or open another repository from the tabs above.";
     count.textContent = "";
     end.textContent = "Done";
     tipAt.glide(performance.now());

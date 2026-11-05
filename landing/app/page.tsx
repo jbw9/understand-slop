@@ -9,7 +9,6 @@ import { LandingInstall } from "@/components/v2/landing-install";
 import { LandingNav } from "@/components/v2/landing-nav";
 import { LandingStart } from "@/components/v2/landing-start";
 import { LandingVoices, type Voice } from "@/components/v2/landing-voices";
-import { LandingWhy, type Problem, type Source } from "@/components/v2/landing-why";
 import s from "@/components/v2/v2.module.css";
 import { loadMap } from "@/lib/maps";
 
@@ -36,81 +35,14 @@ const DEMOS = [
   { id: "kafka", label: "Kafka control plane" },
 ];
 
-const LEVIN: Source = {
-  who: "Isaac Levin",
-  work: "“Why We Still Need an IDE”, JetBrains",
-  href: "https://blog.jetbrains.com/blog/2026/10/20/why-we-still-need-an-ide/",
-};
-const WITTEVEEN: Source = {
-  who: "Sam Witteveen",
-  work: "“What is the Future of IDEs”",
-  href: "https://www.youtube.com/watch?v=I5VxMzaBD6s",
-};
-const SO_SURVEY: Source = {
-  who: "Stack Overflow",
-  work: "Developer Survey 2025",
-  href: "https://survey.stackoverflow.co/2025/ai",
-};
-const METR: Source = {
-  who: "METR",
-  work: "experienced open-source developers with early-2025 AI",
-  href: "https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/",
-};
-
-// Said in public, word for word, and linked to where.
+// The same problem at every size. John Doe is the page's own voice; the other two are people the team spoke with, by role.
 const VOICES: Voice[] = [
-  { source: WITTEVEEN, quote: "The writing part has gotten cheap. The verification hasn’t." },
-  { source: LEVIN, quote: "If you can’t see what it’s seeing, you’re not actually steering it." },
-  { source: LEVIN, quote: "You can’t own code you don’t understand." },
-];
-
-const PROBLEMS: Problem[] = [
   {
-    title: "You can’t see what the agent changed.",
-    said: (
-      <>
-        One task &ldquo;could be touching 10, 15 different files&rdquo;, and &ldquo;from the terminal alone you really
-        can&rsquo;t see any of that.&rdquo;
-      </>
-    ),
-    by: WITTEVEEN,
-    answer: "draws every change on the map: which sections a commit touched, what is new, changed or gone, and the lines under each.",
+    quote: "Code review is the new bottleneck. Some engineers have ten waiting.",
+    by: "Software Development Manager, Amazon",
   },
-  {
-    title: "Reviewing takes longer than writing.",
-    said: (
-      <>
-        45% of developers say debugging AI-generated code takes longer, and 66% say its answers are &ldquo;almost right,
-        but not quite.&rdquo;
-      </>
-    ),
-    by: SO_SURVEY,
-    answer: "lets you read at the right height: the steps the program takes first, then only the parts that changed, down to the line.",
-  },
-  {
-    title: "You own what you ship, whoever typed it.",
-    said: <>&ldquo;Accountability doesn&rsquo;t transfer just because the authorship did.&rdquo;</>,
-    by: LEVIN,
-    answer: "checks every sentence on the map against the code it cites. What it couldn’t prove is marked, so you know what to read yourself.",
-  },
-  {
-    title: "Your agent is working blind too.",
-    said: (
-      <>
-        &ldquo;An agent that can only grep through files &hellip; is often an agent that&rsquo;s kind of working
-        blind.&rdquo;
-      </>
-    ),
-    by: WITTEVEEN,
-    answer: "is the agent’s context as well. Pick a section and it goes into the next prompt; Claude moves your view to the part it’s explaining.",
-  },
-];
-
-const READING = [
-  { ...LEVIN, note: "Why the bottleneck moved from typing to verifying, and what that asks of our tools." },
-  { ...WITTEVEEN, note: "A developer on what he still opens an IDE for: diffs, navigation, verification, docs." },
-  { ...SO_SURVEY, note: "Developers use AI more than ever, and trust its accuracy less." },
-  { ...METR, note: "Developers took 19% longer with AI, and believed they had been 20% faster." },
+  { quote: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
+  { quote: "You built it in a weekend. I bet you can’t explain how it works.", by: "John Doe, solo developer" },
 ];
 
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.
@@ -173,7 +105,6 @@ export default function Landing() {
 
         <div className={s.wrap}>
           <LandingVoices voices={VOICES} />
-          <LandingWhy problems={PROBLEMS} reading={READING} />
           <LandingHow
             name="flask"
             steps={flask.AUTHORED.map((r) => r.title)}
@@ -191,13 +122,9 @@ export default function Landing() {
             }}
           />
         </div>
-        <LandingAgent
-          name="flask"
-          sections={flask.AUTHORED.map((r) => r.title)}
-          changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
-        />
+        <LandingAgent name="flask" diagram={flask.OVERVIEW.anatomy.find((a) => a.kind === "diagram")!} changed="handling-requests" />
         <div className={s.wrap}>
-          <LandingStart github={GITHUB} />
+          <LandingStart />
           <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">
             <h2 id="close-title">
               Start broad. <em>End at the line.</em>

@@ -6,7 +6,6 @@ import s from "./v2.module.css";
 const LINKS = [
   { href: "#why", label: "Why" },
   { href: "#how", label: "How it works" },
-  { href: "#start", label: "Your repo" },
   { href: "#questions", label: "Questions" },
 ];
 
@@ -45,7 +44,7 @@ export function LandingNav({ github }: { github: string }) {
           ))}
           <a href={github}>GitHub</a>
         </nav>
-        <a className={`${s.btn} ${s.primary} ${s.navCta}`} href="#start">
+        <a className={`${s.btn} ${s.primary} ${s.navCta}`} href="#install">
           Install
         </a>
       </div>

@@ -1,20 +1,4 @@
-import { LandingInstall } from "./landing-install";
 import s from "./v2.module.css";
-
-const STEPS = [
-  {
-    title: "Install the app.",
-    body: "One line in a terminal, on macOS or Linux. It builds Bluprint from source, and works through the Claude Code you already use, signed in with your Claude plan.",
-  },
-  {
-    title: "Import a folder.",
-    body: "Any git repository on your computer. Your Claude Code makes its map right away: about 20 minutes for a mid-sized repo, counted against your plan's usage.",
-  },
-  {
-    title: "Open it.",
-    body: "Start at the steps and go down to the code. The map stays on your computer, in the app's own folder.",
-  },
-];
 
 const QUESTIONS = [
   {
@@ -43,41 +27,19 @@ const QUESTIONS = [
   },
 ];
 
-/** How to get a map of your own repository, then what people ask before they do. */
-export function LandingStart({ github }: { github: string }) {
+/** What people ask before they map their own repository. */
+export function LandingStart() {
   return (
-    <>
-      <section id="start" className={s.section} aria-labelledby="start-title">
-        <p className={`${s.eyebrow} ${s.reveal}`}>Your repo</p>
-        <h2 id="start-title" className={s.reveal}>Map your own repo.</h2>
-        <ol className={s.steps}>
-          {STEPS.map((st, i) => (
-            <li key={st.title} className={s.reveal} style={{ "--i": i } as React.CSSProperties}>
-              <i aria-hidden>{i + 1}</i>
-              <b>{st.title}</b>
-              <p>{st.body}</p>
-            </li>
-          ))}
-        </ol>
-        <div className={`${s.startInstall} ${s.reveal}`}>
-          <LandingInstall />
-        </div>
-        <p className={`${s.cap} ${s.reveal}`}>
-          It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The script is{" "}
-          <a href={`${github}/blob/main/install.sh`}>install.sh</a>, in <a href={github}>the source on GitHub</a>.
-        </p>
-      </section>
-      <section id="questions" className={s.section} aria-labelledby="questions-title">
-        <h2 id="questions-title" className={s.reveal}>Questions.</h2>
-        <div className={`${s.faq} ${s.reveal}`}>
-          {QUESTIONS.map(({ q, a }) => (
-            <details key={q}>
-              <summary>{q}</summary>
-              <p>{a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-    </>
+    <section id="questions" className={s.section} aria-labelledby="questions-title">
+      <h2 id="questions-title" className={s.reveal}>Questions.</h2>
+      <div className={`${s.faq} ${s.reveal}`}>
+        {QUESTIONS.map(({ q, a }) => (
+          <details key={q}>
+            <summary>{q}</summary>
+            <p>{a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
   );
 }

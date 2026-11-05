@@ -1,26 +1,34 @@
 import type { Metadata } from "next";
-import { LandingAgent } from "@/components/landing-agent";
-import { LandingDemo, StarCount, type DemoMap } from "@/components/landing-demo";
-import { LandingHow } from "@/components/landing-how";
-import { LandingInstall } from "@/components/landing-install";
-import { LandingNav } from "@/components/landing-nav";
-import { LandingStart } from "@/components/landing-start";
-import { LandingVoices, type Voice } from "@/components/landing-voices";
-import { LandingWhy, type Problem, type Source } from "@/components/landing-why";
-import s from "@/components/landing.module.css";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Zilla_Slab } from "next/font/google";
+import { LandingAgent } from "@/components/v2/landing-agent";
+import { LandingCover } from "@/components/v2/landing-cover";
+import { LandingEvolution } from "@/components/v2/landing-evolution";
+import { LandingDemo, StarCount, type DemoMap } from "@/components/v2/landing-demo";
+import { LandingHow } from "@/components/v2/landing-how";
+import { LandingInstall } from "@/components/v2/landing-install";
+import { LandingNav } from "@/components/v2/landing-nav";
+import { LandingStart } from "@/components/v2/landing-start";
+import { LandingVoices, type Voice } from "@/components/v2/landing-voices";
+import { LandingWhy, type Problem, type Source } from "@/components/v2/landing-why";
+import s from "@/components/v2/v2.module.css";
 import { loadMap } from "@/lib/maps";
 
 export const metadata: Metadata = {
-  title: "Mira",
+  title: "Bluprint",
   description: "A visual way to explore a codebase: start broad, go deeper, down to the line.",
 };
+
+// A light slab for the lettering, Plex Mono for the labels on the sheet, Plex Sans for reading.
+const display = Zilla_Slab({ variable: "--font-display", subsets: ["latin"], weight: ["300", "400", "500"], display: "swap" });
+const sans = IBM_Plex_Sans({ variable: "--font-body", subsets: ["latin"], display: "swap" });
+const mono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 const REPO = "jbw9/understand-slop";
 const GITHUB = `https://github.com/${REPO}`;
 
 // This repo first: the demo opens on the project explaining itself.
 const DEMOS = [
-  { id: "mira", label: "Mira itself" },
+  { id: "mira", label: "Bluprint itself" },
   { id: "flask", label: "Flask" },
   { id: "fastapi", label: "FastAPI" },
   { id: "ky", label: "ky" },
@@ -143,28 +151,21 @@ export default function Landing() {
 
   return (
     // The layout locks the body, as the app's does for its canvas; this page scrolls itself.
-    <div className={s.page}>
+    <div className={`${s.page} ${display.variable} ${sans.variable} ${mono.variable}`}>
+      <div className={s.paper}>
       <LandingNav github={GITHUB} />
       <main>
+        <LandingCover github={GITHUB} />
+        <LandingEvolution />
         <div className={s.top}>
           <div className={s.wrap}>
-            <section className={s.hero}>
-              <a className={`${s.kicker} ${s.rise}`} href="#agent">
+            <header id="app" className={s.appHead}>
+              <p className={s.bracket}>[ The app, live ]</p>
+              <h2>Six real repositories, mapped. Open one.</h2>
+              <a className={s.kicker} href="#agent">
                 Works beside Claude Code, Codex and OpenCode <span aria-hidden>&rarr;</span>
               </a>
-              <h1 className={s.rise} style={{ "--i": 1 } as React.CSSProperties}>
-                Understand the code <em>you didn&rsquo;t write.</em>
-              </h1>
-              <div className={s.pitch}>
-                <p className={s.rise} style={{ "--i": 2 } as React.CSSProperties}>
-                  Mira splits a repository into the steps the program takes. Click a step to open its parts, and keep
-                  going until you reach the code.
-                </p>
-                <div className={`${s.ctas} ${s.rise}`} style={{ "--i": 3 } as React.CSSProperties}>
-                  {ctas}
-                </div>
-              </div>
-            </section>
+            </header>
             <section aria-label="Live demo" className={s.demo}>
               <LandingDemo maps={maps} />
             </section>
@@ -208,11 +209,39 @@ export default function Landing() {
       </main>
 
       <footer className={s.wrap}>
-        <div className={s.end}>
-          <b>Mira</b>
-          <a href={GITHUB}>{REPO}</a>
-        </div>
+        {/* The drawing's title block. */}
+        <dl className={s.end}>
+          <div className={s.endTitle}>
+            <dt>Title</dt>
+            <dd>Bluprint</dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              <a href={GITHUB}>{REPO}</a>
+            </dd>
+          </div>
+          <div>
+            <dt>Site</dt>
+            <dd>blpr.dev</dd>
+          </div>
+          <div>
+            <dt>Scale</dt>
+            <dd>Repo to line</dd>
+          </div>
+          <div>
+            <dt>Sheet</dt>
+            <dd>1 of 1</dd>
+          </div>
+        </dl>
+        <p className={s.credits}>
+          Pictures, all public domain, from Wikimedia Commons: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
+          ENIAC, U.S. Army; Grace Hopper, U.S. Navy; Margaret Hamilton with the Apollo flight software, Draper Laboratory;
+          Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; Michelangelo&rsquo;s{" "}
+          <i>The Creation of Adam</i>.
+        </p>
       </footer>
+      </div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ jobs:
       # What install.sh asks a Debian or Ubuntu user to install.
       - name: System packages
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake pkg-config rsync libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev libpulse-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev libpulse-dev
 
       - name: Install
         run: curl -fsSL "$RAW/install.sh" | sh

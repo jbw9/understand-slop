@@ -29,15 +29,15 @@ main() {
     need node "Node 20 or newer: https://nodejs.org/en/download/package-manager"
     need cargo "Rust: https://rustup.rs"
     if command -v apt-get >/dev/null; then
-      sys="sudo apt-get install -y build-essential cmake pkg-config rsync libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev libpulse-dev"
+      sys="sudo apt-get install -y build-essential cmake pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev libpulse-dev"
     elif command -v dnf >/dev/null; then
-      sys="sudo dnf install -y gcc-c++ cmake pkgconf-pkg-config rsync webkit2gtk4.1-devel gtk3-devel librsvg2-devel openssl-devel alsa-lib-devel pulseaudio-libs-devel"
+      sys="sudo dnf install -y gcc-c++ cmake pkgconf-pkg-config webkit2gtk4.1-devel gtk3-devel librsvg2-devel openssl-devel alsa-lib-devel pulseaudio-libs-devel"
     elif command -v pacman >/dev/null; then
-      sys="sudo pacman -S --needed base-devel cmake rsync webkit2gtk-4.1 gtk3 librsvg openssl alsa-lib libpulse"
+      sys="sudo pacman -S --needed base-devel cmake webkit2gtk-4.1 gtk3 librsvg openssl alsa-lib libpulse"
     else
-      sys="a C++ compiler, cmake, pkg-config, rsync, and the development packages of webkit2gtk-4.1, gtk3, librsvg, openssl, alsa and libpulse"
+      sys="a C++ compiler, cmake, pkg-config and the development packages of webkit2gtk-4.1, gtk3, librsvg, openssl, alsa and libpulse"
     fi
-    for c in c++ cmake pkg-config rsync; do need "$c" "$sys"; done
+    for c in c++ cmake pkg-config; do need "$c" "$sys"; done
     if command -v pkg-config >/dev/null; then
       for m in webkit2gtk-4.1 gtk+-3.0 librsvg-2.0 openssl alsa libpulse; do
         pkg-config --exists "$m" || missing="$missing

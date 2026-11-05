@@ -17,11 +17,18 @@ snap="$data/server"
 next="$data/server-next"
 mkdir -p "$data"
 rm -rf "$next"
-# A copy-on-write clone of the last snapshot, so rsync and next build only redo what changed.
-if [ -d "$snap" ]; then
-  if [ "$os" = Darwin ]; then cp -cR "$snap" "$next"; else cp -R --reflink=auto "$snap" "$next"; fi
-fi
-rsync -a --delete --exclude /src-tauri --exclude /.next --exclude /out --exclude '*.tsbuildinfo' ./ "$next/"
+# Copy-on-write where the disk allows it (APFS, btrfs, XFS), a plain copy elsewhere.
+clone() { if [ "$os" = Darwin ]; then cp -ca "$@"; else cp -a --reflink=auto "$@"; fi; }
+mkdir -p "$next"
+# The last snapshot's build caches, so next build only redoes what changed.
+for f in "$snap/.next" "$snap"/*.tsbuildinfo; do
+  if [ -e "$f" ]; then clone "$f" "$next/"; fi
+done
+# The checkout, minus the Rust side and its own build output.
+for f in ./* ./.[!.]*; do
+  case $f in ./src-tauri | ./.next | ./out | *.tsbuildinfo) continue ;; esac
+  if [ -e "$f" ]; then clone "$f" "$next/"; fi
+done
 (cd "$next" && node node_modules/next/dist/bin/next build)
 # The Node and PATH of this shell, minus the node_modules folders npm puts first, for a Bluprint
 # opened from Finder. `command -v`, not process.execPath: Homebrew's resolves to a versioned

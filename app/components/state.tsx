@@ -28,7 +28,7 @@ export function StateChip({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-[2px] px-2 py-[3px]",
+        "inline-flex shrink-0 items-center px-2 py-[3px]",
         "font-mono text-[10px] leading-none tracking-wide",
         state === "partial" && !alarm && "border border-amber-line bg-amber-surface text-amber-ink",
         state === "partial" && alarm && "border border-clay-line bg-clay-surface text-clay-ink",
@@ -41,7 +41,7 @@ export function StateChip({
   );
 }
 
-/** Small uppercase section label — the eyebrow above a group of rows. */
+/** The landing page's bracket label, `[ PARTS ]`: the eyebrow above a group of rows. */
 export function Eyebrow({
   children,
   className,
@@ -52,7 +52,7 @@ export function Eyebrow({
   return (
     <span
       className={cn(
-        "text-[11px] font-semibold uppercase leading-none tracking-[0.07em] text-muted-slate",
+        "font-mono text-[11px] font-medium uppercase leading-none tracking-[0.06em] text-accent before:content-['[_'] after:content-['_]']",
         className,
       )}
     >
@@ -64,7 +64,7 @@ export function Eyebrow({
 /** Monospace code identifier inline in prose. */
 export function Ident({ children }: { children: React.ReactNode }) {
   return (
-    <code className="rounded-[2px] bg-surface-container px-[5px] py-[1px] font-mono text-[0.86em] text-on-surface-variant">
+    <code className=" bg-surface-container px-[5px] py-[1px] font-mono text-[0.86em] text-on-surface-variant">
       {children}
     </code>
   );
@@ -95,7 +95,7 @@ export function Prose({ text }: { text: string }) {
         i % 2 ? (
           ((go) =>
             go ? (
-              <button key={i} onClick={go} title="Open where this is explained" className="rounded-[2px] underline decoration-faint underline-offset-[3px] hover:decoration-deep-green">
+              <button key={i} onClick={go} title="Open where this is explained" className=" underline decoration-faint underline-offset-[3px] hover:decoration-accent">
                 <Ident>{part}</Ident>
               </button>
             ) : (
@@ -139,7 +139,7 @@ function TermMark({ term, children }: { term: Term; children: string }) {
       {children}
       <span
         role="tooltip"
-        className="pointer-events-none invisible absolute bottom-full left-0 z-50 mb-1.5 w-[280px] rounded-[3px] border border-border-gray bg-pure-white px-3 py-2 text-[12.5px] font-normal not-italic leading-snug text-on-surface shadow-lift group-hover/term:visible group-focus/term:visible"
+        className="pointer-events-none invisible absolute bottom-full left-0 z-50 mb-1.5 w-[280px] border border-border-gray bg-card px-3 py-2 text-[12.5px] font-normal not-italic leading-snug text-on-surface shadow-lift group-hover/term:visible group-focus/term:visible"
       >
         <span className="font-semibold text-ink">{term.term}</span> — {term.meaning}
       </span>

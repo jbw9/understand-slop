@@ -1,6 +1,6 @@
 ---
 name: demo-gif
-description: After a commit to jbw9/understand-slop that changes what a person sees in Mira (app/) or on the landing page (landing/) is pushed, record a short GIF of the change, add it to the `demos` prerelease, and post it as a comment on that commit. Use when a UI commit has been pushed, when the user asks for a demo or GIF of a change, or when they invoke /demo-gif. Skip commits that change only logic.
+description: After a commit to jbw9/understand-slop that changes what a person sees in Bluprint (app/) or on the landing page (landing/) is pushed, record a short GIF of the change, add it to the `demos` prerelease, and post it as a comment on that commit. Use when a UI commit has been pushed, when the user asks for a demo or GIF of a change, or when they invoke /demo-gif. Skip commits that change only logic.
 ---
 
 # Demo GIF
@@ -15,7 +15,7 @@ In this file, `<root>` is the checkout's top folder (`git rev-parse --show-tople
 
 ## Step 1 - Gate: is this a UI change?
 
-Make a GIF only if a person using Mira or the landing page can see a difference on screen.
+Make a GIF only if a person using Bluprint or the landing page can see a difference on screen.
 
 Read the diff with `git show --stat <sha>`, then read the parts you are not sure about. The commit title's `area:` is a first hint, but not the answer.
 
@@ -42,12 +42,12 @@ Do not ask the user each time. Decide, and say what you decided.
 ## Step 3 - Record
 
 1. Start the dev server from the checkout that holds the commit, in the background:
-   - Mira: `npx next dev -p 3217` in `app/`
+   - Bluprint: `npx next dev -p 3217` in `app/`
    - landing page: `npm run dev` in `landing/` (port 3001)
 
-   Next allows only one dev server per folder. If one is already running, use it. The Chrome extension's browsers run on a Mac and cannot reach this PC, so record with a local headless browser.
-2. Install the driver once per session in the scratchpad: `npm i playwright-core@1.48.2`. Launch the system Chrome: `C:/Program Files/Google/Chrome/Application/chrome.exe`.
-3. Write a scenario script in the scratchpad. Import `recorder.mjs` as a `file:///` URL, because Node on Windows rejects a bare `C:/` path. Every helper saves one frame per step, so the GIF plays at the speed the scenario was written for, however slow the screenshots are:
+   Next allows only one dev server per folder. If one is already running, use it. The Chrome extension's browser can be on a different machine and not reach this one, so record with a local headless browser.
+2. Install the driver once per session in the scratchpad: `npm i playwright-core@1.48.2`. Launch the system Chrome with `channel: "chrome"`. Playwright finds it on macOS and Windows. The tools the scripts need are Node, bash, `ffmpeg` and `gh`. On macOS, install the ones that are missing with `brew install ffmpeg gh`.
+3. Write a scenario script in the scratchpad. Import `recorder.mjs` through `pathToFileURL`, because Node on Windows rejects a bare `C:/` path, and a hand-written `file:///` URL is wrong on one OS or the other. Every helper saves one frame per step, so the GIF plays at the speed the scenario was written for, however slow the screenshots are:
    - `hold(n)` repeats n frames
    - `glide(to, steps)` makes an eased pointer move
    - `press`, `release` and `click` act where the pointer is
@@ -55,9 +55,10 @@ Do not ask the user each time. Decide, and say what you decided.
 
    ```js
    import { chromium } from "playwright-core";
-   import { recorder } from "file:///<root>/.claude/skills/demo-gif/scripts/recorder.mjs";
+   import { pathToFileURL } from "node:url";
+   const { recorder } = await import(pathToFileURL("<root>/.claude/skills/demo-gif/scripts/recorder.mjs").href);
 
-   const browser = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+   const browser = await chromium.launch({ channel: "chrome" });
    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
    const r = await recorder(page, "frames");
    await page.goto("http://localhost:3217", { waitUntil: "networkidle" });
@@ -76,11 +77,11 @@ Do not ask the user each time. Decide, and say what you decided.
    ```
 
    The scenario must:
-   - start from a clean, known state. Mira keeps reader state in `localStorage` under `slop:` keys (`slop:tabs:<map>`, `slop:settings`). Clear the keys the change touches, then reload.
+   - start from a clean, known state. Bluprint keeps reader state in `localStorage` under `slop:` keys (`slop:tabs:<map>`, `slop:settings`). Clear the keys the change touches, then reload.
    - show the start state for about 0.7 s, then the change, then the end state for about 1 s
    - move the pointer with `glide`, so the viewer can follow it
    - stay between 5 and 15 s
-4. Run all recording in one `node` process. Each new `node.exe` flashes a console window on the user's screen.
+4. Run all recording in one `node` process. On Windows, each new `node.exe` flashes a console window on the user's screen.
 
 ## Step 4 - Encode and check
 

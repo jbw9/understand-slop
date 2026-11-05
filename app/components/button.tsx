@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils";
  * workspace is one of three weights, so a header with three actions reads as
  * a toolbar rather than three components that happened to land together:
  *
- * - `outline` — the default: a white face and a hairline, for actions on the
- *   page (View the code, Keep the answer).
+ * - `outline` — the default: a paper face and a hairline, for actions on the
+ *   page (View the code, Keep the answer). On hover it fills with ink, as
+ *   the landing page's buttons do.
  * - `ghost` — no face until hovered, for chrome (tab bars, the status bar).
- * - `primary` — filled green, the one thing a dialog is for.
+ * - `primary` — filled with ink, the one thing a dialog is for.
  *
  * `tone="alarm"` recolours any of them for actions about problems.
  */
@@ -30,19 +31,19 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
       ref={ref}
       type={type}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[2px] font-sans font-medium transition-[background-color,border-color,color] duration-100",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green/70",
+        "inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap font-mono font-medium uppercase tracking-[0.04em] transition-[background-color,border-color,color] duration-100",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/70",
         "disabled:cursor-default disabled:opacity-50",
-        size === "sm" ? "h-6 px-2 text-[12px]" : "h-7 px-2.5 text-[12.5px]",
+        size === "sm" ? "h-6 px-2 text-[11px]" : "h-7 px-2.5 text-[11.5px]",
         variant === "outline" &&
           (tone === "alarm"
-            ? "border border-clay-line bg-pure-white text-clay-ink hover:bg-clay-surface"
-            : "border border-border-gray bg-pure-white text-on-surface-variant hover:border-border-strong hover:bg-surface-container-low hover:text-ink"),
+            ? "border border-clay-line bg-card text-clay-ink hover:border-clay-ink hover:bg-clay-ink hover:text-paper"
+            : "border border-border-strong bg-card text-ink hover:border-accent hover:bg-accent hover:text-on-accent"),
         variant === "ghost" &&
           (tone === "alarm"
             ? "text-clay-ink hover:bg-clay-surface"
             : "text-muted-slate hover:bg-surface-container hover:text-ink"),
-        variant === "primary" && "bg-deep-green text-white hover:bg-brand",
+        variant === "primary" && "border border-accent bg-accent text-on-accent hover:border-accent-strong hover:bg-accent-strong",
         className,
       )}
       {...rest}
@@ -58,7 +59,7 @@ export function Kbd({ children, className }: { children: React.ReactNode; classN
   return (
     <kbd
       className={cn(
-        "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[2px] border border-border-gray bg-surface px-1 font-sans text-[10.5px] font-medium leading-none text-muted-slate",
+        "inline-flex h-[18px] min-w-[18px] items-center justify-center border border-border-gray bg-surface px-1 font-sans text-[10.5px] font-medium leading-none text-muted-slate",
         className,
       )}
     >

@@ -4,7 +4,7 @@ import s from "./landing.module.css";
 const STEPS = [
   {
     title: "Install the app.",
-    body: "One line in a terminal, on macOS or Linux. It builds Mira from source, and works through the Claude Code you already use, signed in with your Claude plan.",
+    body: "One line in a terminal, on macOS or Linux. It builds Bluprint from source, and works through the Claude Code you already use, signed in with your Claude plan.",
   },
   {
     title: "Import a folder.",
@@ -19,7 +19,7 @@ const STEPS = [
 const QUESTIONS = [
   {
     q: "Is this an IDE?",
-    a: "No. Keep the editor you use. An editor shows one file at a time and an agent panel one message at a time; Mira shows how the whole repository fits together and what a change did to it. It opens the code where you need it, and hands your questions to the agent beside it.",
+    a: "No. Keep the editor you use. An editor shows one file at a time and an agent panel one message at a time; Bluprint shows how the whole repository fits together and what a change did to it. It opens the code where you need it, and hands your questions to the agent beside it.",
   },
   {
     q: "Does my code leave my computer?",

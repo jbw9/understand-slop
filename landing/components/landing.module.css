@@ -1703,7 +1703,7 @@
     mask-image: linear-gradient(90deg, #000 82%, transparent);
   }
 }
-/* Mira, the theme and Download only: the hero has the link to GitHub. */
+/* Bluprint, the theme and Download only: the hero has the link to GitHub. */
 @media (max-width: 420px) {
   .navBar {
     gap: 12px;

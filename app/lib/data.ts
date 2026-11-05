@@ -1,6 +1,6 @@
 /**
  * Fixture for the prototype. No repository is analysed — this is the shape a
- * real `mira map` run would emit for a mid-size SaaS codebase.
+ * real `bluprint map` run would emit for a mid-size SaaS codebase.
  *
  * The map is organised by CONCEPT, not by file. Someone new to a codebase asks
  * "how does billing work" and "what's in the database", not "what's in

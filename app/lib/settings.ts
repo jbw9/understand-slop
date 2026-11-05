@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from "react";
-import { DARK, SETTINGS_KEY } from "@/lib/theme";
+import { SETTINGS_KEY, themeOf, type Theme } from "@/lib/theme";
 
 /**
  * What the user can change, kept per machine in localStorage like the
  * terminal's height. Blank means "work it out": the `claude` binary is found
  * by the app (src-tauri/src/claude.rs), the model is Claude Code's own
- * default, the theme follows the system, and new tabs open in Claude Code.
+ * default, the theme is Classic, the landing page's look, and new tabs open in Claude Code.
  */
-export type Theme = "system" | "light" | "dark";
+export type { Theme };
 export type Ground = "dots" | "plain" | "squares";
 
 export interface Settings {
@@ -31,7 +31,7 @@ export interface Settings {
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "system", agent: "claude", ground: "plain", devServer: true, voice: true, research: true, quietMedia: null };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "classic", agent: "claude", ground: "plain", devServer: true, voice: true, research: true, quietMedia: null };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));
@@ -57,7 +57,8 @@ export function readSettings(): Settings {
   if (r !== cached.raw) {
     let value = DEFAULTS;
     try {
-      value = { ...DEFAULTS, ...JSON.parse(r) };
+      const saved = { ...DEFAULTS, ...JSON.parse(r) };
+      value = { ...saved, theme: themeOf(saved.theme) };
     } catch {
       /* unreadable: the defaults stand */
     }
@@ -88,22 +89,16 @@ export function useSettings(): Settings {
 
 /**
  * Sets `<html data-theme>`, which app/globals.css reads. The same choice is
- * made before first paint by THEME_SCRIPT (lib/theme.ts), so the page never flashes light.
+ * made before first paint by THEME_SCRIPT (lib/theme.ts), so the page never flashes another theme.
  */
 export function applyTheme(theme: Theme) {
-  const dark = theme === "dark" || (theme === "system" && window.matchMedia(DARK).matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
 }
 
-/** Keeps the page on the saved theme, and on the system's while that is the choice. */
+/** Keeps the page on the saved theme. */
 export function followTheme() {
   const sync = () => applyTheme(readSettings().theme);
-  const media = window.matchMedia(DARK);
-  media.addEventListener("change", sync);
   window.addEventListener(CHANGED, sync);
   sync();
-  return () => {
-    media.removeEventListener("change", sync);
-    window.removeEventListener(CHANGED, sync);
-  };
+  return () => window.removeEventListener(CHANGED, sync);
 }

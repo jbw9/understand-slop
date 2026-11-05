@@ -159,8 +159,8 @@ export function FilesPanel() {
                   aria-pressed={filter === k}
                   onClick={() => setFilter(k)}
                   className={cn(
-                    "cursor-pointer rounded-[2px] border px-2 py-0.5 text-[12px]",
-                    filter === k ? "border-deep-green text-deep-green" : "border-border-gray text-muted-slate hover:text-ink",
+                    "cursor-pointer border px-2 py-0.5 text-[12px]",
+                    filter === k ? "border-accent text-accent" : "border-border-gray text-muted-slate hover:text-ink",
                   )}
                 >
                   {label} <span className="font-mono text-[11px]">{counts[k]}</span>
@@ -235,8 +235,8 @@ function FileRow({
       : f?.status === "other"
         ? { text: f.kind ?? "other", tone: "text-faint" }
         : need
-          ? { text: `${need - gaps}/${need} explained`, tone: gaps ? "text-amber-ink" : "text-deep-green" }
-          : { text: levels.length ? "explained" : "not explained", tone: levels.length ? "text-deep-green" : "text-amber-ink" };
+          ? { text: `${need - gaps}/${need} explained`, tone: gaps ? "text-amber-ink" : "text-accent" }
+          : { text: levels.length ? "explained" : "not explained", tone: levels.length ? "text-accent" : "text-amber-ink" };
   return (
     <div className="py-1.5">
       <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-baseline gap-3 text-left">
@@ -257,7 +257,7 @@ function FileRow({
               </span>
               <span className="min-w-0 flex-1 truncate text-muted-slate">{s.does}</span>
               {s.by.length ? (
-                <button type="button" onClick={() => onGo(s.by[0].path)} className="max-w-[45%] shrink-0 cursor-pointer truncate text-deep-green hover:underline">
+                <button type="button" onClick={() => onGo(s.by[0].path)} className="max-w-[45%] shrink-0 cursor-pointer truncate text-accent hover:underline">
                   {trail(s.by[0].path)}
                 </button>
               ) : (
@@ -269,7 +269,7 @@ function FileRow({
             <div className="flex flex-col gap-0.5 text-[12px]">
               <span className="text-faint">Explained in</span>
               {levels.slice(0, 6).map((p) => (
-                <button key={p.join("/")} type="button" onClick={() => onGo(p)} className="cursor-pointer truncate text-left text-deep-green hover:underline">
+                <button key={p.join("/")} type="button" onClick={() => onGo(p)} className="cursor-pointer truncate text-left text-accent hover:underline">
                   {trail(p)}
                 </button>
               ))}

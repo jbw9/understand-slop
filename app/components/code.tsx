@@ -121,7 +121,7 @@ export function FileView({ file, line }: { file: string; line?: number }) {
             ) : (
               <span className="text-[12px] text-muted-slate">Type to edit; ⌘S saves to disk.</span>
             )}
-            {saved?.ok && !dirty ? <span className="text-[12px] text-deep-green">Saved.</span> : null}
+            {saved?.ok && !dirty ? <span className="text-[12px] text-accent">Saved.</span> : null}
             {saved && !saved.ok ? (
               <span className="text-[12px] text-clay-ink">
                 Not saved: {saved.refused}
@@ -134,7 +134,7 @@ export function FileView({ file, line }: { file: string; line?: number }) {
       {slice === null ? <p className="text-[13px] text-faint">Reading…</p> : null}
       {slice === "failed" ? <p className="text-[13px] text-clay-ink">Could not read this file from the repository.</p> : null}
       {slice && slice !== "failed" ? (
-        <div className="overflow-hidden rounded-[2px] border border-border-gray">
+        <div className="overflow-hidden border border-border-gray">
           <CodeEditor
             file={file}
             start={1}

@@ -1,17 +1,20 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Diagram } from "@/components/v2/landing-agent";
 
 export interface DemoNode {
   id: string;
   title: string;
   sub?: string;
   children?: DemoNode[];
+  anatomy?: ({ kind: string } & Diagram)[];
 }
 
 /** What the page reads of a committed map: its run, and its tree's titles. */
 export interface DemoFile {
   RUN: { files?: number; commit?: string };
   AUTHORED: DemoNode[];
+  OVERVIEW: { anatomy: ({ kind: string } & Diagram)[] };
 }
 
 /**

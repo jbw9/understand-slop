@@ -124,7 +124,7 @@ export function TimelineView() {
         <Button onClick={closeTimeline}>‹ Back to the map</Button>
       </div>
       <Eyebrow>History</Eyebrow>
-      <h1 className="mt-2 text-[22px] font-semibold tracking-[-0.01em] text-ink">How the code got here</h1>
+      <h1 className="mt-2 font-display text-[32px] font-normal leading-[1.05] tracking-[-0.016em] text-ink">How the code got here</h1>
       {data?.commits.length ? (
         <p className="mt-1.5 max-w-[720px] text-[13.5px] leading-relaxed text-on-surface-variant">
           {data.commits.length} commits{data.capped ? " (the most recent)" : ""} from {day(data.commits[0].at)} to {day(data.commits[data.commits.length - 1].at)}, on the map&apos;s
@@ -273,13 +273,13 @@ export function TimelineView() {
           ))}
 
           {drag && Math.abs(drag.b - drag.a) > 6 ? (
-            <rect x={Math.min(drag.a, drag.b)} y={bands} width={Math.abs(drag.b - drag.a)} height={h - AXIS_H - bands} fill="var(--color-mint-success)" opacity={0.5} stroke="var(--color-deep-green)" />
+            <rect x={Math.min(drag.a, drag.b)} y={bands} width={Math.abs(drag.b - drag.a)} height={h - AXIS_H - bands} fill="var(--color-accent-surface)" opacity={0.5} stroke="var(--color-accent)" />
           ) : null}
         </svg>
 
         {hover ? (
           <div
-            className="pointer-events-none absolute z-10 w-[280px] rounded-[3px] border border-border-gray bg-pure-white px-3 py-2 shadow-sm"
+            className="pointer-events-none absolute z-10 w-[280px] border border-border-gray bg-card px-3 py-2 shadow-sm"
             style={{ left: Math.min(hover.x + 12, Math.max(width - 290, 0)), top: hover.y + 12 }}
           >
             <p className="text-[12.5px] font-medium leading-snug text-ink">{hover.c.subject}</p>
@@ -306,7 +306,7 @@ export function TimelineView() {
                   type="button"
                   disabled={!a || !b}
                   onClick={() => a && b && show(a, b)}
-                  className="block w-full cursor-pointer rounded-[3px] px-2 py-1.5 text-left hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
+                  className="block w-full cursor-pointer px-2 py-1.5 text-left hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <span className="text-[13.5px] font-semibold text-ink">
                     <span className="tnum mr-1.5 text-faint">{i + 1}.</span>

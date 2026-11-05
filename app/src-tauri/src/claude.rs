@@ -99,8 +99,8 @@ const TURN: &str = r#"f="$SLOP_CONTEXT"; s=$(cat); printf '%s' "$s" > "$f.ended.
 /// What Claude runs when it finds the map wrong: one line per section, kept
 /// beside the tab's queue until the turn ends. Allowed without asking.
 const FIX: &str = r#"#!/bin/sh
-# Tells Mira its map is wrong about a section (src-tauri/src/claude.rs).
-[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; nothing to correct." >&2; exit 1; }
+# Tells Bluprint its map is wrong about a section (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Bluprint tab; nothing to correct." >&2; exit 1; }
 [ $# -ge 2 ] || { echo 'usage: slop-map-fix "<section title>" "<what the map gets wrong, and what is true>"' >&2; exit 2; }
 printf '%s\t%s\n' "$(printf '%s' "$1" | tr '\t\n' '  ')" "$(printf '%s' "$2" | tr '\t\n' '  ')" >> "$SLOP_CONTEXT.fix"
 echo "Noted. The map's \"$1\" will be corrected after this turn."
@@ -111,8 +111,8 @@ echo "Noted. The map's \"$1\" will be corrected after this turn."
 /// the turn. Refs are written as the user said them and resolved by the app.
 /// Allowed without asking.
 const SHOW: &str = r#"#!/bin/sh
-# Drives Mira's map: shows a section, a diff, or the history (src-tauri/src/claude.rs).
-[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; nothing to show." >&2; exit 1; }
+# Drives Bluprint's map: shows a section, a diff, or the history (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Bluprint tab; nothing to show." >&2; exit 1; }
 clean() { printf '%s' "$1" | tr '\t\n' '  '; }
 case "$1" in
 section)
@@ -140,8 +140,8 @@ esac
 /// (mcp.rs), and this reaches the same tool for the agents that have no MCP
 /// config. Allowed without asking.
 const TERMINAL: &str = r#"#!/bin/sh
-# Prints what a Mira terminal printed, the dev server's by default (src-tauri/src/mcp.rs).
-[ -n "$SLOP_MCP_URL" ] || { echo "Not in a Mira tab; no terminals to read." >&2; exit 1; }
+# Prints what a Bluprint terminal printed, the dev server's by default (src-tauri/src/mcp.rs).
+[ -n "$SLOP_MCP_URL" ] || { echo "Not in a Bluprint tab; no terminals to read." >&2; exit 1; }
 case "$2" in ''|*[!0-9]*) lines=200 ;; *) lines=$2 ;; esac
 name=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\t\n' '  ')
 curl -sS --fail-with-body "$SLOP_MCP_URL/text" -H 'Content-Type: application/json' \
@@ -157,13 +157,13 @@ curl -sS --fail-with-body "$SLOP_MCP_URL/text" -H 'Content-Type: application/jso
 /// not ask to be. The outline is written beside the tab's queue when the tab
 /// starts (pty.rs), from the map the page already has.
 const LIST: &str = r#"#!/bin/sh
-# Lists Mira's map, section by section (src-tauri/src/claude.rs).
-[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Mira tab; no map to list." >&2; exit 1; }
+# Lists Bluprint's map, section by section (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Bluprint tab; no map to list." >&2; exit 1; }
 [ -s "$SLOP_CONTEXT.map" ] || { echo "This repository has no map yet." >&2; exit 1; }
 cat "$SLOP_CONTEXT.map"
 "#;
 
-const SYSTEM: &str = "This session was opened from Mira, an app that maps this \
+const SYSTEM: &str = "This session was opened from Bluprint, an app that maps this \
 repository as a tree of sections (user journey, data flow, the code behind each). The user \
 can attach things they picked on the map: a whole section arrives as a block starting with \
 `[Map section:`, one element of a section (a row, a diagram box, a step, a line of code) as \
@@ -240,7 +240,7 @@ pub struct Launch {
 /// and the conversation the tab would be reopened into, go on any exit — a
 /// quit, a crash, Ctrl+C — and the script's status is Claude's.
 const LAUNCHER: &str = r#"#!/bin/sh
-# Claude Code with Mira's map-context hook (src-tauri/src/claude.rs).
+# Claude Code with Bluprint's map-context hook (src-tauri/src/claude.rs).
 trap 'rm -f "$SLOP_CONTEXT.live" "$SLOP_CONTEXT.session"' EXIT INT TERM HUP
 : > "$SLOP_CONTEXT.live"
 # A reopened tab's conversation, taken once: a `claude` typed later starts afresh.
@@ -263,7 +263,7 @@ exec "$SLOP_LAUNCHER" "$@"
 /// would run without the hooks (no plan tab, no status, no map context).
 /// Each file loads the user's own from where zsh would have read it.
 #[cfg(unix)]
-const ZSHENV: &str = r#"# Mira's zsh startup (src-tauri/src/claude.rs).
+const ZSHENV: &str = r#"# Bluprint's zsh startup (src-tauri/src/claude.rs).
 _slop_dot=$ZDOTDIR
 ZDOTDIR=${SLOP_ZDOTDIR:-$HOME}
 [ -f "$ZDOTDIR/.zshenv" ] && source "$ZDOTDIR/.zshenv"
@@ -273,7 +273,7 @@ ZDOTDIR=$_slop_dot
 unset _slop_dot
 "#;
 #[cfg(unix)]
-const ZSHRC: &str = r#"# Mira's zsh startup (src-tauri/src/claude.rs).
+const ZSHRC: &str = r#"# Bluprint's zsh startup (src-tauri/src/claude.rs).
 ZDOTDIR=$SLOP_ZDOTDIR
 [ "$ZDOTDIR" = "$HOME" ] && unset ZDOTDIR
 [ -f "${ZDOTDIR:-$HOME}/.zshrc" ] && source "${ZDOTDIR:-$HOME}/.zshrc"
@@ -382,7 +382,7 @@ pub async fn claude_detect(configured: Option<String>) -> Option<Detected> {
 /// removes it each time it delivers.
 pub fn queue(id: u32) -> PathBuf {
     std::env::temp_dir()
-        .join("mira")
+        .join("bluprint")
         .join(format!("context-{}-{id}.md", std::process::id()))
 }
 
@@ -403,8 +403,8 @@ fn remove_named(dir: &Path, doomed: impl Fn(&str) -> bool) {
     }
 }
 
-/// At startup: the tab files of a Mira that is gone. A crash or a kill skips
-/// `forget`, and the files would wait for a reboot. Another Mira still
+/// At startup: the tab files of a Bluprint that is gone. A crash or a kill skips
+/// `forget`, and the files would wait for a reboot. Another Bluprint still
 /// running (the dev build beside the installed one) keeps its own.
 pub fn sweep_stale() {
     let Some(dir) = queue(0).parent().map(Path::to_path_buf) else { return };
@@ -619,7 +619,7 @@ pub fn status_of(queue: &Path) -> Option<String> {
 /// where every tab's PATH can find them. Rewritten only when they differ, so
 /// an upgrade of the app replaces old ones.
 fn launcher() -> std::io::Result<PathBuf> {
-    let dir = std::env::temp_dir().join("mira").join("bin");
+    let dir = std::env::temp_dir().join("bluprint").join("bin");
     install(&dir.join("slop-map-fix"), FIX)?;
     install(&dir.join("slop-map-show"), SHOW)?;
     install(&dir.join("slop-map-list"), LIST)?;
@@ -643,7 +643,7 @@ fn launcher() -> std::io::Result<PathBuf> {
 
 #[cfg(unix)]
 fn zdotdir() -> PathBuf {
-    std::env::temp_dir().join("mira").join("zsh")
+    std::env::temp_dir().join("bluprint").join("zsh")
 }
 
 /// What cmd and PowerShell find as `slop-claude` on Windows: the launcher,
@@ -651,7 +651,7 @@ fn zdotdir() -> PathBuf {
 #[cfg(windows)]
 const LAUNCHER_CMD: &str = "@echo off\r\n\
 if not defined SLOP_BASH (\r\n\
-  echo Claude Code in Mira needs Git for Windows: https://git-scm.com/download/win 1>&2\r\n\
+  echo Claude Code in Bluprint needs Git for Windows: https://git-scm.com/download/win 1>&2\r\n\
   exit /b 1\r\n\
 )\r\n\
 \"%SLOP_BASH%\" \"%~dp0slop-claude\" %*\r\n";

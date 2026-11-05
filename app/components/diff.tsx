@@ -200,7 +200,7 @@ export function Pill({ verdict, children }: { verdict: Exclude<Verdict, "untouch
   const t = TINT[verdict];
   return (
     <span
-      className="rounded-[2px] border px-2 py-[3px] font-mono text-[10.5px] leading-none"
+      className=" border px-2 py-[3px] font-mono text-[10.5px] leading-none"
       style={{ color: t.ink, background: t.surface, borderColor: t.line }}
     >
       {children}
@@ -221,7 +221,7 @@ export function Hunks({ file, only }: { file: FileChange; only?: (h: HunkLines) 
   if (!hunks.length) return <p className="px-1 py-1 text-[12px] text-muted-slate">No lines to show: the file is binary, or only its mode changed.</p>;
   const BG = { "+": TINT.added.surface, "-": TINT.removed.surface, " ": undefined };
   return (
-    <div className="mt-1 overflow-x-auto rounded-[2px] border border-border-gray bg-code">
+    <div className="mt-1 overflow-x-auto border border-border-gray bg-code">
       <pre className="min-w-full font-mono text-[12px] leading-[1.6]">
         {hunks.map((h, i) => (
           <div key={i} className={cn(i > 0 && "border-t border-border-gray")}>
@@ -268,9 +268,9 @@ export function SectionTint({ path, children }: { path: string[]; children: Reac
   if (verdict === "untouched") return children;
   const t = TINT[verdict];
   return (
-    <div className="relative rounded-[3px]" style={{ background: t.surface, boxShadow: `inset 0 0 0 1.5px ${t.line}` }}>
+    <div className="relative" style={{ background: t.surface, boxShadow: `inset 0 0 0 1.5px ${t.line}` }}>
       <span
-        className="absolute -top-2 left-3 z-10 rounded-[2px] border px-1.5 py-[2px] font-mono text-[9.5px] uppercase leading-none tracking-[0.08em]"
+        className="absolute -top-2 left-3 z-10 border px-1.5 py-[2px] font-mono text-[9.5px] uppercase leading-none tracking-[0.08em]"
         style={{ color: t.ink, background: t.surface, borderColor: t.line }}
       >
         {WORD[verdict]}
@@ -297,7 +297,7 @@ export function RemovedSections({ path }: { path: string[] }) {
       {here.map((s) => (
         <div
           key={s.id}
-          className="rounded-[3px] border px-4 py-3"
+          className=" border px-4 py-3"
           style={{ background: t.surface, borderColor: t.line }}
         >
           <span className="flex items-center gap-2">
@@ -355,7 +355,7 @@ function RowsDiff({ kind, rows, block }: { kind: Anatomy["kind"]; rows: RowDiff[
   return (
     <div className="min-w-0">
       {title ? <p className="mb-2.5 font-mono text-[12.5px] font-semibold text-ink">{title}</p> : null}
-      <div className="overflow-x-auto rounded-[3px] border border-border-gray bg-pure-white">
+      <div className="overflow-x-auto border border-border-gray bg-card">
         <table className="w-full border-collapse text-left text-[13px]">
           {columns ? (
             <thead>
@@ -488,7 +488,7 @@ export function DiagramDiff({
                     textAnchor={label.anchor}
                     fontSize="12"
                     fill={t?.ink ?? "var(--color-muted-slate)"}
-                    stroke="var(--color-warm-cream)"
+                    stroke="var(--color-paper)"
                     strokeWidth="4"
                     strokeLinejoin="round"
                     paintOrder="stroke"
@@ -510,7 +510,7 @@ export function DiagramDiff({
                   width={w}
                   height={BOX_H}
                   rx="3"
-                  fill={t?.surface ?? "var(--color-pure-white)"}
+                  fill={t?.surface ?? "var(--color-card)"}
                   stroke={t?.line ?? "var(--color-border-strong)"}
                   strokeWidth={t ? 2 : 1.5}
                   strokeDasharray={v === "removed" ? "5 4" : undefined}

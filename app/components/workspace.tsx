@@ -17,7 +17,7 @@ import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
-import { DROP_TARGET, DropMarker, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, useDropOn } from "@/components/tabs";
+import { DROP_TARGET, DropMarker, BlueprintIcon, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, tabTitle, useDropOn } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, findQuestion, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
@@ -186,8 +186,7 @@ export function Workspace() {
   const mapActive = mapState?.active ?? 0;
   // A part dragged off the map onto this strip (components/canvas.tsx).
   const drop = useDropOn("main");
-  const titleOf = (p: string[], file?: string) =>
-    file ? file.split("/").pop()! : p.length ? (map.nodeAt(p)?.title ?? map.RUN.repo) : map.RUN.repo;
+  const titleOf = (p: string[], file?: string) => tabTitle(map.nodeAt, p, file);
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
   // Hidden once it has slid away, so it takes no clicks and no focus.
   const [settled, setSettled] = useState(true);
@@ -619,6 +618,12 @@ export function Workspace() {
     reportStatus(tabs);
   }, [tabs]);
 
+  // The Dock icon's badge (src-tauri/src/lib.rs attention_count).
+  const attention = tabs.filter((t) => t.live && (t.status === "done" || t.status === "waiting")).length;
+  useEffect(() => {
+    if (desktop) void invoke("attention_count", { n: attention }).catch(() => {});
+  }, [desktop, attention]);
+
   // A chime when an agent finishes or needs the user, heard wherever they are
   // looking: the dot alone is easy to miss with the workspace closed.
   const was = useRef<Record<number, Status | undefined>>({});
@@ -703,8 +708,8 @@ export function Workspace() {
   );
 
   useEffect(() => {
-    // Opening an empty panel gives a plain terminal; an agent is one menu pick or Ctrl+Shift+T away.
-    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(null));
+    // Opening an empty panel starts the default agent; a plain terminal is one menu pick or Ctrl+T away.
+    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(main));
     // Asked for from the map: a tab running Claude, shown; or a new one.
     const toClaude = () => {
       const last = (current?.live ? current : undefined) ?? (upFront?.live ? upFront : undefined) ?? mine.findLast((t) => t.live);
@@ -937,7 +942,7 @@ export function Workspace() {
         data-close
         onClick={() => close(t.key)}
         aria-label={`Close ${nameOf(t)}`}
-        className="flex size-[18px] cursor-pointer items-center justify-center rounded-[2px] text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
+        className="flex size-[18px] cursor-pointer items-center justify-center text-faint opacity-0 hover:bg-surface-container hover:text-ink group-hover:opacity-100 group-aria-selected:opacity-100"
       >
         ×
       </button>
@@ -984,19 +989,19 @@ export function Workspace() {
         visibility: !shown && settled ? "hidden" : "visible",
       }}
       data-chrome
-      className="fixed z-40 flex flex-col overflow-hidden rounded-[4px] border border-border-gray bg-surface-container-low shadow-[0_8px_28px_-8px_rgba(0,0,0,0.35)]"
+      className="fixed z-40 flex flex-col overflow-hidden border border-border-gray bg-surface-container-low shadow-[0_8px_28px_-8px_rgba(0,0,0,0.35)]"
     >
       <div
         onPointerDown={drag}
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize workspace"
-        className="absolute inset-y-6 left-0 z-10 w-1.5 cursor-col-resize hover:bg-deep-green/20"
+        className="absolute inset-y-6 left-0 z-10 w-1.5 cursor-col-resize hover:bg-accent/20"
       />
       {/* Tabs as an editor draws them: the open one is the colour of the
           pane below it and has no line under it, so it reads as the front of
           the terminal rather than a pill above it. */}
-      <header className="flex h-7 shrink-0 items-stretch bg-surface-container" role="tablist">
+      <header data-chrome="bar" className="flex h-7 shrink-0 items-stretch bg-surface-container" role="tablist">
         <div className="flex min-w-0 items-stretch overflow-x-auto [scrollbar-width:none]">
           {panel.map((t) => tabView(t, t.key === current?.key))}
         </div>
@@ -1063,7 +1068,7 @@ export function Workspace() {
       {/* The map's own tabs, as its strip draws them (components/tabs.tsx),
           then the tabs dragged here, drawn the same way: with a tab here the
           strip reads as it does without one, just longer. */}
-      <header role="tablist" data-chrome data-section-tabs="main" className={cn(TAB_STRIP, "pointer-events-auto relative")}>
+      <header role="tablist" data-chrome="bar" data-section-tabs="main" className={cn(TAB_STRIP, "pointer-events-auto relative")}>
         {mapTabs.map((m) => {
           const label = titleOf(m.path, m.file);
           const selected = !upFront && m.id === mapActive;
@@ -1100,6 +1105,7 @@ export function Workspace() {
               }}
               className={cn(tabLook(selected, closable), !selected && "cursor-pointer", drop !== null && "on" in drop && drop.on === m.id && DROP_TARGET)}
             >
+              {!m.path.length && !m.file ? <BlueprintIcon /> : null}
               <TabLabel>{label}</TabLabel>
               {closable ? <TabClose label={label} active={selected} onClose={closeMap} /> : null}
             </div>
@@ -1116,7 +1122,7 @@ export function Workspace() {
       </header>
       <div
         ref={setMainSlot}
-        className={cn("relative min-h-0 flex-1 bg-warm-cream", upFront ? "pointer-events-auto" : "invisible")}
+        className={cn("relative min-h-0 flex-1 bg-paper", upFront ? "pointer-events-auto" : "invisible")}
       />
       {upFront?.pty !== undefined ? (
         <div data-chrome className="pointer-events-auto bg-surface-container-low">
@@ -1139,12 +1145,12 @@ export function Workspace() {
               ? { top: (desktop ? TITLEBAR : 0) + GAP, bottom: STATUSBAR + GAP, right: GAP, left: panelLeft() }
               : { top: desktop ? TITLEBAR : 0, bottom: STATUSBAR, left: 0, right: shown ? window.innerWidth - panelLeft() + GAP : 0 }
           }
-          className="pointer-events-none fixed z-50 rounded-[4px] border-2 border-dashed border-deep-green/60 bg-deep-green/8"
+          className="pointer-events-none fixed z-50 border-2 border-dashed border-accent/60 bg-accent/8"
         />
         <div
           aria-hidden
           style={{ left: dragging.x + 12, top: dragging.y + 10 }}
-          className="pointer-events-none fixed z-50 flex items-center gap-1.5 rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
+          className="pointer-events-none fixed z-50 flex items-center gap-1.5 border border-border-gray bg-card px-2.5 py-1 text-[12px] text-ink shadow-lift"
         >
           {(() => {
             const t = tabs.find((x) => x.key === dragging.key);
@@ -1172,7 +1178,7 @@ export function Workspace() {
         style={{ x: dotsX, y: dotsY, right: GAP, top: (desktop ? TITLEBAR : 0) + GAP }}
         title="Drag to move"
         data-chrome
-        className="fixed z-40 flex cursor-grab flex-col items-center gap-0.5 rounded-full border border-border-gray bg-pure-white p-0.5 shadow-lift active:cursor-grabbing"
+        className="fixed z-40 flex cursor-grab flex-col items-center gap-0.5 rounded-full border border-border-gray bg-card p-0.5 shadow-lift active:cursor-grabbing"
       >
         {panel
           .filter((t) => t.status)
@@ -1333,7 +1339,7 @@ function Offer({ phones, onPick, onDismiss }: { phones: Platform[]; onPick: (p: 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
       style={{ bottom: STATUSBAR + GAP }}
-      className="fixed left-3 z-40 flex max-w-[340px] flex-col gap-2.5 rounded-[4px] border border-border-gray bg-pure-white p-3.5 shadow-lift"
+      className="fixed left-3 z-40 flex max-w-[340px] flex-col gap-2.5 border border-border-gray bg-card p-3.5 shadow-lift"
     >
       <p className="text-[13px] leading-snug text-ink">
         This project has {what}. Run {phones.length > 1 ? "them" : "it"} here, in the app?
@@ -1344,7 +1350,7 @@ function Offer({ phones, onPick, onDismiss }: { phones: Platform[]; onPick: (p: 
             key={p}
             type="button"
             onClick={() => onPick(p)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-[2px] border border-border-strong px-2.5 py-1 text-[12px] text-ink hover:bg-surface-container"
+            className="flex cursor-pointer items-center gap-1.5 border border-border-strong px-2.5 py-1 text-[12px] text-ink hover:bg-surface-container"
           >
             <PhoneIcon />
             {p === "ios" ? "iOS Simulator" : "Android emulator"}
@@ -1516,7 +1522,7 @@ function Strip({
               ? "Runs slop-claude in this shell: your Claude Code, able to take map context"
               : `Runs ${a.command} in this shell`
           }
-          className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[2px] border border-border-strong px-2 py-px text-ink hover:bg-surface-container"
+          className="flex shrink-0 cursor-pointer items-center gap-1.5 border border-border-strong px-2 py-px text-ink hover:bg-surface-container"
         >
           <AgentIcon id={a.id} />
           {a.id === CLAUDE.id ? "Claude" : a.label}
@@ -1525,7 +1531,7 @@ function Strip({
       {tab.found === false ? (
         <span className="shrink-0 text-faint">
           Claude Code was not found.{" "}
-          <button type="button" onClick={openSettings} className="cursor-pointer text-deep-green underline">
+          <button type="button" onClick={openSettings} className="cursor-pointer text-accent underline">
             Open Settings
           </button>
         </span>

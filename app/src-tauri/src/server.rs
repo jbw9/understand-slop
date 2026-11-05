@@ -31,7 +31,7 @@ fn up() -> bool {
 }
 
 /// Returns once the server answers. A server already answering is one a crashed
-/// Mira left behind, and is used as it is.
+/// Bluprint left behind, and is used as it is.
 pub fn start(app: &tauri::AppHandle) -> Result<(), String> {
     if up() {
         return Ok(());
@@ -41,7 +41,7 @@ pub fn start(app: &tauri::AppHandle) -> Result<(), String> {
     let env: Env = std::fs::read_to_string(dir.join("env.json"))
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
-        .ok_or("Mira's server isn't installed. Run `npm run app:install` in the repo's app folder.")?;
+        .ok_or("Bluprint's server isn't installed. Run `npm run app:install` in the repo's app folder.")?;
     let log = std::fs::File::create(data.join("server.log")).map_err(|e| e.to_string())?;
     let child = crate::proc::command(&env.node)
         .arg(dir.join("node_modules/next/dist/bin/next"))
@@ -61,12 +61,12 @@ pub fn start(app: &tauri::AppHandle) -> Result<(), String> {
         }
         if let Some(c) = app.state::<Server>().0.lock().unwrap().as_mut() {
             if let Ok(Some(status)) = c.try_wait() {
-                return Err(format!("Mira's server exited ({status}). See {}.", data.join("server.log").display()));
+                return Err(format!("Bluprint's server exited ({status}). See {}.", data.join("server.log").display()));
             }
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    Err(format!("Mira's server didn't start in 30 s. See {}.", data.join("server.log").display()))
+    Err(format!("Bluprint's server didn't start in 30 s. See {}.", data.join("server.log").display()))
 }
 
 pub fn stop(app: &tauri::AppHandle) {

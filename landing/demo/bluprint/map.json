@@ -1,7 +1,7 @@
 {
  "RUN": {
-  "command": "mira map mira",
-  "repo": "mira",
+  "command": "bluprint map bluprint",
+  "repo": "bluprint",
   "commit": "c0c5eac",
   "files": 109,
   "elapsed": "28 min",

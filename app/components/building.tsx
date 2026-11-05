@@ -100,7 +100,7 @@ export function Stages({ progress }: { progress: Progress }) {
   const started = progress.startedAt ? Date.parse(progress.startedAt) : NaN;
   const elapsed = Number.isNaN(started) ? undefined : Math.max(0, (tick - started) / 1000);
   // Too early, the pace says nothing; after that, the time so far scaled to
-  // what is left, rounded so it does not twitch every second.
+  // what is left, so it does not twitch every second.
   const left = elapsed !== undefined && elapsed > 30 && fraction > 0.03 ? (elapsed * (1 - fraction)) / fraction : undefined;
   const leftLabel =
     left === undefined ? "estimating time left…" : left < 60 ? "under a minute left" : `about ${Math.ceil(left / 60)} min left`;
@@ -109,7 +109,7 @@ export function Stages({ progress }: { progress: Progress }) {
       {live ? (
         <div className="max-w-[1100px]">
           <div className="flex items-baseline gap-3 font-mono text-[11.5px]">
-            <span className="text-[13px] font-semibold text-deep-green tabular-nums">{Math.floor(fraction * 100)}%</span>
+            <span className="text-[13px] font-semibold text-accent tabular-nums">{Math.floor(fraction * 100)}%</span>
             {elapsed !== undefined ? <span className="text-faint tabular-nums">{clock(elapsed)} elapsed</span> : null}
             <span className="ml-auto text-on-surface-variant">{leftLabel}</span>
           </div>
@@ -129,7 +129,7 @@ export function Stages({ progress }: { progress: Progress }) {
                 className={cn("relative h-1.5 basis-0 overflow-hidden rounded-full bg-border-gray", i === at && "shimmer")}
               >
                 <div
-                  className={cn("h-full rounded-full transition-[width] duration-700 ease-out", i < at ? "bg-mint-line" : "bg-deep-green")}
+                  className={cn("h-full rounded-full transition-[width] duration-700 ease-out", i < at ? "bg-accent-line" : "bg-accent")}
                   style={{ width: `${share(i) * 100}%` }}
                 />
               </div>
@@ -146,12 +146,12 @@ export function Stages({ progress }: { progress: Progress }) {
               {i ? <span aria-hidden className="h-px w-5 bg-border-strong" /> : null}
               <span
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-2.5 py-1",
-                  now ? "border-mint-line bg-mint-success text-deep-green" : past ? "border-border-gray text-on-surface-variant" : "border-dashed border-border-gray text-faint",
+                  "flex items-center gap-1.5 border px-2.5 py-1",
+                  now ? "border-accent-line bg-accent-surface text-accent" : past ? "border-border-gray text-on-surface-variant" : "border-dashed border-border-gray text-faint",
                 )}
                 aria-current={now ? "step" : undefined}
               >
-                <span aria-hidden className={cn("size-1.5 rounded-full", now ? "animate-pulse bg-deep-green" : past ? "bg-mint-line" : "bg-border-strong")} />
+                <span aria-hidden className={cn("size-1.5 rounded-full", now ? "animate-pulse bg-accent" : past ? "bg-accent-line" : "bg-border-strong")} />
                 {past ? `${label} ✓` : label}
               </span>
             </li>
@@ -186,7 +186,7 @@ function Reading({ reading }: { reading: NonNullable<Progress["reading"]> }) {
         </span>
       </div>
       <div className="mt-2 h-1 max-w-[720px] overflow-hidden rounded-full bg-border-gray">
-        <div className="h-full bg-deep-green transition-[width] duration-300" style={{ width: `${of ? (100 * reading.read.length) / of : 0}%` }} />
+        <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${of ? (100 * reading.read.length) / of : 0}%` }} />
       </div>
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="max-h-[440px] overflow-y-auto pr-2">
@@ -201,8 +201,8 @@ function Reading({ reading }: { reading: NonNullable<Progress["reading"]> }) {
                     key={f}
                     title={f}
                     className={cn(
-                      "size-[9px] rounded-[1.5px] transition-colors duration-500",
-                      recent.has(f) ? "bg-deep-green" : read.has(f) ? "bg-mint-line" : "bg-border-gray",
+                      "size-[9px] transition-colors duration-500",
+                      recent.has(f) ? "bg-accent" : read.has(f) ? "bg-accent-line" : "bg-border-gray",
                     )}
                   />
                 ))}
@@ -234,7 +234,7 @@ function Dividing() {
       </p>
       <div className="mt-5 grid max-w-[1100px] grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="shimmer h-[74px] rounded-[3px] border border-dashed border-border-strong" />
+          <div key={i} className="shimmer h-[74px] border border-dashed border-border-strong" />
         ))}
       </div>
     </div>
@@ -280,8 +280,8 @@ function Skeleton({ progress, onOpen }: { progress: Progress; onOpen: (path: str
               onClick={open}
               disabled={!open}
               className={cn(
-                "group flex min-h-[86px] flex-col rounded-[3px] border px-4 py-3 text-left transition-[background-color,border-color,opacity] duration-500",
-                r.status === "done" && "border-border-strong bg-surface-container-low hover:border-deep-green",
+                "group flex min-h-[86px] flex-col border px-4 py-3 text-left transition-[background-color,border-color,opacity] duration-500",
+                r.status === "done" && "border-border-strong bg-surface-container-low hover:border-accent",
                 r.status === "drafting" && "shimmer border-border-strong",
                 r.status === "drafting" && node?.draft && "border-amber-line",
                 r.status === "queued" && "border-dashed border-border-gray opacity-70",
@@ -294,7 +294,7 @@ function Skeleton({ progress, onOpen }: { progress: Progress; onOpen: (path: str
               <span
                 className={cn(
                   "mt-auto pt-2 font-mono text-[11px]",
-                  r.status === "done" ? "text-deep-green" : r.status === "failed" ? "text-clay-ink" : "text-faint",
+                  r.status === "done" ? "text-accent" : r.status === "failed" ? "text-clay-ink" : "text-faint",
                 )}
               >
                 {r.status === "done"
@@ -388,10 +388,10 @@ function Wireframe() {
       </svg>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="flex min-h-[86px] flex-col gap-2 rounded-[3px] border border-dashed border-border-strong px-4 py-3">
-            <span className="h-2.5 w-2/5 rounded-[2px] bg-border-gray" />
-            <span className="h-1.5 w-4/5 rounded-[2px] bg-border-gray" />
-            <span className="h-1.5 w-3/5 rounded-[2px] bg-border-gray" />
+          <div key={i} className="flex min-h-[86px] flex-col gap-2 border border-dashed border-border-strong px-4 py-3">
+            <span className="h-2.5 w-2/5 bg-border-gray" />
+            <span className="h-1.5 w-4/5 bg-border-gray" />
+            <span className="h-1.5 w-3/5 bg-border-gray" />
           </div>
         ))}
       </div>
@@ -402,7 +402,7 @@ function Wireframe() {
 /** Over a part that is still a draft: what the reader is looking at, before they take it as the map. */
 export function DraftNote({ detail }: { detail?: string }) {
   return (
-    <div className="max-w-[820px] rounded-[3px] border border-amber-line bg-amber-surface px-4 py-3 text-[13.5px] leading-relaxed text-amber-ink">
+    <div className="max-w-[820px] border border-amber-line bg-amber-surface px-4 py-3 text-[13.5px] leading-relaxed text-amber-ink">
       <span className="font-semibold">Draft, being checked.</span> The checker found problems with this part
       {detail ? ` (${detail.replace(/^revising — /, "")})` : ""} and its author is fixing them, so what is here may
       still change. It is shown now so there is something to read while you wait.

@@ -9,6 +9,21 @@ import { Menu } from "@/components/menu";
 import { cn } from "@/lib/utils";
 
 /** What a tab holds, opened: its level, and its file over it. */
+/** A tab's name: its file, else its level's title. The top level is "Bluprint": the project's own tab above already names the repository. */
+export const tabTitle = (nodeAt: (path: string[]) => { title: string } | null | undefined, path: string[], file?: string) =>
+  file ? file.split("/").pop()! : path.length ? (nodeAt(path)?.title ?? "Bluprint") : "Bluprint";
+
+/** A floor plan: the Bluprint tab, the top of the map. Drawn like the workspace's tab glyphs. */
+export function BlueprintIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="mr-0.5 size-3 shrink-0">
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1" />
+      <path d="M7.5 2.5v6h6" />
+      <path d="M2.5 10.5h3" />
+    </svg>
+  );
+}
+
 export const show = (t: Tab) => (t.file ? openFile(t.path, t.file) : goTo(t.path));
 
 /** Opens a level of the open map in a new tab, in front. */
@@ -76,7 +91,7 @@ export function useDropOn(strip: string) {
 }
 
 /** A tab a dragged part would be let go into. */
-export const DROP_TARGET = "border-deep-green bg-deep-green/25 text-ink hover:bg-deep-green/25";
+export const DROP_TARGET = "border-accent bg-accent/25 text-ink hover:bg-accent/25";
 
 /** The gap a dragged part would open a new tab in. */
 export function DropMarker({ drop }: { drop: Drop | null }) {
@@ -84,7 +99,7 @@ export function DropMarker({ drop }: { drop: Drop | null }) {
     <span
       aria-hidden
       style={{ left: drop.x }}
-      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 rounded-full bg-deep-green"
+      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 rounded-full bg-accent"
     />
   ) : null;
 }
@@ -105,7 +120,7 @@ export function DragChip() {
     <div
       aria-hidden
       style={{ left: x + 12, top: y + 10 }}
-      className="pointer-events-none fixed z-50 flex max-w-[320px] items-center gap-1.5 rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
+      className="pointer-events-none fixed z-50 flex max-w-[320px] items-center gap-1.5 border border-border-gray bg-card px-2.5 py-1 text-[12px] text-ink shadow-lift"
     >
       <span className="truncate">{label}</span>
       {drop ? <span className="shrink-0 text-faint">→ {"on" in drop ? "replace" : "new tab"}</span> : null}
@@ -130,7 +145,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
         aria-label="New tab"
         aria-haspopup="menu"
         title="New tab"
-        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
       >
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
           <path d="M5 1.5v7M1.5 5h7" />
@@ -142,7 +157,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            { label: "Map", onClick: onMap },
+            { label: "Bluprint", onClick: onMap },
             { label: "Preview", onClick: () => window.dispatchEvent(new Event(OPEN_PREVIEW)) },
           ]}
         />
@@ -152,6 +167,30 @@ export function NewTab({ onMap }: { onMap: () => void }) {
 }
 
 /**
+ * The landing page's demo repositories, when it frames this map
+ * (landing/components/v2/landing-demo.tsx): it posts them in, and the strip
+ * shows one tab per repository, as if each were open, instead of the map's
+ * own. Picking one posts back, and the landing points the frame at it.
+ */
+type Demos = { repos: { id: string; label: string }[]; open: string };
+let demos: Demos | null = null;
+const demoWatchers = new Set<() => void>();
+if (typeof window !== "undefined" && window.parent !== window) {
+  window.addEventListener("message", (e) => {
+    if (e.origin !== location.origin || e.data?.type !== "slop:repos") return;
+    demos = { repos: e.data.repos, open: e.data.open };
+    for (const f of demoWatchers) f();
+  });
+  // The landing's own post on load can come before this listens, so ask too.
+  window.parent.postMessage({ type: "slop:ready" }, location.origin);
+}
+const watchDemos = (f: () => void) => {
+  demoWatchers.add(f);
+  return () => void demoWatchers.delete(f);
+};
+const useDemos = () => useSyncExternalStore(watchDemos, () => demos, () => null);
+
+/**
  * The open map's tabs, across the top of the map: one per level the reader
  * has open, named by that level's title, and `+` for another at the top. A
  * part opens in a new tab with a middle click, ⌘/Ctrl-click, or "Open in new
@@ -159,7 +198,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
  * Ctrl+Shift+Tab step through them; Ctrl+W (⌘W on a Mac) closes the one in front.
  */
 export function SectionTabs({ path }: { path: string[] }) {
-  const { name, nodeAt, RUN } = useMap();
+  const { name, nodeAt } = useMap();
   const state = useTabs(name);
   const file = useOpenFile()?.file;
   const key = `${path.join("/")}|${file ?? ""}`;
@@ -173,7 +212,8 @@ export function SectionTabs({ path }: { path: string[] }) {
   const active = state?.active ?? 0;
   const many = tabs.length > 1;
   const drop = useDropOn("map");
-  const titleOf = (t: Tab) => (t.file ? t.file.split("/").pop()! : t.path.length ? (nodeAt(t.path)?.title ?? RUN.repo) : RUN.repo);
+  const framed = useDemos();
+  const titleOf = (t: Tab) => tabTitle(nodeAt, t.path, t.file);
 
   const select = (id: number) => {
     const p = selectTab(name, id);
@@ -214,10 +254,28 @@ export function SectionTabs({ path }: { path: string[] }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [name]);
 
+  if (framed)
+    return (
+      // On the landing page the strip is the sheet's, white with a line of its ink, not one of the app's black bars.
+      <div role="tablist" data-chrome aria-label="Repository" className={cn(TAB_STRIP, "shadow-[inset_0_-1px_0_var(--color-ink)]")}>
+        {framed.repos.map((r, i) => (
+          <SectionTab
+            key={r.id}
+            id={i}
+            label={r.label}
+            home={false}
+            active={r.id === framed.open}
+            target={false}
+            onSelect={() => window.parent.postMessage({ type: "slop:open", id: r.id }, location.origin)}
+          />
+        ))}
+      </div>
+    );
+
   return (
     <div
       role="tablist"
-      data-chrome
+      data-chrome="bar"
       data-section-tabs="map"
       aria-label={`Open sections of ${name}`}
       className={cn(TAB_STRIP, "relative")}
@@ -227,6 +285,7 @@ export function SectionTabs({ path }: { path: string[] }) {
           key={t.id}
           id={t.id}
           label={titleOf(t)}
+          home={!t.path.length && !t.file}
           active={t.id === active}
           target={drop !== null && "on" in drop && drop.on === t.id}
           onSelect={() => select(t.id)}
@@ -243,6 +302,7 @@ export function SectionTabs({ path }: { path: string[] }) {
 function SectionTab({
   id,
   label,
+  home,
   active,
   target,
   onSelect,
@@ -250,6 +310,8 @@ function SectionTab({
 }: {
   id: number;
   label: string;
+  /** The top of the map, marked with a floor plan. */
+  home: boolean;
   active: boolean;
   /** A part is dragged over it, to be let go into it. */
   target: boolean;
@@ -282,6 +344,7 @@ function SectionTab({
         target && DROP_TARGET,
       )}
     >
+      {home ? <BlueprintIcon /> : null}
       <TabLabel>{label}</TabLabel>
       {onClose ? <TabClose label={label} active={active} onClose={onClose} /> : null}
     </div>
@@ -303,10 +366,10 @@ export const TAB_STRIP =
  * reads as the top of the page beneath rather than a button on the strip. */
 export function tabLook(active: boolean, closable: boolean) {
   return cn(
-    "group flex h-[29px] min-w-0 max-w-[200px] shrink-0 items-center gap-1 rounded-t-[4px] border border-b-0 pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+    "group flex h-[29px] min-w-0 max-w-[200px] shrink-0 items-center gap-1 border border-b-0 pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
     closable ? "pr-1" : "pr-2.5",
     active
-      ? "border-border-gray bg-warm-cream font-semibold text-ink"
+      ? "border-border-gray bg-paper font-semibold text-ink"
       : "border-transparent text-muted-slate hover:bg-surface-container hover:text-ink",
   );
 }
@@ -336,7 +399,7 @@ export function TabClose({ label, active, onClose }: { label: string; active: bo
       }}
       aria-label={`Close ${label}`}
       className={cn(
-        "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint hover:bg-border-gray hover:text-ink",
+        "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center text-faint hover:bg-border-gray hover:text-ink",
         active ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
       )}
     >

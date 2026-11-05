@@ -32,7 +32,7 @@ const FEATURES: { id: "explore" | Drawing; label: string; project?: string; cap?
   {
     id: "plan",
     label: "Read the plan",
-    project: "mira",
+    project: "bluprint",
     cap: "In the desktop app, a plan from Claude’s plan mode opens as a short doc: a picture of what it will change, the screen you’ll see, then the steps and files, before a line is written. Accept it right there.",
   },
   {
@@ -155,7 +155,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
         <div
           ref={features}
           role="tablist"
-          aria-label="What Mira does"
+          aria-label="What Bluprint does"
           className={s.tabs}
           onKeyDown={(e) => walk(e, FEATURES.map((x) => x.id), feature, (id) => setFeature(id as typeof feature))}
         >

@@ -30,11 +30,11 @@ const WIDTH = 560;
 
 /** Markdown as a terminal draws it: the panel's own monospace, colour for emphasis and code. */
 const PROSE =
-  "min-w-0 flex-1 [&_p]:my-0 [&_p+*]:mt-2 [&_*+p]:mt-2 [&_strong]:font-semibold [&_strong]:text-white [&_em]:text-[#a9bfd4] " +
+  "min-w-0 flex-1 [&_p]:my-0 [&_p+*]:mt-2 [&_*+p]:mt-2 [&_strong]:font-semibold [&_strong]:text-ink [&_em]:text-muted-slate " +
   "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 " +
-  "[&_h1]:mt-3 [&_h1]:font-semibold [&_h1]:text-white [&_h2]:mt-3 [&_h2]:font-semibold [&_h2]:text-white [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-white " +
-  "[&_:not(pre)>code]:text-[#d8ae5b] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-[3px] [&_pre]:bg-[#0b0b0c] [&_pre]:px-3 [&_pre]:py-2 [&_pre]:text-[#e8e8ea] " +
-  "[&_a]:text-[#86bab6] [&_a]:underline [&_table]:my-2 [&_td]:border [&_td]:border-[#3a3a3a] [&_td]:px-2 [&_th]:border [&_th]:border-[#3a3a3a] [&_th]:px-2 [&_th]:text-left";
+  "[&_h1]:mt-3 [&_h1]:font-semibold [&_h1]:text-ink [&_h2]:mt-3 [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-ink " +
+  "[&_:not(pre)>code]:text-amber-ink [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]: [&_pre]:bg-code [&_pre]:px-3 [&_pre]:py-2 [&_pre]:text-code-plain " +
+  "[&_a]:text-[var(--color-sec-2-ink)] [&_a]:underline [&_table]:my-2 [&_td]:border [&_td]:border-border-strong [&_td]:px-2 [&_th]:border [&_th]:border-border-strong [&_th]:px-2 [&_th]:text-left";
 
 /** A question shows as asked; `sent` is it with the context that went along. */
 type Line = { role: "user"; text: string; sent: string } | { role: "assistant" | "tool" | "error"; text: string };
@@ -167,9 +167,10 @@ export function ClaudeWeb() {
           type="button"
           onClick={() => setOpen(true)}
           title="Ask Claude about this code (Ctrl+`)"
-          className="fixed right-3 top-1.5 z-40 flex cursor-pointer items-center gap-1.5 rounded-full border border-[#D97757]/60 bg-[#141415] px-3 py-1 font-mono text-[12px] text-[#dedede] shadow-[0_0_12px_rgba(217,119,87,0.35)] transition-colors hover:border-[#D97757]"
+          data-chrome
+          className="fixed right-3 top-1.5 z-40 flex cursor-pointer items-center gap-1.5 border border-[#D97757]/60 bg-surface px-3 py-1 font-mono text-[12px] text-on-surface shadow-[0_0_12px_rgba(217,119,87,0.35)] transition-colors hover:border-[#D97757]"
         >
-          {seen ? null : <span aria-hidden className="absolute inset-0 animate-ping rounded-full border border-[#D97757]/70" />}
+          {seen ? null : <span aria-hidden className="absolute inset-0 animate-ping border border-[#D97757]/70" />}
           <AgentIcon id="claude" className="size-3.5" />
           Ask Claude
         </button>
@@ -183,7 +184,7 @@ export function ClaudeWeb() {
         transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
         style={{ top: GAP, bottom: STATUSBAR + GAP, right: GAP, width: `min(${WIDTH}px, calc(100vw - ${2 * GAP}px))` }}
         data-chrome
-        className="fixed z-40 flex flex-col overflow-hidden rounded-[4px] border border-border-gray bg-[#141415] font-mono text-[12.5px] leading-relaxed text-[#dedede] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.35)]"
+        className="fixed z-40 flex flex-col overflow-hidden border border-border-gray bg-surface-container-low font-mono text-[12.5px] leading-relaxed text-on-surface shadow-[0_8px_28px_-8px_rgba(8,16,80,0.4)]"
       >
         <header className="flex h-7 shrink-0 items-center gap-2 bg-surface-container px-3 text-[11.5px] text-muted-slate">
           <AgentIcon id="claude" />
@@ -194,25 +195,25 @@ export function ClaudeWeb() {
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" onClick={() => input.current?.focus()}>
-          <p className="text-[#848484]">
+          <p className="text-faint">
             <span className="text-[#D97757]">✻</span> Ask about {RUN.repo}. Claude reads its code to answer.
           </p>
           {lines.map((l, i) =>
             l.role === "user" ? (
-              <p key={i} className="mt-3 whitespace-pre-wrap text-[#848484]">
+              <p key={i} className="mt-3 whitespace-pre-wrap text-faint">
                 &gt; {l.text}
               </p>
             ) : l.role === "tool" ? (
-              <p key={i} className="mt-2 text-[#86bab6]">
+              <p key={i} className="mt-2 text-[var(--color-sec-2-ink)]">
                 ⏺ {l.text}
               </p>
             ) : l.role === "error" ? (
-              <p key={i} className="mt-2 text-[#e88080]">
+              <p key={i} className="mt-2 text-clay-ink">
                 {l.text}
               </p>
             ) : (
               <div key={i} className="mt-2 flex gap-2">
-                <span className="text-[#dedede]">⏺</span>
+                <span className="text-on-surface">⏺</span>
                 <div className={PROSE}>
                   <Markdown remarkPlugins={[remarkGfm]}>{l.text}</Markdown>
                 </div>
@@ -223,19 +224,19 @@ export function ClaudeWeb() {
           <div ref={end} />
         </div>
         {picks.length ? (
-          <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-[#3a3a3a] px-4 pt-2">
+          <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-border-strong px-4 pt-2">
             {picks.map((p) => (
-              <span key={p.key} className="flex max-w-full items-center gap-1 rounded-[2px] bg-[#333] px-1.5 py-0.5 text-[11px] text-[#a9bfd4]">
+              <span key={p.key} className="flex max-w-full items-center gap-1 bg-surface-container px-1.5 py-0.5 text-[11px] text-muted-slate">
                 <span className="truncate">@ {p.title}</span>
-                <button type="button" onClick={() => void unpick(WEB_TAB, p.key)} aria-label={`Remove ${p.title}`} className="cursor-pointer text-[#848484] hover:text-white">
+                <button type="button" onClick={() => void unpick(WEB_TAB, p.key)} aria-label={`Remove ${p.title}`} className="cursor-pointer text-faint hover:text-ink">
                   ×
                 </button>
               </span>
             ))}
           </div>
         ) : null}
-        <div className={cn("flex shrink-0 gap-2 px-4 py-2.5", picks.length ? "" : "border-t border-[#3a3a3a]")}>
-          <span className="text-[#848484]">&gt;</span>
+        <div className={cn("flex shrink-0 gap-2 px-4 py-2.5", picks.length ? "" : "border-t border-border-strong")}>
+          <span className="text-faint">&gt;</span>
           <textarea
             ref={input}
             value={draft}
@@ -252,7 +253,7 @@ export function ClaudeWeb() {
                 void ask(draft.trim());
               }
             }}
-            className="min-h-0 flex-1 resize-none bg-transparent text-[#dedede] outline-none placeholder:text-[#5a5a5a] [field-sizing:content] max-h-40"
+            className="min-h-0 flex-1 resize-none bg-transparent text-on-surface outline-none placeholder:text-faint [field-sizing:content] max-h-40"
           />
         </div>
       </motion.aside>

@@ -72,14 +72,14 @@ export function Titlebar({ bare }: { bare?: boolean }) {
     // is too narrow for both, the map's name truncates first.
     <header
       data-tauri-drag-region
-      data-chrome
+      data-chrome="bar"
       className="grid h-9 shrink-0 select-none grid-cols-[minmax(0,1fr)_max-content] items-center border-b border-border-gray bg-surface-container-low"
     >
       {/* The Mac's traffic lights take the left edge. */}
       <div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center", mac ? "pl-[78px]" : "pl-1.5")}>
         {bare ? (
           <span data-tauri-drag-region className="px-2 font-mono text-[11.5px] font-semibold text-ink">
-            Mira
+            Bluprint
           </span>
         ) : (
           <Where mac={mac} />
@@ -201,11 +201,11 @@ function Where({ mac }: { mac: boolean }) {
               aria-selected={here}
               title={`${m.label}${i < 9 ? ` (${mac ? "⌘" : "Ctrl+"}${i + 1})` : ""}`}
               className={cn(
-                "group flex h-6 min-w-0 max-w-48 items-center gap-1.5 rounded-[2px] pl-2 pr-1 font-mono text-[11.5px] transition-colors",
+                "group flex h-6 min-w-0 max-w-48 items-center gap-1.5 pl-2 pr-1 font-mono text-[11.5px] transition-colors",
                 here ? "bg-surface-container font-semibold text-ink" : "text-muted-slate hover:bg-surface-container hover:text-ink",
               )}
             >
-              <button type="button" onClick={() => go(m.id)} className="flex min-w-0 cursor-pointer items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-deep-green">
+              <button type="button" onClick={() => go(m.id)} className="flex min-w-0 cursor-pointer items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-accent">
                 <span className="truncate">{m.label}</span>
                 {dot && <StatusDot status={dot} />}
               </button>
@@ -222,7 +222,7 @@ function Where({ mac }: { mac: boolean }) {
         }}
         aria-haspopup="menu"
         title="Open another project"
-        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
       >
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
           <path d="M5 1.5v7M1.5 5h7" />
@@ -236,7 +236,7 @@ function Where({ mac }: { mac: boolean }) {
           items={[
             ...maps.map((m) => ({
               label: m.label,
-              icon: <span className="w-3 text-deep-green">{open.includes(m.id) ? "✓" : ""}</span>,
+              icon: <span className="w-3 text-accent">{open.includes(m.id) ? "✓" : ""}</span>,
               onClick: () => go(m.id),
             })),
             { label: "Import project…", icon: <span className="w-3 text-muted-slate">+</span>, onClick: () => void openFolder(), separated: true },
@@ -318,12 +318,12 @@ function Control({
       aria-pressed={active}
       title={label}
       className={cn(
-        "flex cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+        "flex cursor-pointer items-center justify-center text-muted-slate transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
         // Window buttons fill the bar's height, as native ones do; the tools
         // are small square targets, as in an editor's title bar.
-        win ? "h-full w-11" : "mx-px h-7 w-7 rounded-[2px]",
-        danger ? "hover:bg-clay-ink hover:text-white" : "hover:bg-surface-container hover:text-ink",
-        active && "bg-deep-green/15 text-deep-green hover:text-deep-green",
+        win ? "h-full w-11" : "mx-px h-7 w-7",
+        danger ? "hover:bg-clay-ink hover:text-paper" : "hover:bg-surface-container hover:text-ink",
+        active && "bg-accent/15 text-accent hover:text-accent",
         className,
       )}
     >

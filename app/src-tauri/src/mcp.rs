@@ -131,7 +131,7 @@ fn handle(conn: TcpStream, app: &AppHandle) -> std::io::Result<()> {
     }
 }
 
-const INSTRUCTIONS: &str = "These tools use the Preview tab in Mira: the user's project, \
+const INSTRUCTIONS: &str = "These tools use the Preview tab in Bluprint: the user's project, \
 running as a web app beside you, exactly as the user sees it, and any page on the web. Use them \
 to check that what you built works: take a screenshot, then click, type and read the page, as \
 you would in a browser. They are your browser here: to look something up or read a page on \
@@ -144,7 +144,7 @@ Android emulator running in the app. `read_terminal` reads the project's termina
 server's logs by default: read it when the page misbehaves, a build fails or a request errors. When a page \
 needs an account (a login wall on Instagram, X, a private dashboard), call `sign_in` and let the user sign in \
 themselves; never type a password. Sign-ins are kept, so a site signed in to once opens signed in later. `map_search`, `map_section` and `map_where` read the project's \
-map in Mira: what each part of the code is for and which section explains it. Ask `map_where` about a \
+map in Bluprint: what each part of the code is for and which section explains it. Ask `map_where` about a \
 file before changing it, and name sections by the id path these tools give.";
 
 /// One JSON-RPC message; nothing back for a notification.
@@ -155,7 +155,7 @@ fn rpc(msg: &Value, tab: u32, app: &AppHandle) -> Option<Value> {
         "initialize" => Ok(json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or("2025-06-18"),
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "mira", "version": env!("CARGO_PKG_VERSION") },
+            "serverInfo": { "name": "bluprint", "version": env!("CARGO_PKG_VERSION") },
             "instructions": INSTRUCTIONS,
         })),
         "ping" => Ok(json!({})),
@@ -414,7 +414,7 @@ fn tools() -> Value {
         },
         {
             "name": "sign_in",
-            "description": "Asks the user to sign in to a site in the preview, for a page that needs an account: a login wall on an Instagram reel, a post on X, a private dashboard. Opens the address given; the user chooses whether Mira keeps the sign-in for all projects or this project only, signs in on the page themselves, and says when they are done. Returns once they have, or have declined, which can take minutes. You never see or type the password. A sign-in is kept, so try the page first: call this only when it asks to sign in.",
+            "description": "Asks the user to sign in to a site in the preview, for a page that needs an account: a login wall on an Instagram reel, a post on X, a private dashboard. Opens the address given; the user chooses whether Bluprint keeps the sign-in for all projects or this project only, signs in on the page themselves, and says when they are done. Returns once they have, or have declined, which can take minutes. You never see or type the password. A sign-in is kept, so try the page first: call this only when it asks to sign in.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "url": { "type": "string", "description": "The page to sign in on, or the page that asked for it, like https://www.instagram.com/reel/…" } },
@@ -479,7 +479,7 @@ fn tools() -> Value {
         },
         {
             "name": "map_search",
-            "description": "Search the project's map in Mira: sections whose title or text match, and top-level symbols and files by name, each with the section that explains it and that section's id path.",
+            "description": "Search the project's map in Bluprint: sections whose title or text match, and top-level symbols and files by name, each with the section that explains it and that section's id path.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "query": { "type": "string", "description": "Words, a symbol name, or part of a path." } },

@@ -215,10 +215,10 @@ export function MarkdownEditor({
               onKeyDown={(e) => onKeyDown(e, r, i)}
               onBlur={() => setEdit((cur) => (cur?.from === r.from && cur.caret === undefined ? null : cur))}
               spellCheck
-              className="-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden whitespace-pre-wrap rounded-[3px] bg-surface-container px-2 py-1 font-mono text-[13px] leading-[1.65] text-ink caret-ink outline-none"
+              className="-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden whitespace-pre-wrap bg-surface-container px-2 py-1 font-mono text-[13px] leading-[1.65] text-ink caret-ink outline-none"
             />
           ) : (
-            <div key={`${r.from}:${r.to}`} data-from={r.from + 1} onMouseDown={(e) => onBlockDown(e, r)} onClick={(e) => onBlockClick(e, r)} className="doc-prose -mx-2 cursor-text rounded-[3px] px-2 hover:bg-surface-container/50">
+            <div key={`${r.from}:${r.to}`} data-from={r.from + 1} onMouseDown={(e) => onBlockDown(e, r)} onClick={(e) => onBlockClick(e, r)} className="doc-prose -mx-2 cursor-text px-2 hover:bg-surface-container/50">
               <Block text={lines.slice(r.from, r.to).join("\n")} dir={dir} />
             </div>
           ),

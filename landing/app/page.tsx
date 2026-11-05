@@ -1,25 +1,33 @@
 import type { Metadata } from "next";
-import { LandingAgent } from "@/components/landing-agent";
-import { LandingDemo, StarCount, type DemoMap } from "@/components/landing-demo";
-import { LandingHow } from "@/components/landing-how";
-import { LandingInstall } from "@/components/landing-install";
-import { LandingNav } from "@/components/landing-nav";
-import { LandingStart } from "@/components/landing-start";
-import { LandingVoices, type Source, type Voice } from "@/components/landing-voices";
-import s from "@/components/landing.module.css";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Zilla_Slab } from "next/font/google";
+import { LandingAgent } from "@/components/v2/landing-agent";
+import { LandingCover } from "@/components/v2/landing-cover";
+import { LandingEvolution } from "@/components/v2/landing-evolution";
+import { LandingDemo, StarCount, type DemoMap } from "@/components/v2/landing-demo";
+import { LandingHow } from "@/components/v2/landing-how";
+import { LandingInstall } from "@/components/v2/landing-install";
+import { LandingNav } from "@/components/v2/landing-nav";
+import { LandingStart } from "@/components/v2/landing-start";
+import { LandingVoices, type Voice } from "@/components/v2/landing-voices";
+import s from "@/components/v2/v2.module.css";
 import { loadMap } from "@/lib/maps";
 
 export const metadata: Metadata = {
-  title: "Mira",
+  title: "Bluprint",
   description: "A visual way to explore a codebase: start broad, go deeper, down to the line.",
 };
+
+// A light slab for the lettering, Plex Mono for the labels on the sheet, Plex Sans for reading.
+const display = Zilla_Slab({ variable: "--font-display", subsets: ["latin"], weight: ["300", "400", "500"], display: "swap" });
+const sans = IBM_Plex_Sans({ variable: "--font-body", subsets: ["latin"], display: "swap" });
+const mono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
 
 const REPO = "jbw9/understand-slop";
 const GITHUB = `https://github.com/${REPO}`;
 
 // This repo first: the demo opens on the project explaining itself.
 const DEMOS = [
-  { id: "mira", label: "Mira itself" },
+  { id: "bluprint", label: "Bluprint itself" },
   { id: "flask", label: "Flask" },
   { id: "fastapi", label: "FastAPI" },
   { id: "ky", label: "ky" },
@@ -27,22 +35,14 @@ const DEMOS = [
   { id: "kafka", label: "Kafka control plane" },
 ];
 
-const LEVIN: Source = {
-  who: "Isaac Levin",
-  work: "“Why We Still Need an IDE”, JetBrains",
-  href: "https://blog.jetbrains.com/blog/2026/10/20/why-we-still-need-an-ide/",
-};
-const WITTEVEEN: Source = {
-  who: "Sam Witteveen",
-  work: "“What is the Future of IDEs”",
-  href: "https://www.youtube.com/watch?v=I5VxMzaBD6s",
-};
-
-// Said in public, word for word, and linked to where.
+// The same problem at every size. John Doe is the page's own voice; the other two are people the team spoke with, by role.
 const VOICES: Voice[] = [
-  { source: WITTEVEEN, quote: "The writing part has gotten cheap. The verification hasn’t." },
-  { source: LEVIN, quote: "If you can’t see what it’s seeing, you’re not actually steering it." },
-  { source: LEVIN, quote: "You can’t own code you don’t understand." },
+  {
+    quote: "Code review is the new bottleneck. Some engineers have ten waiting.",
+    by: "Software Development Manager, Amazon",
+  },
+  { quote: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
+  { quote: "You built it in a weekend. I bet you can’t explain how it works.", by: "John Doe, solo developer" },
 ];
 
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.
@@ -83,28 +83,20 @@ export default function Landing() {
 
   return (
     // The layout locks the body, as the app's does for its canvas; this page scrolls itself.
-    <div className={s.page}>
+    <div className={`${s.page} ${display.variable} ${sans.variable} ${mono.variable}`}>
+      <div className={s.paper}>
       <LandingNav github={GITHUB} />
       <main>
+        <LandingCover />
+        <LandingEvolution />
         <div className={s.top}>
           <div className={s.wrap}>
-            <section className={s.hero}>
-              <a className={`${s.kicker} ${s.rise}`} href="#agent">
-                Works beside Claude Code, Codex and OpenCode <span aria-hidden>&rarr;</span>
-              </a>
-              <h1 className={s.rise} style={{ "--i": 1 } as React.CSSProperties}>
-                Understand the code <em>you didn&rsquo;t write.</em>
-              </h1>
-              <div className={s.pitch}>
-                <p className={s.rise} style={{ "--i": 2 } as React.CSSProperties}>
-                  Mira splits a repository into the steps the program takes. Click a step to open its parts, and keep
-                  going until you reach the code.
-                </p>
-                <div className={`${s.ctas} ${s.rise}`} style={{ "--i": 3 } as React.CSSProperties}>
-                  {ctas}
-                </div>
-              </div>
-            </section>
+            <header id="app" className={s.appHead}>
+              {/* Uncle Sam from the 1917 poster, cut out in the cover's blue like its hand, pointing out at the reader from behind the line. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- the site is a static export, which next/image cannot optimize. */}
+              <img className={s.you} src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/uncle-sam-cutout.png`} alt="" />
+              <h2>And now there&rsquo;s you.</h2>
+            </header>
             <section aria-label="Live demo" className={s.demo}>
               <LandingDemo maps={maps} />
             </section>
@@ -115,11 +107,12 @@ export default function Landing() {
           <LandingVoices voices={VOICES} />
           <LandingHow
             name="flask"
-            steps={flask.AUTHORED.map((r) => r.title)}
+            roots={flask.OVERVIEW.anatomy.find((a) => a.kind === "diagram")!}
             opened={{
+              id: first.id,
               title: first.title,
               sub: sentence(first.sub ?? ""),
-              parts: first.children!.map((c) => c.title),
+              diagram: first.anatomy!.find((a) => a.kind === "diagram")!,
             }}
             cited={{
               title: config.title,
@@ -130,13 +123,9 @@ export default function Landing() {
             }}
           />
         </div>
-        <LandingAgent
-          name="flask"
-          sections={flask.AUTHORED.map((r) => r.title)}
-          changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
-        />
+        <LandingAgent name="flask" diagram={flask.OVERVIEW.anatomy.find((a) => a.kind === "diagram")!} changed="handling-requests" />
         <div className={s.wrap}>
-          <LandingStart github={GITHUB} />
+          <LandingStart />
           <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">
             <h2 id="close-title">
               Start broad. <em>End at the line.</em>
@@ -147,11 +136,39 @@ export default function Landing() {
       </main>
 
       <footer className={s.wrap}>
-        <div className={s.end}>
-          <b>Mira</b>
-          <a href={GITHUB}>{REPO}</a>
-        </div>
+        {/* The drawing's title block. */}
+        <dl className={s.end}>
+          <div className={s.endTitle}>
+            <dt>Title</dt>
+            <dd>Bluprint</dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              <a href={GITHUB}>{REPO}</a>
+            </dd>
+          </div>
+          <div>
+            <dt>Site</dt>
+            <dd>blpr.dev</dd>
+          </div>
+          <div>
+            <dt>Scale</dt>
+            <dd>Repo to line</dd>
+          </div>
+          <div>
+            <dt>Sheet</dt>
+            <dd>1 of 1</dd>
+          </div>
+        </dl>
       </footer>
+      </div>
+      <p className={s.credits}>
+        Pictures, all public domain, from Wikimedia Commons: Ada Lovelace by Alfred Edward Chalon; Alan Turing, 1951;
+        ENIAC, U.S. Army; Grace Hopper, U.S. Navy; Margaret Hamilton with the Apollo flight software, Draper Laboratory;
+        Apollo core rope memory; Robert Hooke&rsquo;s microscope, from <i>Micrographia</i>, 1665; James Montgomery Flagg&rsquo;s <i>I Want You</i>, 1917; Michelangelo&rsquo;s{" "}
+        <i>The Creation of Adam</i>.
+      </p>
     </div>
   );
 }

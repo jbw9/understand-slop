@@ -5,7 +5,11 @@
  */
 
 export const SETTINGS_KEY = "slop.settings";
-export const DARK = "(prefers-color-scheme: dark)";
+export const THEMES = ["classic", "light", "dark"] as const;
+export type Theme = (typeof THEMES)[number];
 
-/** applyTheme (lib/settings.ts) as an inline script: Settings' choice, else the system's. */
-export const THEME_SCRIPT = `try{var t=JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})||"{}").theme;var d=t==="dark"||(t!=="light"&&matchMedia(${JSON.stringify(DARK)}).matches);document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}`;
+/** A saved theme, or Classic for none and for one this version no longer has. */
+export const themeOf = (t: unknown): Theme => (THEMES.includes(t as Theme) ? (t as Theme) : "classic");
+
+/** applyTheme (lib/settings.ts) as an inline script, so the page never flashes another theme. */
+export const THEME_SCRIPT = `try{var t=JSON.parse(localStorage.getItem(${JSON.stringify(SETTINGS_KEY)})||"{}").theme;document.documentElement.dataset.theme=${JSON.stringify(THEMES)}.indexOf(t)<0?"classic":t}catch(e){document.documentElement.dataset.theme="classic"}`;

@@ -1,0 +1,1801 @@
+/* Bluprint's landing page: one ink, cobalt, on a white sheet that lies on a
+   blueprint grid. In dark, the sheet is the blueprint and the ink is white. */
+/* Bluprint's landing page: one ink, cobalt, on a white sheet that lies on a
+   blueprint grid. Always light, whatever the reader picked in the app. */
+.page {
+  --desk: #1a2fa0;
+  --desk-line: rgba(255, 255, 255, 0.1);
+  --paper: #fcfdff;
+  --low: #eef1fd;
+  --ink: #2438c8;
+  --muted: #4a5bd2;
+  --faint: #8995e2;
+  --line: rgba(36, 56, 200, 0.18);
+  --strong: rgba(36, 56, 200, 0.5);
+  --grid: rgba(36, 56, 200, 0.07);
+  --on-ink: #fcfdff;
+  --blush: #f4a3b4;
+  --code-bg: #2438c8;
+  --code-ink: #d5dbff;
+  --code-key: #ffffff;
+  --code-num: rgba(213, 219, 255, 0.5);
+}
+.page {
+  --display: var(--font-display), Georgia, serif;
+  --mono: var(--font-plex-mono), ui-monospace, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --gap: clamp(96px, 11vw, 160px);
+  --gutter: clamp(16px, 3.4vw, 44px);
+  --edge: clamp(8px, 1.6vw, 22px);
+  height: 100%;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: var(--edge);
+  /* The desk under the sheet: a blueprint's grid, which scrolls with the page. */
+  background-color: var(--desk);
+  background-image: linear-gradient(var(--desk-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--desk-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-attachment: local;
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  scrollbar-color: var(--desk-line) transparent;
+}
+.page ::selection {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.paper {
+  min-height: 100%;
+  border-radius: 6px;
+  background: var(--paper);
+  overflow: clip;
+}
+.page a:focus-visible,
+.page button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.page section[id],
+.page header[id] {
+  scroll-margin-top: 72px;
+}
+.wrap {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* ── labels: the sheet's monospace notes ───────────────── */
+.bracket {
+  margin: 0;
+  font: 12px/1.4 var(--mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.eyebrow {
+  margin: 0 0 22px;
+  font: 12px/1.4 var(--mono);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.eyebrow::before {
+  content: "[ ";
+}
+.eyebrow::after {
+  content: " ]";
+}
+
+/* ── the bar across the top ───────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 0 var(--gutter);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.navBar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: calc(1480px - 2 * var(--gutter));
+  height: 56px;
+  margin: 0 auto;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease-out;
+}
+.nav[data-float="true"] .navBar {
+  border-bottom-color: var(--line);
+}
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 15px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.markLogo {
+  width: 42px;
+  height: 30px;
+  fill: currentColor;
+}
+.markLogo .blush {
+  fill: var(--blush);
+}
+.navBar nav {
+  display: flex;
+  margin: 0 auto;
+  gap: 8px;
+}
+.navBar nav a {
+  padding: 3px 8px;
+  border: 1px solid var(--strong);
+  font: 11.5px/1.4 var(--mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.navBar nav a:hover {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.navBar .navCta {
+  height: 32px;
+  padding: 0 14px;
+  font: 500 12px var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── the cover: the first screen, a sheet of notes ────── */
+.cover {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.5fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 24px clamp(24px, 4vw, 64px);
+  min-height: max(680px, calc(100svh - 2 * var(--edge) - 56px));
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 12px var(--gutter) 28px;
+}
+/* The grid down the left, with the hand on it. */
+.plate {
+  position: relative;
+  min-height: 460px;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 52px 52px;
+  background-position: -1px -1px;
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+  container-type: inline-size;
+}
+.note {
+  position: absolute;
+  z-index: 2;
+  top: 26px;
+  left: 18%;
+  width: 230px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--strong);
+  background: var(--paper);
+  font: 11px/1.45 var(--mono);
+  text-transform: uppercase;
+}
+.note p {
+  margin: 8px 0 0;
+}
+.rows {
+  display: block;
+  width: 104px;
+  height: 22px;
+  fill: none;
+  stroke: var(--ink);
+}
+.fill {
+  fill: var(--ink);
+}
+.ring2 {
+  padding: 0 4px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+}
+.hand {
+  position: absolute;
+  z-index: 1;
+  top: 34%;
+  left: -12%;
+  width: 118%;
+  max-width: none;
+  pointer-events: none;
+}
+/* From the pointing finger to the claim. */
+/* The hand is 118% of the plate wide, so its fingertip sits at a fixed share of the plate's width. */
+.lead {
+  position: absolute;
+  z-index: 1;
+  top: calc(34% + 10.4cqw);
+  left: 66%;
+  right: -44px;
+  border-top: 1px solid var(--ink);
+}
+.lead::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+.window {
+  position: absolute;
+  z-index: 2;
+  right: 8%;
+  bottom: 6%;
+  width: 46%;
+  margin: 0;
+  border: 1px solid var(--strong);
+  background: var(--paper);
+}
+.window figcaption {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--line);
+  font: 10px var(--mono);
+  text-transform: uppercase;
+}
+.window i {
+  font-style: normal;
+}
+.window img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.globe {
+  position: absolute;
+  left: 6%;
+  bottom: 4%;
+  width: 92px;
+  height: 92px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.6;
+  opacity: 0.8;
+}
+.claim {
+  align-self: center;
+  min-width: 0;
+  padding-top: 24px;
+}
+.coverTitle {
+  margin: 0;
+  font: 300 clamp(46px, 5.5vw, 92px) / 0.98 var(--display);
+  letter-spacing: -0.022em;
+}
+.coverSub {
+  max-width: 21em;
+  margin: 0.7em 0 0;
+  font: 300 clamp(26px, 2.9vw, 46px) / 1.04 var(--display);
+  letter-spacing: -0.016em;
+}
+/* A picture set in the line, as tall as a capital. */
+.inline {
+  display: inline-block;
+  height: 0.9em;
+  width: calc(0.9em * var(--r, 1));
+  vertical-align: -0.06em;
+  border: 1px solid var(--strong);
+  overflow: hidden;
+}
+.inline img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.boxed {
+  position: relative;
+  display: inline-block;
+  padding: 0 0.08em;
+  border: 1px solid var(--strong);
+  border-radius: 0.12em;
+}
+.boxed small {
+  position: absolute;
+  left: 0.3em;
+  bottom: -9px;
+  padding: 0 5px;
+  border: 1px solid var(--strong);
+  background: var(--paper);
+  font: 9.5px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.spark {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  vertical-align: 0.02em;
+  fill: var(--ink);
+}
+.coverFoot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.card {
+  width: min(100%, 470px);
+  margin-top: 32px;
+}
+.card .install {
+  width: 100%;
+}
+/* The cover keeps only the line and its button. */
+.card .installBox .copy {
+  width: 44px;
+  padding: 0;
+}
+.copy svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.installOs {
+  display: none;
+}
+.down {
+  font: 12px var(--mono);
+  text-transform: uppercase;
+}
+.down span {
+  display: inline-block;
+  margin-left: 6px;
+  animation: nudge 1.8s var(--ease) infinite;
+}
+@keyframes nudge {
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+/* ── buttons and the install line ─────────────────────── */
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--ink);
+  font: 500 13px var(--mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.primary {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.primary:hover {
+  background: color-mix(in srgb, var(--ink) 86%, var(--paper));
+}
+.ghost {
+  background: var(--paper);
+  color: var(--ink);
+}
+.ghost:hover {
+  background: var(--low);
+}
+.install {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 580px);
+  min-width: 0;
+}
+.installBox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 0 0 14px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+.installBox code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font: 12.5px var(--mono);
+  white-space: nowrap;
+  text-align: left;
+}
+.installBox code span {
+  margin-right: 8px;
+  color: var(--faint);
+  user-select: none;
+}
+.installBox .btn {
+  flex: none;
+  height: 44px;
+  margin: -1px -1px -1px 0;
+  font-size: 12px;
+}
+.installOs {
+  margin: 0;
+  font: 11px var(--mono);
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--muted);
+}
+.gh {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.stars {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 9px;
+  border-left: 1px solid currentColor;
+  font: 12px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.stars svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+.rise {
+  animation: enter 0.8s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+  }
+}
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: fade linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 60%;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── the app, live ─────────────────────────────────────── */
+.appHead {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-bottom: 72px;
+  text-align: center;
+}
+.appHead h2 {
+  margin: 0;
+  font: 300 clamp(32px, 4vw, 60px) / 1.02 var(--display);
+  letter-spacing: -0.01em;
+}
+.you {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  height: clamp(150px, 15vw, 210px);
+  translate: -50% -50%;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.demo {
+  position: relative;
+}
+/* Where the line ends, the app zooms up out of the page and fades in. */
+@supports (animation-timeline: view()) {
+  .appHead,
+  .demo {
+    animation: zoomUp linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 40%;
+  }
+}
+@keyframes zoomUp {
+  from {
+    opacity: 0;
+    transform: translateY(80px) scale(0.82);
+  }
+}
+/* What the app does, a control of its own above the window, so it never reads as the window's tabs. */
+.switcher {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.tabs {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+  border: 1px solid var(--ink);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs button {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: none;
+  font: 11.5px var(--mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease-out;
+}
+.tabs button:last-of-type {
+  border-right: 0;
+}
+.tabs button[aria-selected="true"] {
+  color: var(--on-ink);
+}
+.pill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--w, 0);
+  translate: var(--x, 0) 0;
+  background: var(--ink);
+}
+.tabs:not([data-pill]) .pill {
+  visibility: hidden;
+}
+.tabs:not([data-pill]) button[aria-selected="true"] {
+  background: var(--ink);
+}
+.tabs[data-pill] .pill {
+  transition: translate 0.3s var(--ease), width 0.3s var(--ease);
+}
+.page .tabs button:focus-visible {
+  outline-offset: -3px;
+  outline-color: currentColor;
+}
+.frame {
+  padding: 10px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+.canvas {
+  display: flex;
+  flex-direction: column;
+  height: min(800px, 82vh);
+  min-height: 560px;
+  border: 1px solid var(--ink);
+  overflow: hidden;
+  background: var(--paper);
+}
+.bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 14px;
+  height: 36px;
+  padding: 0 8px 0 10px;
+  border-bottom: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+/* The window's three buttons, as the sheet draws them: empty squares. */
+.lights {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+.lights span,
+.dots i {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+}
+.project {
+  font: 11.5px var(--mono);
+  text-transform: uppercase;
+}
+.replay {
+  height: 38px;
+}
+.stage {
+  position: relative;
+  flex: 1;
+  background: var(--paper);
+}
+.stage iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+}
+.stage[data-ready="true"] iframe {
+  opacity: 1;
+  transition: opacity 0.45s var(--ease);
+}
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font: 11.5px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.under {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+}
+.under:has(.controls[hidden]) {
+  justify-content: flex-start;
+}
+.controls {
+  display: flex;
+  gap: 10px;
+}
+.mode {
+  display: flex;
+  border: 1px solid var(--strong);
+}
+.mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.mode button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.page .mode button:focus-visible {
+  outline-offset: -3px;
+  outline-color: currentColor;
+}
+.mode svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cap {
+  max-width: 46em;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.cap kbd {
+  padding: 0 4px;
+  border: 1px solid var(--strong);
+  font: 11.5px var(--mono);
+}
+
+/* ── the tour ─────────────────────────────────────────── */
+.tour {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 2px solid var(--ink);
+  animation: appear 0.2s ease-out;
+}
+.ring::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  outline: 1px dashed var(--ink);
+  animation: pulse 1.6s var(--ease) infinite;
+}
+@keyframes pulse {
+  from {
+    opacity: 0.9;
+    outline-offset: 0;
+  }
+  to {
+    opacity: 0;
+    outline-offset: 10px;
+  }
+}
+.tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(290px, calc(100% - 24px));
+  padding: 12px 14px 10px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  pointer-events: auto;
+  animation: appear 0.2s ease-out;
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+.tip p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tip kbd {
+  padding: 0 5px;
+  border: 1px solid var(--ink);
+  font: 11.5px/1.6 var(--mono);
+}
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font: 11px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.foot button {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── what people say ──────────────────────────────────── */
+.voices {
+  margin-top: var(--gap);
+  text-align: center;
+  padding: clamp(64px, 8vw, 104px) 0;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+.voiceStage {
+  display: grid;
+}
+.slide {
+  grid-area: 1 / 1;
+  margin: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-out, visibility 0s linear 0.2s;
+}
+.slide[data-on="true"] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.35s var(--ease) 0.12s, visibility 0s;
+}
+.slide blockquote {
+  max-width: 28ch;
+  margin: 0 auto;
+  font: 300 clamp(32px, 4.4vw, 68px) / 1.04 var(--display);
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+.slide figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+  margin-top: 24px;
+  font: 12px var(--mono);
+  text-transform: uppercase;
+}
+.slide figcaption b {
+  font-weight: 500;
+}
+.progress {
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  gap: 6px;
+  width: min(240px, 60%);
+  margin: 40px auto 0;
+}
+.progress span {
+  position: relative;
+  height: 8px;
+  border: 1px solid var(--ink);
+  overflow: hidden;
+}
+.progress span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.progress span[data-done="true"]::after {
+  transform: scaleX(1);
+}
+.progress span[data-now="true"]::after {
+  animation: fill var(--dur) linear forwards;
+}
+@keyframes fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ── how it works ─────────────────────────────────────── */
+.how {
+  margin-top: var(--gap);
+}
+.how h2,
+.section h2 {
+  margin: 0;
+  font: 300 clamp(36px, 4.6vw, 72px) / 1 var(--display);
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+.how h2 {
+  margin-bottom: 40px;
+}
+.box {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 10px;
+}
+.rail {
+  --at: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.rail:has(> :nth-child(2)[aria-selected="true"]) {
+  --at: 1;
+}
+.rail:has(> :nth-child(3)[aria-selected="true"]) {
+  --at: 2;
+}
+.rail::before,
+.rail::after {
+  content: "";
+  position: absolute;
+  left: 31px;
+  top: calc(100% / 6);
+}
+.rail::before {
+  bottom: calc(100% / 6);
+  border-left: 1px dashed var(--strong);
+}
+.rail::after {
+  height: calc(var(--at) * 100% / 3);
+  border-left: 1px solid var(--ink);
+  transition: height 0.45s var(--ease);
+}
+.rail button {
+  display: grid;
+  flex: 1 1 0;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-content: center;
+  gap: 4px 16px;
+  padding: 22px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.rail button:last-child {
+  border-bottom: 0;
+}
+.rail i {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  font: normal 500 12px var(--mono);
+  transition: background-color 0.25s ease-out, color 0.25s ease-out;
+}
+.rail button[aria-selected="true"] i {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.rail b {
+  font: 500 13px var(--mono);
+  text-transform: uppercase;
+}
+.rail span {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.page .rail button:focus-visible {
+  outline-offset: -3px;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.scene {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 600px;
+  padding: 48px;
+  border: 1px solid var(--line);
+  background-color: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.win {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  height: 432px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 6px 6px 0 var(--line);
+  overflow: hidden;
+}
+.winBar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 10px;
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.dots {
+  display: flex;
+  gap: 4px;
+}
+.winName {
+  font: 11.5px var(--mono);
+  text-transform: uppercase;
+}
+.view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 22px 24px;
+  overflow: hidden;
+}
+.pane {
+  position: absolute;
+  inset: 22px 24px;
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+}
+.paneB {
+  opacity: 0;
+  transform: translateY(8px);
+}
+[data-phase="b"] .paneA {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+[data-phase="b"] .paneB {
+  opacity: 1;
+  transform: none;
+}
+/* A map's diagram, small, as the app draws it, in the page's one ink. */
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 18px;
+  overflow: visible;
+}
+/* A diagram on its own fills the window's height, centred, as a level does in the app. */
+.view:has(> .chart:only-child),
+.pane:has(> .chart:only-child) {
+  display: flex;
+  align-items: center;
+}
+.chart:only-child {
+  margin-top: 0;
+}
+.chart path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.3;
+}
+.chart marker path {
+  fill: var(--ink);
+  stroke: none;
+}
+.chart text {
+  font: 12px var(--font-body), sans-serif;
+  fill: var(--muted);
+}
+.chart rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+  transition: fill 0.2s ease-out;
+}
+.chart [data-box] text {
+  font-size: 15px;
+  font-weight: 500;
+  fill: var(--ink);
+  transition: fill 0.2s ease-out;
+}
+.chart [data-box] text + text {
+  font-size: 13px;
+  font-weight: 400;
+  fill: var(--muted);
+}
+.chart [data-hit="true"] rect {
+  fill: var(--ink);
+}
+.chart [data-hit="true"] text,
+.chart [data-hit="true"] text + text {
+  fill: var(--on-ink);
+}
+.head b {
+  display: block;
+  font: 400 22px/1.15 var(--display);
+}
+.head span {
+  display: block;
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.codeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 8px 12px;
+  border: 1px solid var(--ink);
+  font: 12px var(--mono);
+  text-transform: uppercase;
+  transition: background-color 0.2s ease-out, color 0.2s ease-out;
+}
+.codeBtn[data-hit="true"] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.file {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  font: 11.5px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.code {
+  margin: 0;
+  padding: 14px 0;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font: 13px/2.1 var(--mono);
+  color: var(--ink);
+  overflow: hidden;
+}
+.code > span {
+  display: block;
+  padding: 0 16px;
+  white-space: pre;
+}
+.code i {
+  display: inline-block;
+  width: 38px;
+  font-style: normal;
+  color: var(--faint);
+  user-select: none;
+}
+.code b {
+  font-weight: 600;
+}
+.in {
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.in[data-on="true"] {
+  opacity: 1;
+  transform: none;
+}
+.cur {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+  transform: translate(var(--x, 80%), var(--y, 85%)) scale(var(--s, 1));
+  transition: transform 0.8s var(--ease), opacity 0.25s ease-out;
+  pointer-events: none;
+}
+.cur path {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.cur[data-on="true"] {
+  opacity: 1;
+}
+.cur[data-down="true"] {
+  --s: 0.82;
+  transition-duration: 0.12s;
+}
+.intro {
+  max-width: 34em;
+  margin: 22px 0 0;
+  font-size: clamp(16px, 1.3vw, 19px);
+  line-height: 1.55;
+}
+
+/* ── beside your agent ───────────────────────────────── */
+.section {
+  margin-top: var(--gap);
+}
+.agent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 40px 72px;
+}
+.agent .intro + .intro {
+  margin-top: 14px;
+}
+/* The agents it works with, by their marks, in the page's one ink. */
+.agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 13px var(--mono);
+  text-transform: uppercase;
+}
+.agents li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agents .logo {
+  width: 22px;
+  height: 22px;
+}
+.logo {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+/* The agent's terminal over the map, as the app stacks its workspace beside it. */
+.desk {
+  display: grid;
+  /* The map on the left and the agent on the right, as the app lays them out. */
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* On a phone the map keeps a readable size and scrolls inside its panel. */
+@media (max-width: 600px) {
+  .mini {
+    overflow-x: auto;
+  }
+  .roots {
+    min-width: 560px;
+  }
+}
+.term,
+.mini {
+  min-width: 0;
+  border: 1px solid var(--ink);
+  overflow: hidden;
+}
+.term {
+  background: var(--code-bg);
+  color: var(--code-ink);
+}
+.termTabs {
+  display: flex;
+  border-bottom: 1px solid color-mix(in srgb, var(--code-ink) 30%, transparent);
+  font: 11px var(--mono);
+}
+.termTabs span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  opacity: 0.7;
+}
+.termTabs span[data-on] {
+  background: var(--code-ink);
+  color: var(--code-bg);
+  opacity: 1;
+}
+.term pre {
+  margin: 0;
+  padding: 16px 16px 14px;
+  font: 12px/1.8 var(--mono);
+  white-space: pre-wrap;
+}
+.prompt {
+  color: var(--code-key);
+}
+.faintText {
+  color: var(--code-num);
+}
+/* What goes with the next prompt, under the terminal. */
+.context {
+  margin: 0;
+  padding: 7px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--code-ink) 30%, transparent);
+  font: 11px var(--mono);
+  color: var(--code-num);
+}
+.picked {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid currentColor;
+  color: var(--code-key);
+}
+.mini {
+  padding: 12px 14px 16px;
+  background: var(--paper);
+}
+.miniBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  font: 11px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.miniBar .winName {
+  color: var(--ink);
+}
+/* The map's top level in diff mode: the changed box filled, the one calling into it dashed, the rest receding. */
+.roots {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.roots path {
+  fill: none;
+  stroke: var(--faint);
+  stroke-width: 1.3;
+}
+.roots marker path {
+  fill: var(--faint);
+  stroke: none;
+}
+.roots .wire[data-near] path {
+  stroke: var(--ink);
+}
+.roots text {
+  font: 15px var(--font-body), sans-serif;
+  fill: var(--faint);
+}
+.roots rect {
+  fill: var(--paper);
+  stroke: var(--line);
+}
+.roots [data-v] rect {
+  stroke: var(--ink);
+}
+.roots [data-v] text {
+  fill: var(--ink);
+}
+.roots [data-v="near"] rect {
+  stroke-dasharray: 4 3;
+}
+.roots [data-v="changed"] > rect {
+  fill: var(--ink);
+}
+.roots [data-v="changed"] > text {
+  fill: var(--on-ink);
+  font-weight: 500;
+}
+.roots .tag rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+.roots .tag text {
+  font: 500 11px var(--mono);
+  fill: var(--ink);
+}
+
+/* ── questions ─────────────────────── */
+.section .cap {
+  margin-top: 28px;
+}
+.section .cap a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.faq {
+  max-width: 860px;
+  margin-top: 36px;
+  border: 1px solid var(--ink);
+}
+.faq details + details {
+  border-top: 1px solid var(--line);
+}
+.faq summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  font: 400 20px/1.3 var(--display);
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: "+";
+  font: 16px/1.4 var(--mono);
+}
+.faq details[open] summary {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.faq details[open] summary::after {
+  content: "−";
+}
+.faq details p {
+  max-width: 64ch;
+  margin: 0;
+  padding: 16px 18px 20px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── the close ─────────────────────────────────────────── */
+.close {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 32px;
+  margin-top: var(--gap);
+  padding: clamp(40px, 6vw, 72px) 0;
+  border-top: 1px solid var(--ink);
+}
+.close h2 {
+  margin: 0;
+  font: 300 clamp(44px, 7vw, 112px) / 0.98 var(--display);
+  letter-spacing: -0.012em;
+  text-transform: uppercase;
+}
+.close h2 em {
+  display: block;
+  font-style: normal;
+}
+.close .ctas {
+  justify-content: flex-start;
+}
+
+/* The drawing's title block. */
+.end {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.2fr 0.8fr;
+  margin: var(--gap) 0 0;
+  border: 1px solid var(--ink);
+}
+/* Padding, not the block's margin, which would collapse through the sheet's edge. */
+.paper > footer {
+  padding-bottom: var(--gutter);
+}
+.end > div {
+  min-width: 0;
+  padding: 8px 12px 10px;
+  border-left: 1px solid var(--ink);
+}
+.end > div:first-child {
+  border-left: 0;
+}
+.end dt {
+  font: 10px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.end dd {
+  margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 12.5px var(--mono);
+  text-transform: uppercase;
+}
+.endTitle dd {
+  font: 400 26px/1 var(--display);
+  text-transform: uppercase;
+}
+.end a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--strong);
+}
+
+/* ── how we got here: one line down the page, through three people ── */
+.evo {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: clamp(72px, 9vw, 128px) var(--gutter) 0;
+  text-align: center;
+}
+.evo h2 {
+  margin: 10px 0 0;
+  font: 300 clamp(32px, 3.8vw, 58px) / 1.02 var(--display);
+  letter-spacing: -0.016em;
+}
+.evoField {
+  position: relative;
+  height: clamp(900px, 98vw, 1250px);
+  margin-top: 24px;
+  text-align: left;
+}
+.evoLine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+}
+.evoLine path {
+  vector-effect: non-scaling-stroke;
+}
+/* The line fades out before it reaches Uncle Sam, who stands behind the heading below. */
+.evoLine {
+  mask-image: linear-gradient(to bottom, #000 82%, transparent 96%);
+}
+.evoGhost {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+/* The ink follows the reader: drawn as far down as they have scrolled. */
+.evoInk {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  clip-path: inset(0 0 calc((1 - var(--p, 0)) * 100%) 0);
+}
+.stop {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: max-content;
+  margin: 0;
+  translate: -110px -50%;
+  opacity: 0.25;
+  transition: opacity 0.6s var(--ease);
+}
+.stop[data-side="right"] {
+  flex-direction: row-reverse;
+  translate: calc(-100% + 110px) -50%;
+  text-align: right;
+}
+.stop[data-on="true"] {
+  opacity: 1;
+}
+.stop img {
+  display: block;
+  width: 220px;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--strong);
+  background: var(--paper);
+  rotate: var(--tilt);
+  transform: scale(0.94);
+  transition: transform 0.8s var(--ease);
+}
+.stop[data-on="true"] img {
+  transform: none;
+}
+.stop figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 19em;
+}
+.stop b {
+  font: 300 clamp(26px, 2.4vw, 36px) / 1.05 var(--display);
+  letter-spacing: -0.012em;
+}
+.stop figcaption > span:last-child {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.stopYear {
+  font: 11.5px var(--mono);
+  letter-spacing: 0.04em;
+}
+/* Under the sheet, on the desk. */
+.credits {
+  max-width: 80em;
+  margin: 0;
+  padding: var(--edge) var(--gutter) 0;
+  font: 10.5px/1.6 var(--mono);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 1180px) {
+  .canvas[data-drawn="true"] {
+    height: auto;
+    min-height: 0;
+  }
+  .canvas[data-drawn="true"] .stage {
+    flex: none;
+    aspect-ratio: 1100 / 680;
+  }
+}
+@media (max-width: 1080px) {
+  .box {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rail {
+    flex-direction: row;
+  }
+  .rail button {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    padding: 10px 10px 12px;
+    border-bottom: 0;
+  }
+  .rail::before,
+  .rail::after {
+    display: none;
+  }
+  .rail i {
+    grid-row: auto;
+    width: 24px;
+    height: 24px;
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+  .rail b {
+    font-size: 11.5px;
+  }
+  .rail span {
+    display: none;
+  }
+  .scene {
+    min-height: 0;
+    padding: 14px;
+  }
+  .win {
+    width: min(600px, 100%);
+    height: 350px;
+  }
+  .view {
+    padding: 16px 18px;
+  }
+  .pane {
+    inset: 16px 18px;
+  }
+  .code {
+    font-size: 11.5px;
+    line-height: 2;
+  }
+}
+@media (max-width: 900px) {
+  .navBar nav a:not(:last-child) {
+    display: none;
+  }
+  .cover {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    min-height: 0;
+  }
+  .claim {
+    order: -1;
+    padding-top: 8px;
+  }
+  .plate {
+    min-height: 380px;
+  }
+  .lead {
+    display: none;
+  }
+  .coverFoot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .agent {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .end {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .end > div {
+    border-left: 0;
+    border-top: 1px solid var(--ink);
+  }
+  .end > div:nth-child(even) {
+    border-left: 1px solid var(--ink);
+  }
+  .end > .endTitle {
+    grid-column: 1 / -1;
+    border-top: 0;
+  }
+}
+@media (max-width: 600px) {
+  .page {
+    --edge: 6px;
+  }
+  .plate {
+    min-height: 300px;
+  }
+  .note {
+    left: 4%;
+  }
+  /* The hand needs the room. */
+  .window {
+    display: none;
+  }
+  .desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .canvas {
+    height: 600px;
+  }
+  .win {
+    height: 330px;
+  }
+  .code {
+    font-size: 10.5px;
+    mask-image: linear-gradient(90deg, #000 82%, transparent);
+  }
+  .ctas .btn {
+    flex: 1 1 auto;
+  }
+}
+@media (max-width: 420px) {
+  .navBar nav {
+    display: none;
+  }
+  .navBar .mode {
+    margin-left: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    scroll-behavior: auto;
+  }
+  .rise,
+  .reveal,
+  .appHead,
+  .demo,
+  .down span,
+  .ring::after,
+  .progress span[data-now="true"]::after {
+    animation: none;
+  }
+  .progress span[data-now="true"]::after {
+    transform: scaleX(1);
+  }
+  .stage[data-ready="true"] iframe,
+  .tabs[data-pill] .pill,
+  .slide,
+  .slide[data-on="true"],
+  .pane,
+  .in,
+  .cur,
+  .chart rect,
+  .codeBtn,
+  .rail::after,
+  .rail i {
+    transition: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stop,
+  .stop img {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+@media (max-width: 700px) {
+  .evoField {
+    height: 1250px;
+  }
+  .stop,
+  .stop[data-side="right"] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    translate: -50% -50%;
+    text-align: left;
+  }
+  .stop[data-side="right"] {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .stop img {
+    width: 130px;
+  }
+  .stop figcaption {
+    max-width: 13em;
+  }
+}

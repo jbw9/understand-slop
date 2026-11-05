@@ -1,6 +1,7 @@
 "use client";
 
 import "@xterm/xterm/css/xterm.css";
+import type { ITheme } from "@xterm/xterm";
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +9,7 @@ import { useMap } from "@/components/map-context";
 import { screens } from "@/lib/dictate";
 import { outline } from "@/lib/map";
 import { readSettings } from "@/lib/settings";
+import { themeOf, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,35 +21,80 @@ import { cn } from "@/lib/utils";
  */
 
 /**
- * The palette. A terminal is chrome ([data-chrome], app/globals.css), dark in
- * either theme as Kabadoni keeps its UI, so there is one: the background is
- * the window's own, `surface-container-low`, so the terminal sits in it as a
- * tool rather than another card, and the colours are the page's accents
- * lifted for the dark.
+ * The palettes, one per theme. A terminal is chrome ([data-chrome],
+ * app/globals.css): its background is the window's own
+ * `surface-container-low`, so the terminal sits in it as a tool rather than
+ * another card. Classic's chrome is the sheet, so its terminal is white with
+ * the sheet's cobalt ink.
  */
-const PALETTE = {
-  background: "#141415",
-  foreground: "#e8e8ea",
-  cursor: "#f7f8f8",
-  cursorAccent: "#141415",
-  selectionBackground: "#36363a",
-  black: "#0b0b0c",
-  red: "#d98a8c",
-  green: "#8fbf8f",
-  yellow: "#d8ae5b",
-  blue: "#8fa8c0",
-  magenta: "#c7a0cb",
-  cyan: "#86bab6",
-  white: "#dedede",
-  brightBlack: "#848484",
-  brightRed: "#e88080",
-  brightGreen: "#7fc782",
-  brightYellow: "#f0c674",
-  brightBlue: "#a9bfd4",
-  brightMagenta: "#dcbcdf",
-  brightCyan: "#a8d3cf",
-  brightWhite: "#ffffff",
+const PLAIN: Record<"light" | "dark", ITheme> = {
+  light: {
+    background: "#f4f4f5",
+    foreground: "#1c1c1f",
+    cursor: "#111113",
+    cursorAccent: "#f4f4f5",
+    selectionBackground: "#d4d4d8",
+    black: "#1c1c1f",
+    red: "#b42318",
+    green: "#2a7333",
+    yellow: "#8a5a0b",
+    blue: "#1d4ed8",
+    magenta: "#7e3fb8",
+    cyan: "#0e7490",
+    white: "#71717a",
+    brightBlack: "#52525b",
+    brightRed: "#d03a2c",
+    brightGreen: "#3a8a44",
+    brightYellow: "#a36d10",
+    brightBlue: "#2f62e8",
+    brightMagenta: "#9455cf",
+    brightCyan: "#1489a8",
+    brightWhite: "#3f3f46",
+  },
+  dark: {
+    background: "#17171a",
+    foreground: "#ececee",
+    cursor: "#fafafa",
+    cursorAccent: "#17171a",
+    selectionBackground: "#3a3a40",
+    black: "#0f0f11",
+    red: "#f08a8f",
+    green: "#8fd19a",
+    yellow: "#e0b45e",
+    blue: "#93b4ff",
+    magenta: "#c9a7f5",
+    cyan: "#7dd3d8",
+    white: "#d4d4d8",
+    brightBlack: "#7a7a83",
+    brightRed: "#f5a3a7",
+    brightGreen: "#a9e0b2",
+    brightYellow: "#ecc77f",
+    brightBlue: "#b0c8ff",
+    brightMagenta: "#dcc2fa",
+    brightCyan: "#9fe1e5",
+    brightWhite: "#ffffff",
+  },
 };
+
+const PALETTES: Record<Theme, ITheme> = {
+  ...PLAIN,
+  classic: {
+    ...PLAIN.light,
+    background: "#ffffff",
+    foreground: "#1e2f9e",
+    cursor: "#2438c8",
+    cursorAccent: "#ffffff",
+    selectionBackground: "#d5daf5",
+    black: "#1e2f9e",
+    blue: "#2438c8",
+    white: "#7d8adb",
+    brightBlack: "#4a5bd2",
+    brightBlue: "#4a5bd2",
+    brightWhite: "#3445c6",
+  },
+};
+
+const palette = () => PALETTES[themeOf(document.documentElement.dataset.theme)];
 
 /* ── keys ─────────────────────────────────────────────────────── */
 
@@ -214,7 +261,7 @@ export function Shell({
       ]);
       if (gone || !el.current) return;
       const term = new Terminal({
-        theme: PALETTE,
+        theme: palette(),
         fontFamily: `${family}, ui-monospace, monospace`,
         // A whole pixel size: a fractional one gives fractional cells, which
         // drift out of line across a row.
@@ -385,8 +432,11 @@ export function Shell({
         refit();
       };
       window.addEventListener(ZOOMED, onZoom);
+      const recolour = new MutationObserver(() => (term.options.theme = palette()));
+      recolour.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       cleanup = () => {
         window.removeEventListener(ZOOMED, onZoom);
+        recolour.disconnect();
         host.removeEventListener("mouseup", copySelected);
         host.removeEventListener("contextmenu", noKeyMenu, true);
         seen.disconnect();
@@ -415,7 +465,7 @@ export function Shell({
   }, [visible]);
 
   return (
-    // Chrome wherever it is, the window or the main view: a terminal is dark in either theme.
+    // Chrome wherever it is, the window or the main view.
     <div data-chrome className={cn("absolute inset-0 bg-surface-container-low px-3 pb-1", !visible && "hidden")}>
       {error ? (
         <p className="font-mono text-[11.5px] text-clay-ink">{error}</p>

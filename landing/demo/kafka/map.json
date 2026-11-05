@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "mira map kafka-controller-quorum",
+  "command": "bluprint map kafka-controller-quorum",
   "repo": "kafka-controller-quorum",
   "commit": "cfed4e4",
   "files": 13,

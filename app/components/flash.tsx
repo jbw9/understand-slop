@@ -21,8 +21,8 @@ export function useFlash(content: React.RefObject<HTMLElement | null>) {
     const root = content.current;
     if (!fresh.at || !root) return;
     const css = getComputedStyle(document.documentElement);
-    const ring = css.getPropertyValue("--color-deep-green").trim();
-    const wash = css.getPropertyValue("--color-mint-success").trim();
+    const ring = css.getPropertyValue("--color-accent").trim();
+    const wash = css.getPropertyValue("--color-accent-surface").trim();
     // The open level, as its header names it; read when a rewrite lands,
     // not followed, since moving on is not a change.
     const header = root.querySelector<HTMLElement>("header[data-path]");

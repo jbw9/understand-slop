@@ -78,7 +78,7 @@ export function StatBlocks({ added, removed }: { added: number; removed: number 
       {Array.from({ length: 5 }, (_, i) => (
         <span
           key={i}
-          className="size-[7px] rounded-[1px]"
+          className="size-[7px]"
           style={{ background: !total ? "var(--color-border-gray)" : i < green ? TINT.added.ink : TINT.removed.ink }}
         />
       ))}
@@ -103,7 +103,7 @@ export function DiagramChanges({
   if (!items.length) return null;
   const flip = (box: string) => setOpen((o) => (o.has(box) ? new Set([...o].filter((x) => x !== box)) : new Set([...o, box])));
   return (
-    <div className="mt-4 max-w-[1100px] overflow-hidden rounded-[3px] border border-border-gray">
+    <div className="mt-4 max-w-[1100px] overflow-hidden border border-border-gray">
       <p className="border-b border-border-gray bg-surface-container-low px-3 py-1.5 text-[12px] text-muted-slate">
         {items.length} {items.length === 1 ? "part" : "parts"} of this picture changed — open one to read its lines
       </p>
@@ -136,7 +136,7 @@ export function DiagramChanges({
                 </span>
               ) : null}
               {onOpen && ch.verdict !== "removed" ? (
-                <button type="button" onClick={() => onOpen(opens)} className="shrink-0 cursor-pointer text-[12px] text-deep-green hover:underline">
+                <button type="button" onClick={() => onOpen(opens)} className="shrink-0 cursor-pointer text-[12px] text-accent hover:underline">
                   open ›
                 </button>
               ) : null}
@@ -190,9 +190,9 @@ export function DiffBar({ path }: { path: string[] }) {
         ? `${d.from?.slice(0, 7) ?? "start"} ⇄ ${d.to?.slice(0, 7) ?? "working tree"}`
         : "";
   const title = (s: SectionDiff) => nodeAt(s.path)?.title ?? s.title;
-  const btn = "cursor-pointer rounded-[2px] px-2 py-0.5 text-[12px] hover:bg-surface-container-low disabled:cursor-default disabled:opacity-40";
+  const btn = "cursor-pointer px-2 py-0.5 text-[12px] hover:bg-surface-container-low disabled:cursor-default disabled:opacity-40";
   return (
-    <div className="sticky top-0 z-30 border-b border-border-gray bg-pure-white/95 backdrop-blur">
+    <div className="sticky top-0 z-30 border-b border-border-gray bg-card/95 backdrop-blur">
       <div className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-x-4 gap-y-1 px-10 py-2">
         <span className="flex min-w-0 items-center gap-2 text-[12.5px]">
           <span className="size-2 shrink-0 rounded-full" style={{ background: TINT.changed.ink }} />
@@ -201,7 +201,7 @@ export function DiffBar({ path }: { path: string[] }) {
         </span>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px]">
           {(["added", "changed", "removed"] as const).map((k) => (
-            <span key={k} className="rounded-[2px] border px-1.5 py-[1px] font-mono" style={{ color: TINT[k].ink, background: TINT[k].surface, borderColor: TINT[k].line }}>
+            <span key={k} className=" border px-1.5 py-[1px] font-mono" style={{ color: TINT[k].ink, background: TINT[k].surface, borderColor: TINT[k].line }}>
               {TINT[k].mark} {WORD[k]}
             </span>
           ))}
@@ -251,7 +251,7 @@ export function HereChanges({ path }: { path: string[] }) {
   if (!ch) return null;
   const t = TINT[ch.verdict];
   return (
-    <section className="mb-6 max-w-[1100px] overflow-hidden rounded-[3px] border" style={{ borderColor: t.line }}>
+    <section className="mb-6 max-w-[1100px] overflow-hidden border" style={{ borderColor: t.line }}>
       <button
         type="button"
         aria-expanded={open}

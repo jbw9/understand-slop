@@ -35,7 +35,7 @@ export function LandingNav({ github }: { github: string }) {
             bar.current!.parentElement!.scrollTo({ top: 0 });
           }}
         >
-          Mira
+          Bluprint
         </a>
         <nav aria-label="Sections">
           {LINKS.map((l) => (

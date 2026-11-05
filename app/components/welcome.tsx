@@ -15,9 +15,9 @@ import type { MapEntry } from "@/lib/maps";
 export function NoProject({ maps }: { maps: MapEntry[] }) {
   const router = useRouter();
   return (
-    <main className="flex min-h-0 flex-1 justify-center overflow-y-auto bg-warm-cream px-6 py-16">
+    <main className="flex min-h-0 flex-1 justify-center overflow-y-auto bg-paper px-6 py-16">
       <div className="w-full max-w-[640px]">
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Map a repository</h1>
+        <h1 className="font-display text-[32px] font-normal leading-[1.05] tracking-[-0.016em] text-ink">Map a repository</h1>
         <p className="mt-1 text-[14px] text-on-surface-variant">Claude Code reads it and writes a map you can open a level at a time, down to the line.</p>
         <div className="mt-8 grid gap-10 sm:grid-cols-2">
           <section>
@@ -65,4 +65,4 @@ export function NoProject({ maps }: { maps: MapEntry[] }) {
   );
 }
 
-const LINK = "cursor-pointer text-left text-deep-green hover:underline focus-visible:outline-2 focus-visible:outline-deep-green";
+const LINK = "cursor-pointer text-left text-accent hover:underline focus-visible:outline-2 focus-visible:outline-accent";

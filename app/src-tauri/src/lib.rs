@@ -24,7 +24,7 @@ pub fn run() {
         .setup(|app| {
             // Claude's way into the preview, for every Claude tab (mcp.rs).
             mcp::start(app.handle().clone());
-            // Tab files a crashed or killed Mira left in the temp folder.
+            // Tab files a crashed or killed Bluprint left in the temp folder.
             std::thread::spawn(claude::sweep_stale);
             // Plans Claude Code wrote and nothing has touched in a month.
             std::thread::spawn(claude::prune_plans);
@@ -38,7 +38,7 @@ pub fn run() {
                 std::thread::spawn(move || {
                     if let Err(e) = server::start(&handle).and_then(|()| open_main(&handle).map_err(|e| e.to_string())) {
                         use tauri_plugin_dialog::DialogExt;
-                        handle.dialog().message(e).title("Mira couldn't start").blocking_show();
+                        handle.dialog().message(e).title("Bluprint couldn't start").blocking_show();
                         handle.exit(1);
                     }
                 });
@@ -48,6 +48,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            attention_count,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
@@ -113,6 +114,15 @@ fn open_main(app: &tauri::AppHandle) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
     pinch_to_page(&_window);
     Ok(())
+}
+
+/// The Dock icon's badge: how many Claude tabs have finished or are waiting on
+/// the user (components/workspace.tsx), so it shows from any app, as Discord's does.
+#[tauri::command]
+fn attention_count(app: tauri::AppHandle, n: i64) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_badge_count(if n == 0 { None } else { Some(n) });
+    }
 }
 
 /// Cmd+` and Ctrl+` from the menu bar as well as the page: a key pressed in

@@ -298,7 +298,7 @@ a caret and opens nothing, which is the worst failure mode available.
 
 ## D10 — Push on a green gate, not on a clock
 
-`mira` commits and pushes at each **verified milestone**: `tsc
+`bluprint` commits and pushes at each **verified milestone**: `tsc
 --noEmit` clean, `eslint` clean, and the changed behaviour actually driven in the
 running app. No milestone, no push; no asking when one is reached.
 
@@ -1529,7 +1529,7 @@ project. `maps/` is now git-ignored local output from the generator.
 **Kept:** the generator's worked example. The author prompt quoted one root of
 the explorify map, so that root, stripped exactly as before, is now
 `scripts/generate/prompts/exemplar.json`: generation is unchanged.
-**The landing keeps its demo.** Five of the maps (mira, flask,
+**The landing keeps its demo.** Five of the maps (bluprint, flask,
 fastapi, ky, umami: `map.json`, `report.json`, `source.json`) now live in
 `landing/demo/`, with the page that quotes them. The app reads them
 (`loadDemo` in `lib/maps.ts`) only for a page the landing frames (`?embed`)
@@ -1594,7 +1594,7 @@ lighting — the passage a section cites. The docs are listed from git
 (`/api/docs`) and found from the palette (typed with the levels, or "Read the
 docs…"), a title-bar button, and "Open the whole doc" on a cited passage. Their
 text comes through `/api/source`, behind the code's containment check.
-**Fixed with it:** a project whose id matched a landing demo (`mira`)
+**Fixed with it:** a project whose id matched a landing demo (`bluprint`)
 read the demo's frozen `source.json` instead of its checkout; a project now
 wins over a demo of the same name.
 **Beat:** opening docs in a terminal tab or the system's editor, which leaves
@@ -1740,7 +1740,7 @@ another level redoes the roots; the summaries and the cut replay from cache.
 
 ## D71 — What Claude reads on the web opens in the Preview
 
-**Chose:** Claude Code's own WebSearch and WebFetch are allowed without asking in a Mira tab, and a PostToolUse hook hands each one's address (or search) to the app as a `web` act, which navigates the project's Preview there. The system prompt and the preview's MCP instructions say WebFetch is fine for reading docs as text.
+**Chose:** Claude Code's own WebSearch and WebFetch are allowed without asking in a Bluprint tab, and a PostToolUse hook hands each one's address (or search) to the app as a `web` act, which navigates the project's Preview there. The system prompt and the preview's MCP instructions say WebFetch is fine for reading docs as text.
 **Why:** a tester asked whether search "opens the search tab in the app itself". The Preview was already a browser Claude could drive, but asked to fetch docs Claude reaches for WebFetch, which read the page out of sight and asked permission first. Now every page Claude reads is one the reader can see beside the answer.
 **Beat:** denying WebFetch so Claude must browse the Preview, which is slower for plain reading and fights the model's habit.
 **Cost accepted:** the Preview comes forward on each read, as it does when Claude navigates it. Preview screenshots and real input are still macOS only; elsewhere Claude reads pages as text and a tree.
@@ -1799,13 +1799,13 @@ another level redoes the roots; the summaries and the cut replay from cache.
 
 ## D79 — Speak to Claude: Claude Code's own dictation, and Handy's engine on the machine
 
-**Chose:** two ways to dictate, neither needing a key or a subscription. In a Claude tab, hold Space: Claude Code's own `/voice`, turned on through the launcher's `--settings` (Settings → Claude Code dictation). Anthropic transcribes it at no cost, but it needs a claude.ai sign-in. Anywhere in the app, hold Control+Option together, as Wispr Flow holds Fn (not Ctrl+Space, which macOS takes for switching input source; a third key pressed with them cancels, as a shortcut): on-device dictation (`src-tauri/src/dictate.rs`, `lib/dictate.ts`) with Handy's crates, `handy-recorder` for the microphone and `transcribe-cpp` running Parakeet TDT 0.6B v3 (Q8_0) with Metal. The words go into the text field that had focus, or into Claude's prompt in the tab picks go to, without Enter. The app's `Info.plist` names the microphone, which is what lets macOS allow it for Mira and for the `claude` it starts.
+**Chose:** two ways to dictate, neither needing a key or a subscription. In a Claude tab, hold Space: Claude Code's own `/voice`, turned on through the launcher's `--settings` (Settings → Claude Code dictation). Anthropic transcribes it at no cost, but it needs a claude.ai sign-in. Anywhere in the app, hold Control+Option together, as Wispr Flow holds Fn (not Ctrl+Space, which macOS takes for switching input source; a third key pressed with them cancels, as a shortcut): on-device dictation (`src-tauri/src/dictate.rs`, `lib/dictate.ts`) with Handy's crates, `handy-recorder` for the microphone and `transcribe-cpp` running Parakeet TDT 0.6B v3 (Q8_0) with Metal. The words go into the text field that had focus, or into Claude's prompt in the tab picks go to, without Enter. The app's `Info.plist` names the microphone, which is what lets macOS allow it for Bluprint and for the `claude` it starts.
 **Beat:** Bedrock, where Claude cannot take audio and Amazon Transcribe would be a separate paid service; Handy as a separate app, which types into any window but not into the field the user is in here; the webview's `getUserMedia`/`SpeechRecognition`, which WKWebView does not reliably grant; and an LLM pass to tidy the words, which Claude reading them makes redundant.
-**Cost accepted:** two dependencies that compile ggml from source, so a build needs CMake and a working C++ toolchain. A 740 MB model is fetched once with the system's `curl`, on the user's say-so, into the app's data folder. The hold key works only while Mira has focus. A reader on Bedrock or an API key has only the on-device way.
+**Cost accepted:** two dependencies that compile ggml from source, so a build needs CMake and a working C++ toolchain. A 740 MB model is fetched once with the system's `curl`, on the user's say-so, into the app's data folder. The hold key works only while Bluprint has focus. A reader on Bedrock or an API key has only the on-device way.
 
-## D80 — An installed Mira that runs a snapshot of its own server
+## D80 — An installed Bluprint that runs a snapshot of its own server
 
-**Chose:** `npm run app:install` (`app/scripts/install-app.sh`) copies `app/` as it stands, uncommitted changes included, into `<app_data_dir>/server`, builds it there with `next build`, and installs `/Applications/Mira.app`. A release build starts `next start` from that snapshot on 127.0.0.1:3123 and opens its window once the port answers (`src-tauri/src/server.rs`). It stops the server on quit. `app:dev` is unchanged and runs beside it on 3000, so Mira can be worked on from inside Mira and a Rust rebuild relaunches only the dev window. The snapshot is built next to the running one and swapped in at the end. The install records the shell's Node and PATH in `env.json`, since an app opened from Finder has neither.
+**Chose:** `npm run app:install` (`app/scripts/install-app.sh`) copies `app/` as it stands, uncommitted changes included, into `<app_data_dir>/server`, builds it there with `next build`, and installs `/Applications/Bluprint.app`. A release build starts `next start` from that snapshot on 127.0.0.1:3123 and opens its window once the port answers (`src-tauri/src/server.rs`). It stops the server on quit. `app:dev` is unchanged and runs beside it on 3000, so Bluprint can be worked on from inside Bluprint and a Rust rebuild relaunches only the dev window. The snapshot is built next to the running one and swapped in at the end. The install records the shell's Node and PATH in `env.json`, since an app opened from Finder has neither.
 **Beat:** Next's `standalone` output, because the server runs `scripts/generate` through `node_modules/tsx` at runtime (`lib/vault.ts`), which a standalone bundle leaves out. A login agent keeping a server up all the time. Showing the dev window inside a tab, because macOS gives an app no way to hold another app's window, which leaves only screen streaming.
-**Cost accepted:** macOS only. The snapshot holds a full `node_modules` (about 550 MB, cloned copy-on-write after the first install). The port is fixed, so one installed Mira at a time. Both copies share the vault, so a dev build that changes a file's format changes it for the installed one. `tauri build` on its own now makes an app that asks for `app:install`, and `frontendDist` names the server, not a folder.
-**At scale:** one snapshot per machine. Shipping Mira to people without the repo would need Node bundled with the app.
+**Cost accepted:** macOS only. The snapshot holds a full `node_modules` (about 550 MB, cloned copy-on-write after the first install). The port is fixed, so one installed Bluprint at a time. Both copies share the vault, so a dev build that changes a file's format changes it for the installed one. `tauri build` on its own now makes an app that asks for `app:install`, and `frontendDist` names the server, not a folder.
+**At scale:** one snapshot per machine. Shipping Bluprint to people without the repo would need Node bundled with the app.

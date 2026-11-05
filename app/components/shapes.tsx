@@ -224,7 +224,7 @@ export function InlineMarks({ ids, note }: { ids: string[]; note?: string }) {
         return (
           <span
             key={id}
-            className="inline-flex items-center gap-1.5 rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] font-medium text-on-surface-variant"
+            className="inline-flex items-center gap-1.5 border border-border-gray bg-card px-2.5 py-1 text-[12px] font-medium text-on-surface-variant"
           >
             {mark ? (
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden className="shrink-0">

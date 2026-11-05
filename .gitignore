@@ -33,6 +33,3 @@ coverage/
 # rust
 target/
 
-# local agent instructions
-/CLAUDE.md
-/.claude/skills/

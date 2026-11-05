@@ -1,5 +1,5 @@
 // usage (from app/): npx -y tsx --tsconfig tsconfig.json scripts/check-map.mts <map name> <repo dir> [--roots a,b,c] [--generated]
-//   e.g. scripts/check-map.mts explorify ~/Desktop/Code/explorify --roots signup,launch
+//   e.g. scripts/check-map.mts flask ~/Code/flask
 // The rules live in scripts/generate/check.ts.
 import { readFileSync } from "node:fs";
 import { check } from "./generate/check";

@@ -1,14 +1,8 @@
 /**
- * Binding the map to a real repository. Frozen contract for this round.
- *
- * Until now every `source` block was text pasted into `lib/taxbuddy.ts` by
- * hand. That text was verified once, at authoring time, and drifts silently
- * the moment the real file changes — which is exactly the failure this project
- * exists to study. These functions read the file instead.
- *
- * `~/Desktop/Code/taxBuddy` is a live git checkout; every spot-checked
- * file:line in the fixture resolved to the right line, so the anchors are
- * trustworthy enough to read against.
+ * Binding the map to a real repository: read a cited slice and check that the
+ * map's quote still holds, write an edited slice back, and undo an agent turn.
+ * A quote drifts silently the moment the real file changes, which is exactly
+ * the failure this project exists to study.
  */
 
 /**
@@ -103,8 +97,8 @@ import { basename, dirname, join, resolve, sep } from "node:path";
  *    an absolute second argument, it also folds absolute paths back through the
  *    same prefix test rather than silently honouring them.
  * 2. The prefix test uses `root + sep`, not bare `startsWith(root)`. Without the
- *    separator `/Users/.../taxBuddy-secrets` passes as if it were inside
- *    `/Users/.../taxBuddy`.
+ *    separator `/Users/.../repo-secrets` passes as if it were inside
+ *    `/Users/.../repo`.
  * 3. `realpath` resolves symlinks and the prefix test runs AGAIN on the result.
  *    Step 1 is pure string arithmetic and cannot see a link inside the repo
  *    pointing out of it; only asking the filesystem can.

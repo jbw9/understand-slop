@@ -157,7 +157,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            { label: "Map", onClick: onMap },
+            { label: "Bluprint", onClick: onMap },
             { label: "Preview", onClick: () => window.dispatchEvent(new Event(OPEN_PREVIEW)) },
           ]}
         />

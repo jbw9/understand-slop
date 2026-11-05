@@ -1,8 +1,8 @@
 import s from "./v2.module.css";
 
-// The same problem at every size. The first is the page's own voice; the other two are people the team spoke with, by role.
-const SCALE: { who: string; line: string; by?: string }[] = [
-  { who: "On your own", line: "You built it in a weekend. I bet you can’t explain how it works." },
+// The same problem at every size. The first is the page's own voice, said to anyone; the other two are people the team spoke with, by role.
+const SCALE: { who: string; line: string; by?: string; to?: string }[] = [
+  { who: "On your own", line: "You built it in a weekend. I bet you can’t explain how it works.", to: "To John Doe, solo developer" },
   { who: "At a startup", line: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
   {
     who: "At a big company",
@@ -23,7 +23,7 @@ export function LandingWhy() {
           <li key={x.who} className={s.reveal} style={{ "--i": i } as React.CSSProperties}>
             <span>{x.who}</span>
             <p>{x.by ? <>&ldquo;{x.line}&rdquo;</> : x.line}</p>
-            {x.by ? <cite>{x.by}</cite> : null}
+            {x.by || x.to ? <cite>{x.by ?? x.to}</cite> : null}
           </li>
         ))}
       </ul>

@@ -308,10 +308,11 @@ function Diagram({
                 />
                 <text
                   x={x + w / 2}
-                  y={b.sub ? y + 25 : y + BOX_H / 2 + 5}
+                  y={b.sub ? y + 26 : y + BOX_H / 2 + 6}
                   textAnchor="middle"
-                  fontSize="14.5"
-                  fontWeight="600"
+                  fontFamily="var(--font-display), Georgia, serif"
+                  fontSize="18"
+                  letterSpacing="-0.01em"
                   fill={ink}
                   opacity={moved && !v && !near ? 0.5 : 1}
                   textDecoration={v === "removed" ? "line-through" : undefined}

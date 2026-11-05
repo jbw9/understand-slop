@@ -1252,7 +1252,6 @@
   color: var(--muted);
 }
 .problems cite a,
-.reading a,
 .slide figcaption a {
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1272,27 +1271,6 @@
   margin-right: 6px;
   font: 500 12px var(--mono);
   text-transform: uppercase;
-}
-.reading {
-  margin-top: 40px;
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
-}
-.reading ul {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.reading li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  font-size: 15px;
-}
-.reading span {
-  color: var(--muted);
 }
 
 /* ── beside your agent ───────────────────────────────── */

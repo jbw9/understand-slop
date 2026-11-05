@@ -51,11 +51,6 @@ const SO_SURVEY: Source = {
   work: "Developer Survey 2025",
   href: "https://survey.stackoverflow.co/2025/ai",
 };
-const METR: Source = {
-  who: "METR",
-  work: "experienced open-source developers with early-2025 AI",
-  href: "https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/",
-};
 
 // Said in public, word for word, and linked to where.
 const VOICES: Voice[] = [
@@ -104,13 +99,6 @@ const PROBLEMS: Problem[] = [
     by: WITTEVEEN,
     answer: "is the agent’s context as well. Pick a section and it goes into the next prompt; Claude moves your view to the part it’s explaining.",
   },
-];
-
-const READING = [
-  { ...LEVIN, note: "Why the bottleneck moved from typing to verifying, and what that asks of our tools." },
-  { ...WITTEVEEN, note: "A developer on what he still opens an IDE for: diffs, navigation, verification, docs." },
-  SO_SURVEY,
-  { ...METR, note: "Developers took 19% longer with AI, and believed they had been 20% faster." },
 ];
 
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.
@@ -173,7 +161,7 @@ export default function Landing() {
 
         <div className={s.wrap}>
           <LandingVoices voices={VOICES} />
-          <LandingWhy problems={PROBLEMS} reading={READING} />
+          <LandingWhy problems={PROBLEMS} />
           <LandingHow
             name="flask"
             steps={flask.AUTHORED.map((r) => r.title)}

@@ -60,7 +60,7 @@ export function LandingStart({ github }: { github: string }) {
         </ol>
         <p className={`${s.cap} ${s.reveal}`}>
           It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The script is{" "}
-          <a href={`${github}/blob/main/install.sh`}>install.sh</a>, in <a href={github}>the source on GitHub</a>.
+          <a href={`${github}/blob/main/install.sh`}>install.sh</a>.
         </p>
       </section>
       <section id="questions" className={s.section} aria-labelledby="questions-title">

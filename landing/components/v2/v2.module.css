@@ -497,7 +497,6 @@
 }
 
 /* ── the app, live ─────────────────────────────────────── */
-/* The line from How we got here lands here, on a node in the middle. */
 .appHead {
   position: relative;
   isolation: isolate;
@@ -506,14 +505,6 @@
   gap: 12px;
   margin-bottom: 72px;
   text-align: center;
-}
-.appHead::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  margin-bottom: 8px;
-  border: 1.5px solid var(--ink);
-  background: var(--paper);
 }
 .appHead h2 {
   margin: 0;
@@ -1650,6 +1641,10 @@
 }
 .evoLine path {
   vector-effect: non-scaling-stroke;
+}
+/* The line fades out before it reaches Uncle Sam, who stands behind the heading below. */
+.evoLine {
+  mask-image: linear-gradient(to bottom, #000 82%, transparent 96%);
 }
 .evoGhost {
   stroke: var(--line);

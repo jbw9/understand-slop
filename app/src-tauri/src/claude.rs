@@ -67,6 +67,11 @@ const HIDE: &str = r#"h="$SLOP_CONTEXT.hidden"; p=$(sed -n 's/.*"planFilePath": 
 /// changed meanwhile (the user edited it with ctrl+g): then it is theirs.
 const RESTORE: &str = r#"h="$SLOP_CONTEXT.hidden"; [ -e "$h.file" ] || exit 0; p=$(cat "$h.file"); cmp -s "$p" "$h.shown" && cp "$h" "$p"; rm -f "$h" "$h.file" "$h.shown"; exit 0"#;
 
+/// Refuses a Bash call that would start a browser of its own: gstack's shared
+/// Chromium (`$B`, browse/dist/browse, which its /browse, /qa, /scrape and
+/// design skills drive), or Chrome itself. Exit 2 hands the reason to Claude.
+const NO_BROWSER: &str = r#"grep -qE 'browse/dist/browse|\$B [a-z]|Google Chrome|chrome --headless' || exit 0; echo 'Browsing happens in the Preview here (the slop-preview tools), never a headless Chromium or Chrome. Do this step with navigate, computer and get_page_text instead.' >&2; exit 2"#;
+
 /// What Claude is doing, for the dot on its tab: each hook below writes one
 /// word, `working`, `waiting` (a question or a permission only the user can
 /// answer) or `done`.
@@ -196,7 +201,8 @@ as a person would (screenshot, click, type, read the page, navigate, resize); us
 that a change you made works, or when the user asks about what the app shows; `read_terminal` \
 reads the dev server's logs (and the project's other terminals) when something fails. They are also \
 your browser: to search the web or read a page as the user would see it, navigate the preview \
-there, never another browser. WebSearch and WebFetch are fine for reading docs as text; they \
+there, never another browser: not Chrome, not a headless Chromium. When a skill says to \
+drive its own browser (gstack's `$B`), do those steps with the slop-preview tools instead. WebSearch and WebFetch are fine for reading docs as text; they \
 stay out of the preview. \
 A plan you finish in plan mode opens beside you as a short visual design doc, drawn from its \
 Markdown, and is accepted from there. Most people skip a long plan, so write one they will read: \
@@ -683,7 +689,8 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
                 { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] },
                 { "matcher": "ExitPlanMode", "hooks": [hook(PLAN), hook(HIDE)] },
                 // Not on ExitPlanMode itself, whose HIDE runs beside it.
-                { "matcher": "^(?!ExitPlanMode$)", "hooks": [hook(RESTORE)] }
+                { "matcher": "^(?!ExitPlanMode$)", "hooks": [hook(RESTORE)] },
+                { "matcher": "Bash", "hooks": [hook(NO_BROWSER)] }
             ],
             "PostToolUse": [
                 { "matcher": EDITING_TOOLS, "hooks": [hook(EDITED)] },
@@ -697,7 +704,12 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
         "permissions": {
             "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "Bash(slop-terminal:*)", "mcp__slop-preview"],
             // The preview is the browser here: Chrome would open beside the app, out of the user's sight.
-            "deny": ["mcp__claude-in-chrome"]
+            // So is gstack's headless Chromium: these skills do nothing but drive it, or hand it Chrome's sign-ins.
+            "deny": [
+                "mcp__claude-in-chrome",
+                "Skill(browse)", "Skill(connect-chrome)", "Skill(open-gstack-browser)",
+                "Skill(setup-browser-cookies)", "Skill(pair-agent)", "Skill(scrape)", "Skill(skillify)"
+            ]
         }
     });
     // Only ever turned on here: with the setting off, the user's own `/voice` stands.

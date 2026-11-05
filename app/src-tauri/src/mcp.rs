@@ -136,7 +136,9 @@ running as a web app beside you, exactly as the user sees it, and any page on th
 to check that what you built works: take a screenshot, then click, type and read the page, as \
 you would in a browser. They are your browser here: to look something up or read a page on \
 the web, navigate the preview there (an address, or words to search for) instead of opening \
-another browser, so the user sees it beside you. WebFetch and WebSearch are fine for reading \
+another browser, so the user sees it beside you. To research the web while working on the \
+project's own page, navigate with `new_tab` so the page stays open in its own Preview tab, \
+and once there are several, name the one each call is for with `tab`. WebFetch and WebSearch are fine for reading \
 docs as text; they stay out of the preview. `device` does the same on an iOS Simulator or \
 Android emulator running in the app. `read_terminal` reads the project's terminals, the dev \
 server's logs by default: read it when the page misbehaves, a build fails or a request errors. When a page \
@@ -188,15 +190,20 @@ fn said(v: Value) -> Vec<Value> {
 }
 
 fn call(name: &str, args: &Value, tab: u32, app: &AppHandle) -> Result<Vec<Value>, String> {
+    // Which Preview tab a call is for, when the project has more than one (components/workspace.tsx).
+    let on = |mut cmd: Value| {
+        cmd["tab"] = args.get("tab").cloned().unwrap_or(Value::Null);
+        cmd
+    };
     match name {
-        "computer" if args.get("action").and_then(Value::as_str) == Some("screenshot") => screenshot(tab, app),
+        "computer" if args.get("action").and_then(Value::as_str) == Some("screenshot") => screenshot(on(json!({ "op": "frame" })), tab, app),
         "computer" | "read_page" | "find" | "form_input" | "get_page_text" | "javascript" => {
-            ask(app, tab, json!({ "op": "agent", "name": name, "args": args })).map(said)
+            ask(app, tab, on(json!({ "op": "agent", "name": name, "args": args }))).map(said)
         }
-        "navigate" => ask(app, tab, json!({ "op": "navigate", "url": args.get("url") })).map(said),
-        "sign_in" => ask_for(app, tab, json!({ "op": "sign_in", "url": args.get("url") }), 600).map(said),
-        "resize_preview" => ask(app, tab, json!({ "op": "resize", "args": args })).map(said),
-        "read_console_messages" => ask(app, tab, json!({ "op": "console", "args": args })).map(said),
+        "navigate" => ask(app, tab, on(json!({ "op": "navigate", "url": args.get("url"), "newTab": args.get("new_tab") }))).map(said),
+        "sign_in" => ask_for(app, tab, on(json!({ "op": "sign_in", "url": args.get("url") })), 600).map(said),
+        "resize_preview" => ask(app, tab, on(json!({ "op": "resize", "args": args }))).map(said),
+        "read_console_messages" => ask(app, tab, on(json!({ "op": "console", "args": args }))).map(said),
         "device" => crate::devices::tool(args, app),
         "map_search" | "map_section" | "map_where" => ask(app, tab, json!({ "op": "map", "name": name, "args": args })).map(said),
         "read_terminal" => ask(app, tab, json!({ "op": "terminal", "args": args })).map(said),
@@ -253,8 +260,8 @@ struct Frame {
     view: Option<String>,
 }
 
-fn screenshot(tab: u32, app: &AppHandle) -> Result<Vec<Value>, String> {
-    let frame: Frame = serde_json::from_value(ask(app, tab, json!({ "op": "frame" }))?).map_err(|e| e.to_string())?;
+fn screenshot(cmd: Value, tab: u32, app: &AppHandle) -> Result<Vec<Value>, String> {
+    let frame: Frame = serde_json::from_value(ask(app, tab, cmd)?).map_err(|e| e.to_string())?;
     // Asked for at the viewport's own size in pixels, so a point in the
     // picture is a point to click.
     let png = snapshot(app, &frame, frame.viewport_width / frame.dpr.max(1.0))?;
@@ -344,7 +351,7 @@ pub(crate) fn base64(bytes: &[u8]) -> String {
 }
 
 fn tools() -> Value {
-    json!([
+    let mut all = json!([
         {
             "name": "computer",
             "description": "Use the page in the Preview tab with a mouse and keyboard, as a person would: on macOS these are real clicks and keystrokes, so anything a person can click works, and your pointer is drawn where you act for the user to follow. Coordinates are CSS pixels in the preview's viewport, which are the screenshot's pixels (its reply says when they are not). Take a screenshot to see the page, and another after acting to see what changed. A ref from read_page or find can stand in for a coordinate. `type` types into whatever has focus, so click the field first; `key` presses keys, space-separated, like \"Enter\", \"Tab Tab\", \"ctrl+a\" or \"shift+Tab\".",
@@ -396,7 +403,14 @@ fn tools() -> Value {
         {
             "name": "navigate",
             "description": "Opens something in the preview: a path on the dev server (\"/settings\"), a full URL on this machine (another server, which the preview then follows), any page on the web (\"https://react.dev\", \"docs.rs/serde\"), words to search the web for (\"vite proxy websocket\"), or \"back\", \"forward\" or \"reload\".",
-            "inputSchema": { "type": "object", "properties": { "url": { "type": "string" } }, "required": ["url"] }
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "url": { "type": "string" },
+                    "new_tab": { "type": "boolean", "description": "Open it in a new Preview tab, leaving the others as they are: for research on the web while the project's own page stays open in its tab. The reply names the new tab's number." }
+                },
+                "required": ["url"]
+            }
         },
         {
             "name": "sign_in",
@@ -493,7 +507,17 @@ fn tools() -> Value {
                 "required": ["file"]
             }
         }
-    ])
+    ]);
+    for t in all.as_array_mut().into_iter().flatten() {
+        let name = t["name"].as_str().unwrap_or("");
+        if !["device", "read_terminal", "map_search", "map_section", "map_where"].contains(&name) {
+            t["inputSchema"]["properties"]["tab"] = json!({
+                "type": "number",
+                "description": "Which Preview tab, by its number (\"Preview 2\" is 2), when the project has more than one. Left out, the one last in view."
+            });
+        }
+    }
+    all
 }
 
 #[cfg(test)]

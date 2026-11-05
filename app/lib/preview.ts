@@ -6,10 +6,12 @@
  * (components/preview.tsx).
  */
 
-export type Call =
+/** `tab`: which of the project's Preview tabs, by its number from 1; null for the one last in view. */
+export type Call = { tab?: number | null } & (
   | { op: "frame" }
   | { op: "agent"; name: string; args: Record<string, unknown> }
-  | { op: "navigate"; url: string }
+  /** `newTab` opens it in a Preview of its own, leaving the others as they are. */
+  | { op: "navigate"; url: string; newTab?: boolean | null }
   /** Claude asking the user to sign in to a site, which waits on them (src-tauri/src/signins.rs). */
   | { op: "sign_in"; url: string }
   | { op: "resize"; args: { width?: number; height?: number; preset?: string } }
@@ -17,7 +19,8 @@ export type Call =
   /** Claude reading the project's map (app/api/lookup); answered by the workspace, never a preview. */
   | { op: "map"; name: string; args: { query?: string; name?: string; file?: string; line?: number } }
   /** An agent reading a terminal of its project, the dev server's by default; answered by the workspace. */
-  | { op: "terminal"; args: { name?: string; lines?: number } };
+  | { op: "terminal"; args: { name?: string; lines?: number } }
+);
 
 export interface PreviewHandle {
   run(call: Call): Promise<unknown>;

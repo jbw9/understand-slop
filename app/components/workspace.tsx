@@ -291,10 +291,10 @@ export function Workspace() {
     return all.find((x) => x.key === lastPreview.current[root]) ?? all.at(-1);
   };
 
-  /** A project's Preview tab, the one last in view: brought to the front, or opened. */
+  /** A project's Preview tab, the one last in view or the one keyed: brought to the front, or opened. */
   const preview = useCallback(
-    (root: string) => {
-      const open = previewTab(root);
+    (root: string, key?: number) => {
+      const open = key === undefined ? previewTab(root) : tabsNow.current.find((x) => x.key === key);
       setServerShown((s) => ({ ...s, [root]: false }));
       if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
       if (open.main) setFront((f) => ({ ...f, [root]: open.key }));
@@ -401,7 +401,24 @@ export function Workspace() {
         return reply(true, r.text);
       }
       if (cmd.op === "terminal") return reply(true, terminal(root, tab, cmd.args));
-      let handle = previewOf(previewTab(root)?.key);
+      const previews = () => tabsNow.current.filter((x) => x.kind === "preview" && x.cwd === root);
+      const n = cmd.tab ?? undefined;
+      if (n !== undefined && !previews()[n - 1]) {
+        const open = previews().length;
+        throw new Error(`There is no Preview ${n}: this project has ${open || "no"} Preview tab${open === 1 ? "" : "s"} open. Navigate with new_tab to open another.`);
+      }
+      let key = n !== undefined ? previews()[n - 1].key : previewTab(root)?.key;
+      // A new tab beside a Preview already open; with none, the first one opens below as before.
+      if (cmd.op === "navigate" && cmd.newTab && key !== undefined) {
+        const made = add(null, { kind: "preview", title: "Preview", cwd: root });
+        await until(() => previewOf(made), 8000);
+        key = made;
+      }
+      const which = () => {
+        const all = previews();
+        return all.length > 1 ? ` (in Preview ${all.findIndex((x) => x.key === key) + 1})` : "";
+      };
+      let handle = previewOf(key);
       if (!handle) {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
         // Anything else to navigate to is a page from the web, which needs no server.
@@ -413,12 +430,13 @@ export function Workspace() {
         if (asked) setServers((all) => ({ ...all, [root]: asked }));
         preview(root);
         handle = await until(() => previewOf(previewTab(root)?.key), 8000);
+        key = previewTab(root)?.key;
         if (asked) return reply(true, `Opened ${asked} in the preview.`);
       }
       const seen = cmd.op === "frame" || cmd.op === "sign_in" || (cmd.op === "agent" && cmd.name === "computer");
       if (seen && root === latest.current.here) {
         const hidden = !latest.current.shown;
-        preview(root);
+        preview(root, key);
         await sleep(hidden ? 520 : 80);
         // A window behind others draws no frames, so the slide in never runs:
         // it is put where it would have ended.
@@ -426,7 +444,8 @@ export function Workspace() {
       } else if (cmd.op === "frame") {
         throw new Error("That preview belongs to a project that is not open in the window, so it cannot be seen.");
       }
-      reply(true, await handle.run(cmd));
+      const out = await handle.run(cmd);
+      reply(true, cmd.op === "navigate" && typeof out === "string" ? out + which() : out);
     } catch (e) {
       reply(false, e instanceof Error ? e.message : String(e));
     }

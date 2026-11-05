@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DIALOG, INPUT, Overlay, PRIMARY, QUIET } from "@/components/dialog";
 import { useMaybeMap } from "@/components/map-context";
 import { Menu, type MenuItem } from "@/components/menu";
+import { cloneUrl, repoName } from "@/lib/clone";
 import { readSettings } from "@/lib/settings";
 import type { Explain, Progress, Project } from "@/lib/vault";
 import { cn } from "@/lib/utils";
@@ -15,8 +16,9 @@ import { cn } from "@/lib/utils";
  * kept in the app's vault (lib/vault.ts). Starting one works as VS Code's Open
  * Folder does: the system's folder picker first, then one screen to confirm
  * before the map is made through the reader's Claude Code. New Project makes
- * an empty folder instead. The list follows the run, and the map opens from
- * here or the picker once it is made.
+ * an empty folder instead, or clones one from GitHub when given a repository.
+ * The list follows the run, and the map opens from here or the picker once it
+ * is made.
  */
 
 const OPEN = "slop:projects";
@@ -83,6 +85,7 @@ export function ProjectsDialog() {
   const [list, setList] = useState<List | null>(null);
   const [root, setRoot] = useState("");
   const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Confirming an Open Folder or New Project; the list alone when null.
@@ -104,6 +107,7 @@ export function ProjectsDialog() {
       const asked = (e as CustomEvent<Asked>).detail;
       setRoot(asked.root ?? "");
       setLabel(asked.mode === "open" && asked.root ? folderName(asked.root) : "");
+      setUrl("");
       setMode(asked.mode ?? null);
       setOpen(true);
       setError(null);
@@ -145,6 +149,12 @@ export function ProjectsDialog() {
     setRoot(next);
   };
 
+  // A clone's name follows the repository's the same way.
+  const changeUrl = (next: string) => {
+    setLabel((l) => (!l.trim() || l === repoName(url) ? repoName(next) : l));
+    setUrl(next);
+  };
+
   const browse = async () => {
     const dir = await pickFolder(mode === "new" ? "Choose where the new folder goes" : "Open a folder to map");
     if (dir) changeRoot(dir);
@@ -152,14 +162,19 @@ export function ProjectsDialog() {
 
   const start = async (explain: Explain | undefined, paused: boolean) => {
     try {
+      const clone = mode === "new" && Boolean(url.trim());
+      const claude = (mode === "new" && !clone) || paused ? undefined : await claudePath();
       const body =
-        mode === "new"
-          ? { action: "create", root: root.trim(), name: label.trim(), paused }
-          : { action: "import", root: root.trim(), name: label.trim(), claude: paused ? undefined : await claudePath(), explain, paused };
+        mode === "open"
+          ? { action: "import", root: root.trim(), name: label.trim(), claude, explain, paused }
+          : clone
+            ? { action: "clone", url: url.trim(), root: root.trim(), name: label.trim(), claude, explain, paused }
+            : { action: "create", root: root.trim(), name: label.trim(), paused };
       const made = await act(body);
       if (made) {
         setRoot("");
         setLabel("");
+        setUrl("");
         setMode(null);
         // A map being made opens to watch it build (D69); one without a map opens for its tabs.
         if (made.id) openMap(made.id);
@@ -206,6 +221,8 @@ export function ProjectsDialog() {
             setRoot={changeRoot}
             label={label}
             setLabel={setLabel}
+            url={url}
+            setUrl={changeUrl}
             busy={busy}
             error={error}
             onBrowse={isTauri() ? () => void browse() : undefined}
@@ -214,6 +231,7 @@ export function ProjectsDialog() {
               setMode(null);
               setRoot("");
               setLabel("");
+              setUrl("");
               setError(null);
             }}
           />
@@ -249,7 +267,7 @@ export function ProjectsDialog() {
               ) : list ? (
                 <div className="px-3 py-10 text-center">
                   <p className="text-[13.5px] font-medium text-ink">No projects yet</p>
-                  <p className="mt-1 text-[12.5px] text-muted-slate">Open a folder of code to map it, or start a new one.</p>
+                  <p className="mt-1 text-[12.5px] text-muted-slate">Open a folder of code to map it, or start a new one, empty or cloned from GitHub.</p>
                 </div>
               ) : (
                 <p className="px-3 py-10 text-center text-[12.5px] text-faint">Loading…</p>
@@ -386,10 +404,11 @@ const folderName = (root: string) => root.trim().replace(/[\\/]+$/, "").split(/[
 const joinPath = (parent: string, name: string) => `${parent.trim().replace(/[\\/]+$/, "")}/${name}`;
 
 /**
- * Confirming a project, on one screen: the folder (already picked when the
- * picker was there to pick it), its name, and for an existing one how much
- * the map explains and what making it costs. Folders are checked by the
- * server, so a bad one comes back here to fix.
+ * Confirming a project, on one screen: for a new one the repository to clone,
+ * if any, and where it goes; for an existing one the folder (already picked
+ * when the picker was there to pick it); its name; and for code to map how
+ * much the map explains and what making it costs. Folders and repositories
+ * are checked by the server, so a bad one comes back here to fix.
  */
 function StartProject({
   mode,
@@ -397,6 +416,8 @@ function StartProject({
   setRoot,
   label,
   setLabel,
+  url,
+  setUrl,
   busy,
   error,
   onBrowse,
@@ -408,6 +429,8 @@ function StartProject({
   setRoot: (v: string) => void;
   label: string;
   setLabel: (v: string) => void;
+  url: string;
+  setUrl: (v: string) => void;
   busy: boolean;
   error: string | null;
   onBrowse?: () => void;
@@ -415,17 +438,21 @@ function StartProject({
   onCancel: () => void;
 }) {
   const fresh = mode === "new";
+  const clone = fresh && Boolean(url.trim());
+  const known = Boolean(cloneUrl(url));
+  // A new empty folder has nothing to map yet: it is mapped from Projects once it has code.
+  const mappable = !fresh || clone;
   const [mapped, setMapped] = useState(true);
   const [understand, setUnderstand] = useState(2);
   const explain = UNDERSTAND[understand].explain;
-  const name = label.trim() || (fresh ? "" : folderName(root));
-  const ready = Boolean(root.trim()) && (!fresh || Boolean(label.trim()));
+  const name = label.trim() || (clone ? repoName(url) : fresh ? "" : folderName(root));
+  const ready = Boolean(root.trim()) && (clone ? known && Boolean(name) : !fresh || Boolean(label.trim()));
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready) onStart(fresh || !mapped ? undefined : explain, !mapped);
+        if (ready) onStart(mappable && mapped ? explain : undefined, mappable && !mapped);
       }}
       className="flex min-h-0 flex-col"
     >
@@ -442,11 +469,31 @@ function StartProject({
       </header>
 
       <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-5">
+        {fresh ? (
+          <label className="block">
+            <span className={LABEL}>
+              Clone from GitHub <span className="font-normal text-faint">optional</span>
+            </span>
+            <input
+              autoFocus
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://github.com/owner/repo"
+              spellCheck={false}
+              aria-invalid={clone && !known}
+              className={INPUT}
+            />
+            <span className={cn("mt-1.5 block text-[11.5px]", clone && !known ? "text-clay-ink" : "text-faint")}>
+              {clone && !known ? "Paste its GitHub link, owner/repo, or a git address." : "Leave it empty to start an empty folder."}
+            </span>
+          </label>
+        ) : null}
+
         <label className="block">
           <span className={LABEL}>{fresh ? "Location" : "Folder"}</span>
           <div className="flex gap-2">
             <input
-              autoFocus={!root}
+              autoFocus={!root && !fresh}
               value={root}
               onChange={(e) => setRoot(e.target.value)}
               placeholder={fresh ? "~/code" : "~/code/my-app"}
@@ -466,20 +513,20 @@ function StartProject({
             Name
           </span>
           <input
-            autoFocus={Boolean(root) && fresh}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder={(!fresh && folderName(root)) || "my-app"}
+            placeholder={(clone ? repoName(url) : !fresh && folderName(root)) || "my-app"}
             spellCheck={false}
             className={INPUT}
           />
           {fresh && root.trim() && name ? (
-            <span className="mt-1.5 block truncate font-mono text-[11.5px] text-faint">Creates {joinPath(root, name)}</span>
+            <span className="mt-1.5 block truncate font-mono text-[11.5px] text-faint">
+              {clone ? "Clones into" : "Creates"} {joinPath(root, name)}
+            </span>
           ) : null}
         </label>
 
-        {/* A new folder is empty, so there is nothing to map yet: it is mapped from Projects once it has code. */}
-        {fresh ? null : (
+        {mappable ? (
           <div className="flex items-start gap-4 border-t border-border-gray pt-5">
             <div className="min-w-0 flex-1">
               <span className="block text-[13px] font-semibold text-ink">Make a map</span>
@@ -491,9 +538,9 @@ function StartProject({
             </div>
             <Switch on={mapped} onChange={setMapped} label="Make a map" />
           </div>
-        )}
+        ) : null}
 
-        {fresh || !mapped ? null : <Understanding value={understand} onChange={setUnderstand} />}
+        {mappable && mapped ? <Understanding value={understand} onChange={setUnderstand} /> : null}
       </div>
 
       <footer className="flex items-center justify-end gap-2 border-t border-border-gray bg-surface px-5 py-3">
@@ -502,7 +549,7 @@ function StartProject({
           Cancel
         </button>
         <button type="submit" disabled={busy || !ready} className={PRIMARY}>
-          {fresh ? "Create" : mapped ? "Start mapping" : "Open"}
+          {clone ? (busy ? "Cloning…" : mapped ? "Clone and map" : "Clone") : fresh ? "Create" : mapped ? "Start mapping" : "Open"}
         </button>
       </footer>
     </form>

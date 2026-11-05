@@ -25,7 +25,8 @@
 import { execFileSync, spawn } from "node:child_process";
 import { closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { cloneUrl, repoName } from "@/lib/clone";
 import type { Run } from "@/lib/data";
 
 const IDENTIFIER = "dev.bluprint.app";
@@ -285,6 +286,42 @@ export function createProject(parentIn: string, nameIn: string, paused?: boolean
   v.projects.push(project);
   writeVault(v);
   return project;
+}
+
+/**
+ * Clone a repository into `<parent>/<name>`, then import it as an Open Folder
+ * would. Git never asks for a password here, with no terminal to ask in: a
+ * private repository clones only on credentials the machine already keeps.
+ */
+export async function cloneProject(input: string, parentIn: string, nameIn: string, claude?: string, explain?: Explain, paused?: boolean): Promise<Project> {
+  const url = cloneUrl(input);
+  if (!url) throw new ImportError("That is not a repository address. Paste its GitHub link, or owner/repo.");
+  const name = nameIn.trim() || repoName(input);
+  if (!name || /[\\/]/.test(name) || name === "." || name === "..") throw new ImportError("Give it a folder name, without slashes.");
+  const root = join(resolve(parentIn.replace(/^~(?=$|[\\/])/, homedir())), name);
+  if (existsSync(root) && (!statSync(root).isDirectory() || readdirSync(root).length))
+    throw new ImportError(`${root} already exists. Open it with Open Folder instead.`);
+  const same = readVault().projects.find((p) => p.root === root);
+  if (same) throw new ImportError(`Already imported as "${same.name}".`);
+  mkdirSync(dirname(root), { recursive: true });
+  const error = await new Promise<string | undefined>((done) => {
+    const child = spawn("git", ["clone", "--", url, root], {
+      stdio: ["ignore", "ignore", "pipe"],
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" },
+      windowsHide: true,
+      timeout: 15 * 60_000,
+    });
+    let err = "";
+    child.stderr.on("data", (d: Buffer) => (err = (err + d.toString()).slice(-4000)));
+    child.on("error", (e) => done(e.message));
+    child.on("close", (code) => done(code === 0 ? undefined : err));
+  });
+  if (error !== undefined) {
+    rmSync(root, { recursive: true, force: true });
+    const fatal = error.split(/\r?\n/).filter((l) => /^(fatal|error):/.test(l)).pop()?.replace(/^(fatal|error):\s*/, "");
+    throw new ImportError(`Could not clone it: ${fatal || error.trim() || "git stopped without saying why."}`);
+  }
+  return importProject(root, name, claude, explain, paused);
 }
 
 /**

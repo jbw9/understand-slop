@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { auditOf } from "@/lib/maps";
-import { cancel, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, setPaused, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { cancel, cloneProject, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, setPaused, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
- * The reader's projects (lib/vault.ts): list them, start or import one, regenerate,
+ * The reader's projects (lib/vault.ts): list them, start, import or clone one, regenerate,
  * cancel or forget one, or bring one's map up to its code after an edit. Paths arrive from the page, but only as the reader's
  * own choice of a directory on their own machine — nothing here reads or
- * writes inside it except the generator, which only reads, and starting a
- * project, which makes it as an empty git checkout.
+ * writes inside it except the generator, which only reads, starting a
+ * project, which makes it as an empty git checkout, and cloning one into it.
  */
 
 const bad = (message: string, status = 400) => Response.json({ error: message }, { status });
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   // asking, but a JSON one needs a CORS preflight this route never grants.
   if (!request.headers.get("content-type")?.startsWith("application/json")) return bad("bad request", 415);
   const body = (await request.json().catch(() => null)) ?? {};
-  const { action, id, root, name, claude, turn, explain, full, paused } = body as Record<string, unknown>;
+  const { action, id, root, name, url, claude, turn, explain, full, paused } = body as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
   const level = (["none", "minimal", "brief", "detailed", "full"] as const).find((l) => l === explain);
   try {
@@ -89,6 +89,9 @@ export async function POST(request: Request) {
       case "create":
         if (!str(root) || !str(name)) return bad("Choose where it goes and what it is called.");
         return Response.json(createProject(root as string, name as string, paused === true));
+      case "clone":
+        if (!str(url) || !str(root)) return bad("Give the repository and where it goes.");
+        return Response.json(await cloneProject(url as string, root as string, str(name) ?? "", str(claude), level, paused === true));
       case "regenerate":
         if (!str(id)) return bad("bad request");
         return Response.json(generate(id as string, str(claude), level, full === true) ?? null);

@@ -1,17 +1,18 @@
+import { LandingInstall } from "./landing-install";
 import s from "./landing.module.css";
 
 const STEPS = [
   {
-    title: "Download the app.",
-    body: "For macOS. It works through the Claude Code you already use, signed in with your Claude plan.",
+    title: "Install the app.",
+    body: "One line in a terminal, on macOS, Linux or Windows. It builds Mira from source, and works through the Claude Code you already use, signed in with your Claude plan.",
   },
   {
     title: "Import a folder.",
-    body: "Any git repository on your Mac. Your Claude Code makes its map right away: about 20 minutes for a mid-sized repo, counted against your plan's usage.",
+    body: "Any git repository on your computer. Your Claude Code makes its map right away: about 20 minutes for a mid-sized repo, counted against your plan's usage.",
   },
   {
     title: "Open it.",
-    body: "Start at the steps and go down to the code. The map stays on your Mac, in the app's own folder.",
+    body: "Start at the steps and go down to the code. The map stays on your computer, in the app's own folder.",
   },
 ];
 
@@ -21,12 +22,12 @@ const QUESTIONS = [
     a: "No. Keep the editor you use. An editor shows one file at a time and an agent panel one message at a time; Mira shows how the whole repository fits together and what a change did to it. It opens the code where you need it, and hands your questions to the agent beside it.",
   },
   {
-    q: "Does my code leave my Mac?",
-    a: "Only the way it does whenever you use Claude Code: your own Claude Code reads the files it needs to make the map. The map itself is saved on your Mac and nowhere else.",
+    q: "Does my code leave my computer?",
+    a: "Only the way it does whenever you use Claude Code: your own Claude Code reads the files it needs to make the map. The map itself is saved on your computer and nowhere else.",
   },
   {
     q: "What do I need?",
-    a: "A Mac, and Claude Code signed in with a Claude plan. Making a map counts against that plan's usage, like any other Claude Code session.",
+    a: "A Mac, a Linux desktop or Windows, and Claude Code signed in with a Claude plan. Making a map counts against that plan's usage, like any other Claude Code session.",
   },
   {
     q: "Which languages does it read?",
@@ -58,8 +59,13 @@ export function LandingStart({ github }: { github: string }) {
             </li>
           ))}
         </ol>
+        <div className={`${s.startInstall} ${s.reveal}`}>
+          <LandingInstall />
+        </div>
         <p className={`${s.cap} ${s.reveal}`}>
-          Or build it yourself from <a href={github}>the source on GitHub</a>.
+          It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The scripts are{" "}
+          <a href={`${github}/blob/main/install.sh`}>install.sh</a> and{" "}
+          <a href={`${github}/blob/main/install.ps1`}>install.ps1</a>, in <a href={github}>the source on GitHub</a>.
         </p>
       </section>
       <section id="questions" className={s.section} aria-labelledby="questions-title">

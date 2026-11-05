@@ -170,6 +170,10 @@
   font-style: normal;
   color: var(--green);
 }
+/* The hero's full width, not its content's: the install line doesn't wrap, and would set it. */
+.pitch {
+  align-self: stretch;
+}
 .pitch p {
   max-width: 30em;
   margin: 28px auto 32px;
@@ -182,7 +186,8 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
+  /* The install line's systems hang below it; the buttons line up with its box. */
+  align-items: flex-start;
   gap: 12px;
 }
 .btn {
@@ -217,6 +222,77 @@
 }
 .ghost:hover {
   border-color: var(--faint);
+}
+/* The install line: the command, its Copy button, then the systems under it. */
+.install {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(100%, 560px);
+  min-width: 0;
+}
+.installBox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 4px 0 16px;
+  border: 1px solid var(--strong);
+  border-radius: 12px;
+  background: var(--white);
+}
+/* The Windows line is long: it scrolls in place, and Copy takes all of it. */
+.installBox code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font: 13px var(--font-mono);
+  white-space: nowrap;
+  text-align: left;
+  color: var(--ink);
+}
+.installBox code span {
+  margin-right: 8px;
+  color: var(--faint);
+  user-select: none;
+}
+.installBox .btn {
+  flex: none;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 14px;
+}
+.installOs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.installOs button {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.installOs button:hover {
+  color: var(--ink);
+}
+.installOs button[aria-pressed="true"] {
+  background: var(--low);
+  color: var(--ink);
+}
+.installOs span {
+  margin-left: auto;
+}
+.startInstall {
+  margin-top: 40px;
 }
 .gh {
   width: 17px;
@@ -1691,6 +1767,9 @@
     flex: 1 1 0;
     padding-inline: 12px;
     font-size: 15px;
+  }
+  .ctas .installBox .btn {
+    flex: none;
   }
   .canvas {
     height: 600px;

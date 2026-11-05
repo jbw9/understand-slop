@@ -47,9 +47,8 @@ export function LandingNav({ github }: { github: string }) {
           <a href={github}>GitHub</a>
         </nav>
         <ThemeToggle />
-        {/* No build to link yet. */}
-        <a className={`${s.btn} ${s.primary} ${s.navCta}`} href="#">
-          Download
+        <a className={`${s.btn} ${s.primary} ${s.navCta}`} href="#start">
+          Install
         </a>
       </div>
     </header>

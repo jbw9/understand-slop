@@ -1,0 +1,67 @@
+name: Install
+
+# The landing page's one-line install, run as a visitor runs it, on each system it names.
+on:
+  push:
+    paths:
+      - install.sh
+      - install.ps1
+      - app/scripts/install-app.sh
+      - app/src-tauri/**
+      - app/package-lock.json
+      - .github/workflows/install.yml
+  workflow_dispatch:
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      RAW: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}
+      MIRA_REF: ${{ github.sha }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # What install.sh asks a Debian or Ubuntu user to install.
+      - name: System packages
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake pkg-config rsync libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev libpulse-dev
+
+      - name: Install (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: curl -fsSL "$RAW/install.sh" | sh
+
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: powershell -ExecutionPolicy Bypass -c "iex (curl.exe -fsSL %RAW%/install.ps1 | Out-String)"
+
+      # The app's window needs a desktop; what it opens is this server, started as src-tauri/src/server.rs does.
+      - name: Check
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+          macOS) test -x /Applications/Mira.app/Contents/MacOS/mira; data="$HOME/Library/Application Support/dev.mira.app" ;;
+          Linux) test -x "$HOME/.local/bin/mira"; test -f "$HOME/.local/share/applications/mira.desktop"; data="$HOME/.local/share/dev.mira.app" ;;
+          Windows) test -f "$LOCALAPPDATA/Programs/Mira/Mira.exe"; test -f "$APPDATA/Microsoft/Windows/Start Menu/Programs/Mira.lnk"; data="$APPDATA/dev.mira.app" ;;
+          esac
+          node -e '
+          const { spawn } = require("child_process");
+          const dir = require("path").join(process.argv[1], "server");
+          const env = JSON.parse(require("fs").readFileSync(dir + "/env.json", "utf8"));
+          const server = spawn(env.node, [dir + "/node_modules/next/dist/bin/next", "start", "-p", "3123", "-H", "127.0.0.1"],
+            { cwd: dir, env: { ...process.env, PATH: env.path }, stdio: "inherit" });
+          const deadline = Date.now() + 60000;
+          (async function poll() {
+            const res = await fetch("http://127.0.0.1:3123/").catch(() => null);
+            if (res) { console.log("server answered", res.status); server.kill(); process.exit(res.ok ? 0 : 1); }
+            if (Date.now() > deadline) { console.log("server did not answer"); server.kill(); process.exit(1); }
+            setTimeout(poll, 500);
+          })();
+          ' "$data"

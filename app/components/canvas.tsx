@@ -654,6 +654,14 @@ function Level({
   const column = useRef<HTMLDivElement>(null);
   useDrawIn(column, top && watched && !run);
   const draft = !top && Boolean(nodeAt(path.slice(0, 1))?.draft);
+  // A quick section still to be written in full (pipeline.ts, --fast): the
+  // reader opening it asks for it next, and its header says what is coming.
+  const section = top ? undefined : path[0];
+  const queued = section && map.progress?.stage === "deepen" ? map.progress.roots.find((r) => r.id === section) : undefined;
+  const deepening = queued?.status === "queued" || queued?.status === "drafting" ? queued.status : undefined;
+  useEffect(() => {
+    if (deepening === "queued" && section) void fetch("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "focus", id: map.name, section }) }).catch(() => {});
+  }, [deepening, section, map.name]);
   // A project opened without a map, and no run making one (lib/maps.ts, unmapped).
   const unmapped = top && !STATIC_MAP && !map.progress && !node.children?.length && !blocks.length;
 
@@ -662,6 +670,7 @@ function Level({
     <SymbolLinks.Provider value={linkOf}>
       <Header
         path={path}
+        deepening={deepening}
         back={
           top
             ? undefined
@@ -1130,6 +1139,7 @@ function Note({ children }: { children: React.ReactNode }) {
 
 function Header({
   path,
+  deepening,
   back,
   eyebrow,
   title,
@@ -1147,6 +1157,8 @@ function Header({
 }: {
   /** Where this level is, so it can be handed to Claude from its header. */
   path: string[];
+  /** A quick section's place in being written in full: still waiting, or being written now. */
+  deepening?: "queued" | "drafting";
   /** The level above, named — so "back" says where it goes. */
   back?: { label: string; path: string[]; onClick: () => void }[];
   eyebrow?: string;
@@ -1203,6 +1215,14 @@ function Header({
         ) : null}
         {actions}
       </div>
+      {deepening && !rewriting ? (
+        <div role="status" className={cn("mb-5 flex max-w-[720px] items-center gap-2 border border-accent-line bg-accent-surface/60 px-3 py-2 text-[13px] text-accent", deepening === "drafting" && "shimmer")}>
+          <span aria-hidden className={cn("size-[7px] shrink-0 rounded-full bg-accent", deepening === "drafting" && "animate-pulse")} />
+          {deepening === "drafting"
+            ? "This is a quick first version. The full one is being written now; it usually takes a minute or two and appears here by itself."
+            : "This is a quick first version. The full one is written next, since you opened it, and appears here by itself."}
+        </div>
+      ) : null}
       {rewriting ? (
         <div role="status" className="shimmer mb-5 flex max-w-[720px] items-center gap-2 border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
           <span aria-hidden className="size-[7px] shrink-0 animate-pulse rounded-full bg-amber-ink" />

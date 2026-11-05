@@ -549,8 +549,9 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
     anatomy: [top],
   } as unknown as Overview;
 
-  const map: MapFile = { RUN: { ...run, explain: "none" } as MapFile["RUN"], OVERVIEW, AUTHORED };
-  const checkProblems = await lap("check", () => check(map, inv.repo, { generated: true }).problems);
+  const map: MapFile = { RUN: run, OVERVIEW, AUTHORED };
+  // Held to the quick map's own standard: it writes no explainers, whatever the map's level.
+  const checkProblems = await lap("check", () => check({ ...map, RUN: { ...run, explain: "none" } }, inv.repo, { generated: true }).problems);
 
   const arch: FastResult["arch"] = {
     files: Object.fromEntries(

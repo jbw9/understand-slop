@@ -22,6 +22,14 @@ const STAGES = [
   ["author", "Writing each part"],
   ["overview", "Drawing how they connect"],
 ] as const;
+/** A quick map first, then each part written in full in its place (scripts/generate/pipeline.ts, --fast). */
+const FAST_STAGES = [
+  ["summarize", "Reading the code"],
+  ["author", "Drawing a quick map"],
+  ["deepen", "Writing each part in full"],
+  ["overview", "Drawing how they connect"],
+] as const;
+const stagesOf = (progress: Progress) => (progress.fast ? FAST_STAGES : STAGES);
 
 /** Whether the top level is the run itself rather than its picture: until the overview lands. */
 export function isBuilding(progress: Progress | undefined, hasOverview: boolean): progress is Progress {
@@ -58,13 +66,15 @@ export function Building({ progress, onOpen }: { progress: Progress; onOpen: (pa
  * reports how far it has got.
  */
 const TYPICAL: Record<string, number> = { summarize: 6, cut: 2, author: 10, overview: 3, verify: 4 };
-const TOTAL = Object.values(TYPICAL).reduce((a, b) => a + b, 0);
+/** The same for a quick map and its deepening: the quick map is a minute or two, the deepening most of the run. */
+const FAST_TYPICAL: Record<string, number> = { summarize: 2, author: 1.5, deepen: 5, overview: 1.5 };
+const typicalOf = (progress: Progress) => (progress.fast ? FAST_TYPICAL : TYPICAL);
 
 /** How far through its own stage the run is, 0–1. */
 function within(progress: Progress, now: number) {
   const { stage, reading, roots } = progress;
   if (stage === "summarize" && reading?.files.length) return reading.read.length / reading.files.length;
-  if (stage === "author" && roots.length) {
+  if ((stage === "author" || stage === "deepen") && roots.length) {
     const settled = roots.filter((r) => r.status === "done" || r.status === "failed").length;
     const drafting = roots.filter((r) => r.status === "drafting").length;
     return (settled + drafting / 3) / roots.length;
@@ -72,7 +82,7 @@ function within(progress: Progress, now: number) {
   // A stage that says nothing until it ends: closer to done the longer it
   // runs, never quite there.
   const since = progress.stageAt ? (now - Date.parse(progress.stageAt)) / 60000 : 0;
-  return 0.95 * (1 - Math.exp(-since / (TYPICAL[stage] ?? 3)));
+  return 0.95 * (1 - Math.exp(-since / (typicalOf(progress)[stage] ?? 3)));
 }
 
 /** A clock that moves on its own between the run's reports. */
@@ -90,13 +100,16 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 
 /** Where the run is, of the five things it does. */
 export function Stages({ progress }: { progress: Progress }) {
-  const at = STAGES.findIndex(([k]) => k === progress.stage);
+  const stages = stagesOf(progress);
+  const typical = typicalOf(progress);
+  const total = stages.reduce((a, [k]) => a + typical[k], 0);
+  const at = stages.findIndex(([k]) => k === progress.stage);
   const done = progress.stage === "done";
   const live = at >= 0;
   const tick = useNow(live);
   const part = live ? Math.min(1, within(progress, tick)) : 0;
   const share = (i: number) => (done || (at >= 0 && i < at) ? 1 : i === at ? part : 0);
-  const fraction = STAGES.reduce((a, [k], i) => a + share(i) * TYPICAL[k], 0) / TOTAL;
+  const fraction = stages.reduce((a, [k], i) => a + share(i) * typical[k], 0) / total;
   const started = progress.startedAt ? Date.parse(progress.startedAt) : NaN;
   const elapsed = Number.isNaN(started) ? undefined : Math.max(0, (tick - started) / 1000);
   // Too early, the pace says nothing; after that, the time so far scaled to
@@ -121,11 +134,11 @@ export function Stages({ progress }: { progress: Progress }) {
             aria-valuetext={leftLabel}
             className="mt-2 flex gap-[3px]"
           >
-            {STAGES.map(([k, label], i) => (
+            {stages.map(([k, label], i) => (
               <div
                 key={k}
                 title={label}
-                style={{ flexGrow: TYPICAL[k] }}
+                style={{ flexGrow: typical[k] }}
                 className={cn("relative h-1.5 basis-0 overflow-hidden rounded-full bg-border-gray", i === at && "shimmer")}
               >
                 <div
@@ -138,7 +151,7 @@ export function Stages({ progress }: { progress: Progress }) {
         </div>
       ) : null}
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[12.5px]">
-        {STAGES.map(([k, label], i) => {
+        {stages.map(([k, label], i) => {
           const past = done || (at >= 0 && i < at);
           const now = i === at;
           return (

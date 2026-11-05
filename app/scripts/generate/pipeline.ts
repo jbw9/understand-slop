@@ -159,7 +159,7 @@ export async function main(args: string[]) {
   // What the app shows while the run is on: the stage, and once the cut is in,
   // a line per root. A stale file from a previous run would be read as this
   // one's, so the first write happens before any work.
-  const progress: Progress = { startedAt: new Date(t0).toISOString(), stage: "summarize", roots: [] };
+  const progress: Progress = { startedAt: new Date(t0).toISOString(), stage: "summarize", roots: [], ...(has("--fast") ? { fast: true } : {}) };
   // When the stage last changed: the app's time-left guess needs it for the
   // stages that report nothing until they end.
   let stageNow = progress.stage;
@@ -220,23 +220,143 @@ export async function main(args: string[]) {
   withSummaries(activeGraph()!, sums);
   writeFileSync(`${out}/graph.json`, JSON.stringify(activeGraph()) + "\n");
   if (stopAfter === "summarize") return;
-  // --fast: the four-phase map (fast.ts) in place of the cut, the authors and the overview.
+  // --fast: the four-phase map (fast.ts) in place of the cut, the authors and
+  // the overview; then, unless --no-deepen, each of its sections written in
+  // full by the authors, in reading order, a section the reader has open first.
   if (has("--fast")) {
     progress.stage = "author";
     flush();
-    const run: Run = { command: `bluprint map ${inv.name} --fast`, repo: inv.scope ? name : inv.name, commit: inv.commit, files: code.length, elapsed: "", root: repo, explain: "none", models };
+    const deepen = !has("--no-deepen");
+    const run: Run = { command: `bluprint map ${inv.name} --fast`, repo: inv.scope ? name : inv.name, commit: inv.commit, files: code.length, elapsed: "", root: repo, explain: deepen ? EXPLAIN_LEVEL : "none", models };
     const r = await lap("fast", () => fastMap(inv, sums, activeGraph()!, models.author, run, say));
-    const total = Math.round((Date.now() - t0) / 1000);
-    r.map.RUN.elapsed = `${Math.max(1, Math.round(total / 60))} min`;
+    const quick = Math.round((Date.now() - t0) / 1000);
+    r.map.RUN.elapsed = `${Math.max(1, Math.round(quick / 60))} min`;
     atomic(`${out}/map.json`, JSON.stringify(r.map, null, 1) + "\n");
     writeFileSync(`${out}/arch.json`, JSON.stringify(r.arch, null, 1) + "\n");
-    const usd = Object.values(bill).reduce((a, b) => a + b.usd, 0);
-    writeFileSync(`${out}/report.json`, JSON.stringify({ repo: inv.name, commit: inv.commit, backend: BACKEND, mode: "fast", models, elapsed: { ...elapsed, ...r.timing, total }, usd: Math.round(usd * 100) / 100, bill, components: r.arch.components.map((c) => ({ id: c.id, dir: c.dir, files: c.files.length })), discrepancies: r.discrepancies, check: { problems: r.checkProblems } }, null, 1) + "\n");
-    progress.stage = "done";
-    flush();
-    console.log(`\n${out}/map.json — ${r.map.AUTHORED.length} components, ${r.checkProblems.length} check problems, ${r.discrepancies.length} discrepancies, $${usd.toFixed(2)}, ${total}s`);
+    console.log(`\n${out}/map.json — ${r.map.AUTHORED.length} components, ${r.checkProblems.length} check problems, ${r.discrepancies.length} discrepancies, ${quick}s`);
     for (const d of r.discrepancies) console.log(`  discrepancy: ${d}`);
     for (const p of r.checkProblems.slice(0, 30)) console.log(`  check: ${p}`);
+
+    // The components as a cut, so the authors (and later updates, update.ts) read them as roots.
+    const fastCut: Cut = {
+      about: r.map.OVERVIEW?.detail ?? "",
+      roots: r.map.AUTHORED.map((n) => {
+        const c = r.arch.components.find((x) => x.id === n.id)!;
+        return { id: n.id, prefix: c.prefix, title: n.title, sub: n.sub, why: n.detail ?? "", files: c.files };
+      }),
+      excluded: [],
+    };
+    writeFileSync(`${out}/.cache/cut.json`, JSON.stringify(fastCut, null, 1));
+    atomic(`${out}/index.json`, JSON.stringify(catalogOf(inv, sums, fastCut)) + "\n");
+
+    const deep: Record<string, Authored> = {};
+    if (deepen) {
+      progress.stage = "deepen";
+      progress.roots = fastCut.roots.map((x) => ({ id: x.id, title: x.title, sub: x.sub, status: "queued" as RootStatus, detail: "quick version" }));
+      flush();
+      const map = r.map;
+      let writing = Promise.resolve();
+      const save = () => {
+        const body = JSON.stringify(map, null, 1) + "\n";
+        writing = writing.then(() => atomic(`${out}/map.json`, body));
+        return writing;
+      };
+      // The reader's open section, which the app writes when they open a quick one (lib/vault.ts, focus).
+      const focused = () => {
+        try {
+          return (JSON.parse(readFileSync(`${out}/focus.json`, "utf8")) as { id?: string }).id;
+        } catch {
+          return undefined;
+        }
+      };
+      const queue = fastCut.roots.map((x) => x.id);
+      const next = () => {
+        const f = focused();
+        const i = f ? queue.indexOf(f) : -1;
+        return queue.splice(i >= 0 ? i : 0, 1)[0];
+      };
+      const one = async (id: string) => {
+        const root = fastCut.roots.find((x) => x.id === id)!;
+        mark(id, "drafting", "writing in full");
+        let done: Authored;
+        if (tooBig(root, fastCut, inv, sums)) {
+          const split = await authorSplit(root, fastCut, inv, sums, { cut: models.cut, part: models.part, join: models.author }, null, { submit: submitted(id, root.prefix), part: () => {}, say });
+          done = split?.authored ?? (await authorRoot(root, fastCut, inv, sums, models.author, submitted(id, root.prefix)));
+        } else done = await authorRoot(root, fastCut, inv, sums, models.author, submitted(id, root.prefix));
+        deep[id] = done;
+        delete drafts[id];
+        void writeDrafts();
+        if (done.root) {
+          // In the quick one's place: same id and row, so the overview's boxes still open it.
+          const i = map.AUTHORED.findIndex((n) => n.id === id);
+          map.AUTHORED[i] = { ...plain(done.root), col: 0, row: i };
+          dedupeIssues(map.AUTHORED[i]);
+          await save();
+          mark(id, "done", "written in full");
+          say(`${id}: written in full after ${done.turns + 1} turns`);
+        } else {
+          mark(id, "failed", "kept the quick version");
+          say(`${id}: kept the quick version — ${done.problems.length} problems unresolved`);
+        }
+      };
+      const AT_ONCE = Number(process.env.SLOP_DEEPEN_AT_ONCE ?? 3);
+      await lap("deepen", () =>
+        Promise.all(
+          Array.from({ length: Math.min(AT_ONCE, queue.length) }, async () => {
+            for (let id = next(); id; id = next()) await one(id);
+          }),
+        ),
+      );
+      await writing;
+      await drafting;
+      rmSync(`${out}/drafts.json`, { force: true });
+      rmSync(`${out}/focus.json`, { force: true });
+
+      // The top level drawn again over the sections as written in full, as the
+      // full pipeline draws it (D60): its explainer, glossary and walkthroughs,
+      // which the quick map has none of. If it fails the quick one stays.
+      progress.stage = "overview";
+      flush();
+      const drawn = await lap("overview", () => overviewOf(map.AUTHORED, fastCut, inv, models.author, (n, problems) => say(`overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`), sums));
+      if (drawn.overview) {
+        const top = { ...drawn.overview };
+        if (EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary"] as const) delete top[k];
+        map.OVERVIEW = top;
+        atomic(`${out}/map.json`, JSON.stringify(map, null, 1) + "\n");
+      }
+      say(`overview: ${drawn.overview ? "redrawn" : "kept the quick one"} after ${drawn.turns + 1} turns`);
+    }
+
+    const total = Math.round((Date.now() - t0) / 1000);
+    const final = check(r.map, repo, { generated: true });
+    r.map.RUN.elapsed = `${Math.max(1, Math.round(total / 60))} min`;
+    atomic(`${out}/map.json`, JSON.stringify(r.map, null, 1) + "\n");
+    const usd = Object.values(bill).reduce((a, b) => a + b.usd, 0);
+    writeFileSync(
+      `${out}/report.json`,
+      JSON.stringify(
+        {
+          repo: inv.name,
+          commit: inv.commit,
+          backend: BACKEND,
+          mode: deepen ? "fast, then deepened" : "fast",
+          models,
+          elapsed: { ...elapsed, ...r.timing, quick, total },
+          usd: Math.round(usd * 100) / 100,
+          bill,
+          components: r.arch.components.map((c) => ({ id: c.id, dir: c.dir, files: c.files.length })),
+          discrepancies: r.discrepancies,
+          quickCheck: { problems: r.checkProblems },
+          check: { problems: final.problems },
+          deepened: Object.entries(deep).map(([id, a]) => ({ id, accepted: Boolean(a.root), turns: a.turns + 1, submits: a.submits, lastProblems: a.root ? [] : a.problems.slice(0, 20), ...(a.log?.length ? { timing: timingOf(a.log) } : {}) })),
+        },
+        null,
+        1,
+      ) + "\n",
+    );
+    progress.stage = "done";
+    flush();
+    if (deepen) console.log(`\ndeepened ${Object.values(deep).filter((a) => a.root).length}/${fastCut.roots.length} sections; ${final.problems.length} check problems; $${usd.toFixed(2)}, quick map at ${quick}s, done at ${total}s`);
     await ccClose();
     return;
   }

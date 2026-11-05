@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { auditOf } from "@/lib/maps";
-import { cancel, cloneProject, createProject, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, setPaused, updateMap, VAULT, type Turn } from "@/lib/vault";
+import { cancel, cloneProject, createProject, focus, generate, headOf, ImportError, importProject, listProjects, mapFileOf, progressOf, projectDir, removeProject, setPaused, updateMap, VAULT, type Turn } from "@/lib/vault";
 
 /**
  * The reader's projects (lib/vault.ts): list them, start, import or clone one, regenerate,
@@ -103,6 +103,10 @@ export async function POST(request: Request) {
         if (!str(id)) return bad("bad request");
         setPaused(id as string, paused === true);
         return Response.json({ ok: true });
+      case "focus":
+        // The section the reader opened, written in full next.
+        if (!str(id) || !str(body.section)) return bad("bad request");
+        return Response.json({ ok: focus(id as string, body.section as string) });
       case "cancel":
         if (!str(id)) return bad("bad request");
         cancel(id as string);

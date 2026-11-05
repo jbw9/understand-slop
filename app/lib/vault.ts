@@ -364,7 +364,8 @@ export function generate(id: string, claude?: string, explain?: Explain, full?: 
   const log = openSync(join(dir, "generate.log"), "w");
   const child = spawn(
     process.execPath,
-    [...TSX, "scripts/generate/run.mts", p.root, "--name", id, "--out", dir],
+    // A quick map in a few minutes, then each section written in full in its place (pipeline.ts, --fast).
+    [...TSX, "scripts/generate/run.mts", p.root, "--name", id, "--out", dir, "--fast"],
     {
       cwd: process.cwd(),
       detached: true,
@@ -389,6 +390,18 @@ export function generate(id: string, claude?: string, explain?: Explain, full?: 
     }),
   );
   return getProject(id);
+}
+
+/**
+ * The section the reader has open in a map whose sections are still being
+ * written in full: the generator writes it next (pipeline.ts reads focus.json
+ * before each section it starts). Only while that run is going.
+ */
+export function focus(id: string, section: string): boolean {
+  const p = getProject(id);
+  if (!p || p.map.status !== "generating" || !/^[a-z0-9][a-z0-9-]*$/.test(section)) return false;
+  writeFileSync(join(projectDir(id), "focus.json"), JSON.stringify({ id: section, at: new Date().toISOString() }) + "\n");
+  return true;
 }
 
 export function cancel(id: string) {
@@ -711,6 +724,8 @@ export interface Progress {
   /** When the run entered its current stage. */
   stageAt?: string;
   roots: { id: string; title: string; sub?: string; status: "queued" | "drafting" | "done" | "failed"; detail?: string }[];
+  /** A quick map first, then each section written in full in its place (pipeline.ts, --fast): stage "deepen" is the second part. */
+  fast?: boolean;
   /** While the code is read: every file to read, those read so far in the order they were, and what the last few are for. */
   reading?: { files: string[]; read: string[]; recent: { path: string; purpose: string }[] };
   /** The generator's last line, when it has not written a progress file yet. */

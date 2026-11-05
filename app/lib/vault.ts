@@ -143,7 +143,7 @@ export function markOpened(id: string) {
 
 const git = (root: string, ...args: string[]) => {
   try {
-    return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || undefined;
+    return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], windowsHide: true }).trim() || undefined;
   } catch {
     return undefined;
   }
@@ -631,7 +631,7 @@ export function mapReview(id: string, commit: string, claude?: string): ReviewMa
   const tree = join(projectDir(id), "worktrees", commit);
   const drop = () => {
     try {
-      execFileSync("git", ["-C", p.root, "worktree", "remove", "--force", tree], { stdio: "ignore" });
+      execFileSync("git", ["-C", p.root, "worktree", "remove", "--force", tree], { stdio: "ignore", windowsHide: true });
     } catch {
       rmSync(tree, { recursive: true, force: true });
     }
@@ -641,7 +641,7 @@ export function mapReview(id: string, commit: string, claude?: string): ReviewMa
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   try {
-    execFileSync("git", ["-C", p.root, "worktree", "add", "--detach", tree, commit], { stdio: "ignore", timeout: 120_000 });
+    execFileSync("git", ["-C", p.root, "worktree", "add", "--detach", tree, commit], { stdio: "ignore", timeout: 120_000, windowsHide: true });
   } catch {
     return { status: "failed", error: "Could not check out that commit." };
   }
@@ -650,7 +650,7 @@ export function mapReview(id: string, commit: string, claude?: string): ReviewMa
   for (const f of ["map.json", "base.json", "index.json", ".cache"])
     if (existsSync(join(projectDir(id), f))) cpSync(join(projectDir(id), f), join(out, f), { recursive: true });
   // The worktree is the whole repository; the project may be a folder in it.
-  const sub = execFileSync("git", ["-C", p.root, "rev-parse", "--show-prefix"], { encoding: "utf8" }).trim();
+  const sub = execFileSync("git", ["-C", p.root, "rev-parse", "--show-prefix"], { encoding: "utf8", windowsHide: true }).trim();
   const log = openSync(join(out, "update.log"), "w");
   const child = spawn(process.execPath, [...TSX, "scripts/generate/run.mts", join(tree, sub), "--update", "--out", out], {
     cwd: process.cwd(),

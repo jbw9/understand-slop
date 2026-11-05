@@ -35,7 +35,7 @@ export interface Change {
 
 export const git = (repo: string, ...args: string[]) => {
   try {
-    return execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
+    return execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
   } catch {
     return "";
   }
@@ -62,7 +62,7 @@ export function diffOf(path: string, before: string | null, after: string | null
     writeFileSync(b, after ?? "");
     const run = (u: number) => {
       try {
-        return execFileSync("git", ["diff", "--no-index", "--no-color", `-U${u}`, a, b], { encoding: "utf8", maxBuffer: 64 << 20 });
+        return execFileSync("git", ["diff", "--no-index", "--no-color", `-U${u}`, a, b], { encoding: "utf8", maxBuffer: 64 << 20, windowsHide: true });
       } catch (e: any) {
         // 1 means "they differ", which is the point.
         return String(e.stdout ?? "");
@@ -101,7 +101,7 @@ export function changes(repo: string, commit: string, base: Base): Change[] {
 
 export const hasAt = (repo: string, commit: string, path: string) => {
   try {
-    execFileSync("git", ["-C", repo, "cat-file", "-e", `${commit}:${path}`], { stdio: "ignore" });
+    execFileSync("git", ["-C", repo, "cat-file", "-e", `${commit}:${path}`], { stdio: "ignore", windowsHide: true });
     return true;
   } catch {
     return false;

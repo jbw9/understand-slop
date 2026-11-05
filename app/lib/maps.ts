@@ -205,7 +205,7 @@ export function rootOf(run: Run): string {
 /** The checkout's `origin` as a web address (`git@host:o/r.git` → `https://host/o/r`), if it has one. */
 export function remoteOf(run: Run): string | undefined {
   try {
-    const url = execFileSync("git", ["-C", rootOf(run), "remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const url = execFileSync("git", ["-C", rootOf(run), "remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], windowsHide: true }).trim();
     return url.replace(/^git@([^:]+):/, "https://$1/").replace(/\.git$/, "").replace(/^https:\/\/[^@/]+@/, "https://") || undefined;
   } catch {
     return undefined;

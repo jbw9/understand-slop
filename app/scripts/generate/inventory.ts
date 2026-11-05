@@ -105,7 +105,7 @@ const MARK_DEPS: Record<string, RegExp> = {
 };
 
 function git(repo: string, ...args: string[]) {
-  return execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
+  return execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: 64 << 20, windowsHide: true }).trim();
 }
 
 // A mobile framework, by dependency or by the project files it leaves —

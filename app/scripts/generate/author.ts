@@ -355,7 +355,7 @@ export function runTool(call: { name: string; input: any }, inv: Inventory, know
       args.push("--", String(i.under).replace(/^\.?\//, ""), ":!:**/.env*");
     } else if (reach) args.push("--", ...reach);
     try {
-      const hits = execFileSync("git", args, { encoding: "utf8", maxBuffer: 16 << 20, stdio: ["ignore", "pipe", "pipe"] }).split("\n").filter(Boolean);
+      const hits = execFileSync("git", args, { encoding: "utf8", maxBuffer: 16 << 20, stdio: ["ignore", "pipe", "pipe"], windowsHide: true }).split("\n").filter(Boolean);
       return hits.slice(0, 60).map((h) => h.slice(0, 220)).join("\n") + (hits.length > 60 ? `\n… ${hits.length - 60} more` : "");
     } catch (e: any) {
       return e.status === 1 ? "No matches." : `grep failed: ${String(e.stderr ?? e.message).slice(0, 200)}`;

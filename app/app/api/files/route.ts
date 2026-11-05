@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   const root = rootOf(open.file.RUN);
   let present: string[] = [];
   try {
-    present = execFileSync("git", ["-C", root, "ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] })
+    present = execFileSync("git", ["-C", root, "ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
       .split("\n")
       .filter(Boolean);
   } catch {

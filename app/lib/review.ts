@@ -47,7 +47,7 @@ const PATH = [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin"].filter(Bo
 
 function gh(root: string, args: string[]): string | null {
   try {
-    return execFileSync("gh", args, { cwd: root, encoding: "utf8", env: { ...process.env, PATH }, stdio: ["ignore", "pipe", "pipe"], timeout: 20_000 });
+    return execFileSync("gh", args, { cwd: root, encoding: "utf8", env: { ...process.env, PATH }, stdio: ["ignore", "pipe", "pipe"], timeout: 20_000, windowsHide: true });
   } catch {
     return null;
   }
@@ -95,7 +95,7 @@ export function reviewRange(root: string, spec: string): Review | { error: strin
     const p = JSON.parse(out) as { number: number; title: string; body: string; author?: { login?: string }; url: string; baseRefName: string; headRefName: string; headRefOid: string };
     if (!BRANCH.test(p.baseRefName)) return { error: `Unexpected base branch name on #${p.number}.` };
     try {
-      execFileSync("git", ["-C", root, "fetch", "--no-tags", "--quiet", "origin", `+refs/heads/${p.baseRefName}:refs/remotes/origin/${p.baseRefName}`, `pull/${p.number}/head`], { stdio: "ignore", timeout: 60_000 });
+      execFileSync("git", ["-C", root, "fetch", "--no-tags", "--quiet", "origin", `+refs/heads/${p.baseRefName}:refs/remotes/origin/${p.baseRefName}`, `pull/${p.number}/head`], { stdio: "ignore", timeout: 60_000, windowsHide: true });
     } catch {
       return { error: `Could not fetch #${p.number} from origin.` };
     }

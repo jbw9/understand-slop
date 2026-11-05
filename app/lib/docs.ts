@@ -54,6 +54,7 @@ export function listDocs(root: string): Doc[] {
       encoding: "utf8",
       maxBuffer: 16 << 20,
       stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
     }).split("\0");
   } catch {
     return [];

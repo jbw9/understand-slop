@@ -531,18 +531,19 @@
 .demo {
   position: relative;
 }
-/* As the app comes up from under the cover, it settles into place. */
+/* Where the line ends, the app zooms up out of the page and fades in. */
 @supports (animation-timeline: view()) {
+  .appHead,
   .demo {
-    animation: settle linear both;
+    animation: zoomUp linear both;
     animation-timeline: view();
-    animation-range: entry 0% entry 80%;
+    animation-range: entry 0% cover 40%;
   }
 }
-@keyframes settle {
+@keyframes zoomUp {
   from {
-    transform: scale(0.94);
-    opacity: 0.4;
+    opacity: 0;
+    transform: translateY(80px) scale(0.82);
   }
 }
 .switcher {
@@ -1667,8 +1668,7 @@
   translate: calc(-100% + 110px) -50%;
   text-align: right;
 }
-.stop[data-on="true"],
-.now[data-on="true"] {
+.stop[data-on="true"] {
   opacity: 1;
 }
 .stop img {
@@ -1691,34 +1691,17 @@
   gap: 6px;
   max-width: 19em;
 }
-.stop b,
-.now b {
+.stop b {
   font: 300 clamp(26px, 2.4vw, 36px) / 1.05 var(--display);
   letter-spacing: -0.012em;
 }
-.stop figcaption > span:last-child,
-.now > span:last-child {
+.stop figcaption > span:last-child {
   font-size: 15px;
   line-height: 1.5;
 }
 .stopYear {
   font: 11.5px var(--mono);
   letter-spacing: 0.04em;
-}
-.now {
-  position: absolute;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 19em;
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--strong);
-  background: var(--paper);
-  translate: 24px -50%;
-  opacity: 0.25;
-  transition: opacity 0.6s var(--ease);
 }
 .credits {
   max-width: 80em;
@@ -1889,6 +1872,7 @@
   }
   .rise,
   .reveal,
+  .appHead,
   .demo,
   .down span,
   .ring::after,
@@ -1914,7 +1898,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .stop,
-  .now,
   .stop img {
     opacity: 1;
     transform: none;
@@ -1940,11 +1923,7 @@
   .stop img {
     width: 130px;
   }
-  .stop figcaption,
-  .now {
+  .stop figcaption {
     max-width: 13em;
-  }
-  .now {
-    translate: -60% -50%;
   }
 }

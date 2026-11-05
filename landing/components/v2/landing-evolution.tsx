@@ -12,14 +12,13 @@ const STOPS = [
   { x: 730, y: 1000, pic: "tl-turing", who: "Alan Turing", year: "1936", did: "Described a machine that could run any program written as steps.", tilt: 1.5 },
   { x: 290, y: 1620, pic: "tl-hamilton", who: "Margaret Hamilton", year: "1969", did: "Led the team that wrote Apollo’s flight software. It was printed out, and people read it.", tilt: -1 },
 ];
-const NOW = { x: 640, y: 2080 };
 
 const PATH =
-  "M500 0C500 190 270 190 270 380S730 760 730 1000 290 1380 290 1620 640 1900 640 2080 500 2280 500 2400";
+  "M500 0C500 190 270 190 270 380S730 760 730 1000 290 1380 290 1620 500 2150 500 2400";
 
 /**
  * How we got here: one line drawn down the page as it scrolls, through three
- * people who wrote code by hand, to now, and on into the app below.
+ * people who wrote code by hand, and on into the app below.
  */
 export function LandingEvolution() {
   const box = useRef<HTMLElement>(null);
@@ -73,11 +72,6 @@ export function LandingEvolution() {
             </figcaption>
           </figure>
         ))}
-        <p className={s.now} data-at={NOW.y / 2400} style={at(NOW.x, NOW.y)}>
-          <span className={s.stopYear}>Now</span>
-          <b>You, vibecoding.</b>
-          <span>An agent writes it in minutes, across a dozen files. Nobody reads it.</span>
-        </p>
       </div>
     </section>
   );

@@ -31,6 +31,7 @@ Every colour is a token on `.page`. Use the tokens and never a raw value.
 | `--strong` | ink at 50% | Borders on small boxes and around pictures |
 | `--grid` | ink at 7% | The faint grid behind How it works |
 | `--on-ink` | `#fcfdff` | Text on an ink fill |
+| `--blush` | `#f4a3b4` | The cheeks in the logo, and nowhere else |
 | `--code-*` | ink fill, pale text | Code blocks and the drawn terminal: a solid ink panel |
 
 A selected or hovered control fills with ink, and its text turns `--on-ink`. Text selection is the same.
@@ -82,7 +83,7 @@ When you replace a picture, give the file a new name. Browsers cache by name.
 
 ## The page, top to bottom
 
-1. **Nav.** The wordmark in mono on the left, the section links as small boxed tags in the middle, and Install as an ink button on the right. It sticks to the top in paper at 88% with a blur, and gains a hairline once the page scrolls. It has no theme switch.
+1. **Nav.** The logo (the app icon's drawing, without its paper) and the wordmark in mono on the left, the section links as small boxed tags in the middle, and Install as an ink button on the right. It sticks to the top in paper at 88% with a blur, and gains a hairline once the page scrolls. It has no theme switch.
 2. **Cover** (`landing-cover.tsx`). One screen tall. On the left is a hairline grid with a note card, Adam's hand reaching right, a small ENIAC window and a wireframe globe; a line runs from the fingertip toward the claim. On the right is the claim in light slab: "Understand ✦ the code [Hamilton] you didn't write." Under it is one sentence on what Bluprint does, with two more pictures set in it, then the install line. "Scroll to open the app ↓" sits at the bottom.
 3. **How we got here** (`landing-evolution.tsx`). One wavy line drawn down the sheet as the reader scrolls, through three people, each a tilted plate with a year, a name and one line: Lovelace (1843), Turing (1936) and Karpathy (2025, who coined vibe coding). Keep it to three. The point is a glance, not a history lesson.
 4. **And now there's you.** Uncle Sam points out at the reader from behind the heading. Then comes the live app, which zooms up out of the page as the reader reaches it.

@@ -14,6 +14,7 @@
   --strong: rgba(36, 56, 200, 0.5);
   --grid: rgba(36, 56, 200, 0.07);
   --on-ink: #fcfdff;
+  --blush: #f4a3b4;
   --code-bg: #2438c8;
   --code-ink: #d5dbff;
   --code-key: #ffffff;
@@ -111,9 +112,20 @@
   border-bottom-color: var(--line);
 }
 .mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font: 500 15px var(--mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+.markLogo {
+  width: 42px;
+  height: 30px;
+  fill: currentColor;
+}
+.markLogo .blush {
+  fill: var(--blush);
 }
 .navBar nav {
   display: flex;

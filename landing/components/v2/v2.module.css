@@ -443,9 +443,6 @@
   text-align: left;
   color: var(--muted);
 }
-.startInstall {
-  margin-top: 40px;
-}
 .gh {
   width: 16px;
   height: 16px;

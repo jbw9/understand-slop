@@ -1,4 +1,3 @@
-import { LandingInstall } from "./landing-install";
 import s from "./v2.module.css";
 
 const STEPS = [
@@ -59,9 +58,6 @@ export function LandingStart({ github }: { github: string }) {
             </li>
           ))}
         </ol>
-        <div className={`${s.startInstall} ${s.reveal}`}>
-          <LandingInstall />
-        </div>
         <p className={`${s.cap} ${s.reveal}`}>
           It needs git, Node 20 or newer, Rust and CMake, and tells you if one is missing. The script is{" "}
           <a href={`${github}/blob/main/install.sh`}>install.sh</a>, in <a href={github}>the source on GitHub</a>.

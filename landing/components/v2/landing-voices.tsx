@@ -3,18 +3,15 @@
 import { useEffect, useState } from "react";
 import s from "./v2.module.css";
 
-export interface Source {
-  who: string;
-  work: string;
-  href: string;
-}
-
 export interface Voice {
-  source: Source;
+  /** Where they work, the size of team it happens to. */
+  who: string;
   quote: string;
+  by: string;
 }
 
-const DUR = 2670;
+// Long enough to read the longest quote.
+const DUR = 5000;
 
 /** One big quote at a time, with a bar per quote that fills while it shows. */
 export function LandingVoices({ voices }: { voices: Voice[] }) {
@@ -27,9 +24,10 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
 
   return (
     <section
+      id="why"
       className={s.voices}
       aria-roledescription="carousel"
-      aria-label="What developers say"
+      aria-label="Who this happens to"
       style={{ "--n": voices.length, "--dur": `${DUR}ms` } as React.CSSProperties}
     >
       <div className={`${s.voiceStage} ${s.reveal}`}>
@@ -37,8 +35,8 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
           <figure key={v.quote} className={s.slide} data-on={i === at} aria-hidden={i !== at}>
             <blockquote>{v.quote}</blockquote>
             <figcaption>
-              <b>{v.source.who}</b>
-              <a href={v.source.href}>{v.source.work}</a>
+              <b>{v.by}</b>
+              <span>{v.who}</span>
             </figcaption>
           </figure>
         ))}

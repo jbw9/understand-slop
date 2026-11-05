@@ -8,8 +8,7 @@ import { LandingHow } from "@/components/v2/landing-how";
 import { LandingInstall } from "@/components/v2/landing-install";
 import { LandingNav } from "@/components/v2/landing-nav";
 import { LandingStart } from "@/components/v2/landing-start";
-import { LandingVoices, type Source, type Voice } from "@/components/v2/landing-voices";
-import { LandingWhy } from "@/components/v2/landing-why";
+import { LandingVoices, type Voice } from "@/components/v2/landing-voices";
 import s from "@/components/v2/v2.module.css";
 import { loadMap } from "@/lib/maps";
 
@@ -36,27 +35,15 @@ const DEMOS = [
   { id: "kafka", label: "Kafka control plane" },
 ];
 
-const LEVIN: Source = {
-  who: "Isaac Levin",
-  work: "“Why We Still Need an IDE”, JetBrains",
-  href: "https://blog.jetbrains.com/blog/2026/10/20/why-we-still-need-an-ide/",
-};
-const WITTEVEEN: Source = {
-  who: "Sam Witteveen",
-  work: "“What is the Future of IDEs”",
-  href: "https://www.youtube.com/watch?v=I5VxMzaBD6s",
-};
-const OSMANI: Source = {
-  who: "Addy Osmani",
-  work: "“The 70% problem: Hard truths about AI-assisted coding”",
-  href: "https://addyo.substack.com/p/the-70-problem-hard-truths-about",
-};
-
-// Said in public, word for word, and linked to where.
+// The same problem at every size. John Doe is the page's own voice; the other two are people the team spoke with, by role.
 const VOICES: Voice[] = [
-  { source: WITTEVEEN, quote: "The writing part has gotten cheap. The verification hasn’t." },
-  { source: LEVIN, quote: "If you can’t see what it’s seeing, you’re not actually steering it." },
-  { source: OSMANI, quote: "You’re essentially playing whack-a-mole with code you don’t fully understand." },
+  { who: "Solo developers", quote: "You built it in a weekend. I bet you can’t explain how it works.", by: "John Doe, solo developer" },
+  { who: "Startups", quote: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
+  {
+    who: "Big tech",
+    quote: "Code review is the new bottleneck. Engineers are drowning in reviews, and some have ten or more changes waiting in their queue.",
+    by: "Software Development Manager, Amazon",
+  },
 ];
 
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.
@@ -119,7 +106,6 @@ export default function Landing() {
 
         <div className={s.wrap}>
           <LandingVoices voices={VOICES} />
-          <LandingWhy />
           <LandingHow
             name="flask"
             steps={flask.AUTHORED.map((r) => r.title)}

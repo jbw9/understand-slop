@@ -17,7 +17,7 @@ import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
-import { ccAgent, type Handled } from "./claude-code";
+import { ccAgent, type Handled, type Turn } from "./claude-code";
 import { activeGraph, type Def } from "./graph";
 import { briefCalls, GRAPH_TOOLS, graphTool, isGraphTool, signature } from "./graph-tools";
 import type { Cut, Root } from "./cut";
@@ -38,6 +38,8 @@ export interface Authored {
   trail: Step[];
   /** Required symbols of the files this root explains, and those still unexplained when it was accepted. */
   coverage?: { symbols: number; gaps: { file: string; symbol: Sym }[] };
+  /** Each reply, timed (claude-code.ts, Turn): where the root's minutes went. */
+  log?: Turn[];
 }
 
 /** One agent action, in words: "read app/page.tsx 1-80", and what came of it. */
@@ -510,7 +512,7 @@ export async function authorRoot(
   };
 
   const r = await converse<Authored>({ prompt: brief(root, cut, inv, sums), handle, model, stage: "author", maxTurns: 40, salt: contentKey(root, cut, inv) });
-  return { ...(r.value ?? res), turns: r.turns };
+  return { ...(r.value ?? res), turns: r.turns, log: r.log };
 }
 
 /** How an agent runs, beyond its prompt and tools. The defaults are the author's. */
@@ -535,7 +537,7 @@ interface Agent {
  * author's and the updater's only; its requests are what their caches replay,
  * so it stays as it was.
  */
-export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: number }> {
+export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: number; log: Turn[] }> {
   const nudge = a.nudge ?? "Continue: use the tools, and finish by calling submit.";
   if (BACKEND === "claude-code") {
     // Low. At high one root thought for 32k tokens in a reply; medium halved
@@ -546,11 +548,20 @@ export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: n
   }
 
   const messages: Message[] = [{ role: "user", content: a.prompt }];
+  // Timed as Claude Code's turns are, less finely: a reply here is not streamed
+  // to this loop, so its thinking and writing are one span, `write`, and its
+  // thinking tokens are guessed from the thinking's length.
+  const log: Turn[] = [];
+  let last = Date.now();
   let turns = 0;
   for (; turns < a.maxTurns; turns++) {
+    const asked = Date.now();
     const r = await invoke({ model: a.model, stage: a.stage, effort: "medium", maxTokens: 64000, system: a.system ?? system(), messages: withCacheMark(messages), tools: a.tools ?? AUTHOR_TOOLS });
     messages.push({ role: "assistant", content: r.content });
     const calls = callsOf(r);
+    const thought = r.content.reduce((n, b) => n + (b.type === "thinking" ? String(b.thinking ?? "").length : 0), 0);
+    log.push({ wait: Math.round((asked - last) / 100) / 10, think: 0, write: Math.round((Date.now() - asked) / 100) / 10, out: r.usage.output_tokens, thinking: Math.round(thought / 4), did: calls.map((c) => (c.name !== "submit" ? c.name : (c.input as any)?.root ? "submit" : "fix")) });
+    last = Date.now();
     if (!calls.length) {
       messages.push({ role: "user", content: r.stop_reason === "max_tokens" ? "Your reply was cut off at the token limit. Submit again; keep labels short." : nudge });
       continue;
@@ -558,14 +569,14 @@ export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: n
     const results: Block[] = [];
     for (const c of calls) {
       const h = a.handle(c.name, c.input);
-      if (h.done) return { value: h.done as T, turns };
+      if (h.done) return { value: h.done as T, turns, log };
       // Key order as before, so the requests of maps already made still replay from cache.
       results.push(h.isError ? { type: "tool_result", tool_use_id: c.id, is_error: true, content: h.content } : { type: "tool_result", tool_use_id: c.id, content: h.content });
     }
     if (turns === a.maxTurns - 6) results.push({ type: "text", text: "You are almost out of turns. Submit the complete root now." });
     messages.push({ role: "user", content: results });
   }
-  return { value: null, turns };
+  return { value: null, turns, log };
 }
 
 /* ── large roots: cut into parts, authored in parallel, then joined ── */
@@ -624,10 +635,13 @@ export async function authorSplit(
 ): Promise<Split | null> {
   const inner = scoped(root, cut, inv);
   let sub: Cut;
+  // The cut into parts is a model call the parts all wait on: timed as a turn of its own.
+  const cutAt = Date.now();
   if (keep) {
     const added = unclaimed(keep, inner);
     sub = added.length ? (await place(keep, added, inner, sums, models.cut)).cut : keep;
   } else sub = (await cutRepo(inner, sums, models.cut)).cut;
+  const cutTurn: Turn = { wait: 0, think: 0, write: Math.round((Date.now() - cutAt) / 100) / 10, out: 0, thinking: 0, did: ["cut"], part: "cut" };
   if (sub.roots.length < 2) return null;
   const parts = partsCut(root, sub, cut);
   on.say(`${root.id}: split into ${parts.roots.map((p) => p.id).join(", ")}`);
@@ -654,6 +668,7 @@ export async function authorSplit(
     problems: parts.roots.filter((p) => !done[p.id].root).flatMap((p) => done[p.id].problems.map((x) => `${p.id}: ${x}`)),
     trail: parts.roots.flatMap((p) => done[p.id].trail.map((t) => ({ ...t, what: `${p.id} ${t.what}` }))),
     coverage: { symbols: all.reduce((a, x) => a + (x.coverage?.symbols ?? 0), 0), gaps: all.flatMap((x) => x.coverage?.gaps ?? []) },
+    log: [cutTurn, ...parts.roots.flatMap((p) => (done[p.id].log ?? []).map((t) => ({ ...t, part: p.id })))],
   };
   if (kids.length < 2) {
     total.problems.unshift(`only ${kids.length} of ${parts.roots.length} parts were accepted`);
@@ -663,6 +678,7 @@ export async function authorSplit(
   const joined = await joinParts(root, kids, inv, models.join, on.submit);
   total.turns += joined.turns;
   total.submits += joined.submits;
+  total.log!.push(...joined.log.map((t) => ({ ...t, part: "join" })));
   if (joined.node) total.root = joined.node;
   else total.problems.unshift(...joined.problems.map((x) => `join: ${x}`));
   return { cut: sub, authored: total };
@@ -670,7 +686,7 @@ export async function authorSplit(
 
 /** The root's own level over parts already written: its words and the diagram whose boxes open them. */
 async function joinParts(root: Root, kids: Node[], inv: Inventory, model: string, onSubmit: OnSubmit) {
-  const out = { node: null as Node | null, turns: 0, submits: 0, problems: [] as string[] };
+  const out = { node: null as Node | null, turns: 0, submits: 0, problems: [] as string[], log: [] as Turn[] };
   const describe = (n: Node) => `- ${n.id}: ${n.title} — ${n.sub}\n  ${n.detail ?? ""}\n  its parts: ${(n.children ?? []).map((c) => c.title).join(", ")}`;
   const prompt = [
     `# Repository: ${inv.name}`,
@@ -696,6 +712,7 @@ You see the code only through the graph tools: graph_links from one part's files
   };
   const r = await converse<Node>({ prompt, handle, model, stage: "author-join", maxTurns: 16, salt: createHash("sha256").update(JSON.stringify(kids)).digest("hex") });
   out.turns = r.turns;
+  out.log = r.log;
   out.node = r.value;
   return out;
 }

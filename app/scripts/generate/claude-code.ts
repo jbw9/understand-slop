@@ -15,6 +15,7 @@
  * bills compare. Replies are cached on disk like the API's.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- Claude Code's stream events */
 import spawn from "cross-spawn";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -133,6 +134,71 @@ interface Result {
 
 type Usage = Reply["usage"];
 
+/**
+ * One reply of an agent, timed: what a root's minutes went on. `wait` runs
+ * from the previous reply's end (or the process's start) to this one's first
+ * token: the tool call, Claude Code's own overhead and the model reading its
+ * context. `think` is until the first block that is not thinking, `write`
+ * the rest. `did` names its tool calls; a submit of a whole tree is `submit`,
+ * one that sends only fixes is `fix`.
+ */
+export interface Turn {
+  wait: number;
+  think: number;
+  write: number;
+  out: number;
+  thinking: number;
+  did: string[];
+  /** The part of a split root it belongs to, or `join`. */
+  part?: string;
+}
+
+const secs = (ms: number) => Math.round(ms / 100) / 10;
+
+/** A tool call as `did` names it. */
+function kindOf(name: string, json: string): string {
+  const tool = name.replace(/^mcp__slop__/, "");
+  if (tool !== "submit") return tool;
+  try {
+    return JSON.parse(json || "{}").root ? "submit" : "fix";
+  } catch {
+    return "submit";
+  }
+}
+
+/** Reads Claude Code's raw stream events (--include-partial-messages) into turns as they arrive. */
+function turnReader(log: Turn[]) {
+  let last = Date.now();
+  let cur: { start: number; firstOut: number; out: number; thinking: number; did: string[] } | null = null;
+  const blocks = new Map<number, { name: string; json: string }>();
+  return (e: any) => {
+    if (e?.type !== "stream_event") return;
+    const ev = e.event, now = Date.now();
+    if (ev.type === "message_start") {
+      cur = { start: now, firstOut: 0, out: 0, thinking: 0, did: [] };
+      blocks.clear();
+    } else if (!cur) return;
+    else if (ev.type === "content_block_start") {
+      if (ev.content_block?.type !== "thinking" && ev.content_block?.type !== "redacted_thinking" && !cur.firstOut) cur.firstOut = now;
+      if (ev.content_block?.type === "tool_use") blocks.set(ev.index, { name: ev.content_block.name, json: "" });
+    } else if (ev.type === "content_block_delta" && ev.delta?.type === "input_json_delta") {
+      const b = blocks.get(ev.index);
+      if (b) b.json += ev.delta.partial_json;
+    } else if (ev.type === "content_block_stop") {
+      const b = blocks.get(ev.index);
+      if (b) cur.did.push(kindOf(b.name, b.json));
+    } else if (ev.type === "message_delta") {
+      cur.out = ev.usage?.output_tokens ?? cur.out;
+      cur.thinking = ev.usage?.output_tokens_details?.thinking_tokens ?? cur.thinking;
+    } else if (ev.type === "message_stop") {
+      const first = cur.firstOut || now;
+      log.push({ wait: secs(cur.start - last), think: secs(first - cur.start), write: secs(now - first), out: cur.out, thinking: cur.thinking, did: cur.did });
+      last = now;
+      cur = null;
+    }
+  };
+}
+
 /** What `claude -p` runs used, summed over every run and every model each called. */
 function usageOf(...runs: Result[]): Usage {
   const u = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
@@ -159,8 +225,13 @@ const RETRYABLE = /overloaded|529|500|502|503|rate.?limit|429|ECONNRESET|timed? 
  */
 const ccEffort = (effort?: string) => (effort ? process.env.SLOP_CC_EFFORT ?? effort : undefined);
 
-/** One `claude -p` run, prompt on stdin, retried on transient failures. No effort means no thinking, as on the API path. */
-async function claude(args: string[], prompt: string, stage: string, effort?: string): Promise<Result> {
+/**
+ * One `claude -p` run, prompt on stdin, retried on transient failures. No
+ * effort means no thinking, as on the API path. Given a `log`, the run is
+ * streamed and each of its replies timed into it (turnReader).
+ */
+async function claude(args: string[], prompt: string, stage: string, effort?: string, log?: Turn[]): Promise<Result> {
+  const format = log ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : ["--output-format", "json"];
   const flags = [...args, ...(effort ? ["--effort", effort] : [])];
   return slot(async () => {
     for (let attempt = 0; ; attempt++) {
@@ -170,9 +241,27 @@ async function claude(args: string[], prompt: string, stage: string, effort?: st
         delete env.CLAUDECODE;
         delete env.CLAUDE_CODE_ENTRYPOINT;
         env.MAX_THINKING_TOKENS = effort ? "16000" : "0";
-        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", "--output-format", "json", "--setting-sources", "", "--strict-mcp-config", ...flags], { cwd: cwd(), env, windowsHide: true }) as ChildProcessWithoutNullStreams;
+        const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", ...format, "--setting-sources", "", "--strict-mcp-config", ...flags], { cwd: cwd(), env, windowsHide: true }) as ChildProcessWithoutNullStreams;
         let stdout = "", stderr = "";
-        p.stdout.on("data", (d) => (stdout += d));
+        if (log) {
+          // Read line by line as it comes, so each turn is timed when it happens; stdout keeps only the result.
+          const read = turnReader(log);
+          let rest = "";
+          p.stdout.on("data", (d) => {
+            const lines = (rest + d).split("\n");
+            rest = lines.pop()!;
+            for (const line of lines) {
+              let e: any;
+              try {
+                e = JSON.parse(line);
+              } catch {
+                continue;
+              }
+              if (e?.type === "result") stdout = line;
+              else read(e);
+            }
+          });
+        } else p.stdout.on("data", (d) => (stdout += d));
         p.stderr.on("data", (d) => (stderr += d));
         // A missing binary emits "error", not "close"; unheard, it crashes the run.
         p.on("error", (e) => resolve({ code: null, stdout: "", stderr: String(e) }));
@@ -313,12 +402,13 @@ export async function ccAgent<T>(req: {
   nudge: string;
   /** What the run depends on beyond its prompt, such as the hashes of the files it reads; part of the cache key only. */
   salt?: string;
-}): Promise<{ value: T | null; turns: number; calls: number; usage: Usage }> {
+}): Promise<{ value: T | null; turns: number; calls: number; usage: Usage; log: Turn[] }> {
   const system = systemText(req.system);
   const effort = ccEffort(req.effort);
   const key = keyOf(req.model, effort ?? "", system, req.prompt, JSON.stringify(req.tools), ...(req.salt ? [req.salt] : []));
-  const hit = cached<{ value: T | null; turns: number; calls: number }>(key, req.stage, req.model);
-  if (hit) return hit;
+  const hit = cached<{ value: T | null; turns: number; calls: number; log?: Turn[] }>(key, req.stage, req.model);
+  // A replay took no time; its turns are the ones it was first made in.
+  if (hit) return { ...hit, log: hit.log ?? [] };
 
   const { port } = await mcp();
   const id = randomUUID();
@@ -327,13 +417,14 @@ export async function ccAgent<T>(req: {
   const config = JSON.stringify({ mcpServers: { slop: { type: "http", url: `http://127.0.0.1:${port}/mcp/${id}` } } });
   const allowed = req.tools.map((t) => `mcp__slop__${t.name}`).join(",");
   const runs: Result[] = [];
+  const log: Turn[] = [];
   let turns = 0;
   try {
     let prompt = req.prompt;
     for (let run = 0; run < 3 && session.done === undefined && turns < req.maxTurns; run++) {
       // A nudge continues the same session, reads and all, as the API loop's next turn does.
       const flags = [...base(req.model, system), "--tools", "", "--mcp-config", config, "--allowedTools", allowed, "--max-turns", String(req.maxTurns - turns)];
-      const r = await claude([...flags, ...(run === 0 ? ["--session-id", id] : ["--resume", id])], prompt, req.stage, effort);
+      const r = await claude([...flags, ...(run === 0 ? ["--session-id", id] : ["--resume", id])], prompt, req.stage, effort, log);
       runs.push(r);
       turns += r.num_turns;
       prompt = req.nudge;
@@ -343,7 +434,7 @@ export async function ccAgent<T>(req: {
   }
   const usage = usageOf(...runs);
   chargeUsage(req.stage, req.model, usage, false);
-  const out = { value: (session.done as T | undefined) ?? null, turns, calls: session.calls, usage };
+  const out = { value: (session.done as T | undefined) ?? null, turns, calls: session.calls, usage, log };
   store(key, out);
   return out;
 }

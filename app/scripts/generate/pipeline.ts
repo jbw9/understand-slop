@@ -15,7 +15,7 @@ import { coverage } from "@/lib/coverage";
 import { authorRoot, authorSplit, submitLine, tooBig, type Authored, type OnSubmit } from "./author";
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
-import { ccClose } from "./claude-code";
+import { ccClose, type Turn } from "./claude-code";
 import { arrowStats, check, dedupeIssues, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, place, unclaimed, type Cut } from "./cut";
 import { activeGraph, buildGraph, setGraph, withSummaries } from "./graph";
@@ -78,6 +78,43 @@ export function plain(n: Node): Node {
   const out = { ...n, ...(n.children ? { children: n.children.map(plain) } : {}) };
   delete out.explain;
   return out;
+}
+
+/** Seconds, to one decimal. */
+const tenths = (x: number) => Math.round(x * 10) / 10;
+
+/**
+ * Where one agent's time went, from its timed replies: waiting (tool calls,
+ * Claude Code's overhead, reading context), thinking, writing; and how much
+ * of it came before its first whole submit and after, in repairs.
+ */
+function spanOf(log: Turn[]) {
+  const sum = (f: (t: Turn) => number, ts = log) => tenths(ts.reduce((a, t) => a + f(t), 0));
+  const all = (t: Turn) => t.wait + t.think + t.write;
+  const first = log.findIndex((t) => t.did.includes("submit"));
+  return {
+    turns: log.length,
+    seconds: sum(all),
+    wait: sum((t) => t.wait),
+    think: sum((t) => t.think),
+    write: sum((t) => t.write),
+    out: sum((t) => t.out),
+    thinking: sum((t) => t.thinking),
+    toFirstSubmit: first < 0 ? null : sum(all, log.slice(0, first + 1)),
+    repairTurns: first < 0 ? 0 : log.length - first - 1,
+  };
+}
+
+/** A root's timing: one agent's span, or a split root's cut into parts, the parts (run side by side), and its join. */
+function timingOf(log: Turn[]) {
+  if (!log.some((t) => t.part)) return spanOf(log);
+  const parts: Record<string, Turn[]> = {};
+  for (const t of log) (parts[t.part!] ??= []).push(t);
+  const spans = Object.fromEntries(Object.entries(parts).map(([k, ts]) => [k, spanOf(ts)]));
+  // The cut, then the parts side by side, then the join: one after another.
+  const { join, cut, ...rest } = spans;
+  const wall = tenths((cut?.seconds ?? 0) + Math.max(0, ...Object.values(rest).map((x) => x.seconds)) + (join?.seconds ?? 0));
+  return { ...spanOf(log), wall, parts: spans };
 }
 
 export async function main(args: string[]) {
@@ -384,6 +421,7 @@ export async function main(args: string[]) {
       submits: authored[r.id].submits,
       lastProblems: authored[r.id].root ? [] : authored[r.id].problems.slice(0, 20),
       ...(authored[r.id].coverage ? { coverage: { symbols: authored[r.id].coverage!.symbols, unexplained: authored[r.id].coverage!.gaps.length } } : {}),
+      ...(authored[r.id].log?.length ? { timing: timingOf(authored[r.id].log!), log: authored[r.id].log } : {}),
     })),
     check: { problems: final.problems, depth: final.roots },
     graph: { ...activeGraph()!.stats, defs: activeGraph()!.defs.length, edges: activeGraph()!.edges.length },
@@ -396,6 +434,13 @@ export async function main(args: string[]) {
   );
   console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, ${covered.explained}/${covered.symbols} symbols explained, ${report.arrows.inferred}/${report.arrows.total} arrows inferred, $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));
+  // Where the writing stage's minutes went, root by root (replayed roots have no log).
+  const timed = report.roots.flatMap((r) => (r.timing ? [{ id: r.id, ...r.timing }] : []));
+  if (timed.length) {
+    console.log(`\nauthor time by root (s): turns · wait / think / write · out tok (thinking) · to first submit · repair turns`);
+    for (const t of timed.sort((a, b) => ("wall" in b ? b.wall : b.seconds) - ("wall" in a ? a.wall : a.seconds)))
+      console.log(`  ${t.id.padEnd(22)} ${String("wall" in t ? `${t.wall} wall` : t.seconds).padStart(9)} · ${t.turns} turns · ${t.wait} / ${t.think} / ${t.write} · ${t.out} (${t.thinking}) · ${t.toFirstSubmit ?? "never"} · ${t.repairTurns}`);
+  }
   // A whole map asked for every reply it still needs; the rest can never replay.
   if (!only) {
     const swept = sweepCache();

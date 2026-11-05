@@ -703,8 +703,8 @@ export function Workspace() {
   );
 
   useEffect(() => {
-    // Opening an empty panel gives a plain terminal; an agent is one menu pick or Ctrl+Shift+T away.
-    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(null));
+    // Opening an empty panel starts the default agent; a plain terminal is one menu pick or Ctrl+T away.
+    const toggle = () => (open && panel.length ? show(false) : panel.length ? show(true) : add(main));
     // Asked for from the map: a tab running Claude, shown; or a new one.
     const toClaude = () => {
       const last = (current?.live ? current : undefined) ?? (upFront?.live ? upFront : undefined) ?? mine.findLast((t) => t.live);

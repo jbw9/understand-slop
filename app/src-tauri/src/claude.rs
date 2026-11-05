@@ -53,6 +53,9 @@ const PLAN: &str = r#"f="$SLOP_CONTEXT"; cat > "$f.plan.part" && mv "$f.plan.par
 /// ExitPlanMode only runs once the user has accepted the plan, in the terminal
 /// or from the plan's own tab.
 const APPROVED: &str = r#": > "$SLOP_CONTEXT.approved""#;
+/// Said to Claude as the accepted plan comes back to it: on a long build it
+/// loses its place without a list to tick off, so it writes one first.
+const TODOS: &str = r#"printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"The plan is accepted. Before you change any file, turn its Steps into a to-do list with your to-do tool, one item per step plus a last item for its Check. Work through the list in order: mark an item in progress as you start it and done as soon as it is, and add an item when the work turns up one the plan missed."}}'"#;
 
 /// Claude Code's own dialog shows the plan as its file reads once the hooks
 /// have run, and the plan's tab is where it is read: its diagrams are JSON in
@@ -694,7 +697,7 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             ],
             "PostToolUse": [
                 { "matcher": EDITING_TOOLS, "hooks": [hook(EDITED)] },
-                { "matcher": "ExitPlanMode", "hooks": [hook(APPROVED)] },
+                { "matcher": "ExitPlanMode", "hooks": [hook(APPROVED), hook(TODOS)] },
                 { "hooks": [hook(RESTORE), status("working")] }
             ],
             "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [status("waiting")] }],
@@ -1093,6 +1096,11 @@ mod tests {
         run(APPROVED, &q);
         assert!(take_approved(&q));
         assert!(!take_approved(&q));
+
+        // What Claude hears on acceptance must be JSON Claude Code can read.
+        let said = Command::new("sh").args(["-c", TODOS]).output().unwrap();
+        let said: serde_json::Value = serde_json::from_slice(&said.stdout).unwrap();
+        assert!(said["hookSpecificOutput"]["additionalContext"].as_str().unwrap().contains("to-do list"));
     }
 
     /// The launcher as a tab runs it, with `bin` standing in for Claude.

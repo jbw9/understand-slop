@@ -18,9 +18,9 @@
 import spawn from "cross-spawn";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { cacheFile, chargeUsage, slot, type Message, type Reply, type Tool } from "./bedrock";
 
@@ -33,6 +33,55 @@ const CC_MODEL: Record<string, string> = {
 const ccModel = (model: string) => CC_MODEL[model] ?? model;
 
 /**
+ * Where Claude Code keeps the sessions of runs started in `dir`: the agent
+ * loop's calls must keep theirs (a nudge `--resume`s it), and each run's
+ * scratch is a new path, so nothing would ever read or remove them.
+ */
+const SESSIONS = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
+const sessionsOf = (dir: string) => join(SESSIONS, dir.replace(/[^a-zA-Z0-9]/g, "-"));
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+};
+
+/**
+ * What runs that could not clean up left: killed outright (Windows' taskkill
+ * runs no handlers, nor does SIGKILL), or from before sessions were removed.
+ * A scratch whose owner is gone goes; a scratch without an owner file is left,
+ * as it may be a run of an older build still going. Sessions go once their
+ * scratch is gone.
+ */
+function sweepStale() {
+  const live = new Set<string>();
+  try {
+    for (const name of readdirSync(tmpdir())) {
+      if (!name.startsWith("slop-cc-")) continue;
+      const dir = join(tmpdir(), name);
+      let owner: number | undefined;
+      try {
+        owner = Number(readFileSync(join(dir, "owner"), "utf8"));
+      } catch {
+        /* no owner file */
+      }
+      if (owner && !alive(owner)) rmSync(dir, { recursive: true, force: true });
+      else live.add(name.slice("slop-cc-".length));
+    }
+    if (!existsSync(SESSIONS)) return;
+    for (const name of readdirSync(SESSIONS)) {
+      const m = /-slop-cc-([a-zA-Z0-9]+)(?:-work)?$/.exec(name);
+      if (m && !live.has(m[1])) rmSync(join(SESSIONS, name), { recursive: true, force: true });
+    }
+  } catch {
+    /* tidying only: a run never fails over it */
+  }
+}
+
+/**
  * The run's scratch directory: an empty `work` folder to run in (no project
  * CLAUDE.md, no repository for Claude Code's own tools to wander) and, beside
  * it, the system prompts handed over as files.
@@ -40,10 +89,17 @@ const ccModel = (model: string) => CC_MODEL[model] ?? model;
 let scratchDir: string | undefined;
 const scratch = () => {
   if (scratchDir) return scratchDir;
+  sweepStale();
   scratchDir = mkdtempSync(join(tmpdir(), "slop-cc-"));
+  writeFileSync(join(scratchDir, "owner"), String(process.pid));
   mkdirSync(join(scratchDir, "work"));
+  // Claude Code names its sessions folder from the real path (macOS's tmpdir is a symlink).
+  const work = realpathSync(join(scratchDir, "work"));
   // Removed however the run ends: done, failed, or stopped by the app (SIGTERM).
-  const remove = () => rmSync(scratchDir!, { recursive: true, force: true });
+  const remove = () => {
+    rmSync(scratchDir!, { recursive: true, force: true });
+    rmSync(sessionsOf(work), { recursive: true, force: true });
+  };
   process.once("exit", remove);
   for (const sig of ["SIGTERM", "SIGINT"] as const)
     process.once(sig, () => {

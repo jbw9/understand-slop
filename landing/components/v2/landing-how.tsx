@@ -149,7 +149,9 @@ function Chart({ d, still, target }: { d: Diagram; still?: boolean; target?: str
   const at = new Map(d.boxes.map((b) => [b.id, { x: 1 + b.col * (BW + GX), y: 1 + b.row * (bh + GY) }]));
   const w = cols * BW + (cols - 1) * GX + 2;
   const h = rows * bh + (rows - 1) * GY + 2;
-  const fade = still ? {} : { className: s.in, "data-in": "" };
+  // Each box fades in, then the arrow that reaches it: box, arrow, box, arrow.
+  const nth = new Map(d.boxes.map((b, i) => [b.id, i]));
+  const fade = (order: number) => (still ? {} : { className: s.in, "data-in": "", "data-order": order });
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className={s.chart}>
       <defs>
@@ -178,7 +180,7 @@ function Chart({ d, still, target }: { d: Diagram; still?: boolean; target?: str
           label = { x: gx + 7, y: f.y + bh + GY / 2 + 4, anchor: "start" };
         }
         return (
-          <g key={a.from + a.to} {...fade}>
+          <g key={a.from + a.to} {...fade(2 * Math.max(nth.get(a.from)!, nth.get(a.to)!) + 1)}>
             <path d={path} markerEnd="url(#how-arrow)" />
             <text x={label.x} y={label.y} textAnchor={label.anchor}>
               {a.label}
@@ -186,10 +188,10 @@ function Chart({ d, still, target }: { d: Diagram; still?: boolean; target?: str
           </g>
         );
       })}
-      {d.boxes.map((b) => {
+      {d.boxes.map((b, i) => {
         const { x, y } = at.get(b.id)!;
         return (
-          <g key={b.id} {...fade} data-box="" data-target={b.id === target ? "" : undefined}>
+          <g key={b.id} {...fade(2 * i)} data-box="" data-target={b.id === target ? "" : undefined}>
             <rect x={x} y={y} width={BW} height={bh} />
             <text x={x + BW / 2} y={b.sub ? y + 25 : y + bh / 2 + 5} textAnchor="middle">
               {b.label}
@@ -235,7 +237,9 @@ function play(box: HTMLElement) {
     while (!seen && id === run) await new Promise<void>((r) => (wake = r));
     if (id !== run) throw new Error("stale");
   };
-  const ins = (win: HTMLElement) => [...win.querySelectorAll<HTMLElement>("[data-in]")];
+  // In the order a diagram asks for, where it gives one; arrows sit first in its markup, under the boxes.
+  const ins = (win: HTMLElement) =>
+    [...win.querySelectorAll<HTMLElement>("[data-in]")].sort((a, b) => Number(a.dataset.order ?? 0) - Number(b.dataset.order ?? 0));
   const parts = (win: HTMLElement) => ({
     view: win.querySelector<HTMLElement>("[data-view]")!,
     cur: win.querySelector<HTMLElement>("[data-cur]"),

@@ -1139,9 +1139,10 @@
 .code {
   margin: 0;
   padding: 14px 0;
-  background: var(--code-bg);
+  border: 1px solid var(--line);
+  background: var(--paper);
   font: 13px/2.1 var(--mono);
-  color: var(--code-ink);
+  color: var(--ink);
   overflow: hidden;
 }
 .code > span {
@@ -1153,12 +1154,11 @@
   display: inline-block;
   width: 38px;
   font-style: normal;
-  color: var(--code-num);
+  color: var(--faint);
   user-select: none;
 }
 .code b {
-  font-weight: 500;
-  color: var(--code-key);
+  font-weight: 600;
 }
 .in {
   opacity: 0;

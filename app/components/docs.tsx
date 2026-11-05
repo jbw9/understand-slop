@@ -304,7 +304,7 @@ export function DocView({ file, line }: { file: string; line?: number }) {
     const at = [...root.querySelectorAll<HTMLElement>("[data-line]")].filter((el) => Number(el.dataset.line) <= line).pop();
     if (!at) return;
     at.scrollIntoView({ block: "start" });
-    const ring = getComputedStyle(document.documentElement).getPropertyValue("--color-mint-success").trim();
+    const ring = getComputedStyle(document.documentElement).getPropertyValue("--color-accent-surface").trim();
     at.animate([{ backgroundColor: ring }, { backgroundColor: "transparent" }], { duration: 2400, easing: "ease-out" });
   }, [text, line]);
 
@@ -348,7 +348,7 @@ export function DocView({ file, line }: { file: string; line?: number }) {
                         scrollToHeading(article.current, h.id);
                       }}
                       className={cn(
-                        "block truncate rounded-[2px] py-1 text-[12.5px] text-muted-slate hover:text-ink",
+                        "block truncate py-1 text-[12.5px] text-muted-slate hover:text-ink",
                         h.depth === 3 && "pl-3 text-[12px]",
                       )}
                       title={h.label}

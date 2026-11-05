@@ -47,7 +47,7 @@ export function StatusBar() {
   const covered = useMemo(() => (files?.index ? coverage(files.index, L0) : null), [files, L0]);
 
   return (
-    <footer data-chrome className="flex h-6 shrink-0 select-none items-center gap-0.5 border-t border-border-gray bg-surface-container-low px-2 text-[11.5px] text-muted-slate">
+    <footer data-chrome="bar" className="flex h-6 shrink-0 select-none items-center gap-0.5 border-t border-border-gray bg-surface-container-low px-2 text-[11.5px] text-muted-slate">
       <Item title="The commit this map describes" mono>
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
           <circle cx="8" cy="8" r="2.5" />
@@ -126,7 +126,7 @@ function Item({
   className?: string;
 }) {
   const cls = cn(
-    "flex h-full shrink-0 items-center gap-1.5 rounded-[2px] px-1.5",
+    "flex h-full shrink-0 items-center gap-1.5 px-1.5",
     mono && "font-mono text-[11px]",
     onClick && "cursor-pointer hover:bg-surface-container hover:text-ink",
     className,
@@ -278,7 +278,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
             setUnfollowed(false);
             openProjects(root);
           }}
-          className="shrink-0 cursor-pointer text-deep-green underline"
+          className="shrink-0 cursor-pointer text-accent underline"
         >
           Import to keep it updated
         </button>
@@ -298,7 +298,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
         <button
           type="button"
           onClick={() => follow(behind.join("\n"))}
-          className="shrink-0 cursor-pointer text-deep-green underline"
+          className="shrink-0 cursor-pointer text-accent underline"
         >
           Update now
         </button>
@@ -310,7 +310,7 @@ function MapUpdates({ id, root, local }: { id: string; root?: string; local: boo
       title={u.status === "failed" ? u.error : what}
       className={cn(
         "mr-2 flex min-w-0 max-w-[420px] items-center gap-1.5 truncate",
-        u.status === "failed" ? "text-clay-ink" : u.status === "running" ? "text-amber-ink" : "text-deep-green",
+        u.status === "failed" ? "text-clay-ink" : u.status === "running" ? "text-amber-ink" : "text-accent",
       )}
     >
       {u.status === "running" ? <span aria-hidden className="size-[7px] shrink-0 animate-pulse rounded-full bg-amber-ink" /> : null}

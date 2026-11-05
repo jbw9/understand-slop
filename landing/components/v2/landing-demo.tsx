@@ -83,10 +83,10 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const guide = useRef<Tour>(null);
   const shownMap = useRef(open);
 
-  // The page is always the white sheet, so the app in it is always light, whatever the reader picked in the app.
+  // The page is always the white sheet, so the app in it is always Classic, the sheet's own cobalt, whatever the reader picked in the app.
   const light = () => {
     try {
-      frame.current!.contentDocument!.documentElement.dataset.theme = "light";
+      frame.current!.contentDocument!.documentElement.dataset.theme = "classic";
     } catch {}
   };
 

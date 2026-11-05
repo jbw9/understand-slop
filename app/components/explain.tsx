@@ -62,7 +62,7 @@ export function ExplainToggle() {
       onClick={() => set(!on)}
       aria-pressed={on}
       title={on ? "Hide the plain-words explanations" : "Show plain-words explanations for someone new to this"}
-      className={on ? "border-mint-line bg-mint-success text-deep-green hover:border-mint-line hover:bg-mint-success hover:text-deep-green" : undefined}
+      className={on ? "border-accent-line bg-accent-surface text-accent hover:border-accent-line hover:bg-accent-surface hover:text-accent" : undefined}
     >
       <span aria-hidden className="text-[13px] leading-none">{on ? "◉" : "○"}</span>
       Explain
@@ -90,8 +90,8 @@ function settled(b: Anatomy): Anatomy {
  */
 export function Explainer({ owner, explain, ctx }: { owner: string; explain: ExplainerData; ctx: RowCtx }) {
   return (
-    <section data-pick="In plain words" data-pick-text={explain.body} className="border-l-2 border-mint-line pl-5">
-      <Eyebrow className="text-deep-green">In plain words</Eyebrow>
+    <section data-pick="In plain words" data-pick-text={explain.body} className="border-l-2 border-accent-line pl-5">
+      <Eyebrow className="text-accent">In plain words</Eyebrow>
       <div className="max-w-[720px]">
         {explain.body.split(/\n\s*\n/).map((para, i) => (
           <p key={i} className="mt-3 text-[14.5px] leading-[1.65] text-on-surface">
@@ -141,10 +141,10 @@ export function StartHere({
 function Walk({ walkthrough, onOpen }: { walkthrough?: Walkthrough; onOpen: (path: string[]) => void }) {
   const { nodeAt } = useMap();
   return (
-    <section data-pick="Start here" className="border-l-2 border-mint-line pl-5">
+    <section data-pick="Start here" className="border-l-2 border-accent-line pl-5">
       {walkthrough ? (
         <div>
-          <Eyebrow className="text-deep-green">Follow one thing through</Eyebrow>
+          <Eyebrow className="text-accent">Follow one thing through</Eyebrow>
           <p className="mt-2 text-[17px] font-semibold tracking-[-0.01em] text-ink">{walkthrough.title}</p>
           <ol className="mt-4 flex max-w-[820px] flex-col">
             {walkthrough.steps.map((s, i) => {
@@ -153,7 +153,7 @@ function Walk({ walkthrough, onOpen }: { walkthrough?: Walkthrough; onOpen: (pat
               return (
                 <li key={i} className="flex gap-3.5">
                   <div className="flex w-[22px] shrink-0 flex-col items-center pt-[11px]">
-                    <span className="flex size-[22px] items-center justify-center rounded-full border border-mint-line bg-mint-success font-mono text-[10.5px] font-semibold text-deep-green">
+                    <span className="flex size-[22px] items-center justify-center rounded-full border border-accent-line bg-accent-surface font-mono text-[10.5px] font-semibold text-accent">
                       {i + 1}
                     </span>
                     {last ? null : <span className="mt-1 w-px flex-1 bg-border-strong" />}
@@ -161,13 +161,13 @@ function Walk({ walkthrough, onOpen }: { walkthrough?: Walkthrough; onOpen: (pat
                   <button
                     onClick={() => onOpen(s.path)}
                     className={cn(
-                      "group min-w-0 flex-1 rounded-[3px] px-3 py-2.5 text-left transition-colors hover:bg-surface-container-low",
+                      "group min-w-0 flex-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-container-low",
                       last ? "" : "mb-1",
                     )}
                   >
                     <span className="flex items-baseline gap-2">
                       <span className="text-[14px] font-semibold text-ink">{s.title}</span>
-                      <span className="ml-auto shrink-0 truncate text-[11.5px] text-faint group-hover:text-deep-green">
+                      <span className="ml-auto shrink-0 truncate text-[11.5px] text-faint group-hover:text-accent">
                         {where.join(" › ")} ›
                       </span>
                     </span>
@@ -306,7 +306,7 @@ function AlsoExplained({ file, start, end, onGo }: { file: string; start: number
     <p className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
       <span className="text-faint">Also explained in</span>
       {others.slice(0, 4).map((p) => (
-        <button key={p.join("/")} type="button" onClick={() => (goTo(p), onGo())} className="cursor-pointer text-deep-green hover:underline">
+        <button key={p.join("/")} type="button" onClick={() => (goTo(p), onGo())} className="cursor-pointer text-accent hover:underline">
           {trail(p)}
         </button>
       ))}

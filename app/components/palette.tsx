@@ -15,6 +15,7 @@ import { openFiles, useCitations, useFiles, useTrail } from "@/components/files"
 import { toggleWorkspace } from "@/components/workspace";
 import { DocIcon, openDoc, useDocList } from "@/components/docs";
 import { openSettings, readSettings, saveSettings } from "@/lib/settings";
+import type { Theme } from "@/lib/theme";
 import { startDictation } from "@/lib/dictate";
 import type { Node } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -184,7 +185,7 @@ export function Palette() {
   );
 
   const actions = useMemo<Item[]>(() => {
-    const theme = (t: "light" | "dark" | "system") => () => saveSettings({ ...readSettings(), theme: t });
+    const theme = (t: Theme) => () => saveSettings({ ...readSettings(), theme: t });
     return [
       { key: "a:back", label: "Go back a level", kind: "action", kbd: "Esc", run: () => path.length && goTo(path.slice(0, -1)) },
       { key: "a:workspace", label: "Toggle Claude Code & terminal", kind: "action", kbd: "Ctrl+`", run: toggleWorkspace },
@@ -201,9 +202,9 @@ export function Palette() {
       { key: "a:settings", label: "Settings", kind: "action", run: openSettings },
       // After the palette has closed, so the words go to Claude's prompt rather than the palette's field.
       { key: "a:dictate", label: "Dictate on this machine", hint: "Speak, then done; or hold the key", kind: "action", kbd: "Hold ⌃⌥", run: () => setTimeout(startDictation) },
+      { key: "a:classic", label: "Theme: classic", hint: "Cobalt ink, as on the landing page", kind: "action", run: theme("classic") },
       { key: "a:light", label: "Theme: light", kind: "action", run: theme("light") },
       { key: "a:dark", label: "Theme: dark", kind: "action", run: theme("dark") },
-      { key: "a:system", label: "Theme: follow the system", kind: "action", run: theme("system") },
     ];
   }, [map.name, path]);
 
@@ -288,7 +289,7 @@ export function Palette() {
       <div
         role="dialog"
         aria-label="Go to"
-        className="flex h-fit max-h-[60vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[4px] border border-border-strong bg-pure-white shadow-lift"
+        className="flex h-fit max-h-[60vh] w-full max-w-[600px] flex-col overflow-hidden border border-border-strong bg-card shadow-lift"
       >
         <input
           ref={input}

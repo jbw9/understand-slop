@@ -155,7 +155,7 @@ export function DiffPanel() {
         <header className="flex shrink-0 items-center gap-3 border-b border-border-gray px-4 py-2.5">
           <h2 className="text-[14px] font-semibold text-ink">History</h2>
           <span className="min-w-0 flex-1 truncate text-[12px] text-muted-slate">{caption}</span>
-          <div role="group" aria-label="Diff layout" className="flex shrink-0 rounded-[3px] border border-border-gray p-0.5">
+          <div role="group" aria-label="Diff layout" className="flex shrink-0 border border-border-gray p-0.5">
             {(["split", "inline"] as const).map((v) => (
               <button
                 key={v}
@@ -163,8 +163,8 @@ export function DiffPanel() {
                 aria-pressed={view === v}
                 onClick={() => setViewKept(v)}
                 className={cn(
-                  "cursor-pointer rounded-[2px] px-2 py-0.5 text-[11.5px]",
-                  view === v ? "bg-deep-green/15 text-ink" : "text-muted-slate hover:text-ink",
+                  "cursor-pointer px-2 py-0.5 text-[11.5px]",
+                  view === v ? "bg-accent/15 text-ink" : "text-muted-slate hover:text-ink",
                 )}
               >
                 {v === "split" ? "Side by side" : "Inline"}
@@ -175,7 +175,7 @@ export function DiffPanel() {
             type="button"
             onClick={() => setShown(false)}
             title="Close this and keep the map coloured by what changed"
-            className="shrink-0 cursor-pointer rounded-[2px] px-2 py-1 text-[12px] text-deep-green hover:bg-surface-container-low"
+            className="shrink-0 cursor-pointer px-2 py-1 text-[12px] text-accent hover:bg-surface-container-low"
           >
             See it on the map
           </button>
@@ -185,7 +185,7 @@ export function DiffPanel() {
               d.off();
               setShown(false);
             }}
-            className="shrink-0 cursor-pointer rounded-[2px] px-2 py-1 text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+            className="shrink-0 cursor-pointer px-2 py-1 text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
           >
             Leave diff
           </button>
@@ -193,7 +193,7 @@ export function DiffPanel() {
             type="button"
             aria-label="Close"
             onClick={() => setShown(false)}
-            className="shrink-0 cursor-pointer rounded-[2px] px-1.5 py-0.5 text-[15px] leading-none text-muted-slate hover:bg-surface-container-low hover:text-ink"
+            className="shrink-0 cursor-pointer px-1.5 py-0.5 text-[15px] leading-none text-muted-slate hover:bg-surface-container-low hover:text-ink"
           >
             ×
           </button>
@@ -209,7 +209,7 @@ export function DiffPanel() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Filter commits by message, author or sha"
                 aria-label="Filter commits"
-                className="mt-2 w-full rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1.5 text-[12px] text-ink placeholder:text-faint focus:border-deep-green focus:outline-none"
+                className="mt-2 w-full border border-border-gray bg-card px-2.5 py-1.5 text-[12px] text-ink placeholder:text-faint focus:border-accent focus:outline-none"
               />
             </div>
             <div
@@ -270,7 +270,7 @@ export function DiffPanel() {
                             compare(c);
                           }}
                           title={`Compare ${c.short} with ${anchor.short}`}
-                          className="absolute right-2 top-1/2 hidden -translate-y-1/2 cursor-pointer rounded-[2px] border border-border-strong bg-pure-white px-1.5 py-0.5 text-[10.5px] text-ink shadow-sm hover:border-deep-green group-hover:block"
+                          className="absolute right-2 top-1/2 hidden -translate-y-1/2 cursor-pointer border border-border-strong bg-card px-1.5 py-0.5 text-[10.5px] text-ink shadow-sm hover:border-accent group-hover:block"
                         >
                           ⇄ Compare with {anchor.short}
                         </button>
@@ -337,7 +337,7 @@ export function DiffPanel() {
                     {/* A file-level answer never pretends to be a section-level one. */}
                     <h3 className="mt-6 text-[12px] font-medium text-muted-slate">Files — pick one to read its lines</h3>
                     {diff.files.length ? (
-                      <div className="mt-1.5 overflow-hidden rounded-[3px] border border-border-gray">
+                      <div className="mt-1.5 overflow-hidden border border-border-gray">
                         {diff.files.map((f) => (
                           <FileRow key={f.path} file={f} flat onPick={() => setFile(f.path)} />
                         ))}
@@ -362,7 +362,7 @@ export function DiffPanel() {
 /* ── reviews ─────────────────────────────────────────────────── */
 
 const SELECT =
-  "w-full rounded-[2px] border border-border-gray bg-pure-white px-2 py-1.5 text-[12px] text-ink focus:border-deep-green focus:outline-none";
+  "w-full border border-border-gray bg-card px-2 py-1.5 text-[12px] text-ink focus:border-accent focus:outline-none";
 
 /**
  * Something to review as one change: a pull request or a branch, from where
@@ -423,7 +423,7 @@ function ReviewPicker({ map, value, onPick }: { map: string; value?: string; onP
 /** What is under review: the pull request as its author described it, the branch and its base, or the turn's prompt. */
 function ReviewCard({ r, map, spec, onMapped }: { r: Review; map: string; spec?: string; onMapped: () => void }) {
   return (
-    <div className="mt-3 rounded-[3px] border border-border-gray px-3 py-2">
+    <div className="mt-3 border border-border-gray px-3 py-2">
       {r.kind !== "turn" && spec ? <MapAfter key={spec} map={map} spec={spec} commit={r.to} pr={r.kind === "pr"} onMapped={onMapped} /> : null}
       {r.kind === "pr" ? (
         <>
@@ -436,7 +436,7 @@ function ReviewCard({ r, map, spec, onMapped }: { r: Review; map: string; spec?:
             {r.url ? (
               <>
                 {" · "}
-                <a href={r.url} target="_blank" rel="noreferrer" className="text-deep-green hover:underline">
+                <a href={r.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
                   on GitHub
                 </a>
               </>
@@ -490,7 +490,7 @@ function UndoTurn({ map, turn, onUndone }: { map: string; turn: string; onUndone
       );
     }
   };
-  const btn = "cursor-pointer rounded-[2px] px-2 py-0.5 text-[12px]";
+  const btn = "cursor-pointer px-2 py-0.5 text-[12px]";
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2">
       {stage === "idle" ? (
@@ -500,7 +500,7 @@ function UndoTurn({ map, turn, onUndone }: { map: string; turn: string; onUndone
       ) : stage === "confirm" ? (
         <>
           <span className="text-[12px] text-ink">Put every file this turn edited back as it was?</span>
-          <button type="button" onClick={() => void go()} className={cn(btn, "bg-deep-green text-pure-white hover:opacity-90")}>
+          <button type="button" onClick={() => void go()} className={cn(btn, "bg-accent text-card hover:opacity-90")}>
             Undo
           </button>
           <button type="button" onClick={() => setStage("idle")} className={cn(btn, "text-muted-slate hover:text-ink")}>
@@ -558,12 +558,12 @@ function MapAfter({ map, spec, commit, pr, onMapped }: { map: string; spec: stri
   return (
     <p className="mb-1.5 flex items-center gap-2 text-[11.5px] text-muted-slate">
       {s.status === "done" ? (
-        <span className="text-deep-green">The map after {pr ? "this PR" : "this branch"} is drawn: its levels diff box by box.</span>
+        <span className="text-accent">The map after {pr ? "this PR" : "this branch"} is drawn: its levels diff box by box.</span>
       ) : s.status === "running" ? (
         <span className="text-amber-ink">Mapping {pr ? "this PR" : "this branch"}… a few minutes</span>
       ) : (
         <>
-          <button type="button" onClick={() => void start()} className="cursor-pointer text-deep-green underline">
+          <button type="button" onClick={() => void start()} className="cursor-pointer text-accent underline">
             Map {pr ? "this PR" : "this branch"}
           </button>
           <span>to see its new and changed boxes, not only which levels it reaches (an update run)</span>
@@ -584,7 +584,7 @@ function Outside({ outside, title, onOpen }: { outside: NonNullable<MapDiff["out
           <li key={o.path} className="flex items-baseline gap-2 text-[11.5px]">
             <span className="min-w-0 flex-1 truncate font-mono text-on-surface">{o.path}</span>
             {o.near ? (
-              <button type="button" onClick={() => onOpen(o.near!)} className="max-w-[50%] shrink-0 cursor-pointer truncate text-deep-green hover:underline">
+              <button type="button" onClick={() => onOpen(o.near!)} className="max-w-[50%] shrink-0 cursor-pointer truncate text-accent hover:underline">
                 near {o.near.map((_, i) => title(o.near!.slice(0, i + 1))).join(" › ")}
               </button>
             ) : (
@@ -621,7 +621,7 @@ function Row({
       onClick={onPick}
       className={cn(
         "group relative flex cursor-pointer select-none items-stretch gap-2 pr-3",
-        on ? "bg-deep-green/15" : soft ? "bg-deep-green/[0.06]" : "hover:bg-surface-container-low/60",
+        on ? "bg-accent/15" : soft ? "bg-accent/[0.06]" : "hover:bg-surface-container-low/60",
       )}
     >
       {children}
@@ -641,8 +641,8 @@ function Rail({ dot, first, last }: { dot?: "on" | "off" | "merge"; first?: bool
         <span
           className={cn(
             "absolute left-1/2 top-[11px] size-[9px] -translate-x-1/2 rounded-full border-2",
-            dot === "merge" ? "size-[11px] border-double border-[3px] border-deep-green bg-pure-white" : "border-deep-green",
-            dot === "on" ? "bg-deep-green" : dot === "off" ? "bg-pure-white" : undefined,
+            dot === "merge" ? "size-[11px] border-double border-[3px] border-accent bg-card" : "border-accent",
+            dot === "on" ? "bg-accent" : dot === "off" ? "bg-card" : undefined,
           )}
         />
       ) : null}
@@ -675,7 +675,7 @@ function FileRow({ file, on, last, flat, onPick }: { file: FileChange; on?: bool
       <button
         type="button"
         onClick={onPick}
-        className="flex w-full cursor-pointer items-center gap-2 border-b border-border-gray px-3 py-1 text-left last:border-b-0 hover:bg-surface-container-low focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green"
+        className="flex w-full cursor-pointer items-center gap-2 border-b border-border-gray px-3 py-1 text-left last:border-b-0 hover:bg-surface-container-low focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {body}
       </button>
@@ -727,8 +727,8 @@ function Refs({ refs, max }: { refs?: string[]; max?: number }) {
           key={c.name}
           title={"head" in c ? `${c.name}, checked out` : "tag" in c ? `tag ${c.name}` : c.name}
           className={cn(
-            "max-w-[110px] shrink-0 truncate rounded-[2px] border px-1 font-mono text-[9.5px] leading-[15px]",
-            "head" in c ? "border-deep-green bg-deep-green/15 text-ink" : "tag" in c ? "border-amber-line text-amber-ink" : "border-border-strong text-muted-slate",
+            "max-w-[110px] shrink-0 truncate border px-1 font-mono text-[9.5px] leading-[15px]",
+            "head" in c ? "border-accent bg-accent/15 text-ink" : "tag" in c ? "border-amber-line text-amber-ink" : "border-border-strong text-muted-slate",
           )}
         >
           {"tag" in c ? "◆ " : "head" in c ? "● " : ""}
@@ -743,7 +743,7 @@ function Refs({ refs, max }: { refs?: string[]; max?: number }) {
 /** Which end of a comparison a row is. */
 function EndTag({ end }: { end: "base" | "compare" }) {
   return (
-    <span className="shrink-0 rounded-[2px] bg-deep-green px-1 font-mono text-[9.5px] uppercase leading-[15px] tracking-[0.04em] text-white">
+    <span className="shrink-0 bg-accent px-1 font-mono text-[9.5px] uppercase leading-[15px] tracking-[0.04em] text-on-accent">
       {end}
     </span>
   );
@@ -814,7 +814,7 @@ function Details({ map, commit, all, onPick }: { map: string; commit: Commit; al
               ? commit.parents.map((p) => {
                   const c = all.find((x) => x.sha === p);
                   return c ? (
-                    <button key={p} type="button" onClick={() => onPick(c)} title={c.subject} className="cursor-pointer font-mono text-deep-green hover:underline">
+                    <button key={p} type="button" onClick={() => onPick(c)} title={c.subject} className="cursor-pointer font-mono text-accent hover:underline">
                       {p.slice(0, 7)}
                     </button>
                   ) : (
@@ -875,8 +875,8 @@ function InShort({ map, sha }: { map: string; sha: string }) {
   if (!got) return null;
   if (got.summary) {
     return (
-      <div className="mt-3 rounded-[3px] border-l-2 border-deep-green bg-deep-green/[0.07] px-3 py-2">
-        <p className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-deep-green">In short</p>
+      <div className="mt-3 border-l-2 border-accent bg-accent/[0.07] px-3 py-2">
+        <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-accent">In short</p>
         <p className="mt-1 text-[13px] leading-relaxed text-ink">{got.summary.text}</p>
       </div>
     );
@@ -887,7 +887,7 @@ function InShort({ map, sha }: { map: string; sha: string }) {
         type="button"
         disabled={got.asking}
         onClick={() => void ask()}
-        className="cursor-pointer rounded-[2px] border border-deep-green px-2.5 py-1 text-[12px] text-deep-green hover:bg-deep-green/10 disabled:cursor-default disabled:opacity-60"
+        className="cursor-pointer border border-accent px-2.5 py-1 text-[12px] text-accent hover:bg-accent/10 disabled:cursor-default disabled:opacity-60"
       >
         {got.asking ? "Claude is reading the diff…" : "✦ Summarize this commit"}
       </button>
@@ -904,7 +904,7 @@ function InShort({ map, sha }: { map: string; sha: string }) {
 /** Two commits side by side, the base on the left, and the way to swap them. */
 function Comparing({ base, other, between, onSwap, onDone }: { base: Commit; other: Commit; between: number; onSwap: () => void; onDone: () => void }) {
   const card = (c: Commit, end: "base" | "compare") => (
-    <div className="min-w-0 flex-1 rounded-[3px] border border-border-gray px-3 py-2.5">
+    <div className="min-w-0 flex-1 border border-border-gray px-3 py-2.5">
       <div className="flex items-center gap-1.5">
         <EndTag end={end} />
         <Sha sha={c.sha} />
@@ -927,7 +927,7 @@ function Comparing({ base, other, between, onSwap, onDone }: { base: Commit; oth
           type="button"
           onClick={onSwap}
           title="Swap the two ends"
-          className="shrink-0 cursor-pointer self-center rounded-[3px] border border-border-strong px-2 py-1.5 text-[14px] text-ink hover:border-deep-green"
+          className="shrink-0 cursor-pointer self-center border border-border-strong px-2 py-1.5 text-[14px] text-ink hover:border-accent"
         >
           ⇄
         </button>
@@ -936,7 +936,7 @@ function Comparing({ base, other, between, onSwap, onDone }: { base: Commit; oth
       <p className="mt-2 text-[12px] text-muted-slate">
         What changed from <span className="font-mono">{base.short}</span> to <span className="font-mono">{other.short}</span>
         {between > 1 ? ` — ${between} commits apart` : ""}.{" "}
-        <button type="button" onClick={onDone} className="cursor-pointer text-deep-green hover:underline">
+        <button type="button" onClick={onDone} className="cursor-pointer text-accent hover:underline">
           Stop comparing
         </button>
       </p>
@@ -959,7 +959,7 @@ function OnTheMap({ sections, trail, onOpen }: { sections: SectionDiff[]; trail:
                 <button
                   type="button"
                   onClick={() => onOpen(s)}
-                  className="flex w-full cursor-pointer items-baseline gap-2 rounded-[3px] border border-border-gray px-3 py-1.5 text-left hover:border-border-strong hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-deep-green"
+                  className="flex w-full cursor-pointer items-baseline gap-2 border border-border-gray px-3 py-1.5 text-left hover:border-border-strong hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <span className="shrink-0 font-mono text-[12px]" style={{ color: t.ink }}>
                     {t.mark}
@@ -999,7 +999,7 @@ function FilePane({
   onBack: () => void;
 }) {
   const hunks = useMemo(() => hunksOf(file.diff), [file.diff]);
-  const step = "cursor-pointer rounded-[2px] px-1.5 py-0.5 text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink disabled:cursor-default disabled:opacity-40";
+  const step = "cursor-pointer px-1.5 py-0.5 text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink disabled:cursor-default disabled:opacity-40";
   return (
     <>
       <div className="flex shrink-0 items-center gap-2 border-b border-border-gray px-4 py-2">
@@ -1081,7 +1081,7 @@ function Gap({ h, prev, path }: { h: HunkLines; prev?: HunkLines; path?: string 
         <button
           type="button"
           onClick={(e) => startNote({ x: e.clientX, y: e.clientY + 12, kind: "comment", anchor: hunkTarget(path, h) })}
-          className="cursor-pointer text-deep-green hover:underline"
+          className="cursor-pointer text-accent hover:underline"
         >
           {noted ? "✎ commented — add another" : "✎ Comment on this change"}
         </button>

@@ -24,7 +24,7 @@ import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, mention, openClaude, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { startNote } from "@/lib/notes";
 import { FixAndKeep, onAnswer } from "@/components/keep";
-import { DragChip, SectionTabs, dropAt, dropInTab, openInTab, setPartDrag, type Drop } from "@/components/tabs";
+import { DragChip, SectionTabs, dropAt, dropInTab, openInTab, setPartDrag, tabTitle, type Drop } from "@/components/tabs";
 import { BlockDiffView, RemovedSections, SectionTint, useBlockDiffs } from "@/components/diff";
 import { DiffBar, HereChanges } from "@/components/diagram-diff";
 import type { Exchange } from "@/lib/keep";
@@ -235,7 +235,7 @@ export function Canvas() {
     const part = opener(target, path);
     if (!part) return;
     const { el, at } = part;
-    const label = at.length ? (nodeAt(at)?.title ?? RUN.repo) : RUN.repo;
+    const label = tabTitle(nodeAt, at);
     const x0 = e.clientX;
     const y0 = e.clientY;
     let moving = false;
@@ -286,7 +286,7 @@ export function Canvas() {
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden bg-warm-cream"
+      className="flex h-full w-full flex-col overflow-hidden bg-paper"
       onContextMenu={desktop || STATIC_MAP ? onContextMenu : undefined}
       onClickCapture={(e) => (e.metaKey || e.ctrlKey ? toTab(e) : undefined)}
       onAuxClickCapture={(e) => (e.button === 1 ? toTab(e) : undefined)}
@@ -868,7 +868,7 @@ function DataShapes({ owner, blocks, ctx }: { owner: string; blocks: DataBlock[]
           const { name, gloss, size } = labels[i];
           const shown = open.has(i);
           return (
-            <li key={i} data-pick={blockLabel(b)} className="overflow-hidden rounded-[3px] border border-border-gray bg-pure-white">
+            <li key={i} data-pick={blockLabel(b)} className="overflow-hidden border border-border-gray bg-card">
               <button
                 onClick={() => toggle(i)}
                 aria-expanded={shown}
@@ -1027,9 +1027,9 @@ function List({
               onClick={go}
               disabled={!go}
               className={cn(
-                "group flex w-full items-center gap-2.5 rounded-[2px] border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
+                "group flex w-full items-center gap-2.5 border-b border-border-gray/70 px-1.5 py-2.5 text-left transition-colors",
                 go && "hover:bg-surface-container-low",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               )}
             >
               {/* The same hue the box carries upstairs. A part with no box
@@ -1052,7 +1052,7 @@ function List({
               {go ? (
                 <span
                   aria-hidden
-                  className="shrink-0 text-[14px] text-faint transition-colors group-hover:text-deep-green"
+                  className="shrink-0 text-[14px] text-faint transition-colors group-hover:text-accent"
                 >
                   ›
                 </span>
@@ -1090,7 +1090,7 @@ function Reach({ uses, usedBy, onOpen }: { uses: Link[]; usedBy: Link[]; onOpen:
               key={l.path.join("/")}
               onClick={() => onOpen(l.path!)}
               title={title}
-              className="rounded-[3px] border border-border-gray px-2 py-1 text-[12.5px] text-ink transition-colors hover:border-deep-green hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green"
+              className=" border border-border-gray px-2 py-1 text-[12.5px] text-ink transition-colors hover:border-accent hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {name}
             </button>
@@ -1204,7 +1204,7 @@ function Header({
         {actions}
       </div>
       {rewriting ? (
-        <div role="status" className="shimmer mb-5 flex max-w-[720px] items-center gap-2 rounded-[3px] border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
+        <div role="status" className="shimmer mb-5 flex max-w-[720px] items-center gap-2 border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
           <span aria-hidden className="size-[7px] shrink-0 animate-pulse rounded-full bg-amber-ink" />
           Rewriting this section from your conversation. It usually takes a minute or two and updates here by itself.
         </div>
@@ -1212,7 +1212,7 @@ function Header({
       <div className="max-w-[720px]">
         <Eyebrow>{eyebrow}</Eyebrow>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          <h1 className="font-display text-[clamp(32px,3.2vw,46px)] font-normal leading-[1.02] tracking-[-0.018em] text-ink">
             {title}
           </h1>
           {state ? <StateChip state={state} alarm={alarm} /> : null}
@@ -1221,7 +1221,7 @@ function Header({
           {origin ? <OriginMark origin={origin} stale={stale} /> : null}
           {shape?.kind === "marks" ? <InlineMarks ids={shape.ids} note={shape.note} /> : null}
           {shape?.kind === "count" ? (
-            <span className="rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-on-surface-variant">
+            <span className=" border border-border-gray bg-card px-2.5 py-1 text-[12px] text-on-surface-variant">
               <span className="tnum font-semibold text-ink">{shape.value}</span> {shape.unit}
             </span>
           ) : null}
@@ -1234,7 +1234,7 @@ function Header({
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-faint">
             {meta ? <span className="whitespace-pre-wrap font-mono text-[11.5px]">{meta}</span> : null}
             {link ? (
-              <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11.5px] text-deep-green hover:underline">
+              <a href={link.href} target="_blank" rel="noreferrer" className="font-mono text-[11.5px] text-accent hover:underline">
                 {link.label}
               </a>
             ) : null}
@@ -1316,10 +1316,10 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
       onClick={go}
       disabled={!go}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-[3px] border bg-pure-white px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
+        "group flex w-full items-start gap-3 border bg-card px-4 py-3 text-left transition-[border-color,box-shadow] duration-150",
         node.ghost ? "border-dashed border-border-strong bg-surface-container-low/60" : "border-border-gray",
         go && "hover:border-border-strong hover:shadow-panel",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
       )}
     >
       <span className="min-w-0 flex-1">
@@ -1329,7 +1329,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
           </span>
           <StateChip state={node.state} alarm={node.alarm} />
           {node.issues?.length ? (
-            <span className="shrink-0 rounded-[2px] border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
+            <span className="shrink-0 border border-clay-line bg-clay-surface px-2 py-[3px] font-mono text-[10px] leading-none text-clay-ink">
               ⚠ {node.issues.length} {node.issues.length === 1 ? "problem" : "problems"}
             </span>
           ) : null}
@@ -1349,7 +1349,7 @@ function Row({ node, at, onOpen }: { node: Node; at: string[]; onOpen: (p: strin
       {go ? (
         <span
           aria-hidden
-          className="pt-0.5 text-[15px] text-faint transition-colors group-hover:text-deep-green"
+          className="pt-0.5 text-[15px] text-faint transition-colors group-hover:text-accent"
         >
           ›
         </span>
@@ -1364,7 +1364,7 @@ function StepDot({ n, state }: { n: number; state: Node["state"] }) {
       className={cn(
         "flex size-[22px] shrink-0 items-center justify-center rounded-full border font-mono text-[10.5px] font-semibold",
         state === "derived"
-          ? "border-mint-line bg-mint-success text-deep-green"
+          ? "border-accent-line bg-accent-surface text-accent"
           : "border-amber-line bg-amber-surface text-amber-ink",
       )}
     >

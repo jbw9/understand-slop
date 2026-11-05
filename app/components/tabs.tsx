@@ -91,7 +91,7 @@ export function useDropOn(strip: string) {
 }
 
 /** A tab a dragged part would be let go into. */
-export const DROP_TARGET = "border-deep-green bg-deep-green/25 text-ink hover:bg-deep-green/25";
+export const DROP_TARGET = "border-accent bg-accent/25 text-ink hover:bg-accent/25";
 
 /** The gap a dragged part would open a new tab in. */
 export function DropMarker({ drop }: { drop: Drop | null }) {
@@ -99,7 +99,7 @@ export function DropMarker({ drop }: { drop: Drop | null }) {
     <span
       aria-hidden
       style={{ left: drop.x }}
-      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 rounded-full bg-deep-green"
+      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 rounded-full bg-accent"
     />
   ) : null;
 }
@@ -120,7 +120,7 @@ export function DragChip() {
     <div
       aria-hidden
       style={{ left: x + 12, top: y + 10 }}
-      className="pointer-events-none fixed z-50 flex max-w-[320px] items-center gap-1.5 rounded-[2px] border border-border-gray bg-pure-white px-2.5 py-1 text-[12px] text-ink shadow-lift"
+      className="pointer-events-none fixed z-50 flex max-w-[320px] items-center gap-1.5 border border-border-gray bg-card px-2.5 py-1 text-[12px] text-ink shadow-lift"
     >
       <span className="truncate">{label}</span>
       {drop ? <span className="shrink-0 text-faint">→ {"on" in drop ? "replace" : "new tab"}</span> : null}
@@ -145,7 +145,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
         aria-label="New tab"
         aria-haspopup="menu"
         title="New tab"
-        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center rounded-[2px] text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-deep-green"
+        className="flex h-6 w-6 shrink-0 cursor-pointer items-center self-center justify-center text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
       >
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
           <path d="M5 1.5v7M1.5 5h7" />
@@ -232,7 +232,7 @@ export function SectionTabs({ path }: { path: string[] }) {
   return (
     <div
       role="tablist"
-      data-chrome
+      data-chrome="bar"
       data-section-tabs="map"
       aria-label={`Open sections of ${name}`}
       className={cn(TAB_STRIP, "relative")}
@@ -323,10 +323,10 @@ export const TAB_STRIP =
  * reads as the top of the page beneath rather than a button on the strip. */
 export function tabLook(active: boolean, closable: boolean) {
   return cn(
-    "group flex h-[29px] min-w-0 max-w-[200px] shrink-0 items-center gap-1 rounded-t-[4px] border border-b-0 pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-deep-green",
+    "group flex h-[29px] min-w-0 max-w-[200px] shrink-0 items-center gap-1 border border-b-0 pl-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
     closable ? "pr-1" : "pr-2.5",
     active
-      ? "border-border-gray bg-warm-cream font-semibold text-ink"
+      ? "border-border-gray bg-paper font-semibold text-ink"
       : "border-transparent text-muted-slate hover:bg-surface-container hover:text-ink",
   );
 }
@@ -356,7 +356,7 @@ export function TabClose({ label, active, onClose }: { label: string; active: bo
       }}
       aria-label={`Close ${label}`}
       className={cn(
-        "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-faint hover:bg-border-gray hover:text-ink",
+        "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center text-faint hover:bg-border-gray hover:text-ink",
         active ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
       )}
     >

@@ -117,11 +117,11 @@ export function AuditDialog() {
           </div>
 
           {behind.length ? (
-            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[3px] border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
+            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border border-amber-line bg-amber-surface/60 px-3 py-2 text-[13px] text-amber-ink">
               <span>
                 Built from <Ident>{RUN.commit?.slice(0, 7) ?? "an earlier commit"}</Ident> · {behind.length} {behind.length === 1 ? "file has" : "files have"} changed since
               </span>
-              <button type="button" onClick={() => (close(), openDiff())} className="cursor-pointer text-deep-green underline">
+              <button type="button" onClick={() => (close(), openDiff())} className="cursor-pointer text-accent underline">
                 See which levels
               </button>
             </p>
@@ -129,7 +129,7 @@ export function AuditDialog() {
 
           <h3 className="mb-2 mt-7 text-[15px] font-semibold text-ink">Worth a second look</h3>
           {sure.look.length ? (
-            <ul className="flex flex-col divide-y divide-border-gray rounded-[3px] border border-border-gray">
+            <ul className="flex flex-col divide-y divide-border-gray border border-border-gray">
               {sure.look.map((x) => (
                 <li key={x.path.join("/")}>
                   <button
@@ -175,7 +175,7 @@ export function AuditDialog() {
 
 function Stat({ value, label, note, warn }: { value: string; label: string; note: string; warn?: boolean }) {
   return (
-    <div className="rounded-[3px] border border-border-gray px-3 py-2.5" title={note}>
+    <div className=" border border-border-gray px-3 py-2.5" title={note}>
       <p className={cn("tnum text-[22px] font-semibold leading-none", warn ? "text-amber-ink" : "text-ink")}>{value}</p>
       <p className="mt-1.5 text-[12px] leading-snug text-muted-slate">{label}</p>
     </div>
@@ -257,7 +257,7 @@ function Block({ b }: { b: Parsed }) {
       );
     case "table":
       return (
-        <div className="mb-3 overflow-x-auto rounded-[3px] border border-border-gray">
+        <div className="mb-3 overflow-x-auto border border-border-gray">
           <table className="w-full border-collapse text-left text-[12.5px]">
             <thead className="bg-surface-container-low text-ink">
               <tr>
@@ -284,7 +284,7 @@ function Block({ b }: { b: Parsed }) {
       );
     case "details":
       return (
-        <details className="mb-3 rounded-[3px] border border-border-gray bg-surface px-3 py-2 [&_ul]:mb-0">
+        <details className="mb-3 border border-border-gray bg-surface px-3 py-2 [&_ul]:mb-0">
           <summary className="cursor-pointer text-[12.5px] font-medium text-ink">{inline(b.summary)}</summary>
           <div className="mt-2 font-mono text-[11.5px]">
             {b.body.map((x, i) => (

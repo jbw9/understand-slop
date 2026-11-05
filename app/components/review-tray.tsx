@@ -44,7 +44,7 @@ function Tray({ notes }: { notes: Note[] }) {
       aria-label="Review"
       data-chrome
       style={{ bottom: STATUSBAR + GAP, left: GAP }}
-      className="fixed z-[60] flex max-h-[min(460px,60vh)] w-[340px] flex-col overflow-hidden rounded-[4px] border border-border-gray bg-pure-white shadow-lift"
+      className="fixed z-[60] flex max-h-[min(460px,60vh)] w-[340px] flex-col overflow-hidden border border-border-gray bg-card shadow-lift"
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-border-gray px-3 py-2">
         <button type="button" onClick={() => setFolded((f) => !f)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left">
@@ -72,7 +72,7 @@ function Tray({ notes }: { notes: Note[] }) {
               {sending ? (
                 <div className="flex items-center gap-2 text-[12px] text-muted-slate">
                   <span className="min-w-0 flex-1">Waiting for Claude to finish its turn…</span>
-                  <button type="button" onClick={sendNow} className="shrink-0 cursor-pointer text-deep-green hover:underline">
+                  <button type="button" onClick={sendNow} className="shrink-0 cursor-pointer text-accent hover:underline">
                     Send now
                   </button>
                 </div>
@@ -89,13 +89,13 @@ function Tray({ notes }: { notes: Note[] }) {
                     }}
                     rows={2}
                     placeholder="Anything else for Claude… (optional)"
-                    className="w-full resize-none rounded-[3px] border border-border-gray px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-deep-green"
+                    className="w-full resize-none border border-border-gray px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent"
                   />
                   <button
                     type="button"
                     onClick={() => void sendReview(extra).then(() => setExtra(""))}
                     title="Sends every note to Claude as one turn, once it has finished the one it is on"
-                    className="cursor-pointer rounded-[3px] bg-deep-green px-3 py-1.5 text-[12.5px] font-medium text-pure-white hover:opacity-90"
+                    className="cursor-pointer bg-accent px-3 py-1.5 text-[12.5px] font-medium text-card hover:opacity-90"
                   >
                     Send review to Claude
                   </button>
@@ -117,8 +117,8 @@ function NoteRow({ n }: { n: Note }) {
       <div className="flex items-start gap-2">
         <span
           className={cn(
-            "mt-px shrink-0 rounded-[2px] px-1 font-mono text-[10px] uppercase",
-            n.kind === "suggest" ? "bg-deep-green/12 text-deep-green" : "bg-surface-container text-muted-slate",
+            "mt-px shrink-0 px-1 font-mono text-[10px] uppercase",
+            n.kind === "suggest" ? "bg-accent/12 text-accent" : "bg-surface-container text-muted-slate",
           )}
         >
           {n.kind === "suggest" ? "edit" : "note"}
@@ -156,7 +156,7 @@ function NoteRow({ n }: { n: Note }) {
               value={n.after ?? ""}
               onChange={(e) => editNote(n.id, { after: e.target.value })}
               rows={2}
-              className="w-full resize-none rounded-[3px] border border-border-gray px-2 py-1 text-[12.5px] text-ink outline-none focus:border-deep-green"
+              className="w-full resize-none border border-border-gray px-2 py-1 text-[12.5px] text-ink outline-none focus:border-accent"
             />
           ) : null}
           <textarea
@@ -164,7 +164,7 @@ function NoteRow({ n }: { n: Note }) {
             onChange={(e) => editNote(n.id, { note: e.target.value })}
             rows={2}
             placeholder={n.kind === "suggest" ? "Why, or anything else (optional)" : "Your comment"}
-            className="w-full resize-none rounded-[3px] border border-border-gray px-2 py-1 text-[12.5px] text-ink outline-none focus:border-deep-green"
+            className="w-full resize-none border border-border-gray px-2 py-1 text-[12.5px] text-ink outline-none focus:border-accent"
           />
         </div>
       ) : null}
@@ -209,7 +209,7 @@ function NoteEditor({ e }: { e: Editing }) {
       add();
     }
   };
-  const field = "w-full resize-y rounded-[3px] border border-border-gray px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-deep-green";
+  const field = "w-full resize-y border border-border-gray px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent";
 
   return (
     <div
@@ -220,7 +220,7 @@ function NoteEditor({ e }: { e: Editing }) {
       data-note-editor
       onKeyDown={onKey}
       style={{ left: at.x, top: at.y }}
-      className="fixed z-[70] flex w-[340px] flex-col gap-2 rounded-[4px] border border-border-gray bg-pure-white p-3 shadow-lift"
+      className="fixed z-[70] flex w-[340px] flex-col gap-2 border border-border-gray bg-card p-3 shadow-lift"
     >
       <p className="truncate text-[11.5px] text-faint">
         {suggest ? "Suggest an edit to" : "Comment on"} <span className="text-ink">{e.anchor.title}</span>
@@ -243,14 +243,14 @@ function NoteEditor({ e }: { e: Editing }) {
       )}
       <div className="flex items-center justify-end gap-2">
         <span className="mr-auto text-[11px] text-faint">⌘↵ to add</span>
-        <button type="button" onClick={stopEditing} className="cursor-pointer rounded-[3px] px-2 py-1 text-[12px] text-muted-slate hover:text-ink">
+        <button type="button" onClick={stopEditing} className="cursor-pointer px-2 py-1 text-[12px] text-muted-slate hover:text-ink">
           Cancel
         </button>
         <button
           type="button"
           disabled={!ready}
           onClick={add}
-          className="cursor-pointer rounded-[3px] bg-deep-green px-2.5 py-1 text-[12px] font-medium text-pure-white hover:opacity-90 disabled:cursor-default disabled:opacity-40"
+          className="cursor-pointer bg-accent px-2.5 py-1 text-[12px] font-medium text-card hover:opacity-90 disabled:cursor-default disabled:opacity-40"
         >
           Add to review
         </button>

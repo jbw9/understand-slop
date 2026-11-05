@@ -2,75 +2,76 @@
 
 @theme {
   /* ── surfaces ─────────────────────────────────────────────
-     Paper, after the Kabadoni theme (github.com/nickberckley/
-     kabadoni, MIT): the reading area is a soft warm ground that is
-     easy on the eyes over long sessions, and the chrome around it
-     stays dark in either theme ([data-chrome], below). Cards and
-     diagram boxes sit a step lighter than the paper. Kabadoni's
-     kraft leaned red; these keep its lightness at half the colour,
-     turned toward yellow, so the ground reads as paper, not pink. */
-  --color-warm-cream: #e4e2dc;
-  --color-pure-white: #f1f0ec;
-  --color-surface: #e0ded8;
-  --color-surface-container-low: #dbd8d1;
-  --color-surface-container: #d2cfc8;
-  --color-surface-dim: #cbc8c2;
+     Classic: the landing page's sheet (landing/DESIGN.md), one cobalt
+     ink on white paper. The chrome is the sheet too, framed by black
+     bars ([data-chrome], below).
+     Cards are the same white, set apart by their line, as the
+     landing's panels are; panels sit a step deeper. */
+  --color-paper: #ffffff;
+  --color-card: #ffffff;
+  --color-surface: #f6f8fe;
+  --color-surface-container-low: #f1f4fe;
+  --color-surface-container: #e3e8fb;
+  --color-surface-dim: #cfd6f5;
 
   /* ── ink ───────────────────────────────────────────────── */
-  --color-ink: #111111;
-  /* The veil behind a dialog, and a phone's notch: dark in either theme. */
-  --color-night: #0b0b0c;
-  /* A phone's frame. Not `night`: in the dark theme that is the ground's own
-     colour, and the bezel vanished into it. */
-  --color-bezel: #252526;
-  --color-on-surface: #1e1e1e;
-  --color-on-surface-variant: #404040;
-  --color-muted-slate: #575653;
-  --color-faint: #807e78;
+  --color-ink: #2438c8;
+  /* The veil behind a dialog, and a phone's notch: the desk at night. */
+  --color-night: #0a1450;
+  /* A phone's frame, drawn in the ink. */
+  --color-bezel: #1a2fa0;
+  --color-on-surface: #2537c0;
+  --color-on-surface-variant: #3445c6;
+  --color-muted-slate: #4a5bd2;
+  --color-faint: #7d8adb;
 
-  /* ── green family — derived, compiler-resolved ─────────── */
-  --color-deep-green: #3f6640;
-  --color-brand: #2f4f30;
-  --color-mint-success: #dfe0cb;
-  --color-mint-line: #b8c2a0;
+  /* ── accent — the ink itself ──────────────────────────────
+     A selected or primary control fills with ink and its text turns
+     `on-accent`. `derived` carries no mark, so the accent claims no
+     state. */
+  --color-accent: #2438c8;
+  --color-accent-strong: #1a2fa0;
+  --color-on-accent: #fcfdff;
+  --color-accent-surface: #e6eafc;
+  --color-accent-line: #a9b3ee;
 
   /* ── amber family — partial, found but incomplete ──────── */
-  --color-amber-ink: #7a5c1c;
-  --color-amber-surface: #efdfbe;
-  --color-amber-line: #d2b370;
+  --color-amber-ink: #8a5a0b;
+  --color-amber-surface: #fbefd3;
+  --color-amber-line: #e0bd6e;
 
   /* ── clay family — the one alarming finding ────────────── */
-  --color-clay-ink: #8a3f42;
-  --color-clay-surface: #ecd2cc;
-  --color-clay-line: #cfa09c;
+  --color-clay-ink: #b02c3a;
+  --color-clay-surface: #fbe2e3;
+  --color-clay-line: #e9a3a8;
 
-
-  /* ── lines ─────────────────────────────────────────────── */
-  --color-border-gray: #cecbc4;
-  --color-border-strong: #bcb9b2;
-  --color-wire: #9c9993;
+  /* ── lines — the ink at 18% and 50%, as on the landing ── */
+  --color-border-gray: #d5daf5;
+  --color-border-strong: #919be3;
+  --color-wire: #8995e2;
 
   /* ── elevation ─────────────────────────────────────────── */
-  --shadow-panel: 0 1px 2px rgba(40, 38, 32, 0.06);
-  --shadow-lift: 0 10px 34px -6px rgba(40, 38, 32, 0.16);
+  --shadow-panel: 0 1px 2px rgba(36, 56, 200, 0.06);
+  --shadow-lift: 0 10px 34px -6px rgba(26, 47, 160, 0.18);
 
-
+  /* ── type ──────────────────────────────────────────────────
+     Fallbacks only: app/layout.tsx sets the real faces on <html>. */
+  --font-display: Georgia, serif;
 
   /* ── code ─────────────────────────────────────────────────
-     The drawer's syntax colours. Drawn from the families already
-     on the page — green for what the language itself says, clay
-     for literal text, amber for numbers — so a code pane reads as
-     part of this app and not as a pasted-in editor theme. */
-  --color-code: #e1dfd9;
-  --color-code-plain: #1e1e1e;
-  --color-code-comment: #807e78;
-  --color-code-string: #8a3f42;
-  --color-code-number: #7a5c1c;
-  --color-code-keyword: #3f6640;
-  --color-code-type: #3f566d;
-  --color-code-call: #7a5530;
-  --color-code-punct: #575653;
-  --color-code-annotation: #7a5c1c;
+     The drawer's syntax colours: the ink for what the language itself
+     says, and the meaning hues for literals, so a code pane reads as
+     part of this sheet and not as a pasted-in editor theme. */
+  --color-code: #eef1fd;
+  --color-code-plain: #1e2f9e;
+  --color-code-comment: #7d8adb;
+  --color-code-string: #a8381f;
+  --color-code-number: #8a5a0b;
+  --color-code-keyword: #2438c8;
+  --color-code-type: #6a3fb8;
+  --color-code-call: #0f6d78;
+  --color-code-punct: #4a5bd2;
+  --color-code-annotation: #8a5a0b;
 }
 
 /* These are referenced only from inline `var()` in SVG attributes and style
@@ -88,140 +89,206 @@
      carries the same dot — so the picture and the index are
      read as one thing. Seven, because no diagram opens more
      (measured: the widest is 7). Each pair is a tint for the
-     box and an ink for its label and dot. */
-  --color-sec-1-surface: #dbe0cc;
-  --color-sec-1-ink: #3f6640;
-  --color-sec-2-surface: #d6dbe0;
-  --color-sec-2-ink: #3f566d;
-  --color-sec-3-surface: #ecdcb8;
-  --color-sec-3-ink: #7a5c1c;
-  --color-sec-4-surface: #e3d2dc;
-  --color-sec-4-ink: #6e4a72;
-  --color-sec-5-surface: #d3e0dc;
-  --color-sec-5-ink: #3a6866;
-  --color-sec-6-surface: #ecd2cc;
-  --color-sec-6-ink: #8a3f42;
-  --color-sec-7-surface: #ead6c2;
-  --color-sec-7-ink: #7a5530;
+     box and an ink for its label and dot. The first is the
+     sheet's own ink; the rest are set apart from it in hue. */
+  --color-sec-1-surface: #e3e8fc;
+  --color-sec-1-ink: #2438c8;
+  --color-sec-2-surface: #d8eeee;
+  --color-sec-2-ink: #0f6d78;
+  --color-sec-3-surface: #f8ecd0;
+  --color-sec-3-ink: #8a5a0b;
+  --color-sec-4-surface: #ece3f8;
+  --color-sec-4-ink: #6a3fb8;
+  --color-sec-5-surface: #dcecd9;
+  --color-sec-5-ink: #2f6b3a;
+  --color-sec-6-surface: #f8dee4;
+  --color-sec-6-ink: #a8304a;
+  --color-sec-7-surface: #f6e3d5;
+  --color-sec-7-ink: #9a4a1a;
 
   /* ── actors ───────────────────────────────────────────────
      One hue per participant in a sequence, assigned by position.
-     A six-message exchange between two identical grey chips makes
+     A six-message exchange between two identical chips makes
      the reader re-read the labels to track who is speaking; a
      colour per lifeline answers it at a glance. Four, because no
      authored sequence has more actors than that. */
-  --color-actor-1: #3f6640;
-  --color-actor-1-surface: #dbe0cc;
-  --color-actor-2: #3f566d;
-  --color-actor-2-surface: #d6dbe0;
-  --color-actor-3: #7a5c1c;
-  --color-actor-3-surface: #ecdcb8;
-  --color-actor-4: #6e4a72;
-  --color-actor-4-surface: #e3d2dc;
+  --color-actor-1: #2438c8;
+  --color-actor-1-surface: #e3e8fc;
+  --color-actor-2: #0f6d78;
+  --color-actor-2-surface: #d8eeee;
+  --color-actor-3: #8a5a0b;
+  --color-actor-3-surface: #f8ecd0;
+  --color-actor-4: #6a3fb8;
+  --color-actor-4-surface: #ece3f8;
 
   /* ── diff ─────────────────────────────────────────────────
      Red for what a commit took away, green for what it added.
-     Deliberately NOT the `deep-green`/`clay` families: those are
-     state claims — `derived` means the compiler proved it, `alarm`
-     means act on this — and a diff verdict claims neither. A removed
-     box is not an alarm and an added one is not trustworthy, so the
-     hues are shifted off both (a truer red, a brighter green) and
-     the surfaces are cooler, so the two readings never collide on
-     one picture. Amber for `changed` is the existing `amber-*`
-     family, which already means "look here, incomplete".
+     Deliberately NOT the `clay` family: that is a state claim —
+     `alarm` means act on this — and a diff verdict claims none. A
+     removed box is not an alarm, so the red is truer than clay and
+     the surfaces cooler, so the two readings never collide on one
+     picture. Amber for `changed` is the existing `amber-*` family,
+     which already means "look here, incomplete".
 
      Declared HERE and not in `@theme` on purpose, like `--color-sec-*`
      above: diagram boxes read these from inline `var()` in SVG `fill`
      and `stroke`, which Tailwind's scanner never sees as a class, so
      an `@theme` declaration would be dropped and every box would
      render black in light mode. */
-  --color-diff-add-ink: #2e6b31;
-  --color-diff-add-surface: #d9e5cc;
-  --color-diff-add-line: #8fb98a;
-  --color-diff-remove-ink: #a8302f;
-  --color-diff-remove-surface: #efd0ca;
-  --color-diff-remove-line: #d99189;
+  --color-diff-add-ink: #2a7333;
+  --color-diff-add-surface: #dcefd9;
+  --color-diff-add-line: #8cc38f;
+  --color-diff-remove-ink: #b42318;
+  --color-diff-remove-surface: #fbe0dc;
+  --color-diff-remove-line: #e79a92;
 }
 
-/* Dark: the same tokens, pointed at Kabadoni's neutral greys, so every class
-   and every diagram that reads them follows. <html data-theme> is set before
-   first paint by the script in app/layout.tsx, from Settings or the system.
-   Text on a filled green button is `text-white`, which does not flip.
+/* Light and Dark: plain themes, for a reader who wants the landing page's
+   type and square shapes without its cobalt. Neutral greys and a near-black
+   (or near-white) ink; the meaning hues stay, tuned for a grey ground.
 
    The chrome — title bar, status bar, tab strips, the workspace window, its
-   terminals, menus — is marked [data-chrome] and takes these in the light
-   theme too: as in Kabadoni, only the reading area is paper, and the UI
-   around it stays calm and dark. */
+   terminals, menus — is marked [data-chrome] and follows the theme. In
+   Classic it is the sheet, with black bars (below). <html data-theme> is
+   set before first paint by the script in app/layout.tsx, from Settings. */
+:root[data-theme="light"],
+:root[data-theme="light"] [data-chrome] {
+  color-scheme: light;
+
+  --color-paper: #ffffff;
+  --color-card: #ffffff;
+  --color-surface: #f7f7f8;
+  --color-surface-container-low: #f4f4f5;
+  --color-surface-container: #ebebed;
+  --color-surface-dim: #d9d9dd;
+
+  --color-ink: #111113;
+  --color-night: #09090b;
+  --color-bezel: #27272a;
+  --color-on-surface: #1c1c1f;
+  --color-on-surface-variant: #3a3a40;
+  --color-muted-slate: #5e5e66;
+  --color-faint: #85858e;
+
+  --color-accent: #18181b;
+  --color-accent-strong: #000000;
+  --color-on-accent: #ffffff;
+  --color-accent-surface: #f0f0f2;
+  --color-accent-line: #c9c9cf;
+
+  --color-amber-ink: #8a5a0b;
+  --color-amber-surface: #fbf1d9;
+  --color-amber-line: #e3c37a;
+
+  --color-clay-ink: #b42318;
+  --color-clay-surface: #fde4e1;
+  --color-clay-line: #eda59c;
+
+  --color-border-gray: #e4e4e7;
+  --color-border-strong: #c4c4ca;
+  --color-wire: #a1a1aa;
+
+  --color-sec-1-surface: #e3ebfc;
+  --color-sec-1-ink: #2f5fd0;
+  --color-actor-1: #2f5fd0;
+  --color-actor-1-surface: #e3ebfc;
+
+  --color-code: #f6f6f7;
+  --color-code-plain: #1c1c1f;
+  --color-code-comment: #85858e;
+  --color-code-string: #a8381f;
+  --color-code-number: #8a5a0b;
+  --color-code-keyword: #6d28d9;
+  --color-code-type: #0e7490;
+  --color-code-call: #1d4ed8;
+  --color-code-punct: #5e5e66;
+  --color-code-annotation: #8a5a0b;
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.14);
+}
+
+/* The light chrome sits a step below the paper, so the sheet still reads as
+   the thing on top. */
+:root[data-theme="light"] [data-chrome] {
+  --color-paper: #f4f4f5;
+  --color-card: #ffffff;
+  --color-surface: #f4f4f5;
+  --color-surface-container-low: #f4f4f5;
+  --color-surface-container: #e8e8eb;
+}
+
 :root[data-theme="dark"],
-[data-chrome] {
+:root[data-theme="dark"] [data-chrome] {
   color-scheme: dark;
 
-  --color-warm-cream: #0b0b0c;
-  --color-pure-white: #19191b;
-  --color-surface: #101011;
-  --color-surface-container-low: #141415;
-  --color-surface-container: #1f1f21;
-  --color-surface-dim: #262628;
+  --color-paper: #0f0f11;
+  --color-card: #18181b;
+  --color-surface: #141416;
+  --color-surface-container-low: #17171a;
+  --color-surface-container: #222226;
+  --color-surface-dim: #2b2b30;
 
-  --color-ink: #f7f8f8;
-  --color-on-surface: #e8e8ea;
-  --color-on-surface-variant: #d6d6d8;
-  --color-muted-slate: #a8a8ad;
-  --color-faint: #84848a;
+  --color-ink: #fafafa;
+  --color-night: #000000;
+  --color-bezel: #3a3a40;
+  --color-on-surface: #ececee;
+  --color-on-surface-variant: #d4d4d8;
+  --color-muted-slate: #a1a1aa;
+  --color-faint: #7a7a83;
 
-  --color-deep-green: #5e8f5e;
-  --color-brand: #76a876;
-  --color-mint-success: #1f2a1f;
-  --color-mint-line: #3a503a;
+  --color-accent: #fafafa;
+  --color-accent-strong: #e4e4e7;
+  --color-on-accent: #111113;
+  --color-accent-surface: #232327;
+  --color-accent-line: #3f3f46;
 
-  --color-amber-ink: #d8ae5b;
+  --color-amber-ink: #e0b45e;
   --color-amber-surface: #2d2718;
   --color-amber-line: #6b5a2c;
 
-  --color-clay-ink: #d98a8c;
-  --color-clay-surface: #2f2121;
+  --color-clay-ink: #f08a8f;
+  --color-clay-surface: #301e1f;
   --color-clay-line: #6a3c3e;
 
+  --color-border-gray: #27272a;
+  --color-border-strong: #3a3a40;
+  --color-wire: #52525b;
 
-  --color-border-gray: #26262a;
-  --color-border-strong: #36363a;
-  --color-wire: #4a4a4f;
-  --color-bezel: #36363a;
-
-  --color-actor-1: #8fbf8f;
-  --color-actor-1-surface: #1f2a1f;
-  --color-actor-2: #8fa8c0;
-  --color-actor-2-surface: #1f252c;
-  --color-actor-3: #d8ae5b;
+  --color-actor-1: #93b4ff;
+  --color-actor-1-surface: #1e2840;
+  --color-actor-2: #7dd3d8;
+  --color-actor-2-surface: #1a2a2c;
+  --color-actor-3: #e0b45e;
   --color-actor-3-surface: #2d2718;
-  --color-actor-4: #c7a0cb;
-  --color-actor-4-surface: #2a2029;
+  --color-actor-4: #c9a7f5;
+  --color-actor-4-surface: #2a2236;
 
-  --color-sec-1-surface: #1f2a1f;
-  --color-sec-1-ink: #8fbf8f;
-  --color-sec-2-surface: #1f252c;
-  --color-sec-2-ink: #8fa8c0;
+  --color-sec-1-surface: #1e2840;
+  --color-sec-1-ink: #93b4ff;
+  --color-sec-2-surface: #1a2a2c;
+  --color-sec-2-ink: #7dd3d8;
   --color-sec-3-surface: #2d2718;
-  --color-sec-3-ink: #d8ae5b;
-  --color-sec-4-surface: #2a2029;
-  --color-sec-4-ink: #c7a0cb;
-  --color-sec-5-surface: #1c2a29;
-  --color-sec-5-ink: #86bab6;
-  --color-sec-6-surface: #2f2121;
-  --color-sec-6-ink: #d98a8c;
+  --color-sec-3-ink: #e0b45e;
+  --color-sec-4-surface: #2a2236;
+  --color-sec-4-ink: #c9a7f5;
+  --color-sec-5-surface: #1f2a1f;
+  --color-sec-5-ink: #8fd19a;
+  --color-sec-6-surface: #2f2124;
+  --color-sec-6-ink: #f0a0b4;
   --color-sec-7-surface: #2e2419;
-  --color-sec-7-ink: #c4996c;
+  --color-sec-7-ink: #e0a77a;
 
-  --color-code: #070708;
-  --color-code-plain: #dedede;
-  --color-code-comment: #848484;
-  --color-code-string: #d98a8c;
-  --color-code-number: #d8ae5b;
-  --color-code-keyword: #8fbf8f;
-  --color-code-type: #8fa8c0;
-  --color-code-call: #c4996c;
-  --color-code-punct: #a3a3a3;
-  --color-code-annotation: #d8ae5b;
+  --color-code: #0a0a0b;
+  --color-code-plain: #e4e4e7;
+  --color-code-comment: #7a7a83;
+  --color-code-string: #f0a58f;
+  --color-code-number: #e0b45e;
+  --color-code-keyword: #c4a7ff;
+  --color-code-type: #7dd3d8;
+  --color-code-call: #93b4ff;
+  --color-code-punct: #a1a1aa;
+  --color-code-annotation: #e0b45e;
 
   --color-diff-add-ink: #7fc782;
   --color-diff-add-surface: #1d2e1e;
@@ -234,6 +301,44 @@
   --shadow-lift: 0 10px 34px -6px rgba(0, 0, 0, 0.5);
 }
 
+/* Classic's chrome is the sheet itself, white with the cobalt ink, so the
+   terminal and the workspace window read as part of the page. Only its bars
+   ([data-chrome="bar"]: the title bar, the tab strips, the status bar, the
+   Preview toolbar) are black, which frames the sheet; their accent stays
+   cobalt, lifted to read on black. */
+:root[data-theme="classic"] [data-chrome] {
+  --color-surface: #ffffff;
+  --color-surface-container-low: #ffffff;
+}
+:root[data-theme="classic"] [data-chrome="bar"] {
+  color-scheme: dark;
+
+  --color-paper: #0a0a0b;
+  --color-card: #18181b;
+  --color-surface: #0a0a0b;
+  --color-surface-container-low: #0a0a0b;
+  --color-surface-container: #1c1c1f;
+  --color-surface-dim: #27272a;
+
+  --color-ink: #fafafa;
+  --color-on-surface: #ececee;
+  --color-on-surface-variant: #d4d4d8;
+  --color-muted-slate: #a1a1aa;
+  --color-faint: #7a7a83;
+
+  --color-accent: #6b7dff;
+  --color-accent-strong: #8c9bff;
+  --color-on-accent: #ffffff;
+  --color-accent-surface: #161c44;
+  --color-accent-line: #3445c6;
+
+  --color-amber-ink: #e0b45e;
+  --color-clay-ink: #f08a8f;
+
+  --color-border-gray: #222225;
+  --color-border-strong: #333338;
+}
+
 @layer base {
   * {
     border-color: var(--color-border-gray);
@@ -244,8 +349,13 @@
     text-rendering: optimizeLegibility;
   }
   body {
-    background: var(--color-warm-cream);
+    background: var(--color-paper);
     color: var(--color-ink);
+  }
+  /* As on the landing: ink with paper text. */
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
   }
   /* `color` inherits as the body resolved it; the chrome's own ink is light. */
   [data-chrome] {
@@ -291,12 +401,19 @@
     line-height: 1.3;
     scroll-margin-top: 1rem;
   }
+  /* The two top levels are lettering, in the landing's slab. */
+  .doc-prose :is(h1, h2) {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.016em;
+    line-height: 1.1;
+  }
   .doc-prose h1 {
-    font-size: 26px;
+    font-size: 34px;
     margin-top: 1.6em;
   }
   .doc-prose h2 {
-    font-size: 20px;
+    font-size: 25px;
     margin-top: 2em;
     padding-bottom: 0.35em;
     border-bottom: 1px solid var(--color-border-gray);
@@ -317,7 +434,7 @@
     font-weight: 600;
   }
   .doc-prose a {
-    color: var(--color-deep-green);
+    color: var(--color-accent);
     text-decoration: underline;
     text-underline-offset: 2px;
   }
@@ -347,16 +464,14 @@
     font-size: 0.86em;
     background: var(--color-surface-container);
     color: var(--color-on-surface-variant);
-    border-radius: 2px;
     padding: 1px 5px;
   }
   .doc-prose pre {
     font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 12.5px;
     line-height: 1.6;
-    background: var(--color-pure-white);
+    background: var(--color-card);
     border: 1px solid var(--color-border-gray);
-    border-radius: 3px;
     padding: 12px 16px;
     overflow-x: auto;
   }
@@ -412,10 +527,9 @@
     top: 0.18em;
     width: 22px;
     height: 22px;
-    border: 1px solid var(--color-mint-line);
-    border-radius: 999px;
-    background: var(--color-mint-success);
-    color: var(--color-deep-green);
+    border: 1px solid var(--color-accent-line);
+    background: var(--color-accent-surface);
+    color: var(--color-accent);
     font: 600 10.5px/20px var(--font-mono), ui-monospace, monospace;
     text-align: center;
   }
@@ -487,7 +601,7 @@
     outline: none;
   }
   .dg-live:focus-visible rect {
-    stroke: var(--color-deep-green);
+    stroke: var(--color-accent);
     stroke-width: 3;
   }
 }

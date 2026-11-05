@@ -98,7 +98,7 @@ export function CodeEditor({
             autoComplete="off"
             autoCorrect="off"
             wrap="off"
-            className="absolute inset-0 resize-none overflow-hidden whitespace-pre bg-transparent pl-3 pr-4 text-transparent caret-ink outline-none selection:bg-deep-green/25 [font:inherit] [tab-size:4]"
+            className="absolute inset-0 resize-none overflow-hidden whitespace-pre bg-transparent pl-3 pr-4 text-transparent caret-ink outline-none selection:bg-accent/25 [font:inherit] [tab-size:4]"
           />
         </div>
       </div>

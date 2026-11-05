@@ -16,7 +16,7 @@ import { followTheme, onOpenSettings, readSettings, saveSettings, useSettings, t
  */
 
 const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: "System" },
+  { value: "classic", label: "Classic" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
 ];
@@ -86,7 +86,7 @@ export function SettingsDialog() {
               type="submit"
               aria-label="Close"
               title="Close (Esc)"
-              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[2px] text-muted-slate hover:bg-surface-container hover:text-ink"
+              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center text-muted-slate hover:bg-surface-container hover:text-ink"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
                 <path d="m4.5 4.5 7 7m0-7-7 7" />
@@ -95,8 +95,8 @@ export function SettingsDialog() {
           }
         />
         <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-5">
-          <Field label="Theme" hint="System follows your desktop's light or dark setting.">
-            <div role="radiogroup" aria-label="Theme" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+          <Field label="Theme" hint="Classic is the landing page's cobalt ink. Light and Dark are plain.">
+            <div role="radiogroup" aria-label="Theme" className="inline-flex border border-border-gray p-0.5">
               {THEMES.map((t) => (
                 <button
                   key={t.value}
@@ -105,8 +105,8 @@ export function SettingsDialog() {
                   aria-checked={draft.theme === t.value}
                   onClick={() => set({ theme: t.value })}
                   className={cn(
-                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.theme === t.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.theme === t.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {t.label}
@@ -115,7 +115,7 @@ export function SettingsDialog() {
             </div>
           </Field>
           <Field label="Background" hint="What the map is drawn on.">
-            <div role="radiogroup" aria-label="Background" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Background" className="inline-flex border border-border-gray p-0.5">
               {GROUNDS.map((g) => (
                 <button
                   key={g.value}
@@ -124,8 +124,8 @@ export function SettingsDialog() {
                   aria-checked={draft.ground === g.value}
                   onClick={() => set({ ground: g.value })}
                   className={cn(
-                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.ground === g.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.ground === g.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {g.label}
@@ -137,7 +137,7 @@ export function SettingsDialog() {
             label="Default agent"
             hint="What a tab opens into when the app opens one for you: Ctrl+`, Ctrl+Shift+T, the title bar, or the first in the + menu. Map context goes to Claude either way."
           >
-            <div role="radiogroup" aria-label="Default agent" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Default agent" className="inline-flex border border-border-gray p-0.5">
               {agents.map((a) => (
                 <button
                   key={a.id}
@@ -146,8 +146,8 @@ export function SettingsDialog() {
                   aria-checked={draft.agent === a.id}
                   onClick={() => set({ agent: a.id })}
                   className={cn(
-                    "flex cursor-pointer items-center gap-1.5 rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.agent === a.id ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "flex cursor-pointer items-center gap-1.5 px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.agent === a.id ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   <AgentIcon id={a.id} />
@@ -157,7 +157,7 @@ export function SettingsDialog() {
             </div>
           </Field>
           <Field label="Dev server" hint="Start a project's dev server when it opens, and show the running app in a Preview tab.">
-            <div role="radiogroup" aria-label="Dev server" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Dev server" className="inline-flex border border-border-gray p-0.5">
               {[
                 { value: true, label: "Start it" },
                 { value: false, label: "Leave it" },
@@ -169,8 +169,8 @@ export function SettingsDialog() {
                   aria-checked={draft.devServer === o.value}
                   onClick={() => set({ devServer: o.value })}
                   className={cn(
-                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.devServer === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.devServer === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {o.label}
@@ -194,7 +194,7 @@ export function SettingsDialog() {
               {found === undefined ? (
                 <span className="text-faint">Looking…</span>
               ) : found ? (
-                <span className="truncate text-deep-green">
+                <span className="truncate text-accent">
                   ✓ {found.path}
                   {found.version ? ` (${found.version})` : ""}
                 </span>
@@ -206,7 +206,7 @@ export function SettingsDialog() {
               <button
                 type="button"
                 onClick={() => detect(draft.claudePath)}
-                className="ml-auto shrink-0 cursor-pointer text-deep-green hover:underline"
+                className="ml-auto shrink-0 cursor-pointer text-accent hover:underline"
               >
                 Detect again
               </button>
@@ -226,7 +226,7 @@ export function SettingsDialog() {
             label="Claude Code dictation"
             hint="Hold Control+Option (⌃⌥), or Space in a Claude tab, and speak into Claude's prompt. Transcribed by Anthropic at no cost to your usage; needs a claude.ai sign-in, not Bedrock or an API key."
           >
-            <div role="radiogroup" aria-label="Claude Code dictation" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Claude Code dictation" className="inline-flex border border-border-gray p-0.5">
               {[
                 { value: true, label: "On" },
                 { value: false, label: "As in Claude Code" },
@@ -238,8 +238,8 @@ export function SettingsDialog() {
                   aria-checked={draft.voice === o.value}
                   onClick={() => set({ voice: o.value })}
                   className={cn(
-                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.voice === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.voice === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {o.label}
@@ -251,7 +251,7 @@ export function SettingsDialog() {
             label="Skills and web research"
             hint="Claude loads skills and searches or reads the web without asking each time, so plan mode can research freely. Plan mode still never edits files."
           >
-            <div role="radiogroup" aria-label="Skills and web research" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Skills and web research" className="inline-flex border border-border-gray p-0.5">
               {[
                 { value: true, label: "Without asking" },
                 { value: false, label: "As in Claude Code" },
@@ -263,8 +263,8 @@ export function SettingsDialog() {
                   aria-checked={draft.research === o.value}
                   onClick={() => set({ research: o.value })}
                   className={cn(
-                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.research === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.research === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {o.label}
@@ -286,7 +286,7 @@ export function SettingsDialog() {
             <SignIns />
           </Field>
           <Field label="Media while dictating" hint="Pauses Music and Spotify, and mutes everything else, while you hold ⌃⌥; all of it comes back when you let go.">
-            <div role="radiogroup" aria-label="Media while dictating" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+            <div role="radiogroup" aria-label="Media while dictating" className="inline-flex border border-border-gray p-0.5">
               {[
                 { value: true, label: "Quiet it" },
                 { value: false, label: "Leave it" },
@@ -298,8 +298,8 @@ export function SettingsDialog() {
                   aria-checked={draft.quietMedia === o.value}
                   onClick={() => set({ quietMedia: o.value })}
                   className={cn(
-                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
-                    draft.quietMedia === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.quietMedia === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
                   {o.label}
@@ -337,7 +337,7 @@ function OnDevice() {
   return (
     <div className="flex items-baseline gap-3 font-mono text-[11.5px]">
       {s.model === "ready" ? (
-        <span className="text-deep-green">✓ Parakeet v3, {mb(s.total)} MB, on this machine</span>
+        <span className="text-accent">✓ Parakeet v3, {mb(s.total)} MB, on this machine</span>
       ) : s.model === "downloading" ? (
         <span className="text-ink">
           Downloading… {mb(s.bytes)} of {mb(s.total)} MB
@@ -348,7 +348,7 @@ function OnDevice() {
         </span>
       )}
       {s.model === "missing" ? (
-        <button type="button" onClick={() => act("dictate_download")} className="ml-auto shrink-0 cursor-pointer text-deep-green hover:underline">
+        <button type="button" onClick={() => act("dictate_download")} className="ml-auto shrink-0 cursor-pointer text-accent hover:underline">
           {s.bytes ? "Resume download" : "Download"}
         </button>
       ) : (

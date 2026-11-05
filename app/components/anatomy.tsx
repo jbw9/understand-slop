@@ -76,7 +76,7 @@ function Caret({ open }: { open: boolean }) {
       aria-hidden="true"
       className={cn(
         "shrink-0 transition-colors duration-200",
-        open ? "text-deep-green" : "text-faint",
+        open ? "text-accent" : "text-faint",
       )}
     >
       <path
@@ -166,7 +166,7 @@ function rowClass(id: string, ctx: RowCtx, extra?: string) {
   const isLit = ctx.traced === id;
   return cn(
     "w-full text-left transition-all duration-200",
-    isLit && "bg-mint-success",
+    isLit && "bg-accent-surface",
     ctx.traced !== null && !isLit && "opacity-55",
     ctx.traced === null && "hover:bg-surface-container-low",
     extra,
@@ -186,7 +186,7 @@ function Block({
 }) {
   if (block.kind === "schema") {
     return (
-      <div className={headless ? "bg-pure-white" : "overflow-hidden rounded-[2px] border border-border-gray bg-pure-white"}>
+      <div className={headless ? "bg-card" : "overflow-hidden border border-border-gray bg-card"}>
         <div className={cn("flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5", headless && "hidden")}>
           <TableGlyph />
           <span className="font-mono text-[11px] font-semibold text-ink">
@@ -226,7 +226,7 @@ function Block({
                 <span
                   className={cn(
                     "min-w-0 break-words font-mono text-[10.5px]",
-                    isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                    isLit ? "font-semibold text-accent" : "text-on-surface",
                   )}
                 >
                   {c.name}
@@ -273,7 +273,7 @@ function Block({
 
   if (block.kind === "routes") {
     return (
-      <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden border border-border-gray bg-card">
         {block.rows.map((r) => {
           const id = rowId(owner, `${r.method} ${r.path}`);
           const isLit = ctx.traced === id;
@@ -298,7 +298,7 @@ function Block({
                   <span
                     className={cn(
                       "min-w-0 font-mono text-[10.5px] break-all",
-                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                      isLit ? "font-semibold text-accent" : "text-on-surface",
                     )}
                   >
                     {r.path}
@@ -336,7 +336,7 @@ function Block({
 
   if (block.kind === "chips") {
     return (
-      <div className="rounded-[2px] border border-border-gray bg-pure-white px-3 py-2.5">
+      <div className=" border border-border-gray bg-card px-3 py-2.5">
         {block.caption ? (
           <p className="mb-2 font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
             {block.caption}
@@ -353,12 +353,12 @@ function Block({
                 onClick={() => ctx.onTrace(id)}
                 title={c.note}
                 className={cn(
-                  "rounded-[2px] border px-2 py-1 font-mono text-[10px] transition-all duration-200",
+                  " border px-2 py-1 font-mono text-[10px] transition-all duration-200",
                   ctx.traced !== null && !isLit && "opacity-55",
                   isLit
-                    ? "border-deep-green bg-deep-green text-white"
+                    ? "border-accent bg-accent text-on-accent"
                     : c.state === "derived"
-                      ? "border-mint-line bg-mint-success text-deep-green"
+                      ? "border-accent-line bg-accent-surface text-accent"
                       : "border-amber-line bg-amber-surface text-amber-ink",
                 )}
               >
@@ -379,7 +379,7 @@ function Block({
     // that land the way a length does.
     const total = block.rows.reduce((sum, p) => sum + p.weight, 0) || 1;
     return (
-      <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden border border-border-gray bg-card">
         <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
           <span className="font-mono text-[11px] font-semibold text-ink">
             {block.total}
@@ -389,7 +389,7 @@ function Block({
           </span>
         </div>
         <div className="px-3 pb-2.5 pt-2.5">
-          <div className="flex h-[22px] w-full overflow-hidden rounded-[2px]">
+          <div className="flex h-[22px] w-full overflow-hidden">
             {block.rows.map((p, at) => {
               const id = rowId(owner, p.label);
               const isLit = ctx.traced === id;
@@ -405,10 +405,10 @@ function Block({
                   // the bar's job is the contrast, not the arithmetic.
                   style={{ width: `${Math.max((p.weight / total) * 100, 6)}%` }}
                   className={cn(
-                    "h-full border-r border-pure-white transition-all duration-200 last:border-r-0",
+                    "h-full border-r border-card transition-all duration-200 last:border-r-0",
                     ctx.traced !== null && !isLit && "opacity-45",
                     isLit
-                      ? "bg-deep-green"
+                      ? "bg-accent"
                       : p.tone === "vary"
                         ? "bg-amber-line"
                         : // Alternating weights within the same family. Every
@@ -417,8 +417,8 @@ function Block({
                           // seam — measured, not guessed. The ratio only lands
                           // if adjacent slices are separable.
                           at % 2 === 0
-                          ? "bg-deep-green/55"
-                          : "bg-mint-line",
+                          ? "bg-accent/55"
+                          : "bg-accent-line",
                   )}
                 />
               );
@@ -435,14 +435,14 @@ function Block({
                     // Same tone rule as the bar segment above, index included.
                     // A swatch is only a key if it is the colour it explains.
                     className={cn(
-                      "size-[7px] shrink-0 rounded-[2px]",
+                      "size-[7px] shrink-0",
                       isLit
-                        ? "bg-deep-green"
+                        ? "bg-accent"
                         : p.tone === "vary"
                           ? "bg-amber-line"
                           : at % 2 === 0
-                            ? "bg-deep-green/55"
-                            : "bg-mint-line",
+                            ? "bg-accent/55"
+                            : "bg-accent-line",
                     )}
                   />
                   <span
@@ -451,7 +451,7 @@ function Block({
                       // figure past the right edge. The figure stays `shrink-0`
                       // because it is short and is the thing being compared.
                       "min-w-0 font-mono text-[10px]",
-                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                      isLit ? "font-semibold text-accent" : "text-on-surface",
                     )}
                   >
                     {p.label}
@@ -474,7 +474,7 @@ function Block({
     // between an anonymous and a premium quota is visible rather than stated.
     const max = Math.max(...block.rows.map((b) => b.value), 1);
     return (
-      <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
+      <div className="overflow-hidden border border-border-gray bg-card">
         <div className="flex items-center gap-2 border-b border-border-gray bg-surface px-3 py-1.5">
           <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
             {block.unit}
@@ -489,7 +489,7 @@ function Block({
                 key={b.label}
                 data-row={id}
                 onClick={() => ctx.onTrace(id)}
-                className={rowClass(id, ctx, cn(PAIR_SCOPE, "rounded-[2px]"))}
+                className={rowClass(id, ctx, cn(PAIR_SCOPE, ""))}
               >
                 {/* The label was `w-[92px]` and the figure `w-[108px]`: 200px
                     of fixed furniture either side of the bar, so on a narrow
@@ -501,7 +501,7 @@ function Block({
                     className={cn(
                       PAIR_LABEL,
                       "truncate font-mono text-[10px]",
-                      isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                      isLit ? "font-semibold text-accent" : "text-on-surface",
                     )}
                   >
                     {b.label}
@@ -509,15 +509,15 @@ function Block({
                   <span className={cn(PAIR_VALUE, "flex items-center gap-2")}>
                     {/* The track is the scale. Without it a short bar reads as
                         a small number rather than a small share. */}
-                    <span className="h-[9px] min-w-0 flex-1 rounded-[2px] bg-surface-container">
+                    <span className="h-[9px] min-w-0 flex-1 bg-surface-container">
                       <span
                         style={{ width: `${Math.max((b.value / max) * 100, 2)}%` }}
                         className={cn(
-                          "block h-full rounded-[2px] transition-all duration-200",
+                          "block h-full transition-all duration-200",
                           isLit
-                            ? "bg-deep-green"
+                            ? "bg-accent"
                             : b.state === "derived"
-                              ? "bg-mint-line"
+                              ? "bg-accent-line"
                               : "bg-amber-line",
                         )}
                       />
@@ -551,9 +551,9 @@ function Block({
                   className={cn(
                     "flex size-[18px] shrink-0 items-center justify-center rounded-full border font-mono text-[9px] font-semibold transition-colors",
                     isLit
-                      ? "border-deep-green bg-deep-green text-white"
+                      ? "border-accent bg-accent text-on-accent"
                       : s.state === "derived"
-                        ? "border-mint-line bg-mint-success text-deep-green"
+                        ? "border-accent-line bg-accent-surface text-accent"
                         : "border-amber-line bg-amber-surface text-amber-ink",
                   )}
                 >
@@ -580,7 +580,7 @@ function Block({
                   id,
                   ctx,
                   cn(
-                    "min-w-0 flex-1 rounded-[2px] px-1.5 py-0.5",
+                    "min-w-0 flex-1 px-1.5 py-0.5",
                     i < block.rows.length - 1 && "mb-2.5",
                   ),
                 )}
@@ -589,7 +589,7 @@ function Block({
                   <span
                     className={cn(
                       "text-[11px] font-semibold leading-tight",
-                      isLit || ctx.open === id ? "text-deep-green" : "text-ink",
+                      isLit || ctx.open === id ? "text-accent" : "text-ink",
                     )}
                   >
                     {s.title}
@@ -642,7 +642,7 @@ function Facts({
 }) {
 
   return (
-    <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
+    <div className="overflow-hidden border border-border-gray bg-card">
       {block.rows.map((p) => {
         const id = rowId(owner, p.label);
         const isLit = ctx.traced === id;
@@ -662,7 +662,7 @@ function Facts({
                 className={cn(
                   PAIR_LABEL,
                   "font-mono text-[10.5px]",
-                  isLit ? "font-semibold text-deep-green" : "text-on-surface",
+                  isLit ? "font-semibold text-accent" : "text-on-surface",
                 )}
               >
                 {p.label}
@@ -797,8 +797,8 @@ export function SourceView({
       data-pick={`${block.file}:${block.start}`}
       data-pick-code={`${block.file}:${block.start}-${end}`}
       className={cn(
-        "overflow-hidden rounded-[2px] border bg-pure-white",
-        drifted ? "border-amber-line" : isLit ? "border-deep-green" : "border-border-gray",
+        "overflow-hidden border bg-card",
+        drifted ? "border-amber-line" : isLit ? "border-accent" : "border-border-gray",
       )}
     >
       <div
@@ -810,7 +810,7 @@ export function SourceView({
         <button
           data-row={id}
           onClick={() => ctx.onTrace(id)}
-          className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2 rounded-[2px]")}
+          className={rowClass(id, ctx, "flex min-w-0 flex-1 items-center gap-2")}
         >
           <FileGlyph />
           {/* file:line as one addressable string, not a path with a number
@@ -818,7 +818,7 @@ export function SourceView({
           <span
             className={cn(
               "min-w-0 truncate text-left font-mono text-[11px]",
-              isLit ? "font-semibold text-deep-green" : "text-on-surface",
+              isLit ? "font-semibold text-accent" : "text-on-surface",
             )}
           >
             {block.file}
@@ -840,7 +840,7 @@ export function SourceView({
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 rounded-[2px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+            className="shrink-0 border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
           >
             github ↗
           </a>
@@ -852,7 +852,7 @@ export function SourceView({
               openFileInTab(map, path, block.file, block.start);
             }}
             title={`Open all of ${block.file} in a new tab, to read and edit`}
-            className="shrink-0 rounded-[2px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+            className="shrink-0 border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
           >
             open file ↗
           </button>
@@ -887,7 +887,7 @@ export function SourceView({
                 e.stopPropagation();
                 void save();
               }}
-              className="rounded-[2px] bg-deep-green px-2 py-1 font-mono text-[10px] text-white"
+              className=" bg-accent px-2 py-1 font-mono text-[10px] text-on-accent"
             >
               save to disk ⌘S
             </button>
@@ -897,7 +897,7 @@ export function SourceView({
                 setDraft(null);
                 setSaved(null);
               }}
-              className="rounded-[2px] border border-border-strong px-2 py-1 font-mono text-[10px] text-muted-slate hover:text-on-surface"
+              className=" border border-border-strong px-2 py-1 font-mono text-[10px] text-muted-slate hover:text-on-surface"
             >
               discard
             </button>
@@ -943,7 +943,7 @@ function DraftDiff({ before, after }: { before: string; after: string }) {
   b = b.slice(head, b.length - tail);
   a = a.slice(head, a.length - tail);
   return (
-    <pre className="mt-2 overflow-x-auto rounded-[2px] border border-border-gray bg-pure-white py-1.5 font-mono text-[10.5px] leading-[1.5]">
+    <pre className="mt-2 overflow-x-auto border border-border-gray bg-card py-1.5 font-mono text-[10.5px] leading-[1.5]">
       {b.map((l, i) => (
         <div key={`b${i}`} className="bg-clay-surface px-3 text-clay-ink">
           <span className="select-none">- </span>
@@ -951,7 +951,7 @@ function DraftDiff({ before, after }: { before: string; after: string }) {
         </div>
       ))}
       {a.map((l, i) => (
-        <div key={`a${i}`} className="bg-mint-success px-3 text-deep-green">
+        <div key={`a${i}`} className="bg-accent-surface px-3 text-accent">
           <span className="select-none">+ </span>
           {l || " "}
         </div>
@@ -975,7 +975,7 @@ function CopyPath({ text }: { text: string }) {
         timer.current = setTimeout(() => setDone(false), 1200);
       }}
       title={`Copy ${text}`}
-      className="shrink-0 rounded-[2px] border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
+      className="shrink-0 border border-border-strong px-1.5 py-0.5 font-mono text-[9px] text-muted-slate transition-colors hover:text-on-surface"
     >
       {done ? "copied" : "copy path"}
     </button>
@@ -986,11 +986,11 @@ function KeyTag({ k, lit }: { k: "PK" | "FK" | "UQ"; lit?: boolean }) {
   return (
     <span
       className={cn(
-        "shrink-0 rounded-[2px] px-1 py-px font-mono text-[8.5px] font-semibold leading-none",
+        "shrink-0 px-1 py-px font-mono text-[8.5px] font-semibold leading-none",
         lit
-          ? "bg-pure-white text-deep-green ring-1 ring-deep-green/45"
+          ? "bg-card text-accent ring-1 ring-accent/45"
           : k === "PK"
-            ? "bg-mint-success text-deep-green"
+            ? "bg-accent-surface text-accent"
             : "bg-surface-container text-muted-slate",
       )}
     >
@@ -1001,7 +1001,7 @@ function KeyTag({ k, lit }: { k: "PK" | "FK" | "UQ"; lit?: boolean }) {
 
 const METHOD_TONE: Record<string, string> = {
   GET: "bg-surface-container text-muted-slate",
-  POST: "bg-mint-success text-deep-green",
+  POST: "bg-accent-surface text-accent",
   PATCH: "bg-amber-surface text-amber-ink",
   DELETE: "bg-clay-surface text-clay-ink",
 };
@@ -1010,7 +1010,7 @@ function Method({ method }: { method: string }) {
   return (
     <span
       className={cn(
-        "w-[42px] shrink-0 rounded-[2px] px-1 py-px text-center font-mono text-[8.5px] font-semibold leading-[1.4]",
+        "w-[42px] shrink-0 px-1 py-px text-center font-mono text-[8.5px] font-semibold leading-[1.4]",
         METHOD_TONE[method],
       )}
     >
@@ -1057,7 +1057,7 @@ function MapRows({ owner, block, ctx }: { owner: string; block: Extract<Anatomy,
       return next;
     });
   return (
-    <div className="overflow-hidden rounded-[2px] border border-border-gray bg-pure-white">
+    <div className="overflow-hidden border border-border-gray bg-card">
       {block.caption ? (
         <div className="border-b border-border-gray bg-surface px-3 py-1.5">
           <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
@@ -1090,8 +1090,8 @@ function MapRows({ owner, block, ctx }: { owner: string; block: Extract<Anatomy,
               <span className="min-w-0 flex-1">
                 <span
                   className={cn(
-                    "inline-block rounded-[2px] px-1.5 py-0.5 font-mono text-[10px]",
-                    isLit || isOpen ? "bg-deep-green text-white" : "bg-surface-container text-on-surface",
+                    "inline-block px-1.5 py-0.5 font-mono text-[10px]",
+                    isLit || isOpen ? "bg-accent text-on-accent" : "bg-surface-container text-on-surface",
                   )}
                 >
                   {m.from}

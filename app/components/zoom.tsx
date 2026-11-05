@@ -139,7 +139,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
     <>
       <div ref={ref}>{children}</div>
       {zoom === 1 ? null : (
-        <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center overflow-hidden rounded-[2px] border border-border-gray bg-pure-white text-[12.5px] text-ink shadow-lift">
+        <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center overflow-hidden border border-border-gray bg-card text-[12.5px] text-ink shadow-lift">
           <button
             type="button"
             aria-label="Zoom out"

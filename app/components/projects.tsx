@@ -341,20 +341,20 @@ function Understanding({ value, onChange }: { value: number; onChange: (v: numbe
           className="group relative h-7 cursor-pointer touch-none select-none outline-none"
         >
           <div ref={track} className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border-gray">
-            <div className="h-full rounded-full bg-deep-green transition-[width] duration-200 ease-out" style={{ width: left(value) }} />
+            <div className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out" style={{ width: left(value) }} />
           </div>
           {UNDERSTAND.map((u, i) => (
             <span
               key={u.label}
               className={cn(
                 "absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200",
-                i <= value ? "bg-deep-green" : "bg-border-strong",
+                i <= value ? "bg-accent" : "bg-border-strong",
               )}
               style={{ left: left(i) }}
             />
           ))}
           <span
-            className="absolute top-1/2 size-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-deep-green bg-pure-white shadow-panel transition-[left,box-shadow,transform] duration-200 ease-out group-focus-visible:shadow-[0_0_0_4px_var(--color-mint-success)] group-active:scale-110"
+            className="absolute top-1/2 size-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-card shadow-panel transition-[left,box-shadow,transform] duration-200 ease-out group-focus-visible:shadow-[0_0_0_4px_var(--color-accent-surface)] group-active:scale-110"
             style={{ left: left(value) }}
           />
         </div>
@@ -374,8 +374,8 @@ function Understanding({ value, onChange }: { value: number; onChange: (v: numbe
           ))}
         </div>
       </div>
-      <div className="rounded-[2px] border border-border-gray bg-pure-white px-3 py-2.5">
-        <span className="block font-mono text-[10.5px] uppercase tracking-[0.09em] text-deep-green">{EXPLAINS[explain].label}</span>
+      <div className=" border border-border-gray bg-card px-3 py-2.5">
+        <span className="block font-mono text-[10.5px] uppercase tracking-[0.09em] text-accent">{EXPLAINS[explain].label}</span>
         <span className="mt-1 block text-[12px] text-muted-slate">{EXPLAINS[explain].note}</span>
       </div>
     </div>
@@ -434,7 +434,7 @@ function StartProject({
           type="button"
           onClick={onCancel}
           aria-label="Back to projects"
-          className="flex size-7 cursor-pointer items-center justify-center rounded-[3px] text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+          className="flex size-7 cursor-pointer items-center justify-center text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           ←
         </button>
@@ -520,8 +520,8 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (on: boolean) 
       aria-label={label}
       onClick={() => onChange(!on)}
       className={cn(
-        "relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green",
-        on ? "bg-deep-green" : "bg-border-strong",
+        "relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        on ? "bg-accent" : "bg-border-strong",
       )}
     >
       <span
@@ -557,7 +557,7 @@ function Roots({ roots, onOpen }: { roots: Progress["roots"]; onOpen: (at: strin
     <ul className="flex flex-col gap-0.5 font-mono text-[11.5px]">
       {roots.map((r) => (
         <li key={r.id} className="flex items-baseline gap-2">
-          <span className={cn("w-3 shrink-0", r.status === "done" ? "text-deep-green" : r.status === "failed" ? "text-clay-ink" : r.status === "drafting" ? "text-amber-ink" : "text-faint")}>
+          <span className={cn("w-3 shrink-0", r.status === "done" ? "text-accent" : r.status === "failed" ? "text-clay-ink" : r.status === "drafting" ? "text-amber-ink" : "text-faint")}>
             {GLYPH[r.status]}
           </span>
           {r.status === "done" ? (
@@ -567,7 +567,7 @@ function Roots({ roots, onOpen }: { roots: Progress["roots"]; onOpen: (at: strin
           ) : (
             <span className={cn("min-w-0 flex-1 truncate", r.status === "queued" ? "text-faint" : "text-on-surface-variant")}>{r.title}</span>
           )}
-          <span className={cn("shrink-0", r.status === "done" ? "text-deep-green" : r.status === "failed" ? "text-clay-ink" : "text-faint")}>{r.detail}</span>
+          <span className={cn("shrink-0", r.status === "done" ? "text-accent" : r.status === "failed" ? "text-clay-ink" : "text-faint")}>{r.detail}</span>
         </li>
       ))}
     </ul>
@@ -632,7 +632,7 @@ function ProjectRow({
 
   return (
     <li className="flex flex-col">
-      <div className="group flex items-center gap-3 rounded-[3px] px-3 py-2 hover:bg-surface-container-low">
+      <div className="group flex items-center gap-3 px-3 py-2 hover:bg-surface-container-low">
         <button
           type="button"
           onClick={() => openable && onOpen()}
@@ -641,7 +641,7 @@ function ProjectRow({
         >
           <span className="flex max-w-full items-center gap-2">
             <span className="truncate text-[13.5px] font-medium text-ink">{p.name}</span>
-            {current ? <span className="shrink-0 rounded-[2px] bg-mint-success px-1.5 text-[10.5px] font-medium text-deep-green">Open</span> : null}
+            {current ? <span className="shrink-0 bg-accent-surface px-1.5 text-[10.5px] font-medium text-accent">Open</span> : null}
           </span>
           <span className="max-w-full truncate font-mono text-[11.5px] text-faint" title={p.root}>
             {tilde(p.root, home)}
@@ -664,7 +664,7 @@ function ProjectRow({
             setMenu({ x: r.right - 220, y: r.bottom + 4 });
           }}
           className={cn(
-            "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-[3px] text-[16px] leading-none text-faint hover:bg-surface-container hover:text-ink",
+            "flex size-7 shrink-0 cursor-pointer items-center justify-center text-[16px] leading-none text-faint hover:bg-surface-container hover:text-ink",
             menu ? "bg-surface-container text-ink" : "opacity-60 group-hover:opacity-100",
           )}
         >
@@ -682,13 +682,13 @@ function ProjectRow({
       ) : null}
 
       {status === "failed" && !p.paused && p.map.error ? (
-        <pre className="mx-3 mb-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-[2px] bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
+        <pre className="mx-3 mb-2 max-h-28 overflow-auto whitespace-pre-wrap bg-clay-surface/60 px-2.5 py-2 font-mono text-[11px] text-clay-ink">
           {p.map.error}
         </pre>
       ) : null}
 
       {panel === "make" ? (
-        <div className="mx-3 mb-2 mt-1 flex flex-col gap-4 rounded-[3px] border border-border-gray bg-surface px-4 py-4">
+        <div className="mx-3 mb-2 mt-1 flex flex-col gap-4 border border-border-gray bg-surface px-4 py-4">
           <Understanding value={understand} onChange={setUnderstand} />
           <div className="flex items-center justify-end gap-2">
             <p className="mr-auto text-[12px] text-muted-slate">About 20 min with your Claude Code, on your plan.</p>
@@ -711,7 +711,7 @@ function ProjectRow({
       ) : null}
 
       {panel === "remove" ? (
-        <div className="mx-3 mb-2 mt-1 flex items-center gap-2 rounded-[3px] border border-clay-line bg-clay-surface/40 px-4 py-2.5">
+        <div className="mx-3 mb-2 mt-1 flex items-center gap-2 border border-clay-line bg-clay-surface/40 px-4 py-2.5">
           <p className="mr-auto text-[12.5px] text-ink">
             Remove <span className="font-semibold">{p.name}</span>? This deletes its map, not the folder.
           </p>
@@ -722,7 +722,7 @@ function ProjectRow({
             type="button"
             disabled={busy}
             onClick={onRemove}
-            className="cursor-pointer rounded-[2px] bg-clay-ink px-2.5 py-1 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="cursor-pointer bg-clay-ink px-2.5 py-1 text-[13px] font-medium text-paper hover:opacity-90 disabled:opacity-50"
           >
             Remove
           </button>

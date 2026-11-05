@@ -73,8 +73,8 @@ function Caption({ children }: { children?: string }) {
 /* ── diagram ─────────────────────────────────────────────────── */
 
 const TONE = {
-  plain: { stroke: "var(--color-border-strong)", fill: "var(--color-pure-white)", ink: "var(--color-ink)", line: "var(--color-wire)" },
-  good: { stroke: "var(--color-deep-green)", fill: "var(--color-mint-success)", ink: "var(--color-ink)", line: "var(--color-deep-green)" },
+  plain: { stroke: "var(--color-border-strong)", fill: "var(--color-card)", ink: "var(--color-ink)", line: "var(--color-wire)" },
+  good: { stroke: "var(--color-accent)", fill: "var(--color-accent-surface)", ink: "var(--color-ink)", line: "var(--color-accent)" },
   warn: { stroke: "var(--color-amber-ink)", fill: "var(--color-amber-surface)", ink: "var(--color-amber-ink)", line: "var(--color-amber-ink)" },
 } as const;
 
@@ -247,12 +247,12 @@ function Diagram({
                   textAnchor={label.anchor}
                   fontSize="12"
                   fill="var(--color-muted-slate)"
-                  stroke="var(--color-warm-cream)"
+                  stroke="var(--color-paper)"
                   strokeWidth="4"
                   strokeLinejoin="round"
                   paintOrder="stroke"
                   onClick={show}
-                  className={show ? "cursor-pointer hover:fill-deep-green" : undefined}
+                  className={show ? "cursor-pointer hover:fill-accent" : undefined}
                 >
                   {at ? <title>{at}</title> : null}
                   {label.text}
@@ -412,7 +412,7 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[3px] border border-border-gray bg-pure-white">
+      <div className="overflow-x-auto border border-border-gray bg-card">
         <table className="w-full border-collapse text-left text-[13.5px]">
           <thead>
             <tr className="border-b border-border-gray bg-surface">
@@ -450,7 +450,7 @@ function Table({ block }: { block: Extract<Anatomy, { kind: "table" }> }) {
       {block.rows.length > TABLE_ROWS_FOLDED ? (
         <button
           onClick={() => setAll((v) => !v)}
-          className="mt-2 text-[12.5px] font-medium text-deep-green hover:underline"
+          className="mt-2 text-[12.5px] font-medium text-accent hover:underline"
         >
           {all ? "Show fewer" : `Show all ${block.rows.length}`}
         </button>
@@ -489,7 +489,7 @@ function Sequence({
   return (
     <div className="min-w-0">
       <Caption>{block.caption}</Caption>
-      <div className="overflow-x-auto rounded-[3px] border border-border-gray bg-pure-white/80 px-4 pb-4 pt-3">
+      <div className="overflow-x-auto border border-border-gray bg-card/80 px-4 pb-4 pt-3">
         <div className="relative" style={{ minWidth: n * 150 }}>
           {/* lifelines */}
           {block.actors.map((a) => (
@@ -506,7 +506,7 @@ function Sequence({
               return (
                 <div key={a} className="flex flex-1 justify-center">
                   <span
-                    className="rounded-[2px] border px-3 py-1.5 text-[13px] font-semibold"
+                    className=" border px-3 py-1.5 text-[13px] font-semibold"
                     style={{ borderColor: t.ink, background: t.surface, color: t.ink }}
                   >
                     {a}
@@ -535,7 +535,7 @@ function Sequence({
                   data-code-step={code ? "" : undefined}
                   tabIndex={code ? 0 : undefined}
                   title={code ? "Show the code for this message" : undefined}
-                  className={cn("relative h-[76px]", code && "cursor-pointer rounded-[2px] transition-colors hover:bg-surface-container-low")}
+                  className={cn("relative h-[76px]", code && "cursor-pointer transition-colors hover:bg-surface-container-low")}
                 >
                   <span className="absolute bottom-[14px] left-0 font-mono text-[10.5px] text-faint">
                     {i + 1}
@@ -543,7 +543,7 @@ function Sequence({
                   </span>
                   {self ? (
                     <div
-                      className="absolute top-[8px] -translate-x-1/2 rounded-[2px] border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
+                      className="absolute top-[8px] -translate-x-1/2 border border-border-gray bg-surface-container-low px-2.5 py-1.5 text-center text-[12.5px] text-on-surface"
                       style={{ left: `${a}%`, maxWidth: `${100 / n}%` }}
                     >
                       {m.label}
@@ -612,7 +612,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
       <div ref={box} className="relative flex flex-wrap items-start gap-6">
         {block.device !== "phone" ? (
           // A web page: a browser window, its address bar showing the route.
-          <div className="w-[440px] max-w-full shrink-0 overflow-hidden rounded-[4px] border-[1.5px] border-border-strong bg-pure-white shadow-panel">
+          <div className="w-[440px] max-w-full shrink-0 overflow-hidden border-[1.5px] border-border-strong bg-card shadow-panel">
             <div className="flex items-center gap-3 border-b border-border-gray bg-surface-container px-3 py-2">
               <div className="flex shrink-0 gap-1.5">
                 {[0, 1, 2].map((i) => (
@@ -620,7 +620,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
                 ))}
               </div>
               {/* Empty without a route: the title is just below, and an older map has none. */}
-              <p className="h-[22px] min-w-0 flex-1 truncate rounded-[2px] bg-pure-white px-2.5 py-1 font-mono text-[11px] leading-[14px] text-muted-slate">
+              <p className="h-[22px] min-w-0 flex-1 truncate bg-card px-2.5 py-1 font-mono text-[11px] leading-[14px] text-muted-slate">
                 {block.route}
               </p>
             </div>
@@ -634,7 +634,7 @@ function Screen({ block }: { block: Extract<Anatomy, { kind: "screen" }> }) {
             </div>
           </div>
         ) : (
-          <div className="w-[280px] shrink-0 rounded-[30px] border-[1.5px] border-border-strong bg-pure-white p-3 shadow-panel">
+          <div className="w-[280px] shrink-0 rounded-[30px] border-[1.5px] border-border-strong bg-card p-3 shadow-panel">
             <div className="mx-auto mb-3 h-[5px] w-16 rounded-full bg-surface-container" />
             <p className="mb-3 px-2 text-center text-[13px] font-semibold text-ink">{block.title}</p>
             <div className="flex flex-col gap-2 px-2 pb-3">
@@ -736,7 +736,7 @@ function useCallouts(on: boolean) {
 
 function Badge({ n }: { n: number }) {
   return (
-    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-deep-green font-mono text-[11px] font-semibold text-white">
+    <span className="mt-[3px] flex size-[21px] shrink-0 items-center justify-center rounded-full bg-accent font-mono text-[11px] font-semibold text-on-accent">
       {n}
     </span>
   );
@@ -756,38 +756,38 @@ function ScreenThing({ type, label, n }: { type: string; label: string; n?: numb
       return <p className={cn(base, "text-muted-slate")}><span data-anchor>{label}</span>{badge}</p>;
     case "field":
       return (
-        <div className={cn(base, "rounded-[2px] border border-border-strong px-2.5 py-2 text-faint")}>
+        <div className={cn(base, " border border-border-strong px-2.5 py-2 text-faint")}>
           {label}
           {badge}
         </div>
       );
     case "choice":
       return (
-        <div className={cn(base, "rounded-[2px] border border-mint-line bg-mint-success px-3 py-1.5 text-deep-green")}>
+        <div className={cn(base, " border border-accent-line bg-accent-surface px-3 py-1.5 text-accent")}>
           {label}
           {badge}
         </div>
       );
     case "button":
       return (
-        <div className={cn(base, "rounded-[2px] bg-deep-green px-3 py-2 text-center font-medium text-white")}>
+        <div className={cn(base, " bg-accent px-3 py-2 text-center font-medium text-on-accent")}>
           {label}
           {badge}
         </div>
       );
     case "image":
       return (
-        <div className={cn(base, "flex h-20 items-center justify-center rounded-[2px] bg-surface-container text-faint")}>
+        <div className={cn(base, "flex h-20 items-center justify-center bg-surface-container text-faint")}>
           {label}
           {badge}
         </div>
       );
     default:
       return (
-        <div className={cn(base, "flex flex-col gap-1 rounded-[2px] border border-border-gray p-2 text-on-surface-variant")}>
+        <div className={cn(base, "flex flex-col gap-1 border border-border-gray p-2 text-on-surface-variant")}>
           {label}
-          <span className="h-2 w-4/5 rounded-[2px] bg-surface-container" />
-          <span className="h-2 w-3/5 rounded-[2px] bg-surface-container" />
+          <span className="h-2 w-4/5 bg-surface-container" />
+          <span className="h-2 w-3/5 bg-surface-container" />
           {badge}
         </div>
       );
@@ -801,12 +801,12 @@ export function Example({ block, bare }: { block: Extract<Anatomy, { kind: "exam
   return (
     <div className="min-w-0">
       <div className={cn("mb-2.5 flex items-center gap-2", bare && "hidden")}>
-        <span className="rounded-[2px] border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
+        <span className=" border border-border-strong px-2 py-[2px] font-mono text-[10px] uppercase tracking-[0.07em] text-faint">
           example
         </span>
         <span className="text-[13px] font-medium text-on-surface-variant">{block.caption}</span>
       </div>
-      <pre className="overflow-x-auto rounded-[3px] border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
+      <pre className="overflow-x-auto border border-border-gray bg-surface px-4 py-3 font-mono text-[12.5px] leading-relaxed text-on-surface">
         {block.value}
       </pre>
       {block.notes?.length ? (
@@ -860,14 +860,14 @@ export function WatchOut({ issues, action, onCode }: { issues: Issue[]; action?:
           <li
             key={it.title}
             data-pick={it.title}
-            className="rounded-[3px] border border-clay-line bg-clay-surface/60 px-4 py-3"
+            className=" border border-clay-line bg-clay-surface/60 px-4 py-3"
           >
             <p className="text-[14px] font-semibold text-clay-ink">{it.title}</p>
             <p className="mt-1 text-[13.5px] leading-relaxed text-on-surface">
               <Prose text={it.detail} />
             </p>
             {it.where && onCode ? (
-              <button onClick={() => onCode(it.where!, it.title, it.detail)} className="mt-1.5 font-mono text-[11px] text-muted-slate underline-offset-2 hover:text-deep-green hover:underline">
+              <button onClick={() => onCode(it.where!, it.title, it.detail)} className="mt-1.5 font-mono text-[11px] text-muted-slate underline-offset-2 hover:text-accent hover:underline">
                 {it.where}
               </button>
             ) : it.where ? (
@@ -920,7 +920,7 @@ function DocPassage({ doc }: { doc: CodeRef }) {
   };
 
   return (
-    <li data-pick={doc.label} data-pick-code={`${doc.file}:${doc.start}-${doc.end}`} className="rounded-[3px] border border-border-gray bg-pure-white">
+    <li data-pick={doc.label} data-pick-code={`${doc.file}:${doc.start}-${doc.end}`} className=" border border-border-gray bg-card">
       <button onClick={toggle} aria-expanded={shown} className="flex w-full items-baseline gap-3 px-4 py-2.5 text-left">
         <span className="text-[13.5px] text-ink">{doc.label}</span>
         <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">
@@ -940,7 +940,7 @@ function DocPassage({ doc }: { doc: CodeRef }) {
               <button
                 type="button"
                 onClick={() => openDoc(doc.file, { line: doc.start })}
-                className="mt-2 cursor-pointer text-[12.5px] text-deep-green hover:underline"
+                className="mt-2 cursor-pointer text-[12.5px] text-accent hover:underline"
               >
                 Open the whole doc
               </button>

@@ -128,11 +128,11 @@ export function PlanView({
   const change = choices?.find((c) => c.input);
 
   return (
-    <div ref={top} className={cn("absolute inset-0 flex flex-col overflow-y-auto bg-warm-cream", !visible && "hidden")} style={{ paddingRight: inset }}>
+    <div ref={top} className={cn("absolute inset-0 flex flex-col overflow-y-auto bg-paper", !visible && "hidden")} style={{ paddingRight: inset }}>
       <article className="mx-auto w-full max-w-[920px] flex-1 px-10 pb-16 pt-9">
         <header className="mb-9">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <Eyebrow className="text-deep-green">{plan.version > 1 ? `Plan · revision ${plan.version}` : "Plan"}</Eyebrow>
+            <Eyebrow className="text-accent">{plan.version > 1 ? `Plan · revision ${plan.version}` : "Plan"}</Eyebrow>
             <span className="flex flex-wrap items-center gap-x-3 font-mono text-[11px] text-faint">
               {doc.steps ? <span className="tnum">{doc.steps} steps</span> : null}
               {added + changed + removed ? (
@@ -156,7 +156,7 @@ export function PlanView({
               </span>
             ) : null}
           </div>
-          <h1 className="mt-2.5 text-[30px] font-semibold leading-tight tracking-[-0.02em] text-ink">{doc.title}</h1>
+          <h1 className="mt-2.5 font-display text-[clamp(32px,3.2vw,46px)] font-normal leading-[1.02] tracking-[-0.018em] text-ink">{doc.title}</h1>
           {doc.lede ? <p className="mt-2.5 max-w-[720px] text-[17px] leading-relaxed text-on-surface-variant">{doc.lede}</p> : null}
         </header>
         {/* One hairline between sections, as between a level's blocks. */}
@@ -181,10 +181,10 @@ export function PlanView({
       </article>
 
       {/* The question, at the foot of the doc it is about. */}
-      <footer className="sticky bottom-0 border-t border-border-gray bg-warm-cream/95 backdrop-blur-sm">
+      <footer className="sticky bottom-0 border-t border-border-gray bg-paper/95 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-[920px] flex-col gap-2.5 px-10 py-3.5">
           {plan.state === "approved" ? (
-            <Line dot="bg-[#4caf50]" text={
+            <Line dot="bg-[var(--color-diff-add-ink)]" text={
                 status === "working"
                   ? "Accepted. Claude is building it."
                   : status === "waiting"
@@ -195,7 +195,7 @@ export function PlanView({
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="mr-auto flex items-center gap-2 text-[13px] font-medium text-ink">
-                  <span className="size-2 rounded-full bg-[#cf3e3e]" />
+                  <span className="size-2 rounded-full bg-clay-ink" />
                   Build this plan?
                 </span>
                 {yes
@@ -224,7 +224,7 @@ export function PlanView({
                     value={words}
                     onChange={(e) => setWords(e.target.value)}
                     placeholder={`${change.label}…`}
-                    className="h-8 min-w-0 flex-1 rounded-[2px] border border-border-gray bg-pure-white px-3 text-[13px] text-ink placeholder:text-faint focus:border-border-strong focus:outline-none"
+                    className="h-8 min-w-0 flex-1 border border-border-gray bg-card px-3 text-[13px] text-ink placeholder:text-faint focus:border-border-strong focus:outline-none"
                   />
                   <Button type="submit" disabled={!words.trim()}>
                     Send
@@ -233,7 +233,7 @@ export function PlanView({
               ) : null}
             </>
           ) : plan.state === "revising" || status === "working" ? (
-            <Line dot="bg-[#f0c674]" text={plan.asked ? `Asked: “${plan.asked}”. Claude is revising the plan.` : "Claude is revising the plan."} action={onShowClaude} />
+            <Line dot="bg-amber-ink" text={plan.asked ? `Asked: “${plan.asked}”. Claude is revising the plan.` : "Claude is revising the plan."} action={onShowClaude} />
           ) : (
             <Line dot="bg-border-strong" text={pty === undefined ? "Claude's tab is closed." : "Not accepted yet. Claude's tab has the conversation."} action={onShowClaude} />
           )}
@@ -297,14 +297,14 @@ function OnTheMap({ text, since, done }: { text: string; since?: number; done: b
           <li key={p.label + p.section} className="flex items-baseline gap-2">
             <span className="w-[140px] shrink-0 truncate text-ink">{p.label}</span>
             {p.path ? (
-              <button type="button" onClick={() => goTo(p.path!)} className="min-w-0 cursor-pointer truncate text-deep-green hover:underline">
+              <button type="button" onClick={() => goTo(p.path!)} className="min-w-0 cursor-pointer truncate text-accent hover:underline">
                 {trail(p.path)}
               </button>
             ) : (
               <span className="text-faint">no section {p.section}</span>
             )}
             {touched && p.path && p.change ? (
-              <span className={cn("ml-auto shrink-0 text-[12px]", hit(p.path) ? "text-deep-green" : "text-amber-ink")}>{hit(p.path) ? "touched" : "planned, not touched"}</span>
+              <span className={cn("ml-auto shrink-0 text-[12px]", hit(p.path) ? "text-accent" : "text-amber-ink")}>{hit(p.path) ? "touched" : "planned, not touched"}</span>
             ) : null}
           </li>
         ))}
@@ -320,7 +320,7 @@ function OnTheMap({ text, since, done }: { text: string; since?: number; done: b
           ))}
         </p>
       ) : null}
-      {touched && changing.length && changing.every((p) => hit(p.path!)) && !unplanned.length ? <p className="mt-3 text-[12.5px] text-deep-green">Built as planned: every part it named changed, and nothing else.</p> : null}
+      {touched && changing.length && changing.every((p) => hit(p.path!)) && !unplanned.length ? <p className="mt-3 text-[12.5px] text-accent">Built as planned: every part it named changed, and nothing else.</p> : null}
     </section>
   );
 }
@@ -477,7 +477,7 @@ function figureOf(lang: string, body: string): React.ReactNode {
 /** The files a plan touches, marked as the map marks a diff. */
 function Files({ lines }: { lines: FileLine[] }) {
   return (
-    <ul className="max-w-[860px] overflow-hidden rounded-[3px] border border-border-gray bg-pure-white">
+    <ul className="max-w-[860px] overflow-hidden border border-border-gray bg-card">
       {lines.map((f, i) => {
         const t = TINT[f.verdict];
         return (

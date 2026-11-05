@@ -1,7 +1,7 @@
 # Design
 
 How the app works and how it looks. Part one covers what is on screen and how
-you move through it. Part two covers the look: paper, cards, the one green, and
+you move through it. Part two covers the look: the sheet, its black frame, the one ink, and
 motion. The reasons behind each choice are in [DECISIONS.md](DECISIONS.md),
 cited as `Dn`. This records what the code does now, not an aspiration;
 anything not yet true is in §17.
@@ -227,8 +227,9 @@ never appears unless you asked for it.
 
 # Part two — look
 
-The look of the canvas: warm paper ground, hairline-bordered white cards, one
-green accent, and motion that never surprises you.
+The look follows the landing page (`landing/DESIGN.md`): one cobalt ink on a
+white sheet, square corners, slab lettering and mono labels. In Classic,
+black bars frame the sheet.
 
 Tokens live in `app/globals.css` under Tailwind v4's `@theme`. There is no
 `tailwind.config.ts` and there should not be one.
@@ -237,68 +238,91 @@ Tokens live in `app/globals.css` under Tailwind v4's `@theme`. There is no
 
 ## 8. The ground rule
 
-**Paper, not screen.** The page background is warm cream (`#fafaf8`), never pure
-white and never grey. Cards are pure white and sit *on* that cream. This single
-relationship does most of the work: a white card on cream reads as an object on
-a surface, where a white card on white needs a shadow to exist at all.
+**A sheet in a black frame.** The reading area is white paper (`#ffffff`),
+and cards are the same white, set apart by a 1px line. Everything on the
+sheet is drawn in one ink, `#2438c8`: text, borders, fills. The chrome
+(`[data-chrome]`: the workspace window, its terminals, menus) is the sheet
+too. Only the bars (`[data-chrome="bar"]`: the title bar, the tab strips, the
+status bar, the Preview toolbar) are black, with the accent kept cobalt,
+lifted to `#6b7dff` to read on black.
 
-Consequence: **shadows are nearly absent.** `--shadow-panel` is
-`0 1px 2px rgba(26,26,46,0.04)` — barely a shadow, used on hover only.
-Separation comes from the cream/white contrast and a 1px border. If you find
-yourself reaching for a heavier shadow, the contrast is doing something wrong.
+**Three themes.** Settings (and the palette) offer three, and the app opens
+in Classic:
+
+- **Classic** — the sheet in its black frame, as above.
+- **Light** — plain: white paper, near-black ink, grey chrome a step below
+  the paper.
+- **Dark** — plain: near-black paper, near-white ink, the chrome the same.
+
+All three keep the type, the square shapes, the labels and the meaning hues.
+Only the neutral colours and the accent change. The terminal has a palette
+per theme (`PALETTES` in `components/shell.tsx`) and recolours when the
+theme changes.
+
+**Shadows are nearly absent.** `--shadow-panel` is an ink-tinted 1px shadow,
+used on hover only. Separation comes from a 1px line.
 
 ---
 
 ## 9. Color
 
-### Surfaces — a ramp, not a binary
+### Surfaces
 
 ```
---color-warm-cream            #fafaf8   page ground
---color-pure-white            #ffffff   card fill
---color-surface               #f9f9f7   panel headers
---color-surface-container-low #f4f4f2   row hover, ghost fill
---color-surface-container     #eeeeec   inline code fill
---color-surface-dim           #dadad8   the dot grid
+--color-paper                 #ffffff   the sheet, the reading area
+--color-card                  #ffffff   card fill
+--color-surface               #f6f8fe   panel headers
+--color-surface-container-low #f1f4fe   row hover, ghost fill
+--color-surface-container     #e3e8fb   inline code fill
+--color-surface-dim           #cfd6f5   the dot grid
 ```
 
-### Ink — four weights, each with a job
+### Ink
 
 ```
---color-ink                #1a1a2e   titles, primary text
---color-on-surface         #1a1c1b   body inside cards
---color-on-surface-variant #404945   secondary prose, evidence rows
---color-muted-slate        #6b7280   labels, legend text
---color-faint              #9aa0a6   mono subtitles, eyebrows, line numbers
+--color-ink                #2438c8   titles, primary text: the one colour
+--color-on-surface         #2537c0   body inside cards
+--color-on-surface-variant #3445c6   secondary prose, evidence rows
+--color-muted-slate        #4a5bd2   labels, legend text
+--color-faint              #7d8adb   mono subtitles, line numbers
 ```
 
-Mono subtitles are always `--color-faint`. That's what keeps a card's second
-line from competing with its title.
+### The accent is the ink
 
-### The three state families — this is the product, not decoration
+```
+--color-accent         #2438c8   focus, links, selected and primary fills
+--color-accent-strong  #1a2fa0   hover on a filled control
+--color-on-accent      #fcfdff   text on an accent fill
+--color-accent-surface #e6eafc   a quiet accent tint
+--color-accent-line    #a9b3ee   its border
+```
 
-Each state gets ink / surface / line, so a state can tint a chip, a row, or a
-card edge and stay recognisably itself.
+A selected or hovered control fills with ink, and its text turns `on-accent`.
+In Dark the accent is white and `on-accent` is near-black, so write
+`text-on-accent` on an accent fill, never `text-white`. Selection is ink with
+paper text.
 
-| State | Meaning | Ink | Surface | Line |
-|---|---|---|---|---|
-| **derived** | Compiler-resolved. Trustworthy. | `#1f5c4d` | `#e8f5e9` | `#cfe6d4` |
-| **partial** | Found, known incomplete. | `#8a6416` | `#fdf6e3` | `#e2c77e` |
-| **alarm** | Partial *and* worth acting on. | `#8e3320` | `#fbede9` | `#e0b3a5` |
-| **inferred** | Not derivable. A guess. | `#6b7280` | `#f4f4f2` | `#d6d3cc` |
+### Meaning hues — the only colours that are not the ink
 
-**`derived` carries no badge.** Marking certainty creates a two-tier read where
-everything unmarked looks like a failure. Only the exceptions are marked — see
-`StateChip`, which returns `null` for `derived`.
+The landing has one ink. The app keeps a few more, because here a hue means
+something:
 
-Green is the only accent. Amber and clay are semantic state, not brand color,
-and never appear except to mean "incomplete" and "look at this."
+- **State.** `amber-*` is `partial`, `clay-*` is the one alarming finding.
+  **`derived` carries no badge**: marking certainty creates a two-tier read
+  where everything unmarked looks like a failure (`StateChip` returns `null`).
+- **Sections.** `--color-sec-1…7-*`: one hue per part a diagram leads into, so
+  the picture and the list of parts read as one thing. The first is the ink.
+- **Actors.** `--color-actor-1…4`: one per lifeline in a sequence.
+- **Diff.** `--color-diff-add-*` and `--color-diff-remove-*`, kept apart from
+  `clay` so a removed box never reads as an alarm.
+
+Amber and clay never appear except to mean "incomplete" and "look at this."
 
 ### Lines
 
 ```
---color-border-gray   #e7e5e0   every default border and divider
---color-border-strong #d6d3cc   hover, ghost edges, dashed borders
+--color-border-gray   #d5daf5   the ink at 18%: every default border, divider
+--color-border-strong #919be3   the ink at 50%: buttons, hover, dashed edges
 ```
 
 `* { border-color: var(--color-border-gray) }` in `@layer base` means a bare
@@ -308,43 +332,49 @@ and never appear except to mean "incomplete" and "look at this."
 
 ## 10. Shape
 
-```
---radius-panel 20px   panels, the canvas frame
---radius-chip  999px  value chips
-14px                  node cards (literal, not a token)
-12px                  rows, code blocks, callouts
-```
-
-Node cards sit at 14px deliberately — between the 20px panel and the 12px row,
-so a card reads as its own object without competing with the panel containing
-it. Tailwind's `rounded-xl` is ~17px and wrong here; use `rounded-[14px]`.
+**Square.** Nothing in the app is rounded, as on the landing's sheet. Do not
+add `rounded-*` to boxes, buttons, chips or menus. The only round things are
+true circles (`rounded-full`: dots, avatars, status lights) and the phone frame
+in `components/device.tsx`.
 
 ---
 
 ## 11. Type
 
-Two faces, loaded via `next/font/google` in `app/layout.tsx`:
+Three faces, loaded via `next/font/google` in `app/layout.tsx`, the same as
+the landing page:
 
-- **Inter** → `--font-sans`. All prose and UI.
-- **JetBrains Mono** → `--font-mono`. Every identifier, path, line number,
-  count, and eyebrow.
+- **Zilla Slab** → `--font-display` (`font-display`). Lettering: a level's
+  title, a plan's title, the top headings of a doc. Weight 400, tight
+  (`leading-[1.02]`, `-0.018em`).
+- **IBM Plex Sans** → `--font-sans`. All prose and UI.
+- **IBM Plex Mono** → `--font-mono`. Every identifier, path, line number,
+  count, label and button.
 
-The sans/mono split is semantic: **mono means "this is a thing in the codebase."**
-A file path, a symbol, a `:44`. Never use mono for prose and never set an
-identifier in sans.
+The sans/mono split is semantic: **mono means "this is a thing in the codebase"
+or "this is a label on the drawing."** Never set prose in mono, and never set
+an identifier in sans.
 
-Sizes in use (literal, not tokens — the scale tokens exist but the dense canvas
-runs tighter than they allow):
+- **Bracket labels.** `Eyebrow` (`components/state.tsx`) draws
+  `[ INSIDE SIGN UP ]`: mono, 11px, uppercase, `0.06em`, in the accent.
+- **Buttons.** `Button` (`components/button.tsx`) is mono, uppercase,
+  `0.04em`, square. `outline` is a `border-strong` frame that fills with ink on
+  hover; `primary` is filled with ink.
+
+Sizes in use (literal, not tokens — the dense canvas runs tighter than the
+scale tokens allow):
 
 | Role | Size |
 |---|---|
+| Level title | Zilla Slab, `clamp(32px, 3.2vw, 46px)` / 400 |
 | Card title | 15px / 600 / `-0.01em` |
 | Card title (compact) | 12.5px / 600 |
 | Card subtitle | 11.5px mono |
 | Card subtitle (compact) | 10px mono |
 | Detail line | 10.5px / 1.6 |
 | State chip | 10px mono, `tracking-wide` |
-| Eyebrow | 10.5px mono, uppercase, `0.09em` |
+| Eyebrow | 11px mono, uppercase, `0.06em`, in brackets |
+| Button | 11.5px mono, uppercase, `0.04em` |
 
 Add `.tnum` (`font-variant-numeric: tabular-nums`) to anything numeric that
 changes. Tailwind v4 doesn't emit this utility; it's defined in `@layer base`.
@@ -446,7 +476,7 @@ in `globals.css`. Don't add per-component guards; the blanket rule covers it.
 │ ─────────────────────────────────────   │  ← only at depth 2
 │ One line of finding. (10.5px/1.6)       │
 └─────────────────────────────────────────┘
-  14px radius · 1px #e7e5e0 · white on cream
+  square · 1px border-gray · card on paper
 ```
 
 - Title `truncate` inside `min-w-0 flex-1`; the chip is `shrink-0`. The title
@@ -460,19 +490,22 @@ in `globals.css`. Don't add per-component guards; the blanket rule covers it.
 
 ---
 
-## 15. Light mode only
+## 15. Themes
 
-There is no dark palette and no `@custom-variant dark`. The paper metaphor is
-the design; a dark inversion would need a different one, not inverted tokens.
-If dark mode is ever wanted, it's a redesign, not a token swap.
+There is no `@custom-variant dark`. `<html data-theme>` is `classic`, `light`
+or `dark`, set before first paint by `THEME_SCRIPT` (`lib/theme.ts`) and kept
+by `followTheme` (`lib/settings.ts`). Each theme swaps the token values, so
+every class and every diagram that reads them follows (§8). A saved theme
+this version does not know, such as the old `system`, opens as Classic. The
+landing page sets its embedded app to Classic.
 
 ---
 
 ## 16. Reuse checklist
 
 1. Copy the `@theme` block from `app/globals.css`, plus `.tnum` and `.dotfield`.
-2. Load Inter as `--font-sans` and a real mono as `--font-mono` via `next/font`.
-3. Cream page, white cards, 1px `#e7e5e0`, 14px radius, no shadow at rest.
+2. Load Zilla Slab, IBM Plex Sans and IBM Plex Mono as `--font-display`, `--font-sans` and `--font-mono` via `next/font`.
+3. One ink on paper, lighter cards, 1px ink-tint lines, square corners, no shadow at rest.
 4. Mono for anything that names code. Sans for everything else.
 5. Don't badge the confident state. Badge only the exceptions.
 6. Click changes what's shown; zoom changes only how big it is.

@@ -11,7 +11,7 @@ const H = 1250;
 const STOPS = [
   { x: 270, y: 250, pic: "tl-ada", who: "Ada Lovelace", year: "1843", did: "Wrote what is often called the first program, for a machine that was never built.", tilt: -2 },
   { x: 730, y: 600, pic: "tl-turing", who: "Alan Turing", year: "1936", did: "Described a machine that could run any program written as steps.", tilt: 1.5 },
-  { x: 270, y: 950, pic: "tl-karpathy", who: "Andrej Karpathy", year: "2025", did: "Named vibe coding: you “fully give in to the vibes” and “forget that the code even exists.”", tilt: -1 },
+  { x: 270, y: 950, pic: "tl-karpathy", who: "Andrej Karpathy", year: "2025", did: "Coined vibe coding: you “fully give in to the vibes” and “forget that the code even exists.”", tilt: -1 },
 ];
 
 const PATH = "M500 0C500 125 270 125 270 250S730 460 730 600 270 810 270 950 500 1150 500 1250";

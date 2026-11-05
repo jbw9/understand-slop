@@ -10,6 +10,7 @@ import { buildMap, type MapFile } from "@/lib/map";
 import { MARK_IDS } from "@/components/shapes";
 import type { Anatomy } from "@/lib/data";
 import { layoutDiagram, overlaps, segmentsOf } from "@/lib/diagram";
+import { activeGraph, type Def, type Graph } from "./graph";
 
 export interface CheckResult {
   problems: string[];
@@ -25,7 +26,134 @@ export const SUB_WORDS = 8;
 /** A block's caption is a heading over the picture, not a sentence about it.
  *  What follows " — " is a gloss the page sets apart (canvas.tsx shapeLabel). */
 export const CAPTION_WORDS = 5;
+/** Splits prose into sentences the way `sentences` counts them. */
+const splitSentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean);
+/**
+ * A file path on a card (D42): a name with a code extension (`api.ts`), a
+ * directory written with its slash (`app/lib/`), or a path under a usual
+ * source directory (`src/routes`). Words joined by slashes ("date/money",
+ * "read/write/delete") are not paths.
+ */
+export const looksLikePath = (v: string) =>
+  /\b[\w-]+\.(tsx?|jsx?|mjs|mts|cjs|py|go|rb|rs|java|kt|swift|sql|json|ya?ml|css|html|md)\b|[\w.-]+\/(?=$|[\s),.;:])|(^|[\s(`"'])\.{0,2}\/?(src|app|lib|libs|pkg|cmd|internal|components|scripts|pages|assets|tests?|packages|apps)\/[\w.-]/.test(v);
 export const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
+
+export type Range = { file: string; start: number; end: number };
+const defIndex = new WeakMap<Graph, Map<string, Def>>();
+const defsOf = (g: Graph) => {
+  let ix = defIndex.get(g);
+  if (!ix) defIndex.set(g, (ix = new Map(g.defs.map((d) => [d.id, d]))));
+  return ix;
+};
+
+/** Every line range a node stands for: its code, its steps' lines, and all of its parts'. */
+export function rangesOf(n: any, out: Range[] = []): Range[] {
+  if (!n) return out;
+  for (const c of n.code ?? []) out.push({ file: c.file, start: c.start, end: c.end });
+  for (const b of n.anatomy ?? [])
+    for (const r of b.kind === "flow" || b.kind === "sequence" ? (b.rows ?? []) : []) {
+      const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(r.at ?? "");
+      if (m) out.push({ file: m[1], start: +m[2], end: +(m[3] ?? m[2]) });
+    }
+  for (const k of n.children ?? []) rangesOf(k, out);
+  return out;
+}
+
+/**
+ * Why a diagram arrow is not a path the graph has, or null when it is (or the
+ * graph cannot judge it). The arrow's `at` must be a line where code calls or
+ * inherits from something inside the code the target box stands for: the
+ * part it opens, or the definition its `ref` lands in. A box that stands for
+ * nothing in the repository (a database, an outside API, the user) and a file
+ * the graph did not parse are left to the line checks above.
+ */
+/**
+ * The code a diagram box stands for: everything under the part it opens, or
+ * the definition its `ref` lands in. Empty for a box that stands for nothing
+ * in the repository (a database, an outside API, the user).
+ */
+export function boxRanges(g: Graph, box: any, nodes: Map<string, any>): Range[] {
+  if (!box) return [];
+  if (box.opens) return rangesOf(nodes.get(box.opens));
+  if (!box.ref) return [];
+  const m = /^(.+?)(?::(\d+)(?:-(\d+))?)?$/.exec(box.ref);
+  if (!m) return [];
+  const line = m[2] ? +m[2] : 0;
+  const holding = g.defs.filter((d) => d.file === m[1] && (!line || (d.start <= line && line <= d.end))).sort((a, b) => a.end - a.start - (b.end - b.start));
+  return holding.length ? [{ file: m[1], start: holding[0].start, end: holding[0].end }] : [{ file: m[1], start: line || 1, end: m[3] ? +m[3] : line || 1e9 }];
+}
+
+/** Whether a def (or a file, for top-level code) falls in any of these ranges. */
+const landsIn = (ix: Map<string, Def>, id: string, targets: Range[]) => {
+  const d = ix.get(id);
+  return d ? targets.some((t) => t.file === d.file && d.start <= t.end && t.start <= d.end) : targets.some((t) => t.file === id);
+};
+
+/**
+ * The line where code in `from` calls (or inherits from) code in `to`, as
+ * `file:line`: what an arrow between two boxes cites. A call the source
+ * states beats one the graph resolved by name. Null when the graph has none.
+ */
+export function callLine(g: Graph, from: Range[], to: Range[]): string | null {
+  if (!from.length || !to.length) return null;
+  const ix = defsOf(g);
+  const fileOf = (id: string) => ix.get(id)?.file ?? id;
+  let best: { at: string; extracted: boolean } | null = null;
+  for (const e of g.edges) {
+    if (e.kind === "imports" || !e.lines.length || !landsIn(ix, e.to, to) || landsIn(ix, e.to, from)) continue;
+    const file = fileOf(e.from);
+    const line = e.lines.find((l) => from.some((r) => r.file === file && r.start <= l && l <= r.end));
+    if (line === undefined) continue;
+    const extracted = e.how === "extracted";
+    if (!best || (extracted && !best.extracted)) best = { at: `${file}:${line}`, extracted };
+    if (best.extracted) break;
+  }
+  return best?.at ?? null;
+}
+
+function arrowOffGraph(g: Graph, owner: string, box: any, arrow: any, nodes: Map<string, any>, file: string, start: number, end: number): string | null {
+  if (!g.files.includes(file) || !box) return null;
+  const ix = defsOf(g);
+  const targets = boxRanges(g, box, nodes);
+  if (!targets.length) return null;
+  const fileOf = (id: string) => ix.get(id)?.file ?? id;
+  const here = g.edges.filter((e) => e.kind !== "imports" && fileOf(e.from) === file && e.lines.some((l) => l >= start - 1 && l <= end + 1));
+  if (here.some((e) => landsIn(ix, e.to, targets))) return null;
+  const elsewhere = [...new Set(here.map((e) => e.to.split("#").pop()))].slice(0, 4);
+  return `ARROW ${owner} ${arrow.from}→${arrow.to} cites ${arrow.at}, but the graph has no call there into the code of "${box.label}"${elsewhere.length ? ` (the calls there go to ${elsewhere.join(", ")})` : ""} — cite a line graph_links shows from the one's code into the other's, or set \`inferred: true\` if they connect in a way the graph cannot follow (a decorator, a callback, an event, a queue, the network)`;
+}
+
+/**
+ * The same problem told on a level and again on a part inside it: the part
+ * keeps it, where its line is. (What the verify stage did after its review,
+ * kept now that nothing reviews.)
+ */
+export function dedupeIssues(root: any) {
+  const below = (n: any): Set<string> => new Set((n.children ?? []).flatMap((c: any) => [...(c.issues ?? []).flatMap((x: any) => (x.where ? [x.where] : [])), ...below(c)]));
+  const walk = (n: any) => {
+    if (n.issues?.length && n.children?.length) {
+      const deeper = below(n);
+      const kept = n.issues.filter((x: any) => !x.where || !deeper.has(x.where));
+      n.issues = kept.length ? kept : undefined;
+    }
+    (n.children ?? []).forEach(walk);
+  };
+  walk(root);
+}
+
+/** How many of a map's code diagrams' arrows the graph shows, and how many are drawn as inferred. */
+export function arrowStats(map: unknown): { total: number; inferred: number } {
+  const out = { total: 0, inferred: 0 };
+  const walk = (x: any) => {
+    if (!x || typeof x !== "object") return;
+    if (Array.isArray(x)) return x.forEach(walk);
+    if (x.kind === "diagram" && Array.isArray(x.arrows))
+      for (const a of x.arrows) if (a?.at) { out.total++; if (a.inferred) out.inferred++; }
+    Object.values(x).forEach(walk);
+  };
+  walk(map);
+  return out;
+}
 
 /** How the overview is named in a problem: no node can have this id, so it never clashes with one. */
 export const OVERVIEW_ID = "(overview)";
@@ -101,7 +229,9 @@ export function check(
   // `opens` may name a row-built child, so it is checked against the tree the
   // screen actually reads, not the authored one.
   const built = new Map<string, Set<string>>();
-  const index = (ns: any[]) => ns.forEach((n) => { built.set(n.id, new Set((n.children ?? []).map((c: any) => c.id))); index(n.children ?? []); });
+  const nodes = new Map<string, any>();
+  const index = (ns: any[]) => ns.forEach((n) => { built.set(n.id, new Set((n.children ?? []).map((c: any) => c.id))); nodes.set(n.id, n); index(n.children ?? []); });
+  const graph = gen ? activeGraph() : null;
   const tree = buildMap({ RUN: {} as any, AUTHORED: map.AUTHORED }, "");
   const L0 = tree.L0;
   index(L0);
@@ -154,10 +284,14 @@ export function check(
           if (gen && (a.label ?? "").length > 24) problems.push(`ARROW ${owner} ${a.from}→${a.to} label "${a.label}" is over 24 characters — a few words on the line`);
           if (gen && !explain) {
             const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(a.at ?? "");
-            if (!m) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites no line — give \`at\` as file:line where this path happens`);
+            if (!m) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites no line${graph ? ", and the graph has no call from the one box's code into the other's to fill it with" : ""} — give \`at\` as file:line where this path happens${graph ? " (for a box outside the repository, the line that calls out to it), or mark it `inferred: true`" : ""}`);
             else if (!inRange(m[1], +m[2], +(m[3] ?? m[2]))) problems.push(`ARROW ${owner} ${a.from}→${a.to} cites ${a.at}, which does not exist`);
             else if (bareLines(linesOf(m[1])!).slice(+m[2] - 1, +(m[3] ?? m[2])).every(Boolean))
               problems.push(`ARROW ${owner} ${a.from}→${a.to} cites ${a.at}, which is only imports, comments or brackets — cite the line where ${a.from} calls, writes or sends to ${a.to}`);
+            else if (graph && !a.inferred) {
+              const off = arrowOffGraph(graph, owner, b.boxes.find((x: any) => x.id === a.to), a, nodes, m[1], +m[2], +(m[3] ?? m[2]));
+              if (off) problems.push(off);
+            }
           }
         }
         if (gen && b.arrows.every((a: any) => b.boxes.some((x: any) => x.id === a.from) && b.boxes.some((x: any) => x.id === a.to)))
@@ -198,7 +332,7 @@ export function check(
       if (n.title.split(/\s+/).length > 4) problems.push(`TITLE ${n.id} "${n.title}" — more than 4 words`);
       // D42: no file paths on a card.
       for (const [k, v] of [["title", n.title], ["sub", n.sub]])
-        if (/[\w-]+\/[\w.-]+|\b[\w-]+\.(tsx?|jsx?|py|go|rb|rs|java|sql|json)\b/.test(v ?? "")) problems.push(`PATH ${n.id} ${k} "${v}" — no file paths on a card`);
+        if (looksLikePath(v ?? "")) problems.push(`PATH ${n.id} ${k} "${v}" — no file paths on a card`);
       // D38: two short sentences at most; the rest is pictures.
       const w = words(n.detail ?? "");
       const ss = sentences(n.detail ?? "");
@@ -475,6 +609,16 @@ export function autofix(node: any, repo: string): string[] {
   };
   const walk = (n: any) => {
     if (!n || typeof n !== "object" || n.origin) return;
+    if (typeof n.title === "string" && /^[a-z]/.test(n.title)) {
+      const t = n.title[0].toUpperCase() + n.title.slice(1);
+      notes.push(`${n.id}: title "${n.title}" capitalised to "${t}"`);
+      n.title = t;
+    }
+    // Over two sentences, but the first two fit the 40 words: those are the detail.
+    if (typeof n.detail === "string" && sentences(n.detail) > 2) {
+      const two = splitSentences(n.detail).slice(0, 2).join(" ");
+      if (words(two) <= 40) { notes.push(`${n.id}: detail cut to its first two sentences`); n.detail = two; }
+    }
     for (const list of [n.code, n.docs])
       for (const c of Array.isArray(list) ? list : []) {
         const lines = linesOf(c.file);

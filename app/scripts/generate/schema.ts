@@ -9,6 +9,8 @@
 import { readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
 import { autofix, check } from "./check";
+import { fillFromGraph } from "./fill";
+import { activeGraph } from "./graph";
 
 /** lib/data.ts from `State` to its end. */
 export function typeReference(): string {
@@ -117,6 +119,10 @@ export function submitProblems(
   repo: string,
   opts: { isRoot?: boolean; taken?: Set<string>; within?: (node: Node) => Node; fixed?: string[] } = {},
 ): string[] {
+  // What the graph can fill is filled first: a code ref named by its graph id has no lines for the shape to check.
+  const filled = fillFromGraph(node, activeGraph());
+  opts.fixed?.push(...filled.notes);
+  if (filled.problems.length) return filled.problems;
   const shape = shapeProblems(node, prefix, opts.isRoot ?? true);
   if (shape.length) return shape;
   // Once the shape holds, what has one right answer is fixed, not sent back.

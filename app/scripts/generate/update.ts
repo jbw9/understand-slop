@@ -40,7 +40,7 @@ import type { Node } from "@/lib/data";
 import { lastExchange } from "@/lib/keep";
 import type { MapFile } from "@/lib/map";
 import { parseArgs } from "./args";
-import { authorRoot, converse, runTool, submitLine } from "./author";
+import { authorRoot, authorTool, converse, submitLine } from "./author";
 import { catalogOf } from "./catalog";
 import { changes, diffOf, moved, readText, refs, touches, type Base, type Change } from "./gitdiff";
 import { bill, cacheIn, MODELS } from "./bedrock";
@@ -51,7 +51,7 @@ import { inventory, isSource, scopeTo, type Inventory } from "./inventory";
 import { plain, redrawOverview } from "./pipeline";
 import { idsOf, submitProblems } from "./schema";
 import { full, oneLine, summarize, type FileSummary } from "./summarize";
-import { verifyTree } from "./verify";
+import { activeGraph, buildGraph, setGraph, withSummaries } from "./graph";
 
 /** Written whole and renamed into place, so the open map never reads half a file. */
 function atomic(path: string, body: string) {
@@ -204,27 +204,35 @@ function named(map: MapFile, name: string): Placed | null {
 
 /* ── 4. redoing one ──────────────────────────────────────────── */
 
+/** A changed file as the updater sees it: the definitions the graph has on its changed lines, never the diff itself. */
+function changedDefs(c: Change): string {
+  if (c.after === null) return `- ${c.path}: deleted`;
+  const g = activeGraph();
+  const hit = (g?.defs ?? []).filter((d) => d.file === c.path && c.hunks.some((h) => d.start <= h.ns + Math.max(h.nl, 1) - 1 && h.ns <= d.end));
+  const innermost = hit.filter((d) => !hit.some((x) => x !== d && x.parent === d.id));
+  return `- ${c.path}: ${c.before === null ? "added" : "changed"}${innermost.length ? ` — ${innermost.slice(0, 12).map((d) => `${d.id.split("#")[1]} (${d.start}-${d.end})`).join(", ")}` : ""}`;
+}
+
 function brief(t: Placed, root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>, mine: Change[], reach: string[], told: Told): string {
   const trail = t.path.map((n) => n.title).join(" › ");
-  const cap = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}\n… (cut at ${n} characters)` : s);
   return [
     `# Repository: ${inv.name} @ ${inv.commit}, with uncommitted changes`,
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
     `## The section to update\n${trail}\nIt sits in the root "${root.title}"; every id under that root starts with "${root.prefix}-".`,
     told.account ? `## What the coding agent did, in its own words\n${told.account}` : "",
-    mine.length ? `## What changed in the code\n${mine.map((c) => "```diff\n" + cap(c.diff, 12000) + "\n```").join("\n\n")}` : "## The code under this section did not change",
+    mine.length ? `## What changed in the code\nThe files, and the functions and classes on the lines that changed, as the graph has them now. Look them up with graph_show.\n${mine.map(changedDefs).join("\n")}` : "## The code under this section did not change",
     told.notes.length
-      ? `## Where the coding agent found this section wrong\nIt read the code and reported:\n${told.notes.map((n) => `- ${n}`).join("\n")}\nCheck each against the code yourself; correct what it is right about.`
+      ? `## Where the coding agent found this section wrong\nIt read the code and reported:\n${told.notes.map((n) => `- ${n}`).join("\n")}\nCheck each against the graph yourself; correct what it is right about.`
       : "",
     `## The section as the map has it now\nLine references are already moved to where that code is now; the ones on changed lines may be off.\n\`\`\`json\n${JSON.stringify(t.node, null, 1)}\n\`\`\``,
-    `## Files you can read (${reach.length}) — the changed files, what they import and what imports them, and the files this section cites\n${reach.map((p) => (sums[p] ? (mine.some((c) => c.path === p) ? full(sums[p]) : oneLine(sums[p])) : p)).join("\n")}`,
+    `## Files around this change (${reach.length}) — the changed files, what they import and what imports them, and the files this section cites\n${reach.map((p) => (sums[p] ? (mine.some((c) => c.path === p) ? full(sums[p]) : oneLine(sums[p])) : p)).join("\n")}`,
     `## Task
 The code under this section changed, or the coding agent found the section wrong. Update the section so it is true of the code as it is now, and submit it whole, with its full subtree.
 - Keep what is still true as it is: the same id for this section ("${t.node.id}"), the same ids, titles and wording for children that still describe real code. Change what the diff makes wrong, add what it adds, remove what it removes.
-- Problems (\`issues\`, and \`alarm\`/\`unsure\` where they name one) are part of this: read the code each one points at again. Drop one the change fixed, rewrite one it changed, add one it introduced. Keep only what the code still does wrong.
-- Every line reference must point at the code as it is now: read the changed ranges before citing them.
+- Problems (\`issues\`, and \`alarm\`/\`unsure\` where they name one) are part of this: look up what each one points at again in the graph. Drop one the change fixed, rewrite one it changed, add one it introduced. Keep only what the code still does wrong.
+- Every line reference must point at the code as it is now: cite the line ranges and call lines the graph gives.
 - New ids start with "${root.prefix}-" and must not reuse an id from elsewhere in the map.
-- Only the files listed above can be read or searched.
+- You cannot open files: the graph tools are how you see the code. An arrow the graph cannot follow (an event, a decorator, a queue) is drawn \`inferred: true\`.
 - If the code this section describes is gone altogether, submit \`{ "id": "${t.node.id}", "removed": true }\` instead, and the section is taken out.
 Budget: about 15 tool calls before you submit.`,
   ].filter(Boolean).join("\n\n");
@@ -253,14 +261,13 @@ async function redo(
     for (const [from, tos] of Object.entries(inv.imports)) if (tos.includes(c.path)) reach.add(from);
   }
   for (const f of cited) reach.add(f);
-  const known = new Set(inv.files.map((f) => f.path).filter((p) => reach.has(p)));
-  const list = [...known].sort();
+  const list = inv.files.map((f) => f.path).filter((p) => reach.has(p)).sort();
   // Ids taken outside this section, which a new one may not reuse.
   const mineIds = idsOf(t.node);
   const elsewhere = new Set([...map.AUTHORED.flatMap((r) => [...idsOf(r)])].filter((id) => !mineIds.has(id)));
   let submits = 0;
   const handle = (name: string, input: any): Handled => {
-    if (name !== "submit") return { content: runTool({ name, input }, inv, known, list) };
+    if (name !== "submit") return { content: authorTool({ name, input }) };
     submits++;
     const node = input?.root;
     if (node?.removed === true) {
@@ -362,6 +369,7 @@ export async function update(args: string[]) {
   if (corrections.length) console.log(`${corrections.length} corrections from the agent${unmatched.length ? `; no section named ${unmatched.join(", ")}` : ""}`);
 
   const inv = inventory(repo);
+  setGraph(await buildGraph(inv));
   // A scoped map keeps to its part. One made before the scope was saved covers
   // far fewer files than the checkout holds; what its cut claims is its part.
   // Without this, an update of a map of Kafka's controller tried to place the
@@ -385,6 +393,7 @@ export async function update(args: string[]) {
   }
   const byPath = new Map(found.map((c) => [c.path, c]));
   const sums = has("--dry-run") ? {} : await summarize(inv, () => {});
+  withSummaries(activeGraph()!, sums);
   let added: Root[] = [];
   if (unplaced.length && !has("--dry-run")) {
     const placed = await place(cut, unplaced, inv, sums, model);
@@ -474,7 +483,6 @@ export async function update(args: string[]) {
   await Promise.all([
     ...picked.map(async (t) => {
       const node = await redo(t, map, cut, inv, sums, byPath, { account: said, notes: notesFor(t) }, model, say);
-      if (node && !isRemoved(node)) await verifyTree(node, inv, model);
       land(t, node);
     }),
     // A root the placing added is written whole, as a full run writes one.
@@ -487,7 +495,6 @@ export async function update(args: string[]) {
         return;
       }
       const node = plain(a.root);
-      await verifyTree(node, inv, model);
       // Below the last root: rows can have gaps where a root was taken out.
       map.AUTHORED.push({ ...node, col: 0, row: Math.max(-1, ...map.AUTHORED.map((n) => n.row ?? 0)) + 1 });
       fresh.push({ id: r.id, title: node.title, ok: true });

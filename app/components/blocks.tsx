@@ -230,6 +230,9 @@ function Diagram({
             const at = block.arrows.find((a) => a.from === from && a.to === to && a.at)?.at;
             const name = (id: string) => block.boxes.find((x) => x.id === id)?.label ?? id;
             const show = at && onCode ? () => onCode(at, `${name(from)} → ${name(to)}`, label?.text) : undefined;
+            // Dotted when the code links these two only in a way the fact graph cannot follow (DiagramArrow.inferred).
+            const pair = block.arrows.filter((a) => a.from === from && a.to === to);
+            const inferred = pair.length > 0 && pair.every((a) => a.inferred);
             return (
             <g key={i}>
               <path
@@ -237,7 +240,8 @@ function Diagram({
                 fill="none"
                 stroke={hot.has(`${from}→${to}`) ? TINT.changed.line : TONE[tone].line}
                 strokeWidth={hot.has(`${from}→${to}`) ? 2.5 : 1.5}
-                strokeDasharray={tone === "warn" ? "5 4" : undefined}
+                strokeDasharray={tone === "warn" ? "5 4" : inferred ? "1 4" : undefined}
+                strokeLinecap={inferred && tone !== "warn" ? "round" : undefined}
                 markerEnd={`url(#dg-${tone})`}
               />
               {label ? (

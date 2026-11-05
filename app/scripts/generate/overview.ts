@@ -14,7 +14,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import type { Node } from "@/lib/data";
 import type { Overview } from "@/lib/map";
-import { converse, runTool } from "./author";
+import { authorTool, converse } from "./author";
 import { type Handled } from "./claude-code";
 import { bareLines, check, EXPLAIN_LEVEL, fileReader, OVERVIEW_ID, WALK_STEPS, WALKS } from "./check";
 import { owners, type Cut } from "./cut";
@@ -111,8 +111,8 @@ Write the top level of the map: the repository itself, the level a reader lands 
 - \`sub\`: at most 8 words, what this repository IS.
 - \`detail\`: at most two sentences and 40 words, the one thing to know before the picture.
 - \`anatomy\`: exactly one \`diagram\`, its \`caption\` a heading of at most 5 words ("How the roots connect"), not a sentence. One box per root, labelled with the root's title, with \`opens\` set to the root's id; lay them out left to right in the order someone meets them, a branch on a row of its own. Add a box that opens nothing only for a thing outside every root that the roots meet (the database, an outside API).
-- Arrows only where the code goes from one root to another — a call, a redirect, a write another reads — each with \`at\` as file:line, a line in one of the two roots' files. Every edge listed above with a call site is a real path; draw the ones a reader needs (the most-used, and every one a walkthrough crosses), reading the line first. Roots with nothing between them get no arrow.
-- Where the code stores data (a database, files, a cache, browser storage, a queue), a \`table\` captioned "Where data lives", with columns Store | Holds | Defined at | Written by | Read by: one row per store, what it holds in a few words, the file:line where its schema or shape is defined (a migration, a model, a type), and the roots that write and read it, by title. Read the code to confirm each writer and reader; the summaries above are leads. A repository that stores nothing has none.
+- Arrows only where the code goes from one root to another — a call, a redirect, a write another reads — each with \`at\` as file:line, a line in one of the two roots' files. Take them from graph_links, from one root's files to the other's: each link it lists is a real call, with the line to cite. Draw the ones a reader needs (the most-used, and every one a walkthrough crosses). Where roots meet in a way the graph cannot follow (an event, a queue, a route the framework calls, the network), draw the arrow \`inferred: true\`, citing the line that wires it. Roots with nothing between them get no arrow. You cannot open files; the graph tools are how you see the code.
+- Where the code stores data (a database, files, a cache, browser storage, a queue), a \`table\` captioned "Where data lives", with columns Store | Holds | Defined at | Written by | Read by: one row per store, what it holds in a few words, the file:line where its schema or shape is defined (a migration, a model, a type), and the roots that write and read it, by title. Confirm each writer and reader in the graph (graph_callers on the function that writes or reads); the summaries above are leads. A repository that stores nothing has none.
 - \`code\`: the lines that show how the whole fits together (the entry point, the router), \`state\`, and \`issues\` only if one spans roots.
 - \`walkthroughs\`: ${WALKS[0]}-${WALKS[1]} of \`{title, steps}\` — the core things this system does, each followed from start to end across the roots it passes through ("A visitor pays for a plan", "A broker joins the cluster"): the ones a developer new to the code most needs, not edge cases. ${WALK_STEPS[0]}-${WALK_STEPS[1]} steps each, in the order they happen. Each step: \`title\` a few words, \`detail\` one or two plain sentences naming the function that does it, and \`path\` the ids from a root down to the part where it happens (from the list above), as deep as the step is specific.
 
@@ -163,12 +163,11 @@ export function overviewProblems(o: any, roots: Node[], repo: string, cut: Cut):
 }
 
 export async function overviewOf(roots: Node[], cut: Cut, inv: Inventory, model: string, onSubmit: (submit: number, problems: number) => void, sums: Record<string, FileSummary> = {}): Promise<Overviewed> {
-  const known = new Set(inv.files.map((f) => f.path));
   const res: Overviewed = { overview: null, turns: 0, submits: 0, problems: [] };
   let last: any = null;
 
   const handle = (name: string, input: any): Handled => {
-    if (name !== "submit") return { content: runTool({ name, input }, inv, known) };
+    if (name !== "submit") return { content: authorTool({ name, input }) };
     res.submits++;
     // A fix after a rejection may send only what changed; it lands on the last submit.
     const fixes = typeof input?.replace === "string" ? JSON.parse(input.replace) : input?.replace;

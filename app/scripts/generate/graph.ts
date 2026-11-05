@@ -32,6 +32,12 @@ export interface Def {
   end: number;
   /** The definition this one sits in, if any. */
   parent?: string;
+  /** Its decorators and signature as written: `@app.route("/login")\ndef login(form):`. */
+  head?: string;
+  /** Its doc comment or docstring, trimmed. */
+  doc?: string;
+  /** What it does, in one line: the summarize stage's reading of it (withSummaries). */
+  does?: string;
 }
 export interface Edge {
   /** A def id, or a file path for code at a file's top level (and for every import). */
@@ -44,6 +50,10 @@ export interface Edge {
 }
 export interface Graph {
   commit: string;
+  /** Every file the graph parsed: only in these can it say what a line calls. */
+  files: string[];
+  /** What each file is for, from the summarize stage (withSummaries). */
+  about?: Record<string, string>;
   defs: Def[];
   edges: Edge[];
   /** Files parsed, calls left out because their name had several candidates, and how long the build took. */
@@ -81,7 +91,7 @@ const GENERIC = new Set([
   "get", "set", "has", "add", "delete", "remove", "clear", "keys", "values", "items", "entries", "update", "append", "extend", "insert", "copy",
   "join", "split", "format", "replace", "strip", "trim", "lower", "upper", "startswith", "endswith", "startsWith", "endsWith", "includes", "indexOf",
   "map", "filter", "reduce", "forEach", "find", "some", "every", "sort", "slice", "splice", "concat", "then", "catch", "finally", "toString", "valueOf",
-  "length", "size", "count", "index", "len", "Add", "Get", "Set", "String", "Error", "close", "read", "write", "next", "call", "apply", "bind", "emit", "on",
+  "length", "size", "count", "index", "len", "pop", "setdefault", "discard", "print", "Add", "Get", "Set", "String", "Error", "close", "read", "write", "next", "call", "apply", "bind", "emit", "on",
 ]);
 /** Languages whose file edges imports.ts reads from a parsed import statement; the rest are matched by name. */
 const PARSED_IMPORTS = new Set(["ts", "python", "rust", "c", "dart", "ruby", "php"]);
@@ -189,6 +199,69 @@ function shadows(def: string, own: string, name: string): boolean {
   return new RegExp(`\\b${name.replace(/[$]/g, "\\$")}\\b`).test(end < 0 ? sig.split("\n")[0] : sig.slice(0, end));
 }
 
+/** Lines that annotate the definition below them: `@decorator`, `#[attr]`, `[Attribute]`. */
+const ANNOTATION = /^\s*(@[\w.]+|#\[|\[[A-Z]\w*[\](])/;
+/** Lines of comment, in any of the languages read. */
+const COMMENT = /^\s*(\/\/\/?|#(?!\[)|\/\*\*?|\*(?!\/)|\*\/|--|%)/;
+const HEAD_LINES = 4;
+const DOC_CHARS = 400;
+
+/**
+ * A definition's header and doc, read from the lines around it with no
+ * grammar: the annotations just above it and its first lines up to where its
+ * body opens; the comment just above it, or a docstring just inside.
+ */
+function describe(lines: string[], start: number, end: number): { head?: string; doc?: string } {
+  let top = start - 1;
+  while (top > 0 && ANNOTATION.test(lines[top - 1])) top--;
+  const sig: string[] = [];
+  for (let i = start - 1; i < Math.min(end, start - 1 + HEAD_LINES); i++) {
+    sig.push(lines[i].trimEnd());
+    if (/(\{|:|=>|\bdo|=)\s*$/.test(lines[i]) || /\{\s*\S/.test(lines[i])) break;
+  }
+  const head = [...lines.slice(top, start - 1).map((l) => l.trim()), ...sig.map((l, i) => (i ? l.trim() : l.trim()))].join("\n").slice(0, 300);
+  // A comment just above (past any annotations), nearest line last.
+  const above: string[] = [];
+  for (let i = top - 1; i >= 0 && COMMENT.test(lines[i]) && above.length < 12; i--) above.unshift(lines[i]);
+  let doc = above.map((l) => l.replace(/^\s*(\/\/\/?|#|\/\*\*?|\*\/?|--|%)\s?/, "").replace(/\*\/\s*$/, "").trim()).filter(Boolean).join(" ");
+  // Else a docstring just inside: Python's """...""", Elixir's @doc """...""".
+  if (!doc) {
+    const after = lines.slice(start - 1 + sig.length, Math.min(end, start - 1 + sig.length + 15)).join("\n");
+    // A long one need not close within the lines looked at: its opening is what the reader needs.
+    const m = /^\s*(?:@(?:module)?doc\s+)?[rRuUbB]?("""|\'\'\')([\s\S]*?)(?:\1|$)|^\s*(?:@(?:module)?doc\s+)?"([^"\n]*)"/.exec(after);
+    if (m) doc = (m[2] ?? m[3] ?? "").replace(/\s+/g, " ").trim();
+  }
+  return { ...(head ? { head } : {}), ...(doc ? { doc: doc.slice(0, DOC_CHARS) } : {}) };
+}
+
+/**
+ * Lays the summarize stage's reading onto the graph: what each file is for,
+ * and what each symbol it named does, onto the definition of that name whose
+ * lines it spans. The only words in the graph a model wrote.
+ */
+export function withSummaries(g: Graph, sums: Record<string, { purpose: string; symbols: { name: string; start: number; end: number; does: string }[] }>): Graph {
+  g.about = {};
+  const byFile = new Map<string, Def[]>();
+  for (const d of g.defs) byFile.set(d.file, [...(byFile.get(d.file) ?? []), d]);
+  for (const [path, s] of Object.entries(sums)) {
+    if (s.purpose && !s.purpose.startsWith("(not summarised")) g.about[path] = s.purpose;
+    for (const sym of s.symbols ?? []) {
+      const short = sym.name.split(/[.:#\s(]/).filter(Boolean).pop() ?? sym.name;
+      const cands = (byFile.get(path) ?? []).filter((d) => d.name === short || d.name === sym.name);
+      const d = cands.find((x) => x.start <= sym.end && sym.start <= x.end) ?? (cands.length === 1 ? cands[0] : undefined);
+      if (d && sym.does && !d.does) d.does = sym.does;
+    }
+  }
+  return g;
+}
+
+let active: Graph | null = null;
+/** The graph this run draws from: authors' graph tools answer from it, and the checker proves arrows against it. */
+export function setGraph(g: Graph | null) {
+  active = g;
+}
+export const activeGraph = () => active;
+
 const cache = new Map<string, Promise<Graph>>();
 
 /** The repository's fact graph; built once per inventory. */
@@ -210,6 +283,7 @@ async function compile(inv: Inventory): Promise<Graph> {
   const perFile = new Map<string, { spans: (Def & { a: number; b: number })[]; refs: Ref[]; text: string }>();
   const tests = new Set(code.filter((f) => f.test).map((f) => f.path));
   let parsed = 0;
+  const parsedFiles: string[] = [];
   for (const f of code) {
     const g = GRAMMAR[extname(f.path).toLowerCase()];
     if (!g) continue;
@@ -223,7 +297,10 @@ async function compile(inv: Inventory): Promise<Graph> {
     parser.setLanguage(lang);
     const { defs: raws, refs } = read(parser, query(lang, g[0], g[1]), text, g[0]);
     const { defs: mine, spans } = nest(f.path, raws);
+    const lines = text.split("\n");
+    for (const d of mine) Object.assign(d, describe(lines, d.start, d.end));
     defs.push(...mine);
+    parsedFiles.push(f.path);
     // A definition's own name is not a call to it (Elixir's `def run(x)` is a call node).
     const named = new Set(raws.map((r) => r.nameIndex));
     perFile.set(f.path, { spans, refs: refs.filter((r) => !named.has(r.index)), text });
@@ -345,6 +422,7 @@ async function compile(inv: Inventory): Promise<Graph> {
 
   return {
     commit: inv.commit,
+    files: parsedFiles,
     defs,
     edges: [...edges.values()],
     stats: { files: code.length, parsed, calls, resolved, ambiguous, ms: Date.now() - t0 },

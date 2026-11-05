@@ -19,6 +19,7 @@ if (opt("--out")) writeFileSync(opt("--out")!, JSON.stringify(g) + "\n");
 const q = opt("--ask");
 if (q) {
   const [name, ...rest] = q.split(" ");
+  if (name === "links") { const [a, b] = rest.join(" ").split(" -> "); console.log("\n" + graphTool(g, { name: "graph_links", input: { from: a.split(","), to: b.split(",") } })); process.exit(0); }
   const arg = rest.join(" ");
   console.log("\n" + graphTool(g, { name: `graph_${name}`, input: name === "path" ? { from: arg.split(" ")[0], to: arg.split(" ")[1] } : name === "file" ? { path: arg } : name === "entrypoints" ? {} : { name: arg } }));
 }

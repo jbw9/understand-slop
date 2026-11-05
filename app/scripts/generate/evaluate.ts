@@ -93,7 +93,7 @@ export function evaluate(name: string, map: MapFile) {
     issues: nodes.reduce((a, n) => a + (n.issues?.length ?? 0), 0),
     "not certain %": Math.round((100 * nodes.filter((n) => n.state !== "derived").length) / nodes.length),
     problems,
-    "verify %": report?.verifyPassRate ?? "",
+    "inferred arrows %": report?.arrows?.total ? Math.round((100 * report.arrows.inferred) / report.arrows.total) : "",
     usd: report?.fullUsd ?? "",
     // Tokens sent and received over the whole run, cached prompt reads included (in thousands).
     "k tokens": report ? Math.round(Object.values(report.bill as Record<string, { input: number; output: number; cacheRead: number }>).reduce((a, b) => a + b.input + b.output + b.cacheRead, 0) / 1000) : "",

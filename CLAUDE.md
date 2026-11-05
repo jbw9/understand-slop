@@ -2,12 +2,7 @@
 
 ## Commits
 
-Every commit is a title only, in the form `area: summary`. This applies in every directory and on every branch.
-
-- `area` is the lowercase product part the commit changes: `app`, `canvas`, `terminal`, `tabs`, `projects`, `generate`, `preview`, `workspace`, `landing`.
-- `summary` is lowercase and short. It says what the product does after the commit, not what code changed. No trailing period.
-- No body and no co-author line.
-- Example: `terminal: click a file to open it in an editor tab`.
+Write every commit with the `commit` skill (`.claude/skills/commit/`).
 
 ## Demo GIFs
 

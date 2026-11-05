@@ -122,7 +122,7 @@ export default function Landing() {
             }}
           />
         </div>
-        <LandingAgent />
+        <LandingAgent name="flask" diagram={flask.OVERVIEW.anatomy.find((a) => a.kind === "diagram")!} changed="handling-requests" />
         <div className={s.wrap}>
           <LandingStart />
           <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">

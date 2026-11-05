@@ -1215,20 +1215,181 @@
 .section {
   margin-top: var(--gap);
 }
-/* The words, then the app beside the agent at full width, big enough to read. */
 .agent {
   display: grid;
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 40px 72px;
 }
 .agent .intro + .intro {
   margin-top: 14px;
 }
-/* The drawing of the app, at the size the demo's own drawings use. */
-.agentFrame {
-  position: relative;
-  height: clamp(420px, 52vw, 720px);
+/* The agents it works with, by their marks, in the page's one ink. */
+.agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 13px var(--mono);
+  text-transform: uppercase;
+}
+.agents li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agents .logo {
+  width: 22px;
+  height: 22px;
+}
+.logo {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+/* The agent's terminal over the map, as the app stacks its workspace beside it. */
+.desk {
+  display: grid;
+  /* The map on the left and the agent on the right, as the app lays them out. */
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* On a phone the map keeps a readable size and scrolls inside its panel. */
+@media (max-width: 600px) {
+  .mini {
+    overflow-x: auto;
+  }
+  .roots {
+    min-width: 560px;
+  }
+}
+.term,
+.mini {
+  min-width: 0;
   border: 1px solid var(--ink);
   overflow: hidden;
+}
+.term {
+  background: var(--code-bg);
+  color: var(--code-ink);
+}
+.termTabs {
+  display: flex;
+  border-bottom: 1px solid color-mix(in srgb, var(--code-ink) 30%, transparent);
+  font: 11px var(--mono);
+}
+.termTabs span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  opacity: 0.7;
+}
+.termTabs span[data-on] {
+  background: var(--code-ink);
+  color: var(--code-bg);
+  opacity: 1;
+}
+.term pre {
+  margin: 0;
+  padding: 16px 16px 14px;
+  font: 12px/1.8 var(--mono);
+  white-space: pre-wrap;
+}
+.prompt {
+  color: var(--code-key);
+}
+.faintText {
+  color: var(--code-num);
+}
+/* What goes with the next prompt, under the terminal. */
+.context {
+  margin: 0;
+  padding: 7px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--code-ink) 30%, transparent);
+  font: 11px var(--mono);
+  color: var(--code-num);
+}
+.picked {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid currentColor;
+  color: var(--code-key);
+}
+.mini {
+  padding: 12px 14px 16px;
+  background: var(--paper);
+}
+.miniBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  font: 11px var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.miniBar .winName {
+  color: var(--ink);
+}
+/* The map's top level in diff mode: the changed box filled, the one calling into it dashed, the rest receding. */
+.roots {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.roots path {
+  fill: none;
+  stroke: var(--faint);
+  stroke-width: 1.3;
+}
+.roots marker path {
+  fill: var(--faint);
+  stroke: none;
+}
+.roots .wire[data-near] path {
+  stroke: var(--ink);
+}
+.roots text {
+  font: 15px var(--font-body), sans-serif;
+  fill: var(--faint);
+}
+.roots rect {
+  fill: var(--paper);
+  stroke: var(--line);
+}
+.roots [data-v] rect {
+  stroke: var(--ink);
+}
+.roots [data-v] text {
+  fill: var(--ink);
+}
+.roots [data-v="near"] rect {
+  stroke-dasharray: 4 3;
+}
+.roots [data-v="changed"] > rect {
+  fill: var(--ink);
+}
+.roots [data-v="changed"] > text {
+  fill: var(--on-ink);
+  font-weight: 500;
+}
+.roots .tag rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+.roots .tag text {
+  font: 500 11px var(--mono);
+  fill: var(--ink);
 }
 
 /* ── your own repo, and questions ─────────────────────── */
@@ -1617,6 +1778,9 @@
   /* The hand needs the room. */
   .window {
     display: none;
+  }
+  .desk {
+    grid-template-columns: minmax(0, 1fr);
   }
   .canvas {
     height: 600px;

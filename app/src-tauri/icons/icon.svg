@@ -11,7 +11,7 @@
   <g clip-path="url(#sq)">
     <rect width="1024" height="1024" fill="#f3efe4"/>
     <path d="M128 0V1024M0 128H1024M192 0V1024M0 192H1024M256 0V1024M0 256H1024M320 0V1024M0 320H1024M384 0V1024M0 384H1024M448 0V1024M0 448H1024M512 0V1024M0 512H1024M576 0V1024M0 576H1024M640 0V1024M0 640H1024M704 0V1024M0 704H1024M768 0V1024M0 768H1024M832 0V1024M0 832H1024M896 0V1024M0 896H1024" stroke="rgba(36,56,200,0.08)" stroke-width="2" fill="none"/>
-    <g transform="translate(0 -36)" filter="url(#hand)" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(0 -73)" filter="url(#hand)" stroke-linecap="round" stroke-linejoin="round">
       <g stroke="#2438c8" stroke-width="26" fill="none">
         <path d="M334 562 C332 446 414 346 514 346 C612 346 694 444 690 560"/>
         <path d="M200 562 c0 -56 48 -56 48 0 c0 -56 48 -56 48 0"/>

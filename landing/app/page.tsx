@@ -109,7 +109,7 @@ const PROBLEMS: Problem[] = [
 const READING = [
   { ...LEVIN, note: "Why the bottleneck moved from typing to verifying, and what that asks of our tools." },
   { ...WITTEVEEN, note: "A developer on what he still opens an IDE for: diffs, navigation, verification, docs." },
-  { ...SO_SURVEY, note: "Developers use AI more than ever, and trust its accuracy less." },
+  SO_SURVEY,
   { ...METR, note: "Developers took 19% longer with AI, and believed they had been 20% faster." },
 ];
 

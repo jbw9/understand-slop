@@ -14,7 +14,7 @@ export interface Problem {
 }
 
 /** Why Bluprint exists: what developers say goes wrong with agent-written code, each next to what the app does about it. */
-export function LandingWhy({ problems, reading }: { problems: Problem[]; reading: (Source & { note: string })[] }) {
+export function LandingWhy({ problems, reading }: { problems: Problem[]; reading: (Source & { note?: string })[] }) {
   return (
     <section id="why" className={s.section} aria-labelledby="why-title">
       <p className={`${s.eyebrow} ${s.reveal}`}>Why we&rsquo;re building this</p>
@@ -58,7 +58,7 @@ export function LandingWhy({ problems, reading }: { problems: Problem[]; reading
               <a href={r.href}>
                 {r.who}, {r.work}
               </a>
-              <span>{r.note}</span>
+              {r.note ? <span>{r.note}</span> : null}
             </li>
           ))}
         </ul>

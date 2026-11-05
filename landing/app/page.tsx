@@ -67,31 +67,21 @@ const VOICES: Voice[] = [
 const PROBLEMS: Problem[] = [
   {
     title: "You can’t see what the agent changed.",
-    said: (
-      <>
-        One task &ldquo;could be touching 10, 15 different files&rdquo;, and &ldquo;from the terminal alone you really
-        can&rsquo;t see any of that.&rdquo;
-      </>
-    ),
+    said: <>One task &ldquo;could be touching 10, 15 different files.&rdquo;</>,
     by: WITTEVEEN,
-    answer: "draws every change on the map: which sections a commit touched, what is new, changed or gone, and the lines under each.",
+    answer: "Bluprint draws every change on the map, down to the lines.",
   },
   {
     title: "Reviewing takes longer than writing.",
-    said: (
-      <>
-        45% of developers say debugging AI-generated code takes longer, and 66% say its answers are &ldquo;almost right,
-        but not quite.&rdquo;
-      </>
-    ),
+    said: <>66% of developers say AI answers are &ldquo;almost right, but not quite.&rdquo;</>,
     by: SO_SURVEY,
-    answer: "lets you read at the right height: the steps the program takes first, then only the parts that changed, down to the line.",
+    answer: "Read the steps first, then only what changed.",
   },
   {
     title: "You own what you ship, whoever typed it.",
     said: <>&ldquo;Accountability doesn&rsquo;t transfer just because the authorship did.&rdquo;</>,
     by: LEVIN,
-    answer: "checks every sentence on the map against the code it cites. What it couldn’t prove is marked, so you know what to read yourself.",
+    answer: "Every sentence is checked against the code it cites. What isn’t proven is marked.",
   },
   {
     title: "Your agent is working blind too.",
@@ -102,7 +92,7 @@ const PROBLEMS: Problem[] = [
       </>
     ),
     by: WITTEVEEN,
-    answer: "is the agent’s context as well. Pick a section and it goes into the next prompt; Claude moves your view to the part it’s explaining.",
+    answer: "Pick a section and it goes into Claude’s next prompt.",
   },
 ];
 

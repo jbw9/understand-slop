@@ -1,0 +1,280 @@
+{
+  "repo": "saas-starter",
+  "commit": "6e33e58",
+  "questions": [
+    {
+      "id": "ss-1",
+      "kind": "parts",
+      "q": "What are the main parts of this app (pages, server actions, auth, database, payments) and how do they depend on each other?",
+      "facts": [
+        "Pages under app/(login) and app/(dashboard) call server actions from app/(login)/actions.ts (auth, account, team) and lib/payments/actions.ts (checkout, customer portal)",
+        "The actions are wrapped by helpers in lib/auth/middleware.ts and use lib/auth/session.ts for password hashing and the session cookie",
+        "lib/db/queries.ts (getUser, getUserWithTeam, getTeamByStripeCustomerId, updateTeamSubscription, ...) is the shared data-access layer over Drizzle/Postgres, used by both the actions and lib/payments/stripe.ts",
+        "lib/payments/stripe.ts wraps the Stripe SDK and is called from the login actions (createCheckoutSession) as well as the payment actions",
+        "Client components read the current user and team through SWR from /api/user and /api/team; the root layout pre-seeds those two keys with getUser() and getTeamForUser() promises"
+      ],
+      "where": [
+        "app/(dashboard)/dashboard/page.tsx:12-16",
+        "app/(login)/actions.ts:19-27",
+        "lib/payments/stripe.ts:1-12",
+        "app/layout.tsx:29-38"
+      ]
+    },
+    {
+      "id": "ss-2",
+      "kind": "location",
+      "q": "Where is the code that decides how long a new subscriber's free trial lasts?",
+      "facts": [
+        "createCheckoutSession in lib/payments/stripe.ts requests subscription_data.trial_period_days: 14 on every Checkout Session",
+        "The seed script creates the Base and Plus Stripe prices with recurring.trial_period_days: 7",
+        "The pricing page displays the price's recurring.trial_period_days (via getStripePrices), falling back to 7, so it advertises 7 days while checkout asks Stripe for 14"
+      ],
+      "where": [
+        "lib/payments/stripe.ts:27-44",
+        "lib/db/seed.ts:14-22",
+        "app/(dashboard)/pricing/page.tsx:18-28",
+        "lib/payments/stripe.ts:149-165"
+      ]
+    },
+    {
+      "id": "ss-3",
+      "kind": "location",
+      "q": "Where is the code that decides when a visitor gets sent to the sign-in (or sign-up) page?",
+      "facts": [
+        "The root middleware.ts redirects to /sign-in when the path starts with /dashboard and there is no 'session' cookie; it only checks that the cookie exists",
+        "On GET requests that carry the cookie, the middleware verifies the JWT and re-issues it with a fresh 24-hour expiry; if verification fails it deletes the cookie and redirects only when the path is under /dashboard",
+        "The middleware matcher excludes /api, _next/static, _next/image and favicon.ico",
+        "withTeam (used by checkoutAction and customerPortalAction) redirects to /sign-in when getUser() returns null, and createCheckoutSession separately redirects to /sign-up?redirect=checkout&priceId=... when the user or team is missing"
+      ],
+      "where": [
+        "middleware.ts:5-14",
+        "middleware.ts:18-49",
+        "lib/auth/middleware.ts:61-75",
+        "lib/payments/stripe.ts:21-25"
+      ]
+    },
+    {
+      "id": "ss-4",
+      "kind": "data",
+      "q": "Where is a team's subscription state stored, what does it look like, and which code writes and reads it?",
+      "facts": [
+        "It lives on the teams row: stripeCustomerId, stripeSubscriptionId, stripeProductId, planName and subscriptionStatus; there is no separate subscriptions table",
+        "The checkout success route (GET /api/stripe/checkout) writes all five fields, and it is the only code that ever sets stripeCustomerId",
+        "The webhook path (handleSubscriptionChange -> updateTeamSubscription) finds the team by stripeCustomerId; for active/trialing it updates the fields, for canceled/unpaid it nulls subscription id, product id and plan name, and any other status is ignored",
+        "The dashboard's ManageSubscription component reads planName and subscriptionStatus from /api/team"
+      ],
+      "where": [
+        "lib/db/schema.ts:22-32",
+        "app/api/stripe/checkout/route.ts:79-89",
+        "lib/payments/stripe.ts:117-147",
+        "app/(dashboard)/dashboard/page.tsx:52-60"
+      ]
+    },
+    {
+      "id": "ss-5",
+      "kind": "data",
+      "q": "Where do activity log entries come from, what is stored in each one, and who gets to see them?",
+      "facts": [
+        "Entries are rows in activity_logs (teamId, userId, action, timestamp, ipAddress), inserted only by the non-exported logActivity helper in app/(login)/actions.ts",
+        "logActivity silently skips the insert when teamId is null or undefined, so users without a team leave no log",
+        "No caller passes an ipAddress, so it is always stored as an empty string",
+        "The Activity page's getActivityLogs filters by the current user's id (not by team) and returns the 10 most recent entries"
+      ],
+      "where": [
+        "lib/db/schema.ts:46-55",
+        "app/(login)/actions.ts:29-45",
+        "app/(login)/actions.ts:89-92",
+        "lib/db/queries.ts:81-100"
+      ]
+    },
+    {
+      "id": "ss-6",
+      "kind": "flow",
+      "q": "What happens end to end when someone on the pricing page clicks Get Started and pays?",
+      "facts": [
+        "The pricing form posts priceId to checkoutAction, which is wrapped in withTeam: no signed-in user redirects to /sign-in, no team throws 'Team not found'",
+        "So an anonymous visitor is sent to /sign-in without the priceId; the /sign-up?redirect=checkout&priceId=... redirect inside createCheckoutSession is not reached from this path",
+        "createCheckoutSession creates a subscription-mode Stripe Checkout Session with client_reference_id set to the user id, the team's stripeCustomerId if any, and success_url /api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}, then redirects to Stripe",
+        "On return, GET /api/stripe/checkout loads the user from client_reference_id, finds their team via team_members, and writes the Stripe customer, subscription, product, planName and status onto teams",
+        "It then calls setSession for that user and redirects to /dashboard; any error redirects to /error"
+      ],
+      "where": [
+        "lib/payments/actions.ts:7-10",
+        "lib/auth/middleware.ts:61-75",
+        "lib/payments/stripe.ts:21-46",
+        "app/api/stripe/checkout/route.ts:52-96"
+      ]
+    },
+    {
+      "id": "ss-7",
+      "kind": "flow",
+      "q": "What happens when someone signs up, with and without an invitation?",
+      "facts": [
+        "signUp is wrapped in validatedAction with signUpSchema (email, password min 8, optional inviteId); an email that already exists gets a generic 'Failed to create user' error",
+        "The users row is inserted (role 'owner') before the invitation is checked, so an invalid inviteId returns 'Invalid or expired invitation.' but leaves a user with no team behind",
+        "With a valid invite (matching id, matching email, status 'pending') it marks the invitation 'accepted', logs ACCEPT_INVITATION and joins the invitation's team with the invitation's role",
+        "Without an invite it creates a team named \"<email>'s Team\", logs CREATE_TEAM and makes the user that team's 'owner'",
+        "It then inserts the team_members row, logs SIGN_UP and sets the session cookie, and goes to Stripe checkout if redirect=checkout, otherwise /dashboard"
+      ],
+      "where": [
+        "app/(login)/actions.ts:103-142",
+        "app/(login)/actions.ts:148-180",
+        "app/(login)/actions.ts:181-222"
+      ]
+    },
+    {
+      "id": "ss-8",
+      "kind": "impact",
+      "q": "If I change what the session token contains or how it is verified (signToken/verifyToken in lib/auth/session.ts), what else is affected?",
+      "facts": [
+        "The token payload is SessionData { user: { id }, expires }, signed with HS256 by signToken and checked by verifyToken",
+        "middleware.ts calls verifyToken on every GET request that has a session cookie and re-signs the parsed payload with signToken to refresh it",
+        "getUser in lib/db/queries.ts calls verifyToken and also requires user.id to be a number and expires to be in the future before loading the non-deleted user",
+        "getUser is the auth gate for validatedActionWithUser, withTeam, getTeamForUser, getActivityLogs, createCheckoutSession, signOut, /api/user and the root layout's SWR fallback",
+        "setSession produces the cookie for signIn, signUp and the Stripe checkout success route; getSession is exported but never called"
+      ],
+      "where": [
+        "lib/auth/session.ts:20-59",
+        "middleware.ts:18-33",
+        "lib/db/queries.ts:7-37",
+        "lib/auth/middleware.ts:37-75"
+      ]
+    },
+    {
+      "id": "ss-9",
+      "kind": "impact",
+      "q": "If I change getTeamForUser (or the team-with-members shape it returns), what else breaks?",
+      "facts": [
+        "getTeamForUser returns the user's team with its teamMembers and each member's user {id, name, email} (the TeamDataWithMembers shape), or null; it uses findFirst, so only one team per user is ever considered",
+        "GET /api/team returns it as JSON",
+        "The dashboard Team page reads it through useSWR<TeamDataWithMembers>('/api/team'): ManageSubscription for planName and subscriptionStatus, and the members list from the same key",
+        "withTeam calls it and passes the team to the wrapped action (checkoutAction and customerPortalAction), throwing 'Team not found' when it is null"
+      ],
+      "where": [
+        "lib/db/queries.ts:102-130",
+        "app/api/team/route.ts:1-6",
+        "app/(dashboard)/dashboard/page.tsx:40-56",
+        "lib/auth/middleware.ts:61-75"
+      ]
+    },
+    {
+      "id": "ss-10",
+      "kind": "term",
+      "q": "What represents a user's role (owner vs member), and which role does the app actually check?",
+      "facts": [
+        "Roles are plain strings ('owner' / 'member'), not an enum type, and are stored in two places: users.role (default 'member') and team_members.role",
+        "The invite form's owner check reads users.role from /api/user, not the team_members role",
+        "signUp always inserts users.role = 'owner' (the comment says an invitation overrides it, but only team_members.role gets the invitation's role), and nothing else updates users.role, so every signed-up user passes that owner check"
+      ],
+      "where": [
+        "lib/db/schema.ts:11-20",
+        "lib/db/schema.ts:34-44",
+        "app/(dashboard)/dashboard/page.tsx:190-196",
+        "app/(login)/actions.ts:128-132"
+      ]
+    },
+    {
+      "id": "ss-11",
+      "kind": "extend",
+      "q": "How would I add a new form action (say, rename the team) that requires a signed-in user and validates its input?",
+      "facts": [
+        "Add it next to the existing server actions in app/(login)/actions.ts (billing ones live in lib/payments/actions.ts)",
+        "Define a zod schema and wrap the handler in validatedActionWithUser(schema, async (data, formData, user) => ...) from lib/auth/middleware.ts; validatedAction is the no-login variant",
+        "The wrappers parse Object.fromEntries(formData), so every field reaches the schema as a string",
+        "Return an ActionState ({ error } or { success }, plus any echoed fields) and wire it to a client form with useActionState(action, {}), which matches the wrapper's (prevState, formData) signature",
+        "Call logActivity(teamId, user.id, ActivityType.X) as updateAccount does if it should appear in the activity log"
+      ],
+      "where": [
+        "lib/auth/middleware.ts:6-29",
+        "lib/auth/middleware.ts:31-54",
+        "app/(login)/actions.ts:341-359",
+        "app/(dashboard)/dashboard/general/page.tsx:75-92"
+      ]
+    },
+    {
+      "id": "ss-12",
+      "kind": "extend",
+      "q": "How would I add a new kind of event to the activity log so it shows up on the Activity page?",
+      "facts": [
+        "Add a member to the ActivityType string enum in lib/db/schema.ts; its string value is what gets stored in activity_logs.action",
+        "Record it with logActivity(teamId, userId, ActivityType.X), a non-exported helper inside app/(login)/actions.ts, so actions in other files cannot call it as it stands",
+        "Add an icon to iconMap on the Activity page; it is typed Record<ActivityType, LucideIcon>, so TypeScript requires the new entry",
+        "Add a label to formatAction's switch, otherwise the entry renders as 'Unknown action occurred'"
+      ],
+      "where": [
+        "lib/db/schema.ts:131-142",
+        "app/(login)/actions.ts:29-45",
+        "app/(dashboard)/dashboard/activity/page.tsx:17-28",
+        "app/(dashboard)/dashboard/activity/page.tsx:44-69"
+      ]
+    },
+    {
+      "id": "ss-13",
+      "kind": "enforce",
+      "q": "Only team owners are supposed to invite or remove members. Is that actually enforced on the server?",
+      "facts": [
+        "No: removeTeamMember and inviteTeamMember (validatedActionWithUser) only require a signed-in user who belongs to a team; neither checks the caller's role",
+        "The owner rule for invites exists only in the UI, which disables the invite form unless /api/user reports role 'owner'",
+        "The Remove button is shown by list position (index > 1), not by the viewer's role",
+        "removeTeamMember does scope the delete to the caller's own team (teamMembers.teamId must equal the caller's teamId), and any member can send an invite with role 'owner' since the schema allows z.enum(['member', 'owner'])"
+      ],
+      "where": [
+        "app/(login)/actions.ts:361-392",
+        "app/(login)/actions.ts:394-407",
+        "app/(dashboard)/dashboard/page.tsx:156-168",
+        "app/(dashboard)/dashboard/page.tsx:190-196"
+      ]
+    },
+    {
+      "id": "ss-14",
+      "kind": "enforce",
+      "q": "How are the API routes protected, and what does each return to a caller who isn't logged in?",
+      "facts": [
+        "The global middleware's matcher excludes /api, so API routes never go through the session middleware",
+        "/api/user calls getUser itself and responds with JSON null (status 200, not 401) when there is no session cookie, the session has expired or the user is deleted",
+        "/api/user returns the whole users row that getUser selects with db.select(), including passwordHash",
+        "/api/stripe/webhook authenticates by verifying the stripe-signature header against STRIPE_WEBHOOK_SECRET with stripe.webhooks.constructEvent on the raw body, returning 400 on failure"
+      ],
+      "where": [
+        "middleware.ts:46-49",
+        "app/api/user/route.ts:1-6",
+        "lib/db/queries.ts:26-36",
+        "app/api/stripe/webhook/route.ts:7-21"
+      ]
+    },
+    {
+      "id": "ss-15",
+      "kind": "enforce",
+      "q": "How is form input validated for server actions, and is it applied to every action?",
+      "facts": [
+        "validatedAction and validatedActionWithUser run schema.safeParse(Object.fromEntries(formData)) and return only the first zod error message as { error }",
+        "validatedActionWithUser checks authentication before validation and throws 'User is not authenticated' instead of returning an { error }",
+        "The withTeam-wrapped actions (checkoutAction, customerPortalAction) have no schema at all; checkoutAction reads priceId straight from formData",
+        "removeTeamMemberSchema declares memberId as z.number(), but the Remove form sends it as a hidden input string, so validation fails for that form"
+      ],
+      "where": [
+        "lib/auth/middleware.ts:17-54",
+        "lib/payments/actions.ts:7-15",
+        "app/(login)/actions.ts:361-363",
+        "app/(dashboard)/dashboard/page.tsx:156-158"
+      ]
+    },
+    {
+      "id": "ss-16",
+      "kind": "data",
+      "q": "What happens to a user's data when they delete their account, and how does the rest of the app treat that user afterwards?",
+      "facts": [
+        "deleteAccount re-checks the password, then soft-deletes: it sets users.deletedAt to CURRENT_TIMESTAMP and rewrites the email to '<email>-<id>-deleted' so the unique email is freed",
+        "It hard-deletes the user's team_members row, deletes the session cookie and redirects to /sign-in; the DELETE_ACCOUNT activity is logged before the delete",
+        "The team, activity logs and invitations are left in place",
+        "getUser ignores soft-deleted users (isNull(users.deletedAt)), so any session for that user stops resolving",
+        "signIn does not check deletedAt; logging in with the old address fails only because the email was rewritten"
+      ],
+      "where": [
+        "app/(login)/actions.ts:300-338",
+        "lib/db/queries.ts:26-30",
+        "app/(login)/actions.ts:55-64"
+      ]
+    }
+  ]
+}

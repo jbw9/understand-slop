@@ -1,0 +1,284 @@
+{
+  "repo": "shiori",
+  "commit": "36f3b55",
+  "questions": [
+    {
+      "id": "sh-1",
+      "kind": "parts",
+      "q": "What are the main parts of the Go code, and how does a CLI command or an HTTP request end up touching the database?",
+      "facts": [
+        "main.go runs cmd.ShioriCmd(); every command except version starts with initShiori, which loads the SHIORI_* configuration, opens and migrates the database, and wires the auth, accounts, archiver, bookmarks, storage and tags domains into one Dependencies object",
+        "If the database has no accounts, initShiori creates an owner account 'shiori' with password 'gopher'",
+        "CLI commands (add, delete, update, print, import, pocket, ...) call deps.Database() (model.DB) directly instead of going through the domains",
+        "The server command registers routes in internal/http: /api/v1 handlers go through deps.Domains(), which call model.DB, while the legacy /api/* routes wrap internal/webserver handlers that are handed the database directly",
+        "Page download and processing (readable text, thumbnail, archive, ebook) lives in internal/core and is shared by the CLI, the domains and the legacy handlers"
+      ],
+      "where": [
+        "internal/cmd/root.go:92-133",
+        "internal/cmd/add.go:76-83",
+        "internal/http/handlers/api/v1/bookmarks.go:610-623",
+        "internal/http/handlers/legacy.go:18-30"
+      ]
+    },
+    {
+      "id": "sh-2",
+      "kind": "location",
+      "q": "Where is keyword search over bookmarks implemented, and does it behave the same on SQLite, PostgreSQL and MySQL?",
+      "facts": [
+        "GET /api/v1/bookmarks?keyword= passes the keyword through BookmarksDomain.SearchBookmarks into DBGetBookmarksOptions.Keyword; the SQL is written separately in each backend's GetBookmarks",
+        "SQLite matches url or excerpt with LIKE '%kw%', or title/content with an FTS5 MATCH on the bookmark_content virtual table; the keyword is sent as a quoted phrase with '-' replaced by spaces",
+        "PostgreSQL uses plain LIKE '%kw%' on the url, title, excerpt and content columns; its migrations create no full-text index",
+        "MySQL/MariaDB uses url LIKE plus MATCH(title, excerpt, content) AGAINST (kw IN BOOLEAN MODE), backed by the FULLTEXT index in its bookmark migration"
+      ],
+      "where": [
+        "internal/database/sqlite.go:419-437",
+        "internal/database/pg.go:312-322",
+        "internal/database/mysql.go:323-331",
+        "internal/http/handlers/api/v1/bookmarks.go:731-747"
+      ]
+    },
+    {
+      "id": "sh-3",
+      "kind": "location",
+      "q": "Where does the app turn a downloaded web page into readable text, a thumbnail, an offline archive or an ebook?",
+      "facts": [
+        "All of it happens in core.ProcessBookmark (internal/core/processing.go), which works on content already fetched by core.DownloadBookmark",
+        "For text/html it runs go-readability to set Author, Content (plain text) and HTML, and takes the article's title and excerpt unless KeepTitle/KeepExcerpt are set; Content is emptied when readability.Check says the page is not readable",
+        "The thumbnail is the article image, falling back to the favicon, saved to thumb/<id>; an ebook (ebook/<id>.epub) is built only when CreateEbook is set, and for a PDF that returns early with an error, skipping the archive; a WARC archive (archive/<id>) is built only when CreateArchive is set",
+        "Files are written through the Storage domain, but ProcessBookmark never writes to the database; its callers (CLI add/update, BookmarksDomain.UpdateBookmarkCache, the legacy downloadBookmarkContent) decide whether to save the returned bookmark"
+      ],
+      "where": [
+        "internal/core/processing.go:80-120",
+        "internal/core/processing.go:122-157",
+        "internal/core/processing.go:159-190",
+        "internal/domains/bookmarks.go:118-153"
+      ]
+    },
+    {
+      "id": "sh-4",
+      "kind": "data",
+      "q": "Where does a saved bookmark's data actually live (what is in the database, what is on disk), and how does the API know whether a bookmark has an archive or an ebook?",
+      "facts": [
+        "The bookmark table holds url (unique), title, excerpt, author, public, has_content and the timestamps (created_at/modified_at after the 0004 SQLite migration); tags are in tag (unique name) and the bookmark_tag join table. No column links a bookmark to an account",
+        "The readable text and HTML live in the FTS5 virtual table bookmark_content (docid = bookmark id) on SQLite, but in content and html columns of bookmark on PostgreSQL and MySQL",
+        "Thumbnail, archive and ebook are files under the data directory at thumb/<id>, archive/<id> and ebook/<id>.epub (model.GetThumbnailPath / GetArchivePath / GetEbookPath)",
+        "HasThumbnail, HasArchive and HasEbook are not stored: populateAdditionalFields sets them by checking whether those files exist, and ImageURL becomes /bookmark/<id>/thumb when a thumbnail exists"
+      ],
+      "where": [
+        "internal/database/migrations/sqlite/0001_initial.up.sql:11-40",
+        "internal/database/migrations/postgres/0001_initial.up.sql:10-22",
+        "internal/model/bookmark.go:56-74",
+        "internal/domains/bookmarks.go:18-39"
+      ]
+    },
+    {
+      "id": "sh-5",
+      "kind": "data",
+      "q": "How are user accounts and logins stored? Is there a sessions table?",
+      "facts": [
+        "Accounts are rows in the account table: username (unique), a bcrypt password hash, an owner flag and a JSON config of UI preferences (ShowId, ListMode, Theme, UseArchive, CreateEbook, MakePublic, ...)",
+        "There is no session or token table: CreateTokenForAccount signs an HS256 JWT whose claims carry the AccountDTO and an expiry",
+        "CheckToken verifies the signature with Http.SecretKey and then re-reads the account by the ID in the token, so later changes to the account apply to tokens already issued",
+        "The key comes from SHIORI_HTTP_SECRET_KEY; if it is unset a random UUID is generated at startup, which invalidates every token on restart"
+      ],
+      "where": [
+        "internal/model/account.go:11-30",
+        "internal/domains/auth.go:27-53",
+        "internal/domains/auth.go:79-99",
+        "internal/config/config.go:79-89"
+      ]
+    },
+    {
+      "id": "sh-6",
+      "kind": "flow",
+      "q": "What happens, step by step, when a client creates a bookmark with POST /api/v1/bookmarks?",
+      "facts": [
+        "The handler requires a logged-in owner account (RequireLoggedInAdmin), rejects an empty URL, strips utm_* query parameters with core.RemoveUTMParams, and uses the URL as the title when none is given; the payload has no tags field",
+        "BookmarksDomain.CreateBookmark inserts the row with model.DB.SaveBookmarks(create = true); a duplicate URL becomes ErrBookmarkAlreadyExists and a 409 'already_exists.bookmark'",
+        "Without Options, CreateArchive defaults to true and CreateEbook to false; the handler then calls UpdateBookmarkCache, which downloads the page within the request and runs core.ProcessBookmark",
+        "The processed result is saved with BookmarksDomain.UpdateBookmark (SaveBookmarks with create = false) and returned with 201",
+        "If downloading/processing or that second save fails, the error is only logged and the client still gets 201 with the bookmark as first inserted"
+      ],
+      "where": [
+        "internal/http/handlers/api/v1/bookmarks.go:567-589",
+        "internal/http/handlers/api/v1/bookmarks.go:605-623",
+        "internal/http/handlers/api/v1/bookmarks.go:630-669",
+        "internal/domains/bookmarks.go:224-248"
+      ]
+    },
+    {
+      "id": "sh-7",
+      "kind": "flow",
+      "q": "When I select bookmarks in the web UI and run 'Update Cache', what runs on the server, and is the refreshed title and text saved?",
+      "facts": [
+        "The legacy web UI's Update Cache dialog sends PUT /api/v1/bookmarks/cache with IDs, KeepMetadata, CreateArchive, CreateEbook and SkipExist, then swaps the returned bookmarks into its list",
+        "HandleUpdateCache (owner only) runs BookmarksDomain.UpdateBookmarkCache for each bookmark in goroutines, at most 10 at a time; a failure is only logged and that bookmark comes back unchanged",
+        "UpdateBookmarkCache re-downloads the page and runs core.ProcessBookmark, which writes the thumbnail and, when asked, the archive and ebook files",
+        "Neither UpdateBookmarkCache nor HandleUpdateCache saves to the database, so a new title, excerpt or readable text exists only in the response and is gone after a reload",
+        "PUT /api/v1/bookmarks/{id}/data runs the same UpdateBookmarkCache for one bookmark and then does persist it with UpdateBookmark"
+      ],
+      "where": [
+        "internal/view/assets/js/page/home.js:814-842",
+        "internal/http/handlers/api/v1/bookmarks.go:307-338",
+        "internal/domains/bookmarks.go:118-153",
+        "internal/http/handlers/api/v1/bookmarks.go:208-236"
+      ]
+    },
+    {
+      "id": "sh-8",
+      "kind": "impact",
+      "q": "If I change a method on the database interface, for example SaveBookmarks, what else has to change with it?",
+      "facts": [
+        "model.DB is implemented three times, by SQLiteDatabase (sqlite.go), PGDatabase (pg.go) and MySQLDatabase (mysql.go); of its methods only ReaderDB/WriterDB and GetTags, GetTagsCount, AddTagToBookmark, RemoveTagFromBookmark, TagExists and BookmarkExists come from the shared embedded dbbase (SQLite even overrides ReaderDB/WriterDB)",
+        "Each backend's SaveBookmarks is its own SQL copy of the same logic, including tag lookup/creation and tag-name normalization",
+        "SaveBookmarks is called from BookmarksDomain.CreateBookmark/UpdateBookmark, directly from the CLI commands add, import, pocket and update, and from the legacy webserver handlers (insert, update, tag update, browser-extension insert)",
+        "testDatabase in database_test.go runs one shared list of cases against every backend; the PostgreSQL and MySQL/MariaDB test files call log.Fatal in init() unless SHIORI_TEST_PG_URL, SHIORI_TEST_MYSQL_URL and SHIORI_TEST_MARIADB_URL are set or the test_sqlite_only build tag is used"
+      ],
+      "where": [
+        "internal/model/database.go:34-51",
+        "internal/webserver/handler-api.go:226-254",
+        "internal/database/database_test.go:16-38",
+        "internal/database/pg_test.go:1-20"
+      ]
+    },
+    {
+      "id": "sh-9",
+      "kind": "impact",
+      "q": "If I change where thumbnails, archives or ebooks are stored on disk, which code would I have to update?",
+      "facts": [
+        "model.GetThumbnailPath, GetArchivePath and GetEbookPath define thumb/<id>, archive/<id> and ebook/<id>.epub and are used by core processing, the bookmarks domain (Has* flags, DeleteBookmarks) and the /bookmark/{id}/thumb, /archive and /ebook handlers",
+        "Other code rebuilds the same paths by hand with filepath.Join(DataDir, 'thumb' | 'archive' | 'ebook', id): the CLI delete and open commands and the legacy webserver handlers (bookmark list flags, delete, tag update, delete via extension)",
+        "Deletion is implemented three times and they differ: the domain and the legacy API remove thumb, archive and ebook, while the CLI delete removes only thumb and archive (or the whole thumb and archive directories when given no ids), leaving ebooks behind",
+        "ArchiverDomain.GetBookmarkArchive opens the WARC at filepath.Join(DataDir, path) on the OS filesystem rather than through the Storage domain (marked FIXME)"
+      ],
+      "where": [
+        "internal/model/bookmark.go:56-69",
+        "internal/cmd/delete.go:63-78",
+        "internal/webserver/handler-api.go:279-289",
+        "internal/domains/archiver.go:40-49"
+      ]
+    },
+    {
+      "id": "sh-10",
+      "kind": "term",
+      "q": "What is the difference between Bookmark and BookmarkDTO, and which one do API responses use?",
+      "facts": [
+        "model.Bookmark mirrors the bookmark row (db tags): ID, URL, Title, Excerpt, Author, Public, CreatedAt, ModifiedAt, Content, HTML, HasContent",
+        "BookmarkDTO embeds Bookmark and adds Tags, ImageURL, HasArchive, HasEbook, HasThumbnail and the processing switches CreateArchive/CreateEbook; model.DB methods and the v1 JSON responses use BookmarkDTO",
+        "Content is tagged json:\"-\", so the plain readable text never appears in bookmark JSON; GET /api/v1/bookmarks/{id}/readable returns Content and HTML instead",
+        "BookmarksDomain.CreateBookmark and UpdateBookmark take a Bookmark and convert it with ToDTO, which sets an empty Tags list, so those calls never change a bookmark's tags"
+      ],
+      "where": [
+        "internal/model/bookmark.go:8-34",
+        "internal/model/bookmark.go:43-54",
+        "internal/domains/bookmarks.go:250-266",
+        "internal/http/handlers/api/v1/bookmarks.go:73-99"
+      ]
+    },
+    {
+      "id": "sh-11",
+      "kind": "term",
+      "q": "What does 'owner' mean here? Does each bookmark belong to an owner?",
+      "facts": [
+        "Owner is a boolean on the account (Account.Owner, AccountDTO.IsOwner) that means administrator; it is not ownership of bookmarks",
+        "Bookmarks have no account column, so every account sees and works on the same library",
+        "In the v1 API, RequireLoggedInAdmin answers 403 unless IsOwner(); it guards every change to bookmarks and tags, the /api/v1/accounts management routes and system info, while reads and the caller's own /api/v1/auth routes only need RequireLoggedInUser",
+        "The legacy API applies the same split in validateSession: any non-GET request from an account whose Owner is false is refused",
+        "When the database has no accounts, startup creates the owner account 'shiori' with password 'gopher'"
+      ],
+      "where": [
+        "internal/model/account.go:82-93",
+        "internal/http/middleware/auth.go:58-80",
+        "internal/webserver/handler.go:49-80",
+        "internal/cmd/root.go:114-133"
+      ]
+    },
+    {
+      "id": "sh-12",
+      "kind": "extend",
+      "q": "How would I add a new REST endpoint, say GET /api/v1/bookmarks/{id}/stats, including its API docs and the front-end client?",
+      "facts": [
+        "Handlers are plain func(deps model.Dependencies, c model.WebContext) in internal/http/handlers/api/v1; they read path values with c.Request().PathValue and reply with response.SendJSON / response.SendError, reaching data through deps.Domains() (interfaces in internal/model/domains.go)",
+        "The global middleware never rejects anonymous requests, so the handler must begin with middleware.RequireLoggedInUser or RequireLoggedInAdmin",
+        "Register it in Setup in internal/http/server.go with s.mux.HandleFunc(\"GET /api/v1/...\", ToHTTPHandler(deps, handler, globalMiddleware...))",
+        "Add swag comments (@Summary, @Tags, @Security ApiKeyAuth, @Router) and run make swagger to regenerate docs/swagger; the pull-request workflow runs make swag-check, which fails when docs/swagger is out of date",
+        "make generate-client regenerates the TypeScript client in clients/ts from swagger.json and make build-client bundles it into internal/view/assets/js/client/shiori-api.js; handler tests call the function directly with testutil helpers such as NewTestWebContext and SetFakeAdmin"
+      ],
+      "where": [
+        "internal/http/handlers/api/v1/bookmarks.go:771-805",
+        "internal/http/server.go:181-201",
+        "scripts/swagger_check.sh:29-35",
+        "Makefile:183-195"
+      ]
+    },
+    {
+      "id": "sh-13",
+      "kind": "extend",
+      "q": "What would it take to support another database engine?",
+      "facts": [
+        "Add a type in internal/database that implements every model.DB method, embedding dbbase (NewDBBase(reader, writer, flavor)) to inherit ReaderDB/WriterDB, the withTx helper and the shared tag methods in database_tags.go, which build SQL through a go-sqlbuilder Flavor",
+        "Add a case for its URL scheme in database.Connect; SHIORI_DATABASE_URL selects the backend and defaults to a sqlite:/// URL in the data directory",
+        "Put .up.sql files under internal/database/migrations/<engine>/ (embedded by //go:embed migrations/*) and chain them with newFileMigration/newFuncMigration from one semver to the next; Migrate hands the list to runMigrations, which applies each step whose fromVersion equals the current version and records it with SetDatabaseSchemaVersion in the shiori_system table",
+        "Engine-specific SQL has to be written for GetBookmarks (keyword and tag filters), SaveBookmarks, DeleteBookmarks and the account and tag methods, and the backend is tested by passing its own factory to the shared testDatabase suite, as pg_test.go does"
+      ],
+      "where": [
+        "internal/database/database.go:29-53",
+        "internal/database/migrations.go:73-100",
+        "internal/database/pg.go:96-120",
+        "internal/database/pg_test.go:22-42"
+      ]
+    },
+    {
+      "id": "sh-14",
+      "kind": "enforce",
+      "q": "How does the server decide whether a request is logged in, and what can someone reach without logging in?",
+      "facts": [
+        "AuthMiddleware runs on every route and never blocks: it reads a Bearer token from Authorization or the token cookie, and if CheckToken fails it clears the cookie and continues as anonymous",
+        "Rejection happens inside each handler: middleware.RequireLoggedInUser returns 401 and RequireLoggedInAdmin returns 403 for non-owners, so a handler that forgets the call is public",
+        "Login, /system/liveness, /api/v1/system/ping and the web UI need no token; /bookmark/{id}/content, /archive, /thumb and /ebook serve a bookmark with Public == 1 to anyone and redirect anonymous users to the login page otherwise",
+        "With SSO proxy auth turned on (off by default), a request from a trusted CIDR (private ranges by default) is logged in as the username in the Remote-User header, with no password"
+      ],
+      "where": [
+        "internal/http/middleware/auth.go:23-52",
+        "internal/http/middleware/auth.go:58-80",
+        "internal/http/handlers/bookmark.go:14-38",
+        "internal/http/middleware/auth_sso_proxy.go:60-92"
+      ]
+    },
+    {
+      "id": "sh-15",
+      "kind": "enforce",
+      "q": "Are tag names normalized (so 'Go ' and 'go' are the same tag), and is that applied everywhere a tag is created or renamed?",
+      "facts": [
+        "Tag names are lower-cased and have whitespace collapsed (strings.ToLower, then strings.Join(strings.Fields(...), ' ')) only inside each backend's SaveBookmarks, for tags given by name while a bookmark is saved",
+        "POST /api/v1/tags and PUT /api/v1/tags/{id} only reject an empty name; the tags domain and the database CreateTags/UpdateTag store the name exactly as sent",
+        "The legacy PUT /api/tags rename passes the new name straight to DB.RenameTag",
+        "Uniqueness comes only from the UNIQUE constraint on tag.name; a violation is mapped to ErrTagNameAlreadyExists, which HandleCreateTag answers with 409 'already_exists.tag'"
+      ],
+      "where": [
+        "internal/database/sqlite.go:345-357",
+        "internal/http/handlers/api/v1/tags.go:163-192",
+        "internal/database/sqlite.go:989-1005",
+        "internal/domains/tags.go:46-58"
+      ]
+    },
+    {
+      "id": "sh-16",
+      "kind": "enforce",
+      "q": "Is there anything stopping a single request or command from deleting every bookmark?",
+      "facts": [
+        "In every backend, DeleteBookmarks called with no ids deletes all rows from bookmark and bookmark_tag (and bookmark_content on SQLite)",
+        "DELETE /api/v1/bookmarks requires an owner and rejects an empty or non-positive IDs list with 400; BookmarksDomain.DeleteBookmarks also returns early on an empty list",
+        "The CLI delete command with no ids deletes everything after a 'Remove ALL bookmarks? (y/N)' prompt, which --yes/-y skips",
+        "The legacy DELETE /api/bookmarks decodes a JSON array and passes it straight to DB.DeleteBookmarks, so an owner sending [] removes every bookmark row (files are only removed for listed ids)",
+        "Errors in the legacy handlers go to checkError, which panics; nothing in internal/ calls recover(), so the panic is left to Go's net/http server"
+      ],
+      "where": [
+        "internal/database/sqlite.go:689-712",
+        "internal/http/handlers/api/v1/bookmarks.go:904-945",
+        "internal/cmd/delete.go:35-61",
+        "internal/webserver/handler-api.go:262-292"
+      ]
+    }
+  ]
+}

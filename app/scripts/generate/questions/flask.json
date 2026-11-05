@@ -1,0 +1,280 @@
+{
+  "repo": "flask",
+  "commit": "d086db8",
+  "questions": [
+    {
+      "id": "fl-1",
+      "kind": "parts",
+      "q": "What are the main layers of Flask's source code and how do they build on each other?",
+      "facts": [
+        "src/flask/sansio holds IO-free base code meant to be reusable by other implementations such as Quart; it must not do IO or use the Flask globals",
+        "sansio.scaffold.Scaffold is the common base of the app and of blueprints: it owns the registries (view_functions, error_handler_spec, before/after/teardown functions, context processors, URL processors) and the decorators that fill them",
+        "app.py's Flask builds on sansio.app.App and adds the WSGI/request side, importing ctx.AppContext, the globals, sessions, templating, wrappers and cli",
+        "blueprints.py's Blueprint subclasses the sansio Blueprint to add static-file serving and a Click command group (cli.AppGroup)"
+      ],
+      "where": [
+        "src/flask/sansio/README.md:1-6",
+        "src/flask/sansio/scaffold.py:52-68",
+        "src/flask/app.py:31-54",
+        "src/flask/blueprints.py:7-18"
+      ]
+    },
+    {
+      "id": "fl-2",
+      "kind": "flow",
+      "q": "What happens end to end when an HTTP request reaches a Flask app?",
+      "facts": [
+        "wsgi_app creates a new AppContext from the WSGI environ for every request (it does not reuse an already-pushed context), pushes it, and pops it in a finally block, passing along the unhandled error if there was one",
+        "AppContext.push sets the _cv_app ContextVar, sends appcontext_pushed, opens the session, then matches the URL; a routing failure is stored on request.routing_exception instead of being raised",
+        "full_dispatch_request sends request_started and runs preprocess_request (URL value preprocessors, then before_request functions, where a non-None return replaces the view); dispatch_request then raises any stored routing exception or calls view_functions[rule.endpoint](**view_args) through ensure_sync",
+        "Exceptions from the hooks or the view go to handle_user_exception, and the result goes to finalize_request, which runs make_response and process_response and sends request_finished",
+        "process_response runs after_this_request callbacks first, then after_request functions (innermost blueprint first, app last, each in reverse registration order), then saves the session unless it is a null session"
+      ],
+      "where": [
+        "src/flask/app.py:1592-1616",
+        "src/flask/ctx.py:416-444",
+        "src/flask/app.py:978-1019",
+        "src/flask/app.py:1394-1418"
+      ]
+    },
+    {
+      "id": "fl-3",
+      "kind": "flow",
+      "q": "What happens when an app developer calls app.register_blueprint(bp, url_prefix=...)?",
+      "facts": [
+        "Decorators on a Blueprint never touch an app: add_url_rule (and route) only record a deferred function, and the app_* hooks use record_once",
+        "register_blueprint calls Blueprint.register, which builds the dotted name from name_prefix and the name option, raises ValueError if that name is already in app.blueprints, stores it, and creates a BlueprintSetupState from the options and blueprint defaults",
+        "register merges the blueprint's registries (error handlers, request hooks, URL processors, context processors) into the app keyed by the dotted name, then calls every deferred function with the setup state",
+        "BlueprintSetupState.add_url_rule joins url_prefix and the rule, merges url_defaults, and registers the rule on the app with endpoint \"{name_prefix}.{name}.{endpoint}\"",
+        "Child blueprints are then registered recursively, with url_prefix and subdomain combined with the parent's and name_prefix set to the parent's dotted name"
+      ],
+      "where": [
+        "src/flask/sansio/blueprints.py:412-441",
+        "src/flask/sansio/blueprints.py:302-335",
+        "src/flask/sansio/blueprints.py:87-116",
+        "src/flask/sansio/blueprints.py:349-377"
+      ]
+    },
+    {
+      "id": "fl-4",
+      "kind": "data",
+      "q": "Where is session data stored, what does it look like on the wire, and which code reads and writes it?",
+      "facts": [
+        "The default SecureCookieSessionInterface keeps the whole session in one cookie, signed (not encrypted) by an itsdangerous URLSafeTimedSerializer over SECRET_KEY_FALLBACKS plus SECRET_KEY (appended last as the current key) and serialized with the tagged JSON serializer; with no secret key open_session returns None",
+        "open_session returns an empty session when the cookie is missing, the signature is bad, or it is older than PERMANENT_SESSION_LIFETIME, which is used as max_age for every session, permanent or not",
+        "The session is opened by AppContext._get_session (called from push for request contexts), which falls back to make_null_session; reading it through the context's session property sets accessed",
+        "Flask.process_response calls save_session, which adds Vary: Cookie if the session was accessed, deletes the cookie when a modified session is now empty, and otherwise writes it only if should_set_cookie: modified, or permanent with SESSION_REFRESH_EACH_REQUEST"
+      ],
+      "where": [
+        "src/flask/sessions.py:303-335",
+        "src/flask/ctx.py:381-403",
+        "src/flask/sessions.py:233-247",
+        "src/flask/sessions.py:348-373"
+      ]
+    },
+    {
+      "id": "fl-5",
+      "kind": "data",
+      "q": "Where do flashed messages live between requests, and which code writes and reads them?",
+      "facts": [
+        "flash() appends a (category, message) tuple to session[\"_flashes\"], reassigning the list instead of mutating it in place so session backends with external storage see the change, and sends message_flashed",
+        "get_flashed_messages() pops _flashes from the session on its first call in a request and caches the list on the context (app_ctx._flashes), so later calls in the same request return the same messages",
+        "Because they live in the session, the default backend stores them in the signed cookie, and without a SECRET_KEY the NullSession makes flash() raise RuntimeError",
+        "get_flashed_messages is added to the Jinja globals in create_jinja_environment, so templates can call it directly"
+      ],
+      "where": [
+        "src/flask/helpers.py:341-357",
+        "src/flask/helpers.py:391-399",
+        "src/flask/sessions.py:83-97",
+        "src/flask/app.py:492-503"
+      ]
+    },
+    {
+      "id": "fl-6",
+      "kind": "location",
+      "q": "Where is the code that decides which error handler runs for an exception raised during a request?",
+      "facts": [
+        "App._find_error_handler in sansio/app.py looks handlers up in error_handler_spec, shaped {scope: {code: {exception class: handler}}}, where scope None is the app and otherwise a blueprint name",
+        "Search order: handlers for the specific HTTP code before class-only (code None) handlers; within each, the request's blueprints innermost first and then the app; within a scope, the exception's MRO from the most specific class up",
+        "errorhandler/register_error_handler store into error_handler_spec[None][code][class]; an int is converted to Werkzeug's exception class for that code (unknown codes raise ValueError)",
+        "Blueprint handlers are copied into the app's error_handler_spec under the blueprint's dotted name at registration, and handle_http_exception never consults handlers for RoutingExceptions or code-less HTTPExceptions"
+      ],
+      "where": [
+        "src/flask/sansio/app.py:869-892",
+        "src/flask/sansio/scaffold.py:661-685",
+        "src/flask/sansio/blueprints.py:388-397",
+        "src/flask/app.py:849-863"
+      ]
+    },
+    {
+      "id": "fl-7",
+      "kind": "enforce",
+      "q": "When a view raises, where is it decided whether the error becomes a handler's response, a 500 page, or propagates out to the server or test?",
+      "facts": [
+        "full_dispatch_request catches any Exception raised by before_request functions or the view and passes it to handle_user_exception",
+        "HTTPExceptions go to handle_http_exception unless trap_http_exception traps them (TRAP_HTTP_EXCEPTIONS; TRAP_BAD_REQUEST_ERRORS for any BadRequest; or, when that is unset, BadRequestKeyError in debug mode); other exceptions with no matching handler are re-raised",
+        "wsgi_app catches the re-raised exception and calls handle_exception, which sends got_request_exception and re-raises if PROPAGATE_EXCEPTIONS is true (its default None means testing or debug); otherwise it logs the error and returns a 500, using any InternalServerError handler, which receives InternalServerError(original_exception=e)",
+        "Errors raised while finalizing a normal response (for example in after_request functions) propagate out and end up in handle_exception; while finalizing that 500 response (from_error_handler=True) they are only logged"
+      ],
+      "where": [
+        "src/flask/app.py:1012-1051",
+        "src/flask/app.py:882-895",
+        "src/flask/app.py:925-948",
+        "src/flask/sansio/app.py:911-927"
+      ]
+    },
+    {
+      "id": "fl-8",
+      "kind": "enforce",
+      "q": "Where is the Host header checked against an allow-list, and at what point in a request do a bad host or an unknown URL actually get rejected?",
+      "facts": [
+        "TRUSTED_HOSTS (default None, meaning no check) is applied in create_url_adapter, which sets request.trusted_hosts and calls Werkzeug's get_host; an untrusted host raises SecurityError, a 400 BadRequest",
+        "create_url_adapter runs inside AppContext.__init__, which catches the HTTPException and stores it as request.routing_exception; the URL adapter stays None, so no URL matching happens",
+        "URL matching (match_request, run during push) stores 404/405/redirect exceptions on request.routing_exception the same way instead of raising them",
+        "Stored routing exceptions are raised only in dispatch_request, which runs after preprocess_request, so app-level before_request functions still run for bad-host and unknown-URL requests (request.endpoint is None and request.blueprints is empty, so blueprint hooks do not)"
+      ],
+      "where": [
+        "src/flask/app.py:527-548",
+        "src/flask/ctx.py:325-329",
+        "src/flask/ctx.py:405-414",
+        "src/flask/app.py:978-1016"
+      ]
+    },
+    {
+      "id": "fl-9",
+      "kind": "enforce",
+      "q": "What stops someone from registering routes or hooks after the app has started serving, and does that guard cover everything?",
+      "facts": [
+        "Registration methods on apps and blueprints (route, add_url_rule, before_request, errorhandler, register_blueprint, template_filter, teardown_appcontext and others) are wrapped by @setupmethod, which calls _check_setup_finished first",
+        "On the app it raises AssertionError once _got_first_request is True; full_dispatch_request sets that flag when the first request is dispatched",
+        "On a blueprint it raises once that blueprint has been registered on an app (_got_registered_once, set in register), whether or not any request has been served",
+        "Only those method calls are guarded: changing registries such as app.view_functions or app.url_map directly is not checked, and app.run() resets _got_first_request to False when the development server exits"
+      ],
+      "where": [
+        "src/flask/sansio/scaffold.py:42-49",
+        "src/flask/sansio/app.py:407-421",
+        "src/flask/sansio/blueprints.py:213-221",
+        "src/flask/app.py:747-753"
+      ]
+    },
+    {
+      "id": "fl-10",
+      "kind": "term",
+      "q": "Which type represents the current request's context, and how does it relate to the application context?",
+      "facts": [
+        "Since Flask 3.2 one class, ctx.AppContext, represents both; RequestContext survives only as a deprecated alias returned by ctx.__getattr__, and flask.globals.request_ctx likewise returns app_ctx with a warning",
+        "An AppContext is a 'request context' when it was created with request data (has_request is True); app.app_context() creates one without a request",
+        "Each context owns its own g (an instance of app.app_ctx_globals_class, _AppCtxGlobals by default), url_adapter, request, session, flashed messages and after_this_request callbacks",
+        "current_app, g, request, session and app_ctx are all LocalProxy objects over the single ContextVar _cv_app, each reading an attribute of the active AppContext"
+      ],
+      "where": [
+        "src/flask/ctx.py:260-298",
+        "src/flask/ctx.py:300-323",
+        "src/flask/ctx.py:528-540",
+        "src/flask/globals.py:40-75"
+      ]
+    },
+    {
+      "id": "fl-11",
+      "kind": "term",
+      "q": "What exactly is an 'endpoint' in Flask, and how do blueprint names show up in it?",
+      "facts": [
+        "An endpoint is the name a URL rule is registered under; it keys view_functions and defaults to the view function's __name__",
+        "Blueprint routes are registered on the app with endpoint \"{name_prefix}.{name}.{endpoint}\" (leading dot stripped), so a nested blueprint's view becomes parent.child.view; name is the registered name, which the name= option can change",
+        "request.endpoint is url_rule.endpoint; request.blueprint is the part before the last dot, and request.blueprints lists it and each parent, innermost first",
+        "In url_for, an endpoint starting with '.' is relative: during a request it is prefixed with the current blueprint's name, or the dot is dropped when the request is not in a blueprint"
+      ],
+      "where": [
+        "src/flask/sansio/scaffold.py:709-714",
+        "src/flask/sansio/blueprints.py:79-116",
+        "src/flask/wrappers.py:156-195",
+        "src/flask/app.py:1159-1169"
+      ]
+    },
+    {
+      "id": "fl-12",
+      "kind": "impact",
+      "q": "If I change how the app context is pushed (AppContext.push), what else is affected?",
+      "facts": [
+        "Every request goes through it: wsgi_app builds a new context and calls ctx.push() before dispatch, and in its finally block hands the context to werkzeug.debug.preserve_context, if present, before popping it",
+        "push does more than set the ContextVar: it sends appcontext_pushed, opens the session through the session interface, then runs URL matching, so session interfaces and URL converters run inside it and converters can already use the session",
+        "Pushes are re-entrant: a push of an already-active context only bumps _push_count, and teardown runs only when the count returns to zero; stream_with_context relies on this, doing 'with ctx:' on the active context so teardown waits until the streamed response finishes",
+        "The test client, used as 'with client:', collects preserved contexts and re-pushes them after the response, so push runs again for the same context and teardown runs again when it is finally popped"
+      ],
+      "where": [
+        "src/flask/ctx.py:416-444",
+        "src/flask/app.py:1592-1607",
+        "src/flask/helpers.py:126-148",
+        "src/flask/testing.py:230-247"
+      ]
+    },
+    {
+      "id": "fl-13",
+      "kind": "impact",
+      "q": "If I change Request.blueprints (the current blueprint and its parents), what is affected?",
+      "facts": [
+        "It is derived from the endpoint: request.blueprint is the endpoint before its last dot, and _split_blueprint_path turns 'a.b' into ['a.b', 'a'], innermost first; it is empty when there is no blueprint or routing failed",
+        "preprocess_request iterates (None, *reversed(blueprints)), app first and then outermost to innermost blueprint, for URL value preprocessors and before_request functions",
+        "process_response and do_teardown_request iterate chain(blueprints, (None,)), innermost blueprint first and app last",
+        "Error-handler lookup (_find_error_handler, called with ctx.request.blueprints) tries blueprint scopes innermost first before the app's"
+      ],
+      "where": [
+        "src/flask/wrappers.py:161-195",
+        "src/flask/app.py:1376-1392",
+        "src/flask/app.py:1407-1446",
+        "src/flask/sansio/app.py:869-892"
+      ]
+    },
+    {
+      "id": "fl-14",
+      "kind": "extend",
+      "q": "How do I add a custom `flask` command for my app or a blueprint, and how does it get an app context?",
+      "facts": [
+        "Flask.__init__ gives every app a cli attribute, an AppGroup named after the app; decorate a function with @app.cli.command() (a flask.Blueprint has its own bp.cli)",
+        "AppGroup.command wraps the callback in with_appcontext unless with_appcontext=False is passed, and FlaskGroup.get_command loads the app (ScriptInfo.load_app) and pushes app.app_context() before looking the command up in app.cli",
+        "Built-in commands and plugin commands from the flask.commands entry-point group are looked up first, so they still work when the app cannot be loaded",
+        "A blueprint's commands are attached when it is registered: by default as a subgroup named after the blueprint's registered name, merged into the top level with cli_group=None, or under a custom name with cli_group='...'"
+      ],
+      "where": [
+        "src/flask/app.py:334-342",
+        "src/flask/cli.py:405-427",
+        "src/flask/cli.py:600-634",
+        "src/flask/sansio/blueprints.py:337-347"
+      ]
+    },
+    {
+      "id": "fl-15",
+      "kind": "extend",
+      "q": "How would I let the session cookie store a new Python type beyond the ones Flask already supports?",
+      "facts": [
+        "Session data is serialized by TaggedJSONSerializer; for a new type, subclass flask.json.tag.JSONTag with a unique key and implement check, to_json and to_python",
+        "Register it with app.session_interface.serializer.register(MyTag, index=...): tag() uses the first tag in order whose check matches, so index can put a more specific tag ahead of an existing one such as the dict tag; a duplicate key raises KeyError unless force=True",
+        "On load, untag converts only a dict with exactly one key that is a registered tag; anything else is left as-is",
+        "The serializer is the module-level session_json_serializer, a class attribute of SecureCookieSessionInterface, and Flask.session_interface is itself a class-level instance, so a registered tag applies to every app in the process that uses the default session interface"
+      ],
+      "where": [
+        "src/flask/json/tag.py:60-90",
+        "src/flask/json/tag.py:275-307",
+        "src/flask/sessions.py:273-301",
+        "src/flask/app.py:246-250"
+      ]
+    },
+    {
+      "id": "fl-16",
+      "kind": "extend",
+      "q": "If I add a new built-in configuration key to Flask, where does its default go and how should the code read it?",
+      "facts": [
+        "Built-in keys and their defaults are listed in Flask.default_config in app.py",
+        "App.make_config copies default_config into a new config_class (Config, a dict subclass) when the app is constructed, overriding DEBUG from the FLASK_DEBUG environment variable via get_debug_flag(), and rooted at the instance folder if instance_relative_config",
+        "Code reads keys directly with self.config[\"KEY\"], or current_app.config[\"KEY\"] in request-side code, as Request.max_content_length does after checking for a per-request override",
+        "For attribute access, add a ConfigAttribute(\"KEY\") descriptor on the app class, as done for testing, secret_key and permanent_session_lifetime; it reads and writes through app.config, with an optional get_converter"
+      ],
+      "where": [
+        "src/flask/app.py:206-236",
+        "src/flask/sansio/app.py:480-494",
+        "src/flask/wrappers.py:80-86",
+        "src/flask/config.py:20-47"
+      ]
+    }
+  ]
+}

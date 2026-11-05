@@ -8,7 +8,8 @@ import { existsSync, readFileSync } from "node:fs";
 import type { Node } from "@/lib/data";
 import type { MapFile } from "@/lib/map";
 import { rootOf } from "@/lib/maps";
-import { check, LEAF } from "./check";
+import { citations, type MapIndex } from "@/lib/coverage";
+import { bareLines, check, fileReader, LEAF } from "./check";
 import { owners, type Cut } from "./cut";
 
 export function evaluate(name: string, map: MapFile) {
@@ -39,6 +40,20 @@ export function evaluate(name: string, map: MapFile) {
   // How much of a leaf's explanation leads to its code, and how much of the map a newcomer can read.
   const steps = leaves.flatMap((n) => (n.anatomy ?? []).flatMap((b: any) => (b.kind === "flow" || b.kind === "sequence" ? b.rows : [])));
   const explained = nodes.filter((n) => n.explain?.body);
+  // What the map leaves a developer to find alone: source no level cites, levels that only restate one file, arrows pointing at an import.
+  const index: MapIndex | null = existsSync(`maps/${name}/index.json`) ? JSON.parse(readFileSync(`maps/${name}/index.json`, "utf8")) : null;
+  const cited = citations(map.AUTHORED);
+  const source = Object.entries(index?.files ?? {}).filter(([, f]) => f.status === "source").map(([p]) => p);
+  const filesUnder = (n: Node): Set<string> => new Set([...(n.code ?? []).map((c) => c.file), ...(n.children ?? []).flatMap((c) => [...filesUnder(c)])]);
+  const linesOf = existsSync(root) ? fileReader(root) : null;
+  const arrows = [...diagrams, ...(map.OVERVIEW?.anatomy ?? []).filter((b) => b.kind === "diagram")].flatMap((d: any) => d.arrows);
+  const bare = arrows.filter((a: any) => {
+    const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(a.at ?? "");
+    const lines = m && linesOf?.(m[1]);
+    return lines ? bareLines(lines).slice(+m![2] - 1, +(m![3] ?? m![2])).every(Boolean) : false;
+  });
+  const asked = existsSync(`maps/${name}/ask.json`) ? JSON.parse(readFileSync(`maps/${name}/ask.json`, "utf8")).summary : null;
+  const pct = (x?: number) => (x === undefined ? "" : Math.round(100 * x));
   return {
     map: name,
     roots: map.AUTHORED.length,
@@ -64,7 +79,16 @@ export function evaluate(name: string, map: MapFile) {
     "explain pics %": Math.round((100 * explained.filter((n) => n.explain!.blocks?.length).length) / Math.max(1, explained.length)),
     "explain kinds": [...new Set(explained.flatMap((n) => (n.explain!.blocks ?? []).map((b) => b.kind)))].join(","),
     glossary: map.OVERVIEW?.glossary?.length ?? 0,
-    walk: map.OVERVIEW?.walkthrough?.steps.length ?? 0,
+    walks: map.OVERVIEW?.walkthroughs?.length ?? (map.OVERVIEW?.walkthrough ? 1 : 0),
+    "data table": (map.OVERVIEW?.anatomy ?? []).some((b) => b.kind === "table" && /data lives/i.test(b.caption ?? "")) ? 1 : 0,
+    "uncited files %": index ? Math.round((100 * source.filter((p) => !cited.has(p)).length) / Math.max(1, source.length)) : "",
+    "one-file parts %": Math.round((100 * parents.filter((n) => filesUnder(n).size === 1).length) / Math.max(1, parents.length)),
+    "import arrows": bare.length,
+    "ask map %": pct(asked?.map?.score),
+    "ask grep %": pct(asked?.grep?.score),
+    "ask both %": pct(asked?.both?.score),
+    "ask both tok": asked?.both?.tokens ?? "",
+    "ask grep tok": asked?.grep?.tokens ?? "",
     "detail words": median(nodes.map((n) => (n.detail ?? "").split(/\s+/).filter(Boolean).length).sort((a, b) => a - b)),
     issues: nodes.reduce((a, n) => a + (n.issues?.length ?? 0), 0),
     "not certain %": Math.round((100 * nodes.filter((n) => n.state !== "derived").length) / nodes.length),

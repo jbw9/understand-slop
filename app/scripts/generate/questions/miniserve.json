@@ -1,0 +1,281 @@
+{
+  "repo": "miniserve",
+  "commit": "68b6f06",
+  "questions": [
+    {
+      "id": "ms-1",
+      "kind": "parts",
+      "q": "What are the main parts of miniserve and how does work get handed from one to the next, from the command line to a rendered page?",
+      "facts": [
+        "main parses args::CliArgs (clap), converts it with MiniserveConfig::try_from_args (config.rs), and passes the config to run, which builds the actix-web server",
+        "configure_app wires the request side: listing::file_handler when the served path is a single file; otherwise file_op::upload_file and file_op::rm_file plus an actix-files Files service whose listing renderer is listing::directory_listing",
+        "WebDAV is a separate dav_server handler backed by webdav_fs::RestrictedFs, registered only with --enable-webdav",
+        "listing::directory_listing builds the entry list and hands it either to renderer::page (maud HTML) or to archive::ArchiveMethod::create_archive, whose output is streamed through pipe::Pipe",
+        "errors defines StartupError and RuntimeError (with their HTTP status codes) and the middleware that renders error pages through renderer::render_error"
+      ],
+      "where": [
+        "src/main.rs:50-74",
+        "src/main.rs:437-474",
+        "src/listing.rs:418-431",
+        "src/errors.rs:131-155"
+      ]
+    },
+    {
+      "id": "ms-2",
+      "kind": "location",
+      "q": "Where is the code that decides whether a request for a folder gets an HTML listing, a bare listing, an archive download, or an error?",
+      "facts": [
+        "listing::directory_listing is installed as the actix-files files_listing_renderer (with show_files_listing), so it runs only for directory requests that the Files service resolves",
+        "With -I/--disable-indexing it returns a plain-text 404 'File not found.' before anything else, which also blocks archive downloads",
+        "A ?download=tar|tar_gz|zip query creates an archive, or returns 403 'Archive creation is disabled.' when that format's flag is off",
+        "Otherwise renderer::page renders the HTML listing, and returns the minimal raw table instead when ?raw=true"
+      ],
+      "where": [
+        "src/main.rs:409-416",
+        "src/listing.rs:171-186",
+        "src/listing.rs:397-405",
+        "src/renderer.rs:43-46"
+      ]
+    },
+    {
+      "id": "ms-3",
+      "kind": "location",
+      "q": "Where are error responses turned into the styled HTML error page, and which errors stay plain text?",
+      "facts": [
+        "errors::error_page_middleware, installed on the whole App with from_fn in main.rs, inspects responses after the handler has run",
+        "RuntimeError::error_response produces text/plain bodies (adding WWW-Authenticate: Basic realm=\"miniserve\" for InvalidHttpCredentials); the middleware rewrites only 4xx/5xx responses whose Content-Type is text/plain",
+        "It skips requests whose path is exactly \"/upload\" so the upload XHR gets plain text; that comparison is a literal string and does not account for --route-prefix",
+        "map_error_page replaces the body with renderer::render_error, using the Referer as the back address; the 'Go back to file listing' link is shown only when there is no route prefix and indexing is not disabled, so a random route is not leaked"
+      ],
+      "where": [
+        "src/errors.rs:115-155",
+        "src/errors.rs:157-181",
+        "src/renderer.rs:1255-1262",
+        "src/main.rs:245-251"
+      ]
+    },
+    {
+      "id": "ms-4",
+      "kind": "data",
+      "q": "Where is the server's configuration kept at runtime, what is in it, and how do request handlers get to it?",
+      "facts": [
+        "All runtime settings live in one struct, config::MiniserveConfig, built once from CliArgs by MiniserveConfig::try_from_args",
+        "Some fields are derived rather than copied from flags: file_upload is whether -u/--upload-files was given, rm_enabled is whether -R/--rm-files was given, and route_prefix comes from --route-prefix or six random hex characters with --random-route",
+        "run clones it into every worker's App as web::Data<MiniserveConfig> app data; nothing mutates it after startup",
+        "Handlers read it with req.app_data::<web::Data<MiniserveConfig>>() (upload_file, rm_file, handle_auth, directory_listing, map_error_page) or take it as a web::Data<MiniserveConfig> extractor (the api handler)"
+      ],
+      "where": [
+        "src/config.rs:208-224",
+        "src/config.rs:355-366",
+        "src/main.rs:245-249",
+        "src/file_op.rs:452-458"
+      ]
+    },
+    {
+      "id": "ms-5",
+      "kind": "data",
+      "q": "Where is a visitor's chosen color theme stored, and where does the server's default theme come from?",
+      "facts": [
+        "The visitor's choice lives only in the browser: updateColorScheme saves it in localStorage under 'theme' and sets a data-theme attribute on <body>; a 'storage' listener keeps other tabs in sync, and the server never sees it",
+        "The server default comes from -c/--color-scheme and -d/--color-scheme-dark (ThemeSlug values in MiniserveConfig)",
+        "At startup run concatenates the base stylesheet, default_color_scheme.css() and default_color_scheme_dark.css_dark() (wrapped in @media (prefers-color-scheme: dark)) into one web::Data<String> that the css handler serves at css_route",
+        "The CSS is compiled at build time: build.rs compiles data/style.scss and every file in data/themes with sasso into OUT_DIR, and ThemeSlug::css embeds the results with include_str!"
+      ],
+      "where": [
+        "src/renderer.rs:763-786",
+        "src/main.rs:236-259",
+        "src/renderer.rs:427-441",
+        "build.rs:7-28"
+      ]
+    },
+    {
+      "id": "ms-6",
+      "kind": "flow",
+      "q": "What happens end to end when someone uploads a file from the web page?",
+      "facts": [
+        "The page's JavaScript sends each file as its own multipart POST (XMLHttpRequest) to the upload form's action, {route_prefix}/upload?path=<current dir>, adding X-File-Hash and X-File-Hash-Function: SHA256 only when it managed to hash the file in the browser",
+        "file_op::upload_file sanitizes the path query parameter and returns 403 UploadForbiddenError unless it starts with one of the allowed upload directories (an empty list means anywhere)",
+        "Each file field goes through handle_multipart, which sanitizes its file name, to save_file, which first applies --on-duplicate-files: error (DuplicateFileError), overwrite, or rename to name-N.ext",
+        "save_file streams the data into a NamedTempFile (in --temp-directory if set, else the OS temp dir) and only renames it onto the target after the optional hash check passes; a mismatch deletes the temp file and returns UploadHashMismatchError"
+      ],
+      "where": [
+        "src/renderer.rs:1149-1154",
+        "src/file_op.rs:452-474",
+        "src/file_op.rs:119-155",
+        "src/file_op.rs:241-256"
+      ]
+    },
+    {
+      "id": "ms-7",
+      "kind": "flow",
+      "q": "When an HTTP request arrives, what middleware and routes does it pass through before a handler answers?",
+      "facts": [
+        "App-wide middleware: DefaultHeaders built from --header, error_page_middleware, the access Logger, and Compress only when -C/--compress-response",
+        "The healthcheck, API, favicon and CSS routes are registered directly on the App; everything else goes into web::scope(route_prefix), which gets HTTP Basic auth (auth::handle_auth) only when auth entries exist",
+        "Inside the scope, /upload and /rm are POST-only resources (registered only when enabled and the served path is a directory), actix-files Files is mounted at \"\" behind a GET/HEAD guard, and OPTIONS/PROPFIND fall through to the read-only WebDAV dav_handler when --enable-webdav",
+        "When the served path is a single file, the scope only has listing::file_handler at \"\" and \"/\", which always returns that file",
+        "The App's default_service is error_404, which returns RuntimeError::RouteNotFoundError"
+      ],
+      "where": [
+        "src/main.rs:245-271",
+        "src/main.rs:360-365",
+        "src/main.rs:437-451",
+        "src/main.rs:453-474"
+      ]
+    },
+    {
+      "id": "ms-8",
+      "kind": "impact",
+      "q": "If I change sanitize_path in file_utils, what else is affected?",
+      "facts": [
+        "upload_file and rm_file run the path query parameter through it (with conf.show_hidden) and then prefix-match the result against the allowed directories",
+        "handle_multipart uses it on each uploaded file name and as the hidden-path check for mkdir paths",
+        "The api DirSize handler in main.rs calls it with traverse_hidden = true, so hidden directories are allowed there regardless of -H",
+        "At startup config::validate_allowed_paths uses it to normalize --upload-files and --rm-files directories into the strings that upload_file, rm_file and the renderer's upload_allowed/rm_allowed checks compare against; an illegal path aborts startup"
+      ],
+      "where": [
+        "src/file_utils.rs:12-35",
+        "src/file_op.rs:452-470",
+        "src/main.rs:505-517",
+        "src/config.rs:389-398"
+      ]
+    },
+    {
+      "id": "ms-9",
+      "kind": "impact",
+      "q": "If I change how the route prefix (--route-prefix / --random-route) is represented, what else depends on it?",
+      "facts": [
+        "config.rs builds it as '/' plus the trimmed prefix, '/' plus six random hex characters, or an empty string, and prefixes the internal __miniserve_internal routes with it except under --random-route, so the random route is not leaked",
+        "main.rs mounts the auth-wrapped file-serving scope at it",
+        "listing.rs uses it to decide is_root, to strip it from the request path for encoded_dir, and as the base of the breadcrumb links",
+        "renderer.rs builds the upload and rm form actions as {route_prefix}/upload and {route_prefix}/rm"
+      ],
+      "where": [
+        "src/config.rs:220-256",
+        "src/main.rs:260-269",
+        "src/listing.rs:189-221",
+        "src/renderer.rs:48-52"
+      ]
+    },
+    {
+      "id": "ms-10",
+      "kind": "term",
+      "q": "Which type represents the logged-in user, and where does it get used?",
+      "facts": [
+        "auth::CurrentUser { name } holds the Basic-auth user name for the request",
+        "handle_auth inserts it into the request extensions before checking the password, then rejects the request if no credential matches",
+        "directory_listing reads it from req.extensions() and passes it to renderer::page",
+        "Its only use in the page is the wget footer, which adds --ask-password --user '<name>' to the download command"
+      ],
+      "where": [
+        "src/auth.rs:72-94",
+        "src/listing.rs:175-176",
+        "src/renderer.rs:212-214",
+        "src/renderer.rs:354-358"
+      ]
+    },
+    {
+      "id": "ms-11",
+      "kind": "term",
+      "q": "Which type represents one file or folder row in the listing, and what does it carry?",
+      "facts": [
+        "listing::Entry: name, entry_type (EntryType::Directory or File), link, size (Option<ByteSize>, files only), last_modification_date and symlink_info",
+        "symlink_info is filled only when the entry is a symlink and --show-symlink-info is on (the read_link target)",
+        "For files, link is replaced by --file-external-url plus the relative path when that option is set",
+        "Directory sizes are not in Entry: the page's JavaScript POSTs {\"DirSize\": path} to the API for each directory row (updateSizeCells runs every second and caches results per path), and the server answers '-' unless --directory-size is on"
+      ],
+      "where": [
+        "src/listing.rs:95-114",
+        "src/listing.rs:274-281",
+        "src/listing.rs:303-330",
+        "src/renderer.rs:810-843"
+      ]
+    },
+    {
+      "id": "ms-12",
+      "kind": "extend",
+      "q": "How would I add a new command-line option, and what do I have to touch for handlers to see it?",
+      "facts": [
+        "Add a field with an #[arg(...)] attribute to args::CliArgs; most options also set env = \"MINISERVE_<NAME>\", and options that only make sense with uploads use requires = \"allowed_upload_dir\"",
+        "Add a matching field to MiniserveConfig and set it in the Ok(Self { ... }) literal at the end of try_from_args; the literal lists every field, so the compiler forces this",
+        "Handlers and the renderer only see MiniserveConfig (renderer::page takes &MiniserveConfig), never CliArgs",
+        "Shell completions and the man page are generated from CliArgs::command() (--print-completions, --print-manpage), so they pick up the new option automatically"
+      ],
+      "where": [
+        "src/args.rs:257-281",
+        "src/config.rs:330-360",
+        "src/main.rs:53-67",
+        "src/renderer.rs:26-36"
+      ]
+    },
+    {
+      "id": "ms-13",
+      "kind": "extend",
+      "q": "How would I add a new archive format to the folder download buttons?",
+      "facts": [
+        "Add a variant to archive::ArchiveMethod; its snake_case serde/strum name becomes the ?download= value, and extension, content_type, is_enabled and create_archive each need an arm",
+        "is_enabled takes one bool per format (tar, tar_gz, zip), so a new format also needs its own CLI flag and MiniserveConfig field and a new argument at its call sites in listing.rs and renderer.rs",
+        "The buttons come from iterating ArchiveMethod::iter(), but the toolbar is only shown when tar_enabled || tar_gz_enabled || zip_enabled, so that condition needs the new flag too",
+        "directory_listing writes the archive into a pipe::Pipe on a separate thread while already returning a 200 streaming response; archive errors are only logged, so a failure shows up as a truncated or empty body, not an error status"
+      ],
+      "where": [
+        "src/archive.rs:13-53",
+        "src/archive.rs:60-76",
+        "src/listing.rs:397-436",
+        "src/renderer.rs:124-135"
+      ]
+    },
+    {
+      "id": "ms-14",
+      "kind": "enforce",
+      "q": "When --auth is set, is every endpoint behind the password?",
+      "facts": [
+        "Basic auth is applied by wrapping only the web::scope(route_prefix) with HttpAuthentication::basic(auth::handle_auth), inside a Condition that is on only when auth entries exist",
+        "The healthcheck, API, favicon and CSS routes are registered on the App outside that scope, so they answer without credentials; the tests assert this for healthcheck, favicon and CSS",
+        "That includes the POST API: with --directory-size on, DirSize computes directory sizes for unauthenticated clients",
+        "handle_auth accepts when any configured RequiredAuth matches the user name and password (plain compare, or sha256/sha512 of the supplied password); otherwise InvalidHttpCredentials becomes a 401 with WWW-Authenticate: Basic realm=\"miniserve\""
+      ],
+      "where": [
+        "src/main.rs:256-269",
+        "src/auth.rs:76-94",
+        "src/errors.rs:115-128",
+        "tests/serve_request.rs:138-150"
+      ]
+    },
+    {
+      "id": "ms-15",
+      "kind": "enforce",
+      "q": "How do upload and delete stop a client from writing or deleting outside the served folder or the allowed directories?",
+      "facts": [
+        "sanitize_path keeps only normal path components, resolves '..' by popping (so it can never climb above the root), and returns None for dot-prefixed components unless hidden files are allowed (-H)",
+        "upload_file and rm_file then require the sanitized path to start with one of the allowed directories (an empty list from a bare -u or -R means anywhere), else 403 UploadForbiddenError / RmForbiddenError",
+        "The canonicalized target must exist, but it is required to stay under the served root only when --no-symlinks is set; otherwise a symlink inside the root can lead outside it",
+        "The renderer's own upload_allowed/rm_allowed string-prefix check only hides the forms and delete buttons; the server-side checks are the ones in file_op"
+      ],
+      "where": [
+        "src/file_utils.rs:12-35",
+        "src/file_op.rs:465-486",
+        "src/file_op.rs:562-577",
+        "src/renderer.rs:56-68"
+      ]
+    },
+    {
+      "id": "ms-16",
+      "kind": "enforce",
+      "q": "Where are hidden files and symlinks filtered out, and do archive downloads respect the same rules?",
+      "facts": [
+        "Plain file serving: actix-files only serves hidden files when -H turns on use_hidden_files, and with --no-symlinks the Files path_filter rejects any request path that has a symlink component under the served root",
+        "Listing: directory_listing skips entries that dir.is_visible rejects unless show_hidden, and skips symlinks when no_symlinks",
+        "WebDAV: RestrictedFs returns NotFound for hidden or symlinked paths and filters them out of directory reads",
+        "Archives get only a skip_symlinks flag and no hidden-files flag; the zip walker adds every entry, so dotfiles end up in archives even without -H",
+        "The zip symlink skip checks std::fs::metadata, which follows links, so is_symlink() is never true there and symlinks are not skipped"
+      ],
+      "where": [
+        "src/main.rs:405-434",
+        "src/listing.rs:262-287",
+        "src/webdav_fs.rs:45-55",
+        "src/archive.rs:228-250"
+      ]
+    }
+  ]
+}

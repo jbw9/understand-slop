@@ -1,0 +1,285 @@
+{
+  "repo": "kafka-controller-quorum",
+  "commit": "cfed4e4",
+  "questions": [
+    {
+      "id": "kcq-1",
+      "kind": "parts",
+      "q": "What are the main components created when a node starts in KRaft mode as a controller, and how do they depend on each other?",
+      "facts": [
+        "KafkaRaftServer creates one SharedServer and, based on process.roles, a ControllerServer and/or a BrokerServer; the controller is started before the broker",
+        "SharedServer owns the pieces shared by broker and controller (the Raft manager, the metadata loader and the snapshot generator), with a single instance even in combined mode",
+        "KafkaRaftManager builds the metadata RaftLog, the KafkaNetworkChannel, the KafkaRaftClient and a KafkaRaftClientDriver that runs it; its startup() initializes the client with the voters and a FileQuorumStateStore",
+        "ControllerServer builds the QuorumController on top of raftManager.client (the QuorumController itself is outside this excerpt)"
+      ],
+      "where": [
+        "core/src/main/scala/kafka/server/KafkaRaftServer.scala:65-100",
+        "core/src/main/scala/kafka/server/SharedServer.scala:83-96",
+        "core/src/main/scala/kafka/raft/KafkaRaftManager.scala:129-145",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:240-245"
+      ]
+    },
+    {
+      "id": "kcq-2",
+      "kind": "flow",
+      "q": "What happens, in order, when the controller part of a node starts up, up to the point where it serves requests?",
+      "facts": [
+        "It creates the SocketServer, builds ListenerInfo from the advertised controller listeners, and calls sharedServer.startForController(listenerInfo), which starts the shared Raft manager before any QuorumController exists",
+        "It waits (bounded by the startup deadline) for controllerQuorumVotersFuture, then builds the QuorumController",
+        "It creates ControllerApis and a request handler pool, collects the metadata publishers, and waits for sharedServer.loader.installPublishers(metadataPublishers)",
+        "It then enables request processing on the SocketServer, starts the registration channel manager and the ControllerRegistrationManager, and waits for the authorizer futures and the socket acceptors",
+        "Any Throwable during startup goes to sharedServer.controllerStartupFaultHandler, then shutdown() runs and the exception is rethrown"
+      ],
+      "where": [
+        "core/src/main/scala/kafka/server/ControllerServer.scala:182-217",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:271-305",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:397-437",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:438-444"
+      ]
+    },
+    {
+      "id": "kcq-3",
+      "kind": "flow",
+      "q": "What happens end to end when a new controller node automatically joins an existing quorum as a voter?",
+      "facts": [
+        "The new node runs as an observer following the leader; pollFollowerAsObserver sends AddRaftVoter only when kraft.version supports reconfiguration, canBecomeVoter is true (process.roles includes controller), quorumConfig.autoJoin() is set, and the update-voter-set period has expired",
+        "If the node's id is already in the voter set under a different directory id, it sends RemoveRaftVoter for that old voter key instead of AddRaftVoter",
+        "The leader's AddVoterHandler sends an API_VERSIONS request to the new node and stores the pending operation as an AddVoterHandlerState; the AddVoter response future completes later",
+        "When the API_VERSIONS reply passes validation, the leader adds the node to lastVoterSet() and appends the new VotersRecord via LeaderState.appendVotersRecord; if ackWhenCommitted is false the success response is sent immediately",
+        "The pending operation is cleared in AddVoterHandler.highWatermarkUpdated once the high watermark passes the VotersRecord's offset, which is also when an ackWhenCommitted request gets its success response"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:3378-3409",
+        "raft/src/main/java/org/apache/kafka/raft/internals/AddVoterHandler.java:204-242",
+        "raft/src/main/java/org/apache/kafka/raft/internals/AddVoterHandler.java:370-398",
+        "raft/src/main/java/org/apache/kafka/raft/internals/AddVoterHandler.java:415-432"
+      ]
+    },
+    {
+      "id": "kcq-4",
+      "kind": "enforce",
+      "q": "When the leader receives a request to add a voter, what does it check before accepting it, and what error does each failed check return?",
+      "facts": [
+        "KafkaRaftClient.handleAddVoterRequest calls validateLeaderOnlyRequest with the node's own quorum.epoch() (the request carries no epoch), so the only leader-level rejections are NOT_LEADER_OR_FOLLOWER and BROKER_NOT_AVAILABLE (shutting down)",
+        "A voter key without a directory id, or listeners without an endpoint for the default listener, is rejected with INVALID_REQUEST",
+        "AddVoterHandler returns REQUEST_TIMED_OUT when another voter change is pending, when the high watermark is not yet established, or when the latest VotersRecord is not committed (its offset >= HWM) or there is no VotersRecord in the log at all",
+        "It returns UNSUPPORTED_VERSION when kraft.version does not support reconfiguration, and DUPLICATE_VOTER when the id is already in the voter set"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:2274-2303",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:2801-2816",
+        "raft/src/main/java/org/apache/kafka/raft/internals/AddVoterHandler.java:132-172",
+        "raft/src/main/java/org/apache/kafka/raft/internals/AddVoterHandler.java:174-202"
+      ]
+    },
+    {
+      "id": "kcq-5",
+      "kind": "data",
+      "q": "Where is the set of quorum voters kept, what does each voter entry contain, and where does it come from at startup?",
+      "facts": [
+        "VoterSet maps voter id to a VoterNode holding a ReplicaKey voterKey (id plus optional directory id), the voter's listener Endpoints, and its supported kraft.version range",
+        "VoterSet is immutable: addVoter (and removeVoter/updateVoter) return a new VoterSet in an Optional, which is empty if the change is not allowed (e.g. the id already exists)",
+        "Statically configured voters become a VoterSet via fromInetSocketAddresses, with Uuid.ZERO_UUID as the directory id and a supported kraft.version range of (0, 0)",
+        "KafkaRaftClient.initialize hands that static set to KRaftControlRecordStateMachine (partitionState), which reads the snapshot and log; the live voter set is then read through partitionState.lastVoterSet()"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/VoterSet.java:189-208",
+        "raft/src/main/java/org/apache/kafka/raft/VoterSet.java:360-373",
+        "raft/src/main/java/org/apache/kafka/raft/VoterSet.java:497-513",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:493-510"
+      ]
+    },
+    {
+      "id": "kcq-6",
+      "kind": "data",
+      "q": "Where does a node persist its election state (epoch, leader, who it voted for) so it survives a restart, and when is it written?",
+      "facts": [
+        "QuorumState.durableTransitionTo calls store.writeElectionState(newState.election(), partitionState.lastKraftVersion()) before memoryTransitionTo swaps in the new state",
+        "The store is a FileQuorumStateStore in the Raft manager's data directory, created in KafkaRaftManager.startup and passed to KafkaRaftClient.initialize",
+        "transitionToResigned uses memoryTransitionTo only: Resigned is a soft state that is not persisted",
+        "On restart, a node whose stored election shows it as leader comes back as Resigned in the same epoch; if the stored epoch is behind the log's last epoch it starts Unattached at the log's epoch"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:729-743",
+        "core/src/main/scala/kafka/raft/KafkaRaftManager.scala:136-145",
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:350-370",
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:155-189"
+      ]
+    },
+    {
+      "id": "kcq-7",
+      "kind": "location",
+      "q": "Where is the code that decides whether this node grants its vote to a candidate?",
+      "facts": [
+        "KafkaRaftClient.handleVoteRequest validates the request, then calls quorum.canGrantVote(replicaKey, isLogUpToDate, preVote), where isLogUpToDate compares the candidate's last offset and epoch with the local log end",
+        "A Vote request with a higher epoch first transitions the node to Unattached in that epoch",
+        "QuorumState.canGrantVote delegates to the current EpochState; LeaderState.canGrantVote always returns false",
+        "The shared rule for Unattached and Prospective replicas, QuorumState.unattachedOrProspectiveCanGrantVote, grants a PreVote whenever the log is up to date, but grants a real vote only if the node has not voted for a different candidate, knows no leader in that epoch, and the candidate's log is up to date",
+        "A granted real (non-pre) vote is recorded durably through unattachedAddVotedState or prospectiveAddVotedState"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:896-937",
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:751-753",
+        "raft/src/main/java/org/apache/kafka/raft/LeaderState.java:1050-1059",
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:894-931"
+      ]
+    },
+    {
+      "id": "kcq-8",
+      "kind": "location",
+      "q": "Where is the code that decides what counts as committed (the high watermark), and what makes it move?",
+      "facts": [
+        "LeaderState.maybeUpdateHighWatermark sorts the voters by descending end offset and takes the offset at index voterStates.size() / 2; the leader counts as one of the voters",
+        "The high watermark only advances once that offset is past epochStartOffset, i.e. after a record from the leader's own epoch is replicated, which is why onBecomeLeader immediately appends start-of-epoch control records",
+        "It is recomputed when a replica fetches (updateReplicaState, called from tryCompleteFetchRequest) and when the leader's own end offset changes (updateLocalState); fetches from observers never move it",
+        "When it moves, onUpdateLeaderHighWatermark notifies the add, remove and update voter handlers, completes the append and fetch purgatories, and delivers newly committed data to listeners"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/LeaderState.java:660-680",
+        "raft/src/main/java/org/apache/kafka/raft/LeaderState.java:779-813",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:666-676",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:368-401"
+      ]
+    },
+    {
+      "id": "kcq-9",
+      "kind": "term",
+      "q": "Which types represent a node's role in the election (leader, follower, candidate, ...), and who is allowed to change it?",
+      "facts": [
+        "Each role is its own EpochState class: UnattachedState, ProspectiveState, CandidateState, LeaderState, FollowerState and ResignedState; Prospective and Candidate are both NomineeStates",
+        "QuorumState holds the current role in its volatile `state` field and owns every transition (the transitionToX methods), following the transition table in its class comment",
+        "Observers (non-voters) only ever move between Unattached and Follower",
+        "KafkaRaftClient.pollCurrentState dispatches on the current role to pollLeader, pollCandidate, pollProspective, pollFollower, pollUnattached or pollResigned"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:61-99",
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:837-871",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:703-718",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:3540-3556"
+      ]
+    },
+    {
+      "id": "kcq-10",
+      "kind": "location",
+      "q": "Where is the code that makes a leader give up leadership, and what happens to the node afterwards?",
+      "facts": [
+        "pollLeader resigns when a graceful shutdown is in progress, when a resignation was requested, or when the check-quorum timer has expired",
+        "The check-quorum timer is reset only after a majority of voters have fetched during the interval (the leader counts implicitly), in updateCheckQuorumForFollowingVoter",
+        "Resigning fails all parked fetches with NOT_LEADER_OR_FOLLOWER, and the preferred successors are the non-leader voters ordered by descending fetch offset",
+        "In the Resigned state, pollResigned sends EndQuorumEpoch to voters that have not acknowledged, and after the election timeout (unless shutting down) moves to Unattached at epoch + 1"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:3182-3190",
+        "raft/src/main/java/org/apache/kafka/raft/LeaderState.java:245-268",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:753-761",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:3151-3180"
+      ]
+    },
+    {
+      "id": "kcq-11",
+      "kind": "impact",
+      "q": "If I change VoterSet (for example how isVoter or voterIds behave), what else is affected?",
+      "facts": [
+        "QuorumState.isVoter() and isObserver() come from partitionState.lastVoterSet().isVoter(ReplicaKey(localId, localDirectoryId)), which decides whether this node behaves as a voter or an observer",
+        "LeaderState.updateVoterAndObserverStates rebuilds the leader's voterStates from the latest VoterSet and moves voters that are no longer in it into observerStates",
+        "AddVoterHandler's DUPLICATE_VOTER check uses voterIds()",
+        "Election requests look up their destinations with voterNode(id, listenerName) and throw IllegalStateException when a voter has no endpoint for the listener"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/QuorumState.java:332-348",
+        "raft/src/main/java/org/apache/kafka/raft/LeaderState.java:881-909",
+        "raft/src/main/java/org/apache/kafka/raft/internals/AddVoterHandler.java:189-202",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:3223-3246"
+      ]
+    },
+    {
+      "id": "kcq-12",
+      "kind": "impact",
+      "q": "If I change SharedServer's start/stop logic, what else is affected?",
+      "facts": [
+        "Both ControllerServer (startForController) and BrokerServer (startForBroker) start it; it really starts only for the first caller, tracked with the usedByController / usedByBroker flags",
+        "The Raft manager starts with the first caller's endpoints: the controller listener endpoints from startForController, Endpoints.empty() from startForBroker, which is why KafkaRaftServer starts the controller before the broker",
+        "KafkaRaftServer shuts the broker down before the controller, because controller shutdown stops the Raft client early",
+        "ControllerServer.shutdown calls sharedServer.ensureNotRaftLeader(), which shuts down and nulls the whole RaftManager because there is no resign API"
+      ],
+      "where": [
+        "core/src/main/scala/kafka/server/SharedServer.scala:144-172",
+        "core/src/main/scala/kafka/server/KafkaRaftServer.scala:92-109",
+        "core/src/main/scala/kafka/server/SharedServer.scala:376-383",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:447-453"
+      ]
+    },
+    {
+      "id": "kcq-13",
+      "kind": "extend",
+      "q": "How would I add handling for a new Raft RPC type in the raft client?",
+      "facts": [
+        "Inbound requests are dispatched on the Raft poll thread by the switch on ApiKeys in KafkaRaftClient.handleRequest; add a case returning a CompletionStage of the response",
+        "If that stage completes exceptionally, the reply is built with RaftUtil.errorResponse(apiKey, ...)",
+        "Responses to requests this node sent are dispatched by the switch in handleResponse; the boolean result goes to requestManager.onResponseResult (false means back off)",
+        "Leader-only APIs validate with validateLeaderOnlyRequest (FENCED_LEADER_EPOCH, UNKNOWN_LEADER_EPOCH, NOT_LEADER_OR_FOLLOWER, BROKER_NOT_AVAILABLE)",
+        "Outbound requests go through maybeSendRequest, which respects requestManager backoff and readiness and routes the response back through messageQueue; on the server side, KafkaRaftManager.handleRequest just forwards to KafkaRaftClientDriver.handleRequest"
+      ],
+      "where": [
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:2743-2765",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:2801-2847",
+        "raft/src/main/java/org/apache/kafka/raft/KafkaRaftClient.java:2883-2921",
+        "core/src/main/scala/kafka/raft/KafkaRaftManager.scala:157-164"
+      ]
+    },
+    {
+      "id": "kcq-14",
+      "kind": "extend",
+      "q": "How would I add a new component on the controller that reacts to metadata changes?",
+      "facts": [
+        "Implement a MetadataPublisher, as ControllerRegistrationManager does: onMetadataUpdate(delta, newImage, manifest) receives each change and close() shuts it down",
+        "In ControllerServer.startup, add the instance to metadataPublishers before sharedServer.loader.installPublishers(metadataPublishers) is awaited",
+        "The existing controller publishers take sharedServer.metadataPublishingFaultHandler, which is non-fatal and only increments error metrics",
+        "Order in the list can matter: the startup code requires config.dynamicConfig.addReconfigurables(this) to run before DynamicClientQuotaPublisher is added",
+        "Publishers receive no metadata until the controller has caught up to the high watermark"
+      ],
+      "where": [
+        "server/src/main/java/org/apache/kafka/server/controller/ControllerRegistrationManager.java:187-199",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:316-353",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:397-412",
+        "core/src/main/scala/kafka/server/SharedServer.scala:256-266"
+      ]
+    },
+    {
+      "id": "kcq-15",
+      "kind": "enforce",
+      "q": "How are faults handled on a controller node? Which ones kill the process and which are only logged?",
+      "facts": [
+        "SharedServer creates every fault handler through FaultHandlerFactory.build(name, fatal, action); StandardFaultHandlerFactory returns a ProcessTerminatingFaultHandler when fatal and a LoggingFaultHandler otherwise",
+        "Fatal: the raft manager, controller startup, initial broker metadata loading and QuorumController fatal faults; metadata loading is fatal only when the node has the controller role",
+        "Non-fatal: metadata publishing and non-fatal QuorumController faults, whose actions only increment error metrics",
+        "The metadata-loading, controller-startup, initial-broker-load and fatal QuorumController actions also disable snapshot generation by setting snapshotsDisabledReason; the raft manager handler's action is a no-op, and publishing faults explicitly do not disable snapshots",
+        "ControllerServer.startup catches any Throwable, calls controllerStartupFaultHandler.handleFault, runs shutdown() and rethrows"
+      ],
+      "where": [
+        "core/src/main/scala/kafka/server/SharedServer.scala:64-81",
+        "core/src/main/scala/kafka/server/SharedServer.scala:194-233",
+        "core/src/main/scala/kafka/server/SharedServer.scala:235-266",
+        "core/src/main/scala/kafka/server/ControllerServer.scala:438-444"
+      ]
+    },
+    {
+      "id": "kcq-16",
+      "kind": "flow",
+      "q": "How does a controller register itself with the cluster, and when does it consider itself registered?",
+      "facts": [
+        "ControllerServer starts the ControllerRegistrationManager, with a NodeToControllerChannelManager built from RaftControllerNodeProvider, only after the socket server's request processing has been enabled",
+        "maybeSendControllerRegistration sends only when the node is not already registered, the channel manager is set, the metadata.version is known and supports controller registration, and no RPC is pending",
+        "The ControllerRegistrationRequest carries the controller id, the incarnation id, supported features and listeners, with zkMigrationReady false",
+        "A successful RPC response does not mark the node registered; registeredInLog becomes true only when a metadata update shows a registration for this node id with the same incarnation id",
+        "Error responses and timeouts reschedule the attempt with exponential backoff (scheduleNextCommunicationAfterFailure)"
+      ],
+      "where": [
+        "core/src/main/scala/kafka/server/ControllerServer.scala:412-427",
+        "server/src/main/java/org/apache/kafka/server/controller/ControllerRegistrationManager.java:217-255",
+        "server/src/main/java/org/apache/kafka/server/controller/ControllerRegistrationManager.java:257-274",
+        "server/src/main/java/org/apache/kafka/server/controller/ControllerRegistrationManager.java:312-340"
+      ]
+    }
+  ]
+}

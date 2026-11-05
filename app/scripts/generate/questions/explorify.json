@@ -1,0 +1,279 @@
+{
+  "repo": "explorify",
+  "commit": "304a512",
+  "questions": [
+    {
+      "id": "ex-1",
+      "kind": "parts",
+      "q": "What are the main pieces of this project and how do they talk to each other? Is there a backend I need to run?",
+      "facts": [
+        "The Expo Router app talks directly to Supabase (auth, Postgres tables, storage buckets) through one client in lib/supabase.ts, with the anon key hard-coded",
+        "lib/localStorage.ts wraps AsyncStorage and caches the signed-in profile and the campus event list that screens read instead of re-querying",
+        "Only two Supabase edge functions exist: delete-user (used by student account deletion) and archive-event, which is the unmodified 'Hello {name}' template and is never invoked",
+        "The Flask app in api/app.py only serves a 'Hello World' route at / and nothing in the mobile app calls it"
+      ],
+      "where": [
+        "lib/supabase.ts:5-16",
+        "lib/localStorage.ts:42-76",
+        "supabase/functions/archive-event/index.ts:10-20",
+        "api/app.py:11-17"
+      ]
+    },
+    {
+      "id": "ex-2",
+      "kind": "location",
+      "q": "Where is the code that decides which events show up under 'You might like', and in what order?",
+      "facts": [
+        "It is computed on the device in YouMightLike's filterAndScoreEvents (app/individual/index/components/youmightlike.tsx) over the campus events the home screen passes in; there is no server-side recommender",
+        "Interest match adds (event.type entries that are in user.interests / number of user.interests) x 5",
+        "Events within 7/14/30 days get +3/+2/+1, and events with at least 10 or 5 RSVPs (keys of events.rsvp) get +2 or +1",
+        "A same-city match on user.location adds +2 and a start hour from 18 to 21 adds +1; no code in the repo ever writes individual.location",
+        "Events are sorted by score and the home row shows only the first 8"
+      ],
+      "where": [
+        "app/individual/index/components/youmightlike.tsx:41-44",
+        "app/individual/index/components/youmightlike.tsx:48-86",
+        "app/individual/index/index.tsx:384-391"
+      ]
+    },
+    {
+      "id": "ex-3",
+      "kind": "location",
+      "q": "Where does the app decide which campus a student is shown events for?",
+      "facts": [
+        "On first focus the student home screen requests foreground location (expo-location) and picks the nearest entry of the hard-coded universities list in universityList.tsx by great-circle distance",
+        "If permission is denied it offers CampusDrawer for a manual choice; that component lives in the organisation event editor folder (app/org/index/editEvent/campusDrawer.tsx)",
+        "The university's full name is what gets passed to fetchAllEvents; the abbreviation is only shown in the header (initial value 'UIUC')",
+        "The chosen campus is kept in component state only; it is not saved to the student's profile or to local storage"
+      ],
+      "where": [
+        "app/individual/index/index.tsx:130-169",
+        "app/individual/index/index.tsx:73-91",
+        "app/org/index/editEvent/campusDrawer.tsx:214-218",
+        "app/individual/index/components/universityList.tsx:1-7"
+      ]
+    },
+    {
+      "id": "ex-4",
+      "kind": "data",
+      "q": "Where are RSVPs stored, what does an RSVP record look like, and which code reads and writes them?",
+      "facts": [
+        "RSVPs live in two places: events.rsvp, a JSON string of an object keyed by the student's user id, and individual.rsvp, an array of event ids",
+        "Each events.rsvp entry is { fullName, email, partySize, dietaryRestrictions }, written by RSVPDrawer's handleConfirm; the organisation attendees screen adds checkedIn when it checks someone in",
+        "Every writer does a client-side read-modify-write (select, JSON.parse, JSON.stringify, update) with no transaction; check-in parses the screen's own copy of the event instead of re-reading it",
+        "Attendee lists (student and org event details, org attendees.tsx) and YouMightLike's popularity score read events.rsvp; the Saved tab and home read individual.rsvp",
+        "The Saved tab's Cancel treats events.rsvp as an array (rsvpArray.includes(userId)); on the stored object that throws, the error is only logged, and the RSVP is not removed"
+      ],
+      "where": [
+        "app/individual/index/components/rsvpDrawer.tsx:141-174",
+        "app/individual/index/components/rsvpDrawer.tsx:192-215",
+        "app/org/index/attendees.tsx:97-112",
+        "app/individual/saved/index.tsx:114-133"
+      ]
+    },
+    {
+      "id": "ex-5",
+      "kind": "data",
+      "q": "What does the app keep in local device storage, and who writes and reads it?",
+      "facts": [
+        "lib/localStorage.ts wraps AsyncStorage with JSON storeData/retrieveData and three loaders (fetchAllEvents, fetchUserProfileOrg, fetchUserProfileIndividual)",
+        "'uuid' holds the auth user id (written by the root layout, login and registration) and is what the profile loaders use to fetch the individual or organizations row",
+        "'user' holds that whole profile row and most screens read user.id, interests and names from it; 'events' holds one campus's published, today-or-later events and is written only by fetchAllEvents",
+        "Editing a student's interests updates the individual table but does not rewrite 'user'; the cache is only refreshed when fetchUserProfileIndividual runs again (login, app start, opening event details)",
+        "Sign-out wipes everything with AsyncStorage.clear()"
+      ],
+      "where": [
+        "lib/localStorage.ts:78-106",
+        "lib/localStorage.ts:65-71",
+        "app/individual/account/components/EditProfileDrawer.tsx:104-115",
+        "app/individual/account/index.tsx:51-79"
+      ]
+    },
+    {
+      "id": "ex-6",
+      "kind": "flow",
+      "q": "What happens end to end when a student taps Join on an event?",
+      "facts": [
+        "JoinButton's Join only calls openRSVPDrawer(event) from EventContext, which sets currentEvent and opens the single shared RSVPDrawer",
+        "On confirm (a swipe up), RSVPDrawer reads events.rsvp, sets rsvpJson[user.id] = { fullName, email, partySize, dietaryRestrictions } and writes it back with JSON.stringify",
+        "addEventToUserRSVP then adds the event id to individual.rsvp, de-duplicated through a Set",
+        "toggleJoined flips the id in the context's joinedEvents, which is what JoinButton reads to show Join or Cancel",
+        "joinedEvents starts empty and is never loaded from the database, and the isRSVPd/isRSVP props callers pass are not in JoinButtonProps, so after a restart a joined event shows 'Join' again"
+      ],
+      "where": [
+        "app/individual/index/components/joinButton.tsx:9-26",
+        "app/individual/index/components/eventContext.tsx:17-47",
+        "app/individual/index/components/rsvpDrawer.tsx:141-179",
+        "app/individual/index/components/rsvpDrawer.tsx:192-215"
+      ]
+    },
+    {
+      "id": "ex-7",
+      "kind": "flow",
+      "q": "What happens when an organisation creates a new event, from the Add screen until students can see it?",
+      "facts": [
+        "addEvent's checkRequiredFields requires name, description, at least one category, date, end time, location, food and a thumbnail; campus is not required (the edit screen does require it)",
+        "A picked image is uploaded first, then an events row is inserted with uuid = the organisation's auth user id and published: false",
+        "After the insert it navigates to previewEvent with the new row; only previewEvent's handlePublish (update published: true by id) publishes it",
+        "Students only receive it through fetchAllEvents, which selects published = true events whose campus equals the student's chosen campus"
+      ],
+      "where": [
+        "app/org/index/addEvent.tsx:177-191",
+        "app/org/index/addEvent.tsx:205-245",
+        "app/org/index/previewEvent.tsx:103-119",
+        "lib/localStorage.ts:49-54"
+      ]
+    },
+    {
+      "id": "ex-8",
+      "kind": "impact",
+      "q": "If I rename or change a value in the shared categories list, what else is affected?",
+      "facts": [
+        "categories (app/individual/index/data/categories.ts) is imported by registerIndividual, registerOrg, the student EditProfileDrawer, the org categorydrawer and multiselect, and both search screens",
+        "Its value strings are persisted: individual.interests at student sign-up, organizations.type at organisation sign-up, and events.type through the event category picker",
+        "YouMightLike scores by lower-cased overlap of event.type with user.interests, so a renamed value stops matching rows that already store the old string"
+      ],
+      "where": [
+        "app/individual/index/data/categories.ts:1-10",
+        "app/(auth)/registerIndividual.tsx:128-138",
+        "app/(auth)/registerOrg.tsx:117-127",
+        "app/individual/index/components/youmightlike.tsx:59-62"
+      ]
+    },
+    {
+      "id": "ex-9",
+      "kind": "impact",
+      "q": "What calls fetchAllEvents, and what would break if I changed how it filters by campus?",
+      "facts": [
+        "It is called by the student home (refreshEvents), the organisation 'other events' tab, and at the end of both registerIndividual and registerOrg",
+        "It keeps published = true events whose campus exactly equals its argument, drops events before today, and overwrites the single 'events' AsyncStorage key",
+        "The home screen passes the university's full name, which is what event creation stores in events.campus; registration passes the abbreviation 'UIUC', which matches no stored campus",
+        "The organisation tab passes user.campus from the cached organizations row"
+      ],
+      "where": [
+        "lib/localStorage.ts:42-76",
+        "app/individual/index/index.tsx:60-91",
+        "app/(auth)/registerIndividual.tsx:160-161",
+        "app/org/otherevents/index.tsx:66-80"
+      ]
+    },
+    {
+      "id": "ex-10",
+      "kind": "term",
+      "q": "What makes an event a 'draft', 'ongoing' or 'archived' event? Is there a status field?",
+      "facts": [
+        "There is no status column; the state is derived from events.published and events.date",
+        "Draft = published false; ongoing = published true and date today or later; archive = published true and date before startOfDay(today)",
+        "Each organisation list (draft.tsx, ongoing.tsx, archive.tsx) queries only events whose uuid equals the signed-in organisation's id, then filters dates on the client",
+        "The archive-event edge function archives nothing: it is the template 'Hello {name}' handler"
+      ],
+      "where": [
+        "app/org/index/components/draft.tsx:47-66",
+        "app/org/index/components/ongoing.tsx:42-57",
+        "app/org/index/components/archive.tsx:42-57",
+        "supabase/functions/archive-event/index.ts:10-20"
+      ]
+    },
+    {
+      "id": "ex-11",
+      "kind": "term",
+      "q": "How does the app tell a student account from an organisation account, and what represents each?",
+      "facts": [
+        "Both are Supabase auth users; the role is implied by which table has a row whose id equals the auth user id: individual (students) or organizations. There is no role column or claim",
+        "The root layout (and login) query individual first and route to /individual, otherwise query organizations and route to /org",
+        "Student rows are created with id, email, full_name and interests; organisation rows with id, email, org_name and type (a category array)",
+        "Whichever row is found is cached under the same 'user' key, so screens read user.full_name or user.org_name from it"
+      ],
+      "where": [
+        "app/_layout.tsx:46-83",
+        "app/(auth)/registerIndividual.tsx:128-138",
+        "app/(auth)/registerOrg.tsx:117-127",
+        "lib/localStorage.ts:108-136"
+      ]
+    },
+    {
+      "id": "ex-12",
+      "kind": "extend",
+      "q": "How would I add a new screen to the organisation side, for example an analytics page opened from the organisation home?",
+      "facts": [
+        "Routes are files (expo-router): add app/org/index/<name>.tsx; app/org/index/_layout.tsx is a header-less Stack that picks up new files without listing them",
+        "Open it by file name with navigation.navigate('<name>', params), as the organisation home does for 'addEvent'",
+        "A new bottom tab instead needs a folder with its own _layout.tsx plus a Tabs.Screen entry in app/org/_layout.tsx (otherevents, index, account)",
+        "Detail screens hide the tab bar themselves with navigation.getParent()?.setOptions({ tabBarStyle: { display: 'none' } })"
+      ],
+      "where": [
+        "app/org/_layout.tsx:20-43",
+        "app/org/index/_layout.tsx:1-11",
+        "app/org/index/index.tsx:130-137",
+        "app/org/index/addEvent.tsx:65-79"
+      ]
+    },
+    {
+      "id": "ex-13",
+      "kind": "extend",
+      "q": "Where would I add a new event field, say a capacity limit, so organisations can set it and students can see it?",
+      "facts": [
+        "The repo has no database schema or migrations (supabase/ holds config.toml, an empty seed.sql and the functions), so the column must be added in the hosted Supabase project",
+        "The field has to be added to both the insert payload in addEvent.tsx and the update in editEvent/[id].tsx, which are separate copies of the event form",
+        "There is no shared Event type: about twenty screens each declare their own local Event interface, so each display screen is updated one by one",
+        "Student reads use select('*') in fetchAllEvents, so a new column reaches the cached 'events' list without changing the query"
+      ],
+      "where": [
+        "app/org/index/addEvent.tsx:222-242",
+        "app/org/index/editEvent/[id].tsx:225-242",
+        "app/org/index/previewEvent.tsx:27-39",
+        "lib/localStorage.ts:49-54"
+      ]
+    },
+    {
+      "id": "ex-14",
+      "kind": "enforce",
+      "q": "Who is allowed to edit, publish or delete an event, and where is that checked?",
+      "facts": [
+        "On the client, the only ownership filter is that the organisation lists load events whose uuid equals the signed-in organisation's id",
+        "Edit (editEvent updateEvent), publish (previewEvent handlePublish) and delete (handleDeleteEvent in draft/ongoing/archive) all filter by event id only, with no uuid condition",
+        "The repo contains no SQL schema or row-level-security policies, so any server-side restriction exists only in the hosted Supabase project; the client uses the public anon key",
+        "Student clients must also be able to update events rows: RSVP and cancel rewrite events.rsvp directly by event id"
+      ],
+      "where": [
+        "app/org/index/editEvent/[id].tsx:225-242",
+        "app/org/index/components/ongoing.tsx:42-80",
+        "app/org/index/previewEvent.tsx:103-110",
+        "app/individual/index/components/rsvpDrawer.tsx:166-170"
+      ]
+    },
+    {
+      "id": "ex-15",
+      "kind": "enforce",
+      "q": "Is account deletion protected so a user can only delete their own account, and does it work for both account types?",
+      "facts": [
+        "delete-user takes the Authorization bearer token, resolves the user with auth.getUser(token) and returns 401 when there is no valid user",
+        "The { userId } the client sends in the body is ignored; the id comes only from the token",
+        "With the service-role key it deletes the individual row and then the auth user; it never touches organizations or events, so the student's entries in events.rsvp remain",
+        "The organisation account screen invokes 'delete-organization', a function that does not exist in supabase/functions"
+      ],
+      "where": [
+        "supabase/functions/delete-user/index.ts:15-47",
+        "app/individual/account/index.tsx:111-132",
+        "app/org/account/index.tsx:129-149"
+      ]
+    },
+    {
+      "id": "ex-16",
+      "kind": "enforce",
+      "q": "Where is the password rule enforced, and is it enforced on every path that sets a password?",
+      "facts": [
+        "The rule (at least 8 characters, one capital, one digit) is the isPasswordValid regex, duplicated in registerIndividual and registerOrg",
+        "It only disables the stage-4 Continue button; supabase.auth.signUp was already called earlier with a generated temporary password just to send the email code",
+        "resetPassword only checks that the code and new password are non-empty before calling auth.updateUser; no strength rule applies",
+        "For organisation accounts, the reset also writes the new password in plain text to organizations.password"
+      ],
+      "where": [
+        "app/(auth)/registerIndividual.tsx:52-64",
+        "app/(auth)/registerIndividual.tsx:353-358",
+        "app/(auth)/resetPassword.tsx:113-137",
+        "app/(auth)/resetPassword.tsx:157-171"
+      ]
+    }
+  ]
+}

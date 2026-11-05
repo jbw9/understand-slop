@@ -33,14 +33,24 @@ fn web(url: &str) -> Result<Url, String> {
 }
 
 /// A page from the web, at a place in the window: CSS pixels of the app's
-/// page, with `zoom` the scale the viewport is drawn at.
+/// page, with `zoom` the scale the viewport is drawn at. With `project`, in
+/// that project's own store of sign-ins rather than the shared one (signins.rs).
 #[tauri::command]
-pub async fn browser_open(app: AppHandle, url: String, x: f64, y: f64, width: f64, height: f64, zoom: f64) -> Result<String, String> {
+pub async fn browser_open(
+    app: AppHandle,
+    url: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    zoom: f64,
+    project: Option<String>,
+) -> Result<String, String> {
     let window = app.get_window("main").ok_or("The window is gone.")?;
     let label = format!("browser-{}", NEXT.fetch_add(1, Ordering::Relaxed));
     let (tell, me) = (app.clone(), label.clone());
     let (own, mine) = (app.clone(), label.clone());
-    let builder = WebviewBuilder::new(&label, WebviewUrl::External(web(&url)?))
+    let mut builder = WebviewBuilder::new(&label, WebviewUrl::External(web(&url)?))
         // Told that it is asked, rather than posting to a page around it.
         .initialization_script(format!("(function (SLOP_NATIVE) {{\n{AGENT}\n}})(true);"))
         .on_page_load(move |_, load| {
@@ -54,6 +64,9 @@ pub async fn browser_open(app: AppHandle, url: String, x: f64, y: f64, width: f6
             }
             NewWindowResponse::Deny
         });
+    if let Some(root) = project {
+        builder = builder.data_store_identifier(crate::signins::store_of(&root));
+    }
     let view = window
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;

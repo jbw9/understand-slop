@@ -405,7 +405,7 @@ export function Workspace() {
       if (!handle) {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
         // Anything else to navigate to is a page from the web, which needs no server.
-        const web = cmd.op === "navigate" && !asked && !cmd.url.trim().startsWith("/");
+        const web = cmd.op === "sign_in" || (cmd.op === "navigate" && !asked && !cmd.url.trim().startsWith("/"));
         if (!asked && !web && !servers[root])
           throw new Error(
             "No preview is open for this project, and no dev server has printed an address. Start the dev server in a terminal tab, or navigate to its address, like http://localhost:3000.",
@@ -415,7 +415,7 @@ export function Workspace() {
         handle = await until(() => previewOf(previewTab(root)?.key), 8000);
         if (asked) return reply(true, `Opened ${asked} in the preview.`);
       }
-      const seen = cmd.op === "frame" || (cmd.op === "agent" && cmd.name === "computer");
+      const seen = cmd.op === "frame" || cmd.op === "sign_in" || (cmd.op === "agent" && cmd.name === "computer");
       if (seen && root === latest.current.here) {
         const hidden = !latest.current.shown;
         preview(root);

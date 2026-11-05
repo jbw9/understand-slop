@@ -10,6 +10,8 @@ export type Call =
   | { op: "frame" }
   | { op: "agent"; name: string; args: Record<string, unknown> }
   | { op: "navigate"; url: string }
+  /** Claude asking the user to sign in to a site, which waits on them (src-tauri/src/signins.rs). */
+  | { op: "sign_in"; url: string }
   | { op: "resize"; args: { width?: number; height?: number; preset?: string } }
   | { op: "console"; args: { pattern?: string; only_errors?: boolean; clear?: boolean; limit?: number } }
   /** Claude reading the project's map (app/api/lookup); answered by the workspace, never a preview. */

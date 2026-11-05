@@ -570,14 +570,185 @@
 .files > li > code {
   color: var(--color-ink);
 }
-.onMap {
-  margin-bottom: 8px;
-  font-size: 12.5px;
-  color: var(--color-muted-slate);
+/* The doc is read down to its steps, as a reader would scroll it. A set
+   width keeps its height the same on any stage, so the scroll lands on the
+   same place. */
+.scroll {
+  width: 600px;
+  animation: read 5.5s var(--ease) var(--t) forwards;
 }
-/* Small enough to clear the question at the foot. */
-.doc .pic {
-  max-width: 500px;
+@keyframes read {
+  0%,
+  8% {
+    translate: 0 0;
+  }
+  38%,
+  60% {
+    translate: 0 -228px;
+  }
+  100% {
+    translate: 0 -784px;
+  }
+}
+.planFig figcaption {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+}
+.planFig figcaption span {
+  margin-left: 10px;
+  font: 10.5px var(--font-mono);
+  color: var(--color-faint);
+}
+.planFig svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* A web screen and its notes, numbered as the app numbers them when the lines can't be drawn. */
+.planScreen {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-top: 22px;
+}
+.browser {
+  width: 290px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-pure-white);
+  box-shadow: var(--shadow-panel);
+}
+.browserBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--color-border-gray);
+  background: var(--color-surface-container);
+}
+.browserBar span {
+  display: flex;
+  gap: 5px;
+}
+.browserBar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+.browserBar p {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  border-radius: 2px;
+  background: var(--color-pure-white);
+  font: 10.5px var(--font-mono);
+  color: var(--color-muted-slate);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.browserBody {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+.screenTitle {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.thing {
+  position: relative;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.thing[data-type="heading"] {
+  font-size: 13px;
+  font-weight: 600;
+}
+.thing[data-type="choice"] {
+  padding: 5px 9px;
+  border: 1px solid var(--color-mint-line);
+  border-radius: 2px;
+  background: var(--color-mint-success);
+  color: var(--color-deep-green);
+}
+.thing[data-type="button"] {
+  padding: 6px 9px;
+  border-radius: 2px;
+  background: var(--color-deep-green);
+  color: #fff;
+  font-weight: 500;
+  text-align: center;
+}
+.thing[data-type="image"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 58px;
+  border-radius: 2px;
+  background: var(--color-surface-container);
+  color: var(--color-faint);
+}
+.thing em,
+.notes em {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-deep-green);
+  font: 600 10px var(--font-mono);
+  font-style: normal;
+  color: #fff;
+}
+.thing em {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+}
+.notes {
+  display: grid;
+  gap: 10px;
+  padding-top: 6px;
+}
+.notes li {
+  display: flex;
+  gap: 9px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-on-surface-variant);
+}
+.notes em {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.notes b {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.steps {
+  display: grid;
+  gap: 6px;
+  max-width: 40em;
+}
+.steps li {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-on-surface);
+}
+.steps i {
+  flex-shrink: 0;
+  min-width: 16px;
+  font-style: normal;
+  color: var(--color-muted-slate);
 }
 /* The question, at the foot of the doc it is about. */
 .ask {

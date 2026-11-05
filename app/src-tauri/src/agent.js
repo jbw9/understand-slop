@@ -547,10 +547,15 @@
     });
   });
 
+  // The user types their own passwords: Claude is handed the sign_in tool instead.
+  const PASSWORD = "That is a password field, which only the user types into. Call sign_in so they can sign in themselves.";
+  const secret = (el) => el instanceof HTMLInputElement && el.type === "password";
+
   /** Typing into whatever has focus, as React and the rest expect to hear it. */
   const type = (text) => {
     const el = document.activeElement;
     if (!el || el === document.body) throw new Error("Nothing has focus to type into: click a field first.");
+    if (secret(el)) throw new Error(PASSWORD);
     if (el.isContentEditable) {
       document.execCommand("insertText", false, text);
       return `Typed into ${describe(el)}.`;
@@ -641,6 +646,7 @@
 
   const formInput = ({ ref, value }) => {
     const el = byRef(ref);
+    if (secret(el)) throw new Error(PASSWORD);
     if (el.type === "checkbox" || el.type === "radio") {
       const want = value === true || value === "true" || value === "on" || value === "checked";
       if (el.checked !== want) el.click();
@@ -803,6 +809,7 @@
     /** What typing would go into, if anything. */
     focused() {
       const el = document.activeElement;
+      if (secret(el)) throw new Error(PASSWORD);
       return !el || el === document.body ? null : describe(el);
     },
     read_page: readPage,

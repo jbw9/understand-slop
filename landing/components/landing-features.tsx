@@ -187,60 +187,60 @@ const SAVE_STEPS: [string, ReactNode][] = [
 
 /* ── a plan, before it is built ─────────────────────────── */
 
+/** The plan as written in plan mode, kept verbatim in demo/plans/saved-sign-ins.md. */
 function PlanScene() {
   return (
     <>
       <Strip>
-        <Tab>Handling Requests</Tab>
+        <Tab>Desktop App</Tab>
         <Tab on>
           <PlanIcon />
           Plan
         </Tab>
       </Strip>
-      <div className={f.main} style={{ "--ws": "38%" } as CSSProperties}>
+      <div className={f.main} style={{ "--ws": "36%" } as CSSProperties}>
         <div className={f.doc}>
-          <article>
+          <article className={f.scroll} style={at(3.2)}>
             <header className={f.in} style={at(0.15)}>
               <p className={f.planMeta}>
                 <span className={f.eyebrow}>Plan</span>
                 <span>
-                  3 steps · 3 files <b data-v="changed">~2</b> <b data-v="added">+1</b> · 2 min read
+                  6 steps · 7 files <b data-v="changed">~6</b> <b data-v="added">+1</b> · 2 min read
                 </span>
               </p>
-              <h3 className={f.planTitle}>Cap flashed messages</h3>
+              <h3 className={f.planTitle}>Saved sign-ins for the Preview browser</h3>
               <p className={f.lede}>
-                A cookie session holds about 4 KB, and <code>flash()</code> appends with no limit, so a page that flashes in
-                a loop can grow the cookie past what the browser keeps. Keep only the newest messages.
+                You sign in to a site once in the Preview, choose &ldquo;all projects&rdquo; or &ldquo;this project
+                only&rdquo;, and from then on Claude opens it already signed in. Mira keeps the site&rsquo;s session cookies
+                the way a browser does and never stores your password.
               </p>
             </header>
             <section className={f.in} style={at(0.4)}>
-              <p className={f.eyebrow}>What changes</p>
-              <ul className={f.files}>
-                <li>
-                  <b data-v="changed">~</b>
-                  <code>src/flask/helpers.py</code>
-                  <span>
-                    <code>flash()</code> keeps the newest <code>MAX_FLASHED_MESSAGES</code>
-                  </span>
-                </li>
-                <li>
-                  <b data-v="changed">~</b>
-                  <code>src/flask/app.py</code>
-                  <span>the default config gains the limit, 20</span>
-                </li>
-                <li>
-                  <b data-v="added">+</b>
-                  <code>tests/test_basic.py</code>
-                  <span>
-                    <code>test_flash_limit</code>
-                  </span>
-                </li>
-              </ul>
+              <PlanDiagram />
+              <PlanScreen />
             </section>
             <section className={f.in} style={at(0.65)}>
-              <p className={f.eyebrow}>On the map</p>
-              <p className={f.onMap}>Inside Handling Requests</p>
-              <Picture view={BOTTOM_RIGHT} marks={{ helpers: "changed", dispatch: "near" }} recede />
+              <p className={f.eyebrow}>Steps</p>
+              <ol className={f.steps}>
+                {PLAN_STEPS.map((s, i) => (
+                  <li key={i}>
+                    <i>{i + 1}.</i>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section className={f.in} style={at(0.8)}>
+              <p className={f.eyebrow}>Files</p>
+              <ul className={f.files}>
+                {PLAN_FILES.map(([v, path, why]) => (
+                  <li key={path}>
+                    <b data-v={v}>{v === "added" ? "+" : "~"}</b>
+                    <code>{path}</code>
+                    <span>{why}</span>
+                  </li>
+                ))}
+              </ul>
             </section>
           </article>
           <footer className={`${f.ask} ${f.in}`} style={at(1.2)}>
@@ -268,22 +268,22 @@ function PlanScene() {
           }
         >
           <div className={f.term}>
-            <Hello />
-            <p className={f.you}>&gt; keep flashed messages from overflowing the session cookie</p>
+            <Hello cwd="~/code/mira" />
+            <p className={f.you}>&gt; let me sign in to Instagram once and keep it for every project</p>
             <div className={`${f.msg} ${f.in}`} style={at(0.3)}>
               <span className={f.ok}>⏺</span>
               <span>
-                <b>Read</b>(src/flask/helpers.py)
+                <b>Read</b>(app/src-tauri/src/browser.rs)
                 <br />
-                <span className={f.res}>⎿&nbsp;&nbsp;Read 679 lines</span>
+                <span className={f.res}>⎿&nbsp;&nbsp;Read 342 lines</span>
               </span>
             </div>
             <div className={`${f.msg} ${f.in}`} style={at(0.5)}>
               <span className={f.ok}>⏺</span>
               <span>
-                <b>Read</b>(src/flask/sessions.py)
+                <b>Read</b>(app/components/preview.tsx)
                 <br />
-                <span className={f.res}>⎿&nbsp;&nbsp;Read 385 lines</span>
+                <span className={f.res}>⎿&nbsp;&nbsp;Read 1047 lines</span>
               </span>
             </div>
             <div className={`${f.choices} ${f.in}`} style={at(1)}>
@@ -303,6 +303,168 @@ function PlanScene() {
     </>
   );
 }
+
+type Change = "added" | "changed";
+
+/** The plan's ```diagram, laid out as components/diff.tsx lays out a plan's boxes. */
+const PLAN_BOXES: { label: string; sub: string; col: number; row: number; v?: Change }[] = [
+  { label: "Claude", sub: "navigate / sign_in tools", col: 0, row: 0 },
+  { label: "Preview tools", sub: "src-tauri/src/mcp.rs", col: 0, row: 1, v: "changed" },
+  { label: "Sign-in bar", sub: "components/preview.tsx", col: 1, row: 0, v: "added" },
+  { label: "Site rules", sub: "vault sign-ins.json (hosts only)", col: 1, row: 1, v: "added" },
+  { label: "Web view", sub: "src-tauri/src/browser.rs", col: 1, row: 2, v: "changed" },
+  { label: "Shared store", sub: "WebKit default, all projects", col: 2, row: 1 },
+  { label: "Project store", sub: "WebKit store per project id", col: 2, row: 2, v: "added" },
+];
+
+const PLAN_ARROWS: { d: string; label: string; x: number; y: number; anchor?: "start" | "end"; v?: Change }[] = [
+  { d: "M117 72V122", label: "sign_in", x: 125, y: 101, anchor: "start" },
+  { d: "M222 153H267V43H310", label: "asks you", x: 267, y: 101, v: "added" },
+  { d: "M417 72V122", label: "your choice", x: 425, y: 101, anchor: "start", v: "added" },
+  { d: "M417 182V232", label: "picks store", x: 425, y: 211, anchor: "start", v: "added" },
+  { d: "M522 250H588V153H610", label: "default", x: 582, y: 204, anchor: "end" },
+  { d: "M522 272H610", label: "project-only", x: 562, y: 290, v: "added" },
+];
+
+const PLAN_BOX_W = 210;
+const PLAN_BOX_H = 58;
+const TINTS = {
+  added: { ink: "var(--color-diff-add-ink)", surface: "var(--color-diff-add-surface)", line: "var(--color-diff-add-line)", mark: "+" },
+  changed: { ink: "var(--color-amber-ink)", surface: "var(--color-amber-surface)", line: "var(--color-amber-line)", mark: "~" },
+};
+
+function PlanDiagram() {
+  return (
+    <figure className={f.planFig}>
+      <figcaption>
+        Where a sign-in is kept<span>green is new · amber changes</span>
+      </figcaption>
+      <svg viewBox="0 0 834 306">
+        <defs>
+          {(["added", "changed", "untouched"] as const).map((v) => (
+            <marker key={v} id={`p-${v}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M1 1.2L7 4 1 6.8z" fill={v === "untouched" ? "var(--color-wire)" : TINTS[v].line} />
+            </marker>
+          ))}
+        </defs>
+        {PLAN_ARROWS.map((a) => {
+          const t = a.v ? TINTS[a.v] : null;
+          return (
+            <g key={a.d} opacity={t ? 1 : 0.45}>
+              <path d={a.d} fill="none" stroke={t?.line ?? "var(--color-wire)"} strokeWidth={t ? 2 : 1.5} markerEnd={`url(#p-${a.v ?? "untouched"})`} />
+              <text
+                x={a.x}
+                y={a.y}
+                textAnchor={a.anchor ?? "middle"}
+                fontSize="12"
+                fill={t?.ink ?? "var(--color-muted-slate)"}
+                stroke="var(--color-warm-cream)"
+                strokeWidth="4"
+                strokeLinejoin="round"
+                paintOrder="stroke"
+              >
+                {a.label}
+              </text>
+            </g>
+          );
+        })}
+        {PLAN_BOXES.map((b) => {
+          const x = 12 + b.col * 300;
+          const y = 14 + b.row * 110;
+          const t = b.v ? TINTS[b.v] : null;
+          return (
+            <g key={b.label} opacity={t ? 1 : 0.5}>
+              <rect
+                x={x}
+                y={y}
+                width={PLAN_BOX_W}
+                height={PLAN_BOX_H}
+                rx="3"
+                fill={t?.surface ?? "var(--color-pure-white)"}
+                stroke={t?.line ?? "var(--color-border-strong)"}
+                strokeWidth={t ? 2 : 1.5}
+              />
+              <text x={x + PLAN_BOX_W / 2} y={y + 25} textAnchor="middle" fontSize="14.5" fontWeight="600" fill={t?.ink ?? "var(--color-ink)"}>
+                {b.label}
+              </text>
+              <text x={x + PLAN_BOX_W / 2} y={y + 43} textAnchor="middle" fontSize="12" fill="var(--color-faint)">
+                {b.sub}
+              </text>
+              {t ? (
+                <text x={x + PLAN_BOX_W - 11} y={y + 18} textAnchor="middle" fontSize="15" fontWeight="700" fill={t.ink}>
+                  {t.mark}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+    </figure>
+  );
+}
+
+/** The plan's ```screen, as components/blocks.tsx draws a web screen with its notes numbered. */
+const PLAN_SCREEN: { type: "heading" | "choice" | "button" | "image"; label: string; note: string }[] = [
+  { type: "heading", label: "Claude needs you to sign in to instagram.com", note: "new bar above the page; Claude can't type into the page while it's showing" },
+  { type: "choice", label: "Keep this sign-in for: All projects · Only this project", note: "new; the default is 'All projects' for social sites and 'Only this project' for everything else" },
+  { type: "button", label: "I'm signed in", note: "new; Claude carries on" },
+  { type: "image", label: "the site's own login page", note: "you type your password here yourself" },
+];
+
+function PlanScreen() {
+  return (
+    <div className={f.planScreen}>
+      <div className={f.browser}>
+        <div className={f.browserBar}>
+          <span>
+            <i />
+            <i />
+            <i />
+          </span>
+          <p>instagram.com/reel/…</p>
+        </div>
+        <div className={f.browserBody}>
+          <p className={f.screenTitle}>Preview, Claude needs a sign-in</p>
+          {PLAN_SCREEN.map((it, i) => (
+            <div key={it.label} className={f.thing} data-type={it.type}>
+              {it.label}
+              <em>{i + 1}</em>
+            </div>
+          ))}
+        </div>
+      </div>
+      <ol className={f.notes}>
+        {PLAN_SCREEN.map((it, i) => (
+          <li key={it.label}>
+            <em>{i + 1}</em>
+            <span>
+              <b>{it.label}</b> — {it.note}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+const PLAN_STEPS = [
+  "Give every project its own WebKit cookie store, next to the shared one that already persists today.",
+  "Keep a short list of which sites use which store: shared sites in the vault and project-only sites in the project's folder. The list holds site names only, never secrets.",
+  "When the web view opens a site, use the store that site's rule names. If the store has to change, close the view and reopen it.",
+  "Add a sign_in tool for Claude. It shows the bar, you pick where to keep the sign-in, the page reopens in that store, and you sign in yourself.",
+  "While the bar is up, block Claude from typing into the page. Always block it from reading or filling password fields.",
+  "Add “Saved sign-ins” to settings with a Forget button for each site. Removing a project also deletes its store.",
+];
+
+const PLAN_FILES: [Change, string, string][] = [
+  ["changed", "app/src-tauri/src/browser.rs", "open the web view with a per-project store"],
+  ["changed", "app/src-tauri/Cargo.toml", "turn on the WebKit data-store features"],
+  ["changed", "app/src-tauri/src/mcp.rs", "add the sign_in tool"],
+  ["changed", "app/components/preview.tsx", "sign-in bar, choose the store when opening a site"],
+  ["added", "app/lib/sign-ins.ts", "read and write site rules"],
+  ["changed", "app/src-tauri/src/agent.js", "refuse to fill or reveal password fields"],
+  ["changed", "app/components/settings.tsx", "saved sign-ins, with Forget"],
+];
 
 /* ── a change, on the map ───────────────────────────────── */
 
@@ -622,14 +784,14 @@ function WsTab({ on, icon, children }: { on?: boolean; icon: ReactNode; children
   );
 }
 
-function Hello() {
+function Hello({ cwd = "~/code/flask" }: { cwd?: string }) {
   return (
     <div className={f.hello}>
       <p>
         <b>✻</b> Welcome to Claude Code!
       </p>
       <p className={f.res}>/help for help, /status for your current setup</p>
-      <p className={f.res}>cwd: ~/code/flask</p>
+      <p className={f.res}>cwd: {cwd}</p>
     </div>
   );
 }
@@ -689,7 +851,6 @@ const ARROWS: { d: string; label: string; x: number; y: number; anchor?: "start"
 
 /** Parts of the picture, where a narrower column would shrink the whole of it past reading. */
 const TOP_RIGHT = "292 0 772 200";
-const BOTTOM_RIGHT = "292 120 772 198";
 
 const BOX_W = 170;
 const BOX_H = 50;

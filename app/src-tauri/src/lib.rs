@@ -8,6 +8,7 @@ mod preview;
 mod proc;
 mod pty;
 mod server;
+mod signins;
 
 use tauri::Manager;
 
@@ -68,6 +69,10 @@ pub fn run() {
             browser::browser_go,
             browser::browser_eval,
             browser::browser_close,
+            signins::signin_project,
+            signins::signin_keep,
+            signins::signin_list,
+            signins::signin_forget,
             browser::native_input,
             devices::project_detect,
             devices::device_status,

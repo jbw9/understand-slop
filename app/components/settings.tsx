@@ -254,6 +254,12 @@ export function SettingsDialog() {
           >
             <OnDevice />
           </Field>
+          <Field
+            label="Saved sign-ins"
+            hint="Sites you signed in to in the Preview when Claude asked. Mira keeps their sign-in cookies, never your password. Forget signs you out."
+          >
+            <SignIns />
+          </Field>
           <Field label="Media while dictating" hint="Pauses Music and Spotify, and mutes everything else, while you hold ⌃⌥; all of it comes back when you let go.">
             <div role="radiogroup" aria-label="Media while dictating" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
               {[
@@ -326,5 +332,45 @@ function OnDevice() {
         </button>
       )}
     </div>
+  );
+}
+
+type Kept = { global: string[]; projects: Record<string, string[]> };
+
+/** The sign-ins the preview keeps (src-tauri/src/signins.rs): for all projects, then each project's own. */
+function SignIns() {
+  const [kept, setKept] = useState<Kept | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const read = useCallback(() => {
+    invoke<Kept>("signin_list").then(setKept, (e) => setFailed(String(e)));
+  }, []);
+  useEffect(read, [read]);
+  if (!kept) return <span className="font-mono text-[11.5px] text-faint">{failed ?? "Looking…"}</span>;
+  const rows = [
+    ...kept.global.map((site) => ({ site, root: null as string | null, where: "All projects" })),
+    ...Object.entries(kept.projects).flatMap(([root, sites]) =>
+      sites.map((site) => ({ site, root, where: root.split("/").filter(Boolean).pop() ?? root })),
+    ),
+  ];
+  if (!rows.length) return <span className="font-mono text-[11.5px] text-faint">None yet.</span>;
+  return (
+    <ul className="flex flex-col gap-1 font-mono text-[11.5px]">
+      {rows.map((r) => (
+        <li key={`${r.root ?? ""}:${r.site}`} className="flex items-baseline gap-3">
+          <span className="truncate text-ink">{r.site}</span>
+          <span className="truncate text-faint" title={r.root ?? undefined}>
+            {r.where}
+          </span>
+          <button
+            type="button"
+            onClick={() => invoke("signin_forget", { root: r.root, site: r.site }).then(read, (e) => setFailed(String(e)))}
+            className="ml-auto shrink-0 cursor-pointer text-faint hover:text-ink"
+          >
+            Forget
+          </button>
+        </li>
+      ))}
+      {failed ? <li className="text-clay-ink">{failed}</li> : null}
+    </ul>
   );
 }

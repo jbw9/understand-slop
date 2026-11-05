@@ -139,7 +139,9 @@ the web, navigate the preview there (an address, or words to search for) instead
 another browser, so the user sees it beside you. WebFetch and WebSearch are fine for reading \
 docs as text; they stay out of the preview. `device` does the same on an iOS Simulator or \
 Android emulator running in the app. `read_terminal` reads the project's terminals, the dev \
-server's logs by default: read it when the page misbehaves, a build fails or a request errors. `map_search`, `map_section` and `map_where` read the project's \
+server's logs by default: read it when the page misbehaves, a build fails or a request errors. When a page \
+needs an account (a login wall on Instagram, X, a private dashboard), call `sign_in` and let the user sign in \
+themselves; never type a password. Sign-ins are kept, so a site signed in to once opens signed in later. `map_search`, `map_section` and `map_where` read the project's \
 map in Mira: what each part of the code is for and which section explains it. Ask `map_where` about a \
 file before changing it, and name sections by the id path these tools give.";
 
@@ -159,7 +161,8 @@ fn rpc(msg: &Value, tab: u32, app: &AppHandle) -> Option<Value> {
         "tools/call" => {
             let name = params.get("name").and_then(Value::as_str).unwrap_or("");
             let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
-            let _turn = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+            // A sign-in waits on the user for minutes: other calls are not held up behind it.
+            let _turn = (name != "sign_in").then(|| ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner()));
             Ok(match call(name, &args, tab, app) {
                 Ok(content) => json!({ "content": content }),
                 Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
@@ -191,6 +194,7 @@ fn call(name: &str, args: &Value, tab: u32, app: &AppHandle) -> Result<Vec<Value
             ask(app, tab, json!({ "op": "agent", "name": name, "args": args })).map(said)
         }
         "navigate" => ask(app, tab, json!({ "op": "navigate", "url": args.get("url") })).map(said),
+        "sign_in" => ask_for(app, tab, json!({ "op": "sign_in", "url": args.get("url") }), 600).map(said),
         "resize_preview" => ask(app, tab, json!({ "op": "resize", "args": args })).map(said),
         "read_console_messages" => ask(app, tab, json!({ "op": "console", "args": args })).map(said),
         "device" => crate::devices::tool(args, app),
@@ -202,14 +206,18 @@ fn call(name: &str, args: &Value, tab: u32, app: &AppHandle) -> Result<Vec<Value
 
 /// Hands a call to the page and waits for its answer.
 fn ask(app: &AppHandle, tab: u32, cmd: Value) -> Reply {
+    ask_for(app, tab, cmd, 60)
+}
+
+fn ask_for(app: &AppHandle, tab: u32, cmd: Value, secs: u64) -> Reply {
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
     pending().lock().unwrap().insert(id, tx);
     let sent = app.emit_to("main", "slop:preview", json!({ "id": id, "tab": tab, "cmd": cmd }));
     let out = match sent {
         Ok(()) => rx
-            .recv_timeout(Duration::from_secs(60))
-            .unwrap_or_else(|_| Err("The preview did not answer within a minute.".into())),
+            .recv_timeout(Duration::from_secs(secs))
+            .unwrap_or_else(|_| Err(format!("The preview did not answer within {} seconds.", secs))),
         Err(e) => Err(e.to_string()),
     };
     pending().lock().unwrap().remove(&id);
@@ -389,6 +397,15 @@ fn tools() -> Value {
             "name": "navigate",
             "description": "Opens something in the preview: a path on the dev server (\"/settings\"), a full URL on this machine (another server, which the preview then follows), any page on the web (\"https://react.dev\", \"docs.rs/serde\"), words to search the web for (\"vite proxy websocket\"), or \"back\", \"forward\" or \"reload\".",
             "inputSchema": { "type": "object", "properties": { "url": { "type": "string" } }, "required": ["url"] }
+        },
+        {
+            "name": "sign_in",
+            "description": "Asks the user to sign in to a site in the preview, for a page that needs an account: a login wall on an Instagram reel, a post on X, a private dashboard. Opens the address given; the user chooses whether Mira keeps the sign-in for all projects or this project only, signs in on the page themselves, and says when they are done. Returns once they have, or have declined, which can take minutes. You never see or type the password. A sign-in is kept, so try the page first: call this only when it asks to sign in.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "url": { "type": "string", "description": "The page to sign in on, or the page that asked for it, like https://www.instagram.com/reel/…" } },
+                "required": ["url"]
+            }
         },
         {
             "name": "resize_preview",

@@ -76,6 +76,25 @@ const toWeb = (v: string) =>
       ? `https://${v}`
       : `https://www.google.com/search?q=${encodeURIComponent(v)}`;
 
+/** A page's site, as sign-ins are kept by (src-tauri/src/signins.rs): `www.instagram.com` is `instagram.com`. */
+const siteOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+};
+const covers = (site: string, url: string) => {
+  const host = siteOf(url);
+  return !!host && (host === site || host.endsWith(`.${site}`));
+};
+
+/** Sites a sign-in is offered for all projects first; any other, for this project only. */
+const SHARED = /(^|\.)(instagram|facebook|x|twitter|youtube|google|tiktok|linkedin|reddit|threads|github|vimeo|pinterest)\.(com|net)$|^youtu\.be$/;
+
+/** Claude waiting on the user to sign in, and where they chose to keep it. */
+type Signing = { site: string; project: boolean };
+
 // Real input is AppKit's (src-tauri/src/browser.rs).
 const REAL = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 
@@ -165,12 +184,17 @@ export function Preview({
   // A page from the web is in front, in the webview of this label.
   const [web, setWeb] = useState<string | null>(null);
   const [claude, setClaude] = useState(false);
+  const [signing, setSigning] = useState<Signing | null>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const replace = useRef(() => {});
 
   // What the calls below read: they outlive any one render.
   const proxy = useRef<{ id: number; port: number } | null>(null);
   const browser = useRef<string | null>(null);
+  // Whether that webview is in the project's own store of sign-ins, not the shared one.
+  const ownStore = useRef(false);
+  const signingNow = useRef<Signing | null>(null);
+  const signedIn = useRef<((done: boolean) => void) | null>(null);
   const onWeb = useRef(false);
   const here = useRef("");
   const server = useRef(target);
@@ -209,19 +233,34 @@ export function Preview({
   const go = (url: string) => {
     if (isWeb(url)) {
       onWeb.current = true;
-      const label = browser.current;
-      if (label) {
-        setWeb(label);
-        return void invoke("browser_go", { label, url }).catch((e) => setError(String(e)));
-      }
-      const r = sheet.current?.getBoundingClientRect();
-      const { scale: zoom } = view.current;
-      return void invoke<string>("browser_open", { url, x: r?.x ?? 0, y: r?.y ?? 0, width: r?.width || 1, height: r?.height || 1, zoom })
-        .then((label) => {
-          browser.current = label;
-          if (onWeb.current) setWeb(label);
-        })
-        .catch((e) => setError(String(e)));
+      return void (async () => {
+        // A webview has one store for its life: a page kept in the other is opened in a new one.
+        const s = signingNow.current;
+        const own = s && covers(s.site, url) ? s.project : await invoke<boolean>("signin_project", { root, url }).catch(() => false);
+        const label = browser.current;
+        if (label && ownStore.current === own) {
+          setWeb(label);
+          return invoke("browser_go", { label, url });
+        }
+        if (label) {
+          browser.current = null;
+          void invoke("browser_close", { label });
+        }
+        const r = sheet.current?.getBoundingClientRect();
+        const { scale: zoom } = view.current;
+        const opened = await invoke<string>("browser_open", {
+          url,
+          x: r?.x ?? 0,
+          y: r?.y ?? 0,
+          width: r?.width || 1,
+          height: r?.height || 1,
+          zoom,
+          project: own ? root : null,
+        });
+        browser.current = opened;
+        ownStore.current = own;
+        if (onWeb.current) setWeb(opened);
+      })().catch((e) => setError(String(e)));
     }
     onWeb.current = false;
     setWeb(null);
@@ -264,6 +303,7 @@ export function Preview({
       proxy.current = null;
       if (browser.current) void invoke("browser_close", { label: browser.current });
       browser.current = null;
+      signedIn.current?.(false);
     },
     [],
   );
@@ -584,6 +624,35 @@ export function Preview({
     return null;
   };
 
+  /** Where a sign-in is kept, changed while the user is signing in: the page reopens in that store. */
+  const keepIn = (project: boolean) => {
+    const s = signingNow.current;
+    if (!s || s.project === project) return;
+    signingNow.current = { ...s, project };
+    setSigning(signingNow.current);
+    go(isWeb(here.current) && covers(s.site, here.current) ? here.current : `https://${s.site}`);
+  };
+
+  /** Claude's `sign_in`: the page opened, and the user asked to sign in on it themselves. */
+  const signIn = async (raw: string): Promise<string> => {
+    const url = toWeb(raw.trim());
+    const site = siteOf(url);
+    if (!site) throw new Error(`Not an address: ${raw}`);
+    if (signedIn.current) throw new Error(`The user is already being asked to sign in to ${signingNow.current?.site}.`);
+    signingNow.current = { site, project: !SHARED.test(site) };
+    setSigning(signingNow.current);
+    const done = new Promise<boolean>((r) => (signedIn.current = r));
+    go(url);
+    const ok = await done;
+    const kept = signingNow.current;
+    signedIn.current = null;
+    signingNow.current = null;
+    setSigning(null);
+    if (!ok) return `The user did not sign in to ${site}.`;
+    await invoke("signin_keep", { root, site, project: kept.project });
+    return `The user signed in to ${site}, kept for ${kept.project ? "this project only" : "all projects"}. The preview is at ${display(here.current)}.`;
+  };
+
   const resize = (next: Size | null) => {
     setSize(next);
     keepSize(root, next);
@@ -622,6 +691,8 @@ export function Preview({
         };
       }
       case "agent": {
+        if (signingNow.current)
+          throw new Error(`The user is signing in to ${signingNow.current.site} in the preview. Wait for sign_in to return before using the page.`);
         dialogs.current = [];
         let said = call.name === "computer" && reachable() ? await act(call.args) : null;
         if (said === null) said = (await agent(call.name, call.args)) as string;
@@ -637,6 +708,8 @@ export function Preview({
       }
       case "navigate":
         return navigate(call.url);
+      case "sign_in":
+        return signIn(call.url);
       case "resize": {
         const { width, height, preset } = call.args;
         if (preset === "fill") {
@@ -856,6 +929,53 @@ export function Preview({
           <path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M11.5 9.5v4h-9v-9h4" />
         </Tool>
       </div>
+      {signing ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border-gray bg-[#d97757]/8 px-3 py-2 text-[12px]">
+          <span className="min-w-0 flex-1 text-ink">
+            Claude needs you to sign in to <b className="font-medium">{signing.site}</b>. Sign in on the page yourself: Claude never sees your
+            password, and waits until you are done.
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5 text-muted-slate">
+            Keep for
+            <span role="radiogroup" aria-label="Keep this sign-in for" className="flex items-center rounded-[3px] bg-surface-container p-0.5">
+              {[
+                { label: "All projects", project: false },
+                { label: "Only this project", project: true },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={signing.project === o.project}
+                  onClick={() => keepIn(o.project)}
+                  className={cn(
+                    "h-5 cursor-pointer rounded-[2px] px-2 text-[11.5px]",
+                    signing.project === o.project ? "bg-pure-white text-ink shadow-[0_0_0_1px_var(--color-border-gray)]" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => signedIn.current?.(false)}
+              className="cursor-pointer rounded-md px-2.5 py-0.5 text-[12px] text-muted-slate hover:text-ink"
+            >
+              Not now
+            </button>
+            <button
+              type="button"
+              onClick={() => signedIn.current?.(true)}
+              className="cursor-pointer rounded-md bg-deep-green px-2.5 py-0.5 text-[12px] text-white hover:opacity-90"
+            >
+              I&apos;m signed in
+            </button>
+          </span>
+        </div>
+      ) : null}
       {picking ? (
         <PickMenu
           {...picking}

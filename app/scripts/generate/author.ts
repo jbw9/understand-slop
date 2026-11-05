@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/coverage";
 import type { Node } from "@/lib/data";
-import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
+import { ask, BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
 import { ccAgent, type Handled, type Turn } from "./claude-code";
 import { activeGraph, type Def } from "./graph";
 import { briefCalls, GRAPH_TOOLS, graphTool, isGraphTool, signature } from "./graph-tools";
@@ -596,6 +596,105 @@ export function tooBig(root: Root, cut: Cut, inv: Inventory, sums: Record<string
   return owned.length > SPLIT_FILES || owned.reduce((a, f) => a + sums[f.path].symbols.filter(need).length, 0) > SPLIT_SYMBOLS;
 }
 
+/**
+ * Sections owning at least this many source files are written in parts side
+ * by side (outlineParts, then authorSplit), not by one agent writing the whole
+ * tree in one reply: that reply is what a section waits on. 0 turns it off.
+ * SLOP_PARALLEL_FILES.
+ */
+const PARALLEL_FILES = Number(process.env.SLOP_PARALLEL_FILES ?? 0);
+export const inParts = (root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>) => PARALLEL_FILES > 0 && explains(root, cut, inv, sums).length >= PARALLEL_FILES;
+
+const PARTS_TOOL: Tool = {
+  name: "parts",
+  description: "Record the parts this section is written in.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["about", "parts"],
+    properties: {
+      about: { type: "string", description: "One sentence: how the section is divided, and why that order." },
+      parts: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "title", "sub", "why", "files"],
+          properties: {
+            id: { type: "string", description: "kebab-case, short: 'side-nav', 'post-list'." },
+            title: { type: "string", description: "1-4 words, Title Case, everyday words." },
+            sub: { type: "string", description: `At most ${SUB_WORDS} words, plainly: what the reader sees or does in this part. No file paths.` },
+            why: { type: "string", description: "One sentence for this part's author: what it covers and where it stops." },
+            files: { type: "array", items: { type: "string" }, description: "Paths from the list that this part explains. Every path goes in exactly one part." },
+          },
+        },
+      },
+    },
+  },
+};
+
+/** A part's prefix: 2-3 letters from its id, unused by the others. */
+export function prefixFor(id: string, taken: Set<string>): string {
+  const letters = id.replace(/[^a-z]/g, "");
+  const words = id.split("-").filter(Boolean);
+  const tries = [words.map((w) => w[0]).join("").slice(0, 3), letters.slice(0, 2), letters.slice(0, 3), ...[...letters].map((c) => letters[0] + c), ..."abcdefghijklmnopqrstuvwxyz".split("").map((c) => `p${c}`)];
+  const p = tries.find((t) => /^[a-z]{2,3}$/.test(t) && !taken.has(t))!;
+  taken.add(p);
+  return p;
+}
+
+/**
+ * A section's own files cut into 2-4 parts by one short call with no tools
+ * and no thinking: the outline its parts are then written from, side by side.
+ * The repository's cut (cutRepo) does the same job for the whole map, but
+ * with rounds of checks at high effort; for a section it took minutes, and
+ * once ran out of turns. A file the answer leaves out goes to the part it
+ * shares the most imports with. Null when fewer than two parts come back.
+ */
+async function outlineParts(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>, model: string): Promise<Cut | null> {
+  const owned = explains(root, cut, inv, sums).map((f) => f.path);
+  if (owned.length < 2) return null;
+  const mine = new Set(owned);
+  const links = owned.flatMap((a) => (inv.imports[a] ?? []).filter((b) => mine.has(b) && b !== a).map((b) => `${a} → ${b}`));
+  const most = Math.min(4, owned.length);
+  const prompt = [
+    `# Repository: ${inv.name}`,
+    `## The section\n${root.title} — ${root.sub}\n${root.why}`,
+    `## Its files\n${owned.map((p) => (sums[p] ? oneLine(sums[p]) : p)).join("\n")}`,
+    `## Which of them import which\n${links.join("\n") || "(none)"}`,
+    `## Task\nThis section is written as a diagram of 2 to ${most} boxes, each a part the reader opens. Choose those parts: group the files that work together into what a reader sees or does, in the order they meet them. Every file goes in exactly one part.`,
+  ].join("\n\n");
+  const answer = await ask<{ about: string; parts: { id: string; title: string; sub: string; why: string; files: string[] }[] }>({
+    model,
+    stage: "author-outline",
+    maxTokens: 4000,
+    system: "You divide one section of a map of a codebase into the parts it is written in. Answer only with the structure asked for.",
+    messages: [{ role: "user", content: prompt }],
+    tool: PARTS_TOOL,
+  });
+  const taken = new Set<string>();
+  const seen = new Set<string>();
+  const ids = new Set<string>();
+  const parts: Root[] = [];
+  for (const p of answer.parts ?? []) {
+    const files = (p.files ?? []).map((f) => f.replace(/^\.?\//, "")).filter((f) => mine.has(f) && !seen.has(f));
+    if (!files.length) continue;
+    files.forEach((f) => seen.add(f));
+    let id = (p.id ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `part-${parts.length + 1}`;
+    while (ids.has(id)) id = `${id}-${parts.length + 1}`;
+    ids.add(id);
+    parts.push({ id, prefix: prefixFor(id, taken), title: p.title, sub: p.sub, why: p.why, files });
+  }
+  if (parts.length < 2) return null;
+  // Left out: to the part it shares the most imports with, else the smallest.
+  for (const f of owned.filter((x) => !seen.has(x))) {
+    const ties = (r: Root) => r.files.filter((g) => (inv.imports[f] ?? []).includes(g) || (inv.imports[g] ?? []).includes(f)).length;
+    const best = [...parts].sort((a, b) => ties(b) - ties(a) || a.files.length - b.files.length)[0];
+    best.files.push(f);
+  }
+  return { about: answer.about ?? "", roots: parts, excluded: [] };
+}
+
 /** The repository as a cut of one root sees it: only that root's files are source. */
 function scoped(root: Root, cut: Cut, inv: Inventory): Inventory {
   const files = inv.files.map((f) => (isSource(f) && owners(cut, f.path).includes(root.id) ? f : { ...f, code: false, outside: true }));
@@ -632,6 +731,8 @@ export async function authorSplit(
   models: { cut: string; part: string; join: string },
   keep: Cut | null,
   on: { submit: OnSubmit; part: (draft: Node) => void; say: (s: string) => void },
+  /** Cut by outlineParts, a section's quick outline, rather than by the repository's cut. */
+  outline = false,
 ): Promise<Split | null> {
   const inner = scoped(root, cut, inv);
   let sub: Cut;
@@ -640,6 +741,10 @@ export async function authorSplit(
   if (keep) {
     const added = unclaimed(keep, inner);
     sub = added.length ? (await place(keep, added, inner, sums, models.cut)).cut : keep;
+  } else if (outline) {
+    const o = await outlineParts(root, cut, inv, sums, models.part);
+    if (!o) return null;
+    sub = o;
   } else sub = (await cutRepo(inner, sums, models.cut)).cut;
   const cutTurn: Turn = { wait: 0, think: 0, write: Math.round((Date.now() - cutAt) / 100) / 10, out: 0, thinking: 0, did: ["cut"], part: "cut" };
   if (sub.roots.length < 2) return null;

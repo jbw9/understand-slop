@@ -12,7 +12,7 @@ import type { Progress } from "@/lib/vault";
 import { parseArgs } from "./args";
 import { auditMarkdown } from "./audit";
 import { coverage } from "@/lib/coverage";
-import { authorRoot, authorSplit, submitLine, tooBig, type Authored, type OnSubmit } from "./author";
+import { authorRoot, authorSplit, inParts, submitLine, tooBig, type Authored, type OnSubmit } from "./author";
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose, type Turn } from "./claude-code";
@@ -317,7 +317,9 @@ export async function main(args: string[]) {
           return;
         }
         mark(r.id, "drafting", "drafting");
-        if (tooBig(r, cut, inv, sums)) {
+        // A root too big for one agent is cut as the repository is; one past SLOP_PARALLEL_FILES is outlined quickly, so its parts are written side by side.
+        const big = tooBig(r, cut, inv, sums);
+        if (big || inParts(r, cut, inv, sums)) {
           mark(r.id, "drafting", "splitting into parts");
           const split = await authorSplit(r, cut, inv, sums, { cut: models.cut, part: models.part, join: models.author }, subcuts[r.id] ?? null, {
             submit: submitted(r.id, r.prefix),
@@ -329,7 +331,7 @@ export async function main(args: string[]) {
               mark(r.id, "drafting", `${draft.children?.length ?? 0} parts written`);
             },
             say,
-          });
+          }, !big);
           if (split) {
             subcuts[r.id] = split.cut;
             writeFileSync(`${out}/.cache/subcuts.json`, JSON.stringify(subcuts, null, 1));

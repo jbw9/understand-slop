@@ -5,7 +5,7 @@
 #   so they stay as deployed.
 set -e
 site=$(cd "$1" && pwd)
-base=/understand-slop
+base=
 keep="kafka kafka-control-plane understand-slop"
 demos="fastapi:fastapi/full-stack-fastapi-template flask:pallets/flask ky:sindresorhus/ky mira:jbw9/understand-slop umami:umami-software/umami"
 
@@ -24,4 +24,6 @@ for d in $demos; do
   cp -R "out/$map" "$site/$map"
 done
 touch "$site/.nojekyll"
+# The site is served at blpr.dev; Pages drops the custom domain when this file is gone.
+echo blpr.dev > "$site/CNAME"
 echo "built $site"

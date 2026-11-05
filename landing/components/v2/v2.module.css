@@ -847,9 +847,6 @@
 .slide figcaption b {
   font-weight: 500;
 }
-.slide figcaption span {
-  color: var(--muted);
-}
 .progress {
   display: grid;
   grid-template-columns: repeat(var(--n), 1fr);

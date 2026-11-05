@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import s from "./v2.module.css";
 
 export interface Voice {
-  /** Where they work, the size of team it happens to. */
-  who: string;
   quote: string;
   by: string;
 }
@@ -36,7 +34,6 @@ export function LandingVoices({ voices }: { voices: Voice[] }) {
             <blockquote>{v.quote}</blockquote>
             <figcaption>
               <b>{v.by}</b>
-              <span>{v.who}</span>
             </figcaption>
           </figure>
         ))}

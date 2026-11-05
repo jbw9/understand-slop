@@ -38,12 +38,11 @@ const DEMOS = [
 // The same problem at every size. John Doe is the page's own voice; the other two are people the team spoke with, by role.
 const VOICES: Voice[] = [
   {
-    who: "Big tech",
     quote: "Code review is the new bottleneck. Some engineers have ten waiting.",
     by: "Software Development Manager, Amazon",
   },
-  { who: "Startups", quote: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
-  { who: "Solo developers", quote: "You built it in a weekend. I bet you can’t explain how it works.", by: "John Doe, solo developer" },
+  { quote: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
+  { quote: "You built it in a weekend. I bet you can’t explain how it works.", by: "John Doe, solo developer" },
 ];
 
 // The lines flask's make_config part cites, from src/flask/sansio/app.py.

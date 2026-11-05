@@ -497,19 +497,21 @@
 }
 
 /* ── the app, live ─────────────────────────────────────── */
-.top {
-  padding-top: clamp(56px, 7vw, 96px);
-  border-top: 1px solid var(--line);
-}
+/* The line from How we got here lands here, on a node in the middle. */
 .appHead {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 12px 32px;
-  margin-bottom: 28px;
+  justify-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  text-align: center;
 }
-.appHead .bracket {
-  grid-column: 1 / -1;
+.appHead::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  margin-bottom: 8px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
 }
 .appHead h2 {
   margin: 0;
@@ -1607,183 +1609,116 @@
   text-decoration-color: var(--strong);
 }
 
-/* ── how we got here: the eras, panned by the page's scroll ── */
+/* ── how we got here: one line down the page, through three people ── */
 .evo {
-  /* Tall enough to pan the whole row while the section holds still. */
-  height: 360vh;
-  border-top: 1px solid var(--line);
-  view-timeline: --evo block;
-}
-.evoStick {
-  position: sticky;
-  top: 56px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 28px;
-  height: calc(100svh - 56px - 2 * var(--edge));
-  overflow: hidden;
-}
-.evoHead {
   max-width: 1480px;
-  width: 100%;
   margin: 0 auto;
-  padding: 0 var(--gutter);
+  padding: clamp(72px, 9vw, 128px) var(--gutter) 0;
+  text-align: center;
 }
-.evoHead h2 {
-  max-width: 18em;
+.evo h2 {
   margin: 10px 0 0;
   font: 300 clamp(32px, 3.8vw, 58px) / 1.02 var(--display);
   letter-spacing: -0.016em;
 }
-.evoView {
-  min-height: 0;
+.evoField {
+  position: relative;
+  height: clamp(1700px, 190vw, 2400px);
+  margin-top: 24px;
+  text-align: left;
 }
-.evoTrack {
+.evoLine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+}
+.evoLine path {
+  vector-effect: non-scaling-stroke;
+}
+.evoGhost {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+/* The ink follows the reader: drawn as far as they have scrolled. */
+.evoInk {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: calc(1 - var(--p, 0));
+}
+.stop {
+  position: absolute;
+  z-index: 1;
   display: flex;
-  gap: clamp(20px, 2.4vw, 36px);
+  align-items: center;
+  gap: 24px;
   width: max-content;
   margin: 0;
-  padding: 0 var(--gutter);
-  list-style: none;
-  animation: pan linear both;
-  animation-timeline: --evo;
-  animation-range: contain 0% contain 100%;
+  translate: -110px -50%;
+  opacity: 0.25;
+  transition: opacity 0.6s var(--ease);
 }
-@keyframes pan {
-  to {
-    transform: translateX(calc(-100% + 100vw - 2 * var(--edge)));
-  }
+.stop[data-side="right"] {
+  flex-direction: row-reverse;
+  translate: calc(-100% + 110px) -50%;
+  text-align: right;
 }
-.evoTrack li {
-  display: flex;
-  flex-direction: column;
-  width: clamp(220px, 21vw, 290px);
+.stop[data-on="true"],
+.now[data-on="true"] {
+  opacity: 1;
 }
-.evoTrack figure {
-  margin: 0;
+.stop img {
+  display: block;
+  width: 220px;
+  height: auto;
+  aspect-ratio: 4 / 5;
   border: 1px solid var(--strong);
   background: var(--paper);
+  rotate: var(--tilt);
+  transform: scale(0.94);
+  transition: transform 0.8s var(--ease);
 }
-.evoTrack figcaption {
+.stop[data-on="true"] img {
+  transform: none;
+}
+.stop figcaption {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 3px 7px;
-  border-bottom: 1px solid var(--line);
-  font: 10px var(--mono);
-  text-transform: uppercase;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 19em;
 }
-.evoTrack img,
-.evoDraw {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 5;
-  height: auto;
-  max-height: 40svh;
-  object-fit: cover;
+.stop b,
+.now b {
+  font: 300 clamp(26px, 2.4vw, 36px) / 1.05 var(--display);
+  letter-spacing: -0.012em;
 }
-.evoDraw {
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 1;
-}
-.evoDraw text {
-  fill: var(--ink);
-  stroke: none;
-  font: 9px var(--mono);
-  text-anchor: middle;
-}
-.evoDraw text.left {
-  text-anchor: start;
-  font-size: 9.5px;
-}
-.evoDraw text.small {
-  text-anchor: start;
-  font-size: 7px;
-  opacity: 0.7;
-}
-.ghost {
-  stroke-dasharray: 3 3;
-  opacity: 0.6;
-}
-.caret {
-  stroke-width: 1.5;
-  animation: blink 1.1s steps(1) infinite;
-}
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
-}
-.year {
-  margin-top: 14px;
-  font: 300 clamp(34px, 3vw, 48px) / 1 var(--display);
-  letter-spacing: -0.02em;
-}
-.evoTrack p {
-  margin: 8px 0 0;
-  font-size: 14px;
+.stop figcaption > span:last-child,
+.now > span:last-child {
+  font-size: 15px;
   line-height: 1.5;
 }
-.evoTrack strong {
-  font-weight: 600;
+.stopYear {
+  font: 11.5px var(--mono);
+  letter-spacing: 0.04em;
 }
-.evoTrack li[data-last] figure {
-  border-color: var(--ink);
-  box-shadow: 6px 6px 0 var(--line);
-}
-.evoGo {
-  margin-top: 10px;
-  font: 12px var(--mono);
-  text-transform: uppercase;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-/* The rule under the row fills as it pans: how far along the eras the reader is. */
-.evoRule {
-  max-width: 1480px;
-  width: calc(100% - 2 * var(--gutter));
-  margin: 0 auto;
-  height: 7px;
-  border-left: 1px solid var(--strong);
-  border-right: 1px solid var(--strong);
-  background: linear-gradient(var(--line), var(--line)) 0 3px / 100% 1px no-repeat;
-}
-.evoRule span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(var(--ink), var(--ink)) 0 3px / 100% 1px no-repeat;
-  transform-origin: left;
-  animation: grow linear both;
-  animation-timeline: --evo;
-  animation-range: contain 0% contain 100%;
-}
-@keyframes grow {
-  from {
-    transform: scaleX(0);
-  }
-}
-/* Where motion can't follow the scroll, or isn't wanted, the row scrolls by itself. */
-@supports not (animation-timeline: view()) {
-  .evo {
-    height: auto;
-    padding: 64px 0;
-  }
-  .evoStick {
-    position: static;
-    height: auto;
-  }
-  .evoView {
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-  }
-  .evoTrack li {
-    scroll-snap-align: start;
-  }
-  .evoRule {
-    display: none;
-  }
+.now {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 19em;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--strong);
+  background: var(--paper);
+  translate: 24px -50%;
+  opacity: 0.25;
+  transition: opacity 0.6s var(--ease);
 }
 .credits {
   max-width: 80em;
@@ -1882,9 +1817,6 @@
     flex-direction: column-reverse;
     align-items: stretch;
   }
-  .appHead {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .agent,
   .steps,
   .story,
@@ -1958,7 +1890,6 @@
   .rise,
   .reveal,
   .demo,
-  .caret,
   .down span,
   .ring::after,
   .progress span[data-now="true"]::after {
@@ -1981,29 +1912,39 @@
     transition: none;
   }
 }
-@media (prefers-reduced-motion: reduce), (max-width: 700px) {
-  .evo {
-    height: auto;
-    padding: 56px 0;
+@media (prefers-reduced-motion: reduce) {
+  .stop,
+  .now,
+  .stop img {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
-  .evoStick {
-    position: static;
-    height: auto;
+}
+@media (max-width: 700px) {
+  .evoField {
+    height: 1500px;
   }
-  .evoView {
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
+  .stop,
+  .stop[data-side="right"] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    translate: -50% -50%;
+    text-align: left;
   }
-  .evoTrack {
-    animation: none;
+  .stop[data-side="right"] {
+    align-items: flex-end;
+    text-align: right;
   }
-  .evoTrack li {
-    width: min(72vw, 260px);
-    scroll-snap-align: start;
-    scroll-margin-left: var(--gutter);
+  .stop img {
+    width: 130px;
   }
-  .evoRule {
-    display: none;
+  .stop figcaption,
+  .now {
+    max-width: 13em;
+  }
+  .now {
+    translate: -60% -50%;
   }
 }

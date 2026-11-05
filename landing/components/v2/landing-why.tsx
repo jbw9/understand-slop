@@ -6,7 +6,7 @@ const SCALE: { who: string; line: string; by?: string }[] = [
   { who: "At a startup", line: "The agents ship more in a week than the team can review.", by: "CTO, Series B tech startup" },
   {
     who: "At a big company",
-    line: "Every team adds agent-written code to a codebase nobody has read end to end.",
+    line: "Code review is the new bottleneck. Engineers are drowning in reviews, and some have ten or more changes waiting in their queue.",
     by: "SDM at Amazon",
   },
 ];

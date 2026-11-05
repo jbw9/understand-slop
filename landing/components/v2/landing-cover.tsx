@@ -10,7 +10,7 @@ const img = (name: string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/${n
  * with pictures between the words, and down the left a grid with a hand
  * reaching for the first step, as the reader will.
  */
-export function LandingCover({ github }: { github: string }) {
+export function LandingCover() {
   return (
     <section className={s.cover} aria-labelledby="cover-title">
       <div className={s.plate} aria-hidden>
@@ -60,13 +60,7 @@ export function LandingCover({ github }: { github: string }) {
           Scroll to open the app <span aria-hidden>↓</span>
         </a>
         <div className={s.card}>
-          <p className={s.cardHead}>
-            In one line <Spark />
-          </p>
           <LandingInstall />
-          <p className={s.cardNote}>
-            Builds Bluprint from source and works through your own Claude Code. <a href={github}>Source on GitHub</a>.
-          </p>
         </div>
       </div>
     </section>

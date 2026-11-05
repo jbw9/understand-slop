@@ -155,7 +155,7 @@ export default function Landing() {
       <div className={s.paper}>
       <LandingNav github={GITHUB} />
       <main>
-        <LandingCover github={GITHUB} />
+        <LandingCover />
         <LandingEvolution />
         <div className={s.top}>
           <div className={s.wrap}>

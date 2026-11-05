@@ -326,36 +326,13 @@
 }
 .card {
   width: min(100%, 470px);
-  padding: 12px 14px 14px;
-  border: 1px solid var(--strong);
-  background: var(--paper);
-}
-.cardHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-  font: 500 13px var(--mono);
-  text-transform: uppercase;
-}
-.cardHead .spark {
-  width: 11px;
-  height: 11px;
 }
 .card .install {
   width: 100%;
 }
-.cardNote {
-  margin: 10px 0 0;
-  font: 11px/1.5 var(--mono);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.cardNote a {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+/* The cover keeps only the line and its button. */
+.card .installOs {
+  display: none;
 }
 .down {
   font: 12px var(--mono);

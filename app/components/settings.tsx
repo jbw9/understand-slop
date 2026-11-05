@@ -247,6 +247,31 @@ export function SettingsDialog() {
               ))}
             </div>
           </Field>
+          <Field
+            label="Skills and web research"
+            hint="Claude loads skills and searches or reads the web without asking each time, so plan mode can research freely. Plan mode still never edits files."
+          >
+            <div role="radiogroup" aria-label="Skills and web research" className="inline-flex rounded-[3px] border border-border-gray p-0.5">
+              {[
+                { value: true, label: "Without asking" },
+                { value: false, label: "As in Claude Code" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.research === o.value}
+                  onClick={() => set({ research: o.value })}
+                  className={cn(
+                    "cursor-pointer rounded-[2px] px-3.5 py-1 text-[12.5px] transition-colors",
+                    draft.research === o.value ? "bg-deep-green text-white" : "text-muted-slate hover:text-ink",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </Field>
           <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
           <Field
             label="On-device dictation"

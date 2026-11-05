@@ -193,13 +193,13 @@ export function Shell({
     (async () => {
       // Every tab can run Claude, so it is looked for every time; without it
       // the tab is still a shell.
-      const { claudePath, model, voice } = readSettings();
+      const { claudePath, model, voice, research } = readSettings();
       const found = await invoke<{ path: string } | null>("claude_detect", {
         configured: claudePath || null,
       }).catch(() => null);
       if (gone) return;
       handlers.current.onClaude?.(!!found);
-      const launch = found ? { path: found.path, model: model || null, voice } : null;
+      const launch = found ? { path: found.path, model: model || null, voice, research } : null;
       // xterm measures one glyph to size every cell, so it needs the face's
       // name (not a var()) and the face itself loaded: measured against the
       // fallback, the real font lands in cells of the wrong width once it

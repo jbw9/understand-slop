@@ -223,6 +223,8 @@ pub struct Launch {
     model: Option<String>,
     #[serde(default)]
     voice: bool,
+    #[serde(default)]
+    research: bool,
 }
 
 /// Runs Claude with the hook, and marks the tab live while it does. The marker,
@@ -693,7 +695,7 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
             "SessionEnd": [{ "hooks": [hook(RESTORE)] }]
         },
         "permissions": {
-            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "Bash(slop-terminal:*)", "mcp__slop-preview", "WebSearch", "WebFetch"],
+            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "Bash(slop-terminal:*)", "mcp__slop-preview"],
             // The preview is the browser here: Chrome would open beside the app, out of the user's sight.
             "deny": ["mcp__claude-in-chrome"]
         }
@@ -701,6 +703,12 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     // Only ever turned on here: with the setting off, the user's own `/voice` stands.
     if launch.voice {
         settings["voice"] = serde_json::json!({ "enabled": true });
+    }
+    // Lets plan mode research without a prompt per step; plan mode still blocks edits.
+    if launch.research {
+        if let Some(allow) = settings["permissions"]["allow"].as_array_mut() {
+            allow.extend(["Skill", "WebSearch", "WebFetch"].map(serde_json::Value::from));
+        }
     }
     cmd.env("SLOP_CONTEXT", queue);
     cmd.env("SLOP_LAUNCHER", &path);

@@ -521,16 +521,6 @@
   opacity: 0.45;
   pointer-events: none;
 }
-.kicker {
-  font: 12px var(--mono);
-  text-transform: uppercase;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  text-decoration-color: var(--strong);
-}
-.kicker:hover {
-  text-decoration-color: currentColor;
-}
 .demo {
   position: relative;
 }

@@ -164,9 +164,6 @@ export default function Landing() {
               {/* eslint-disable-next-line @next/next/no-img-element -- the site is a static export, which next/image cannot optimize. */}
               <img className={s.you} src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/uncle-sam-cutout.png`} alt="" />
               <h2>And now there&rsquo;s you.</h2>
-              <a className={s.kicker} href="#agent">
-                Works with most coding agents <span aria-hidden>&rarr;</span>
-              </a>
             </header>
             <section aria-label="Live demo" className={s.demo}>
               <LandingDemo maps={maps} />

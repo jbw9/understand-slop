@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import s from "./landing.module.css";
 import { Drawn, type Drawing } from "./landing-features";
-import { pick } from "./landing-picked";
 import { onTheme, readTheme } from "./landing-theme";
 
 export interface DemoMap {
@@ -12,9 +11,6 @@ export interface DemoMap {
   files: number;
   /** The commit the map describes. */
   commit: string;
-  sections: number;
-  /** Sections the map marks partial or inferred. */
-  unsure: number;
 }
 
 // Built, each map's own export beside this page; in dev, the live app on this origin (next.config.ts).
@@ -87,10 +83,6 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
   const replay = useRef<HTMLButtonElement>(null);
   const guide = useRef<Tour>(null);
   const shownMap = useRef(open);
-  const choose = (id: string) => {
-    setOpen(id);
-    pick(id);
-  };
 
   // The page's theme is picked in the nav. The observer runs before a view transition's snapshot, so the frame turns with the page.
   useEffect(
@@ -200,7 +192,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
             </div>
             {exploring ? (
               // The app's own tabs, one per project: which map the frame shows.
-              <div role="tablist" aria-label="Repository" className={s.repos} onKeyDown={(e) => walk(e, maps.map((m) => m.id), open, choose)}>
+              <div role="tablist" aria-label="Repository" className={s.repos} onKeyDown={(e) => walk(e, maps.map((m) => m.id), open, setOpen)}>
                 {maps.map((m) => (
                   <button
                     key={m.id}
@@ -208,7 +200,7 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
                     data-id={m.id}
                     aria-selected={m.id === open}
                     tabIndex={m.id === open ? 0 : -1}
-                    onClick={() => choose(m.id)}
+                    onClick={() => setOpen(m.id)}
                   >
                     {m.label}
                   </button>
@@ -217,6 +209,11 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
             ) : (
               <span className={s.project}>{shown.project}</span>
             )}
+            {exploring ? (
+              <span className={s.meta}>
+                {current.files.toLocaleString("en-US")} files · {current.commit}
+              </span>
+            ) : null}
           </div>
           <div ref={stage} className={s.stage} data-ready={loaded === open}>
             {exploring && loaded !== open ? <p className={s.loading}>loading {current.id}…</p> : null}
@@ -240,18 +237,6 @@ export function LandingDemo({ maps }: { maps: DemoMap[] }) {
             </div>
             {shown.id === "explore" ? null : <Drawn key={shown.id} drawing={shown.id} />}
           </div>
-          {exploring ? (
-            // The app's own status bar: the same counts, for the map in the frame.
-            <div className={s.status}>
-              <span>{current.commit}</span>
-              <span>{current.files.toLocaleString("en-US")} files</span>
-              <span>{current.sections} sections</span>
-              <span>{current.unsure ? `${current.unsure} not certain` : "all checked against the code"}</span>
-              <span className={s.keys}>
-                <kbd>Esc</kbd> back up
-              </span>
-            </div>
-          ) : null}
         </div>
       </div>
       <div className={s.under}>

@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 60
     env:
       RAW: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}
-      MIRA_REF: ${{ github.sha }}
+      BLUPRINT_REF: ${{ github.sha }}
     steps:
       - uses: actions/setup-node@v4
         with:
@@ -39,8 +39,8 @@ jobs:
       - name: Check
         run: |
           case "$RUNNER_OS" in
-          macOS) test -x /Applications/Mira.app/Contents/MacOS/mira; data="$HOME/Library/Application Support/dev.mira.app" ;;
-          Linux) test -x "$HOME/.local/bin/mira"; test -f "$HOME/.local/share/applications/mira.desktop"; data="$HOME/.local/share/dev.mira.app" ;;
+          macOS) test -x /Applications/Bluprint.app/Contents/MacOS/bluprint; data="$HOME/Library/Application Support/dev.bluprint.app" ;;
+          Linux) test -x "$HOME/.local/bin/bluprint"; test -f "$HOME/.local/share/applications/bluprint.desktop"; data="$HOME/.local/share/dev.bluprint.app" ;;
           esac
           node -e '
           const { spawn } = require("child_process");

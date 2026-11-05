@@ -31,7 +31,7 @@ const FEATURES: { id: "explore" | Drawing; label: string; project?: string; cap?
   {
     id: "plan",
     label: "Read the plan",
-    project: "mira",
+    project: "bluprint",
     cap: "In the desktop app, a plan from Claude’s plan mode opens as a short doc: a picture of what it will change, the screen you’ll see, then the steps and files, before a line is written. Accept it right there.",
   },
   {

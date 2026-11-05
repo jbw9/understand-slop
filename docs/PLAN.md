@@ -1,4 +1,4 @@
-# Mira
+# Bluprint
 
 ## The problem
 

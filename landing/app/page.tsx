@@ -27,7 +27,7 @@ const GITHUB = `https://github.com/${REPO}`;
 
 // This repo first: the demo opens on the project explaining itself.
 const DEMOS = [
-  { id: "mira", label: "Bluprint itself" },
+  { id: "bluprint", label: "Bluprint itself" },
   { id: "flask", label: "Flask" },
   { id: "fastapi", label: "FastAPI" },
   { id: "ky", label: "ky" },

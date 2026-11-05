@@ -1,18 +1,18 @@
 #!/bin/sh
-# Installs Mira on macOS or Linux, built from source:
+# Installs Bluprint on macOS or Linux, built from source:
 #   curl -fsSL https://raw.githubusercontent.com/jbw9/understand-slop/main/install.sh | sh
-# The source is kept in ~/.mira/src (MIRA_DIR moves it); running this again updates and rebuilds.
+# The source is kept in ~/.bluprint/src (BLUPRINT_DIR moves it); running this again updates and rebuilds.
 set -e
 
 # Everything happens inside main, called on the last line, so a download cut short runs nothing.
 main() {
-  repo=${MIRA_REPO:-https://github.com/jbw9/understand-slop.git}
-  ref=${MIRA_REF:-main}
-  dir=${MIRA_DIR:-$HOME/.mira}/src
+  repo=${BLUPRINT_REPO:-https://github.com/jbw9/understand-slop.git}
+  ref=${BLUPRINT_REF:-main}
+  dir=${BLUPRINT_DIR:-$HOME/.bluprint}/src
   os=$(uname)
   case $os in
   Darwin | Linux) ;;
-  *) die "Mira installs on macOS and Linux." ;;
+  *) die "Bluprint installs on macOS and Linux." ;;
   esac
   # rustup's default place, for a shell opened before Rust was installed.
   [ -x "$HOME/.cargo/bin/cargo" ] && PATH="$HOME/.cargo/bin:$PATH"
@@ -45,10 +45,10 @@ main() {
       done
     fi
   fi
-  [ -z "$missing" ] || die "Mira builds from source, and needs:$missing
+  [ -z "$missing" ] || die "Bluprint builds from source, and needs:$missing
 Install those, then run this again."
   command -v node >/dev/null && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 20 ] ||
-    die "Mira needs Node 20 or newer; this is $(node -v)."
+    die "Bluprint needs Node 20 or newer; this is $(node -v)."
 
   say "Getting the source into $dir"
   mkdir -p "$dir"
@@ -60,11 +60,11 @@ Install those, then run this again."
   cd "$dir/app"
   say "Installing packages"
   npm ci --no-audit --no-fund
-  say "Building Mira (the first build compiles the app: 10 to 20 minutes)"
+  say "Building Bluprint (the first build compiles the app: 10 to 20 minutes)"
   sh scripts/install-app.sh
 
   command -v claude >/dev/null ||
-    say "Mira makes maps through Claude Code, which isn't on your PATH: https://claude.com/claude-code"
+    say "Bluprint makes maps through Claude Code, which isn't on your PATH: https://claude.com/claude-code"
 }
 
 need() { command -v "$1" >/dev/null 2>&1 || missing="$missing

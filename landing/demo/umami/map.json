@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "mira map umami",
+  "command": "bluprint map umami",
   "repo": "umami",
   "commit": "e92fdab",
   "files": 1651,

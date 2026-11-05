@@ -281,7 +281,7 @@ export function SettingsDialog() {
           </Field>
           <Field
             label="Saved sign-ins"
-            hint="Sites you signed in to in the Preview when Claude asked. Mira keeps their sign-in cookies, never your password. Forget signs you out."
+            hint="Sites you signed in to in the Preview when Claude asked. Bluprint keeps their sign-in cookies, never your password. Forget signs you out."
           >
             <SignIns />
           </Field>

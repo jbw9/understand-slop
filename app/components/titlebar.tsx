@@ -79,7 +79,7 @@ export function Titlebar({ bare }: { bare?: boolean }) {
       <div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center", mac ? "pl-[78px]" : "pl-1.5")}>
         {bare ? (
           <span data-tauri-drag-region className="px-2 font-mono text-[11.5px] font-semibold text-ink">
-            Mira
+            Bluprint
           </span>
         ) : (
           <Where mac={mac} />

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Mira",
+  "productName": "Bluprint",
   "version": "0.1.0",
-  "identifier": "dev.mira.app",
+  "identifier": "dev.bluprint.app",
   "build": {
     "devUrl": "http://localhost:3000",
     "frontendDist": "http://localhost:3123",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "create": false,
-        "title": "Mira",
+        "title": "Bluprint",
         "width": 1512,
         "height": 900,
         "minWidth": 480,

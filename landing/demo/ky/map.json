@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "mira map ky",
+  "command": "bluprint map ky",
   "repo": "ky",
   "commit": "3541888",
   "files": 112,

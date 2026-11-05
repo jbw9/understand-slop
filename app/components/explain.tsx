@@ -24,7 +24,7 @@ import type { Anatomy, Explainer as ExplainerData, Walkthrough } from "@/lib/dat
  * the browser: on by default, since the reader it serves is the one who does
  * not yet know to look for it.
  */
-const KEY = "mira.explain";
+const KEY = "bluprint.explain";
 const listeners = new Set<() => void>();
 
 function readExplain(): boolean {

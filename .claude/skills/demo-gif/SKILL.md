@@ -1,6 +1,6 @@
 ---
 name: demo-gif
-description: After a commit to jbw9/understand-slop that changes what a person sees in Mira (app/) or on the landing page (landing/) is pushed, record a short GIF of the change, add it to the `demos` prerelease, and post it as a comment on that commit. Use when a UI commit has been pushed, when the user asks for a demo or GIF of a change, or when they invoke /demo-gif. Skip commits that change only logic.
+description: After a commit to jbw9/understand-slop that changes what a person sees in Bluprint (app/) or on the landing page (landing/) is pushed, record a short GIF of the change, add it to the `demos` prerelease, and post it as a comment on that commit. Use when a UI commit has been pushed, when the user asks for a demo or GIF of a change, or when they invoke /demo-gif. Skip commits that change only logic.
 ---
 
 # Demo GIF
@@ -15,7 +15,7 @@ In this file, `<root>` is the checkout's top folder (`git rev-parse --show-tople
 
 ## Step 1 - Gate: is this a UI change?
 
-Make a GIF only if a person using Mira or the landing page can see a difference on screen.
+Make a GIF only if a person using Bluprint or the landing page can see a difference on screen.
 
 Read the diff with `git show --stat <sha>`, then read the parts you are not sure about. The commit title's `area:` is a first hint, but not the answer.
 
@@ -42,7 +42,7 @@ Do not ask the user each time. Decide, and say what you decided.
 ## Step 3 - Record
 
 1. Start the dev server from the checkout that holds the commit, in the background:
-   - Mira: `npx next dev -p 3217` in `app/`
+   - Bluprint: `npx next dev -p 3217` in `app/`
    - landing page: `npm run dev` in `landing/` (port 3001)
 
    Next allows only one dev server per folder. If one is already running, use it. The Chrome extension's browser can be on a different machine and not reach this one, so record with a local headless browser.
@@ -77,7 +77,7 @@ Do not ask the user each time. Decide, and say what you decided.
    ```
 
    The scenario must:
-   - start from a clean, known state. Mira keeps reader state in `localStorage` under `slop:` keys (`slop:tabs:<map>`, `slop:settings`). Clear the keys the change touches, then reload.
+   - start from a clean, known state. Bluprint keeps reader state in `localStorage` under `slop:` keys (`slop:tabs:<map>`, `slop:settings`). Clear the keys the change touches, then reload.
    - show the start state for about 0.7 s, then the change, then the end state for about 1 s
    - move the pointer with `glide`, so the viewer can follow it
    - stay between 5 and 15 s

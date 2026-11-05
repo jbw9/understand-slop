@@ -1,6 +1,6 @@
 # Landing page design
 
-The page at `/`: `app/page.tsx`, its parts in `components/v2/`, all of its styles in `components/v2/v2.module.css`, and its pictures in `public/v2/`. The old Mira page lives at `/v1` (`app/v1/page.tsx`, `components/landing-*`). It is kept to go back to, and follows none of this.
+The page at `/`: `app/page.tsx`, its parts in `components/v2/`, all of its styles in `components/v2/v2.module.css`, and its pictures in `public/v2/`. The old Bluprint page lives at `/v1` (`app/v1/page.tsx`, `components/landing-*`). It is kept to go back to, and follows none of this.
 
 ## The idea
 

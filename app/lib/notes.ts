@@ -57,7 +57,7 @@ const subscribe = (f: () => void) => {
   listeners.add(f);
   return () => listeners.delete(f);
 };
-const KEY = "mira.review.";
+const KEY = "bluprint.review.";
 
 /** The open map: its notes are loaded, and the next ones are kept with it. */
 export function reviewFor(map: string) {

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const root = q.get("root");
   const p = listProjects().find((x) => x.root === root);
   const open = p ? loadMap(p.id) : null;
-  if (!p || !open) return Response.json({ text: "This checkout has no map in Mira yet, so there is nothing to look up. Import it from Projects to map it." });
+  if (!p || !open) return Response.json({ text: "This checkout has no map in Bluprint yet, so there is nothing to look up. Import it from Projects to map it." });
   const m = buildMap(open.file, open.name);
   const f = join(projectDir(p.id), "index.json");
   const index: MapIndex | null = existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null;

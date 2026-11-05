@@ -186,7 +186,7 @@ export function useRedoing(): string[] {
  * example describes some other copy of its code, so when an agent edits its
  * checkout this says so and offers to import it.
  *
- * Edits made outside a Mira tab (another editor, a pull) never ask for an
+ * Edits made outside a Bluprint tab (another editor, a pull) never ask for an
  * update, so between updates this says how far the code has moved from what
  * the map describes, and updates it once those files have stopped changing
  * for SETTLE: long enough that an agent mid-turn (whose turn updates the map

@@ -1,6 +1,6 @@
 {
  "RUN": {
-  "command": "mira map flask",
+  "command": "bluprint map flask",
   "repo": "flask",
   "commit": "d086db8",
   "files": 227,

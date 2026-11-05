@@ -26,7 +26,7 @@ const display = Zilla_Slab({
 
 export const metadata: Metadata = {
   // A published export is one map, and its tab says which.
-  title: process.env.NEXT_PUBLIC_STATIC_MAP ?? "Mira",
+  title: process.env.NEXT_PUBLIC_STATIC_MAP ?? "Bluprint",
   description:
     "See what an agent actually changed in your codebase — and what the analysis could not prove.",
 };

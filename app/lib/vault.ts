@@ -28,7 +28,7 @@ import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { Run } from "@/lib/data";
 
-const IDENTIFIER = "dev.mira.app";
+const IDENTIFIER = "dev.bluprint.app";
 
 function dataDir(): string {
   const home = homedir();

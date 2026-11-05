@@ -45,7 +45,7 @@ export const openDiffPanel = openDiff;
 
 type Item = { k: "commit"; c: Commit } | { k: "file"; path: string };
 type View = "split" | "inline";
-const VIEW_KEY = "mira.diff.view";
+const VIEW_KEY = "bluprint.diff.view";
 
 const STATUS: Record<Exclude<Verdict, "untouched">, string> = { changed: "M", added: "A", removed: "D" };
 

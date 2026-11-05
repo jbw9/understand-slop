@@ -1,7 +1,7 @@
-# Do we still need an IDE? What it means for Mira
+# Do we still need an IDE? What it means for Bluprint
 
 Notes on two pieces from October 2026, what we agree and disagree with, and
-what Mira should change because of them. Written 2026-11-04.
+what Bluprint should change because of them. Written 2026-11-04.
 
 - Isaac Levin, [“Why We Still Need an IDE”](https://blog.jetbrains.com/blog/2026/10/20/why-we-still-need-an-ide/), JetBrains Blog, 2026-10-20.
 - Sam Witteveen, [“What is the Future of IDEs”](https://www.youtube.com/watch?v=I5VxMzaBD6s), YouTube, 14:30. Sponsored by JetBrains; he says so up front.
@@ -71,12 +71,12 @@ Other points he makes that matter to us:
 
 ---
 
-## 2. Where they back what Mira already does
+## 2. Where they back what Bluprint already does
 
-| They say | Mira today |
+| They say | Bluprint today |
 |---|---|
 | “Go very quickly from the high-level chunks down to the low-level chunks” (Witteveen) | The whole product: features first, one level at a time, down to the line (D16, D28) |
-| Agent-written HTML docs and diagrams citing file names | A Mira map is exactly that, except every sentence is checked against the code it cites (Verifying Claims) and kept current as the code changes (D64) |
+| Agent-written HTML docs and diagrams citing file names | A Bluprint map is exactly that, except every sentence is checked against the code it cites (Verifying Claims) and kept current as the code changes (D64) |
 | Diffs, not a wall of text in a terminal | Changes drawn on the map: section verdicts, +/− per box, Prev / Next through every changed part (D72–D78) |
 | “If you can’t see what it’s seeing, you’re not steering it” | Picks go into the agent’s prompt; Claude moves your view to the section it is explaining (D59) |
 | Review the docs; did it change things I didn’t ask for? | Docs reader (D65–D66); the Plan tab compares planned sections with what actually changed |
@@ -91,7 +91,7 @@ Other points he makes that matter to us:
   Go-to-definition, find usages and the file tree were built for code you
   already know. For code you didn’t write, the missing instrument is *what
   each part is for and how the parts connect*, and no IDE draws that. Both
-  authors name the problem Mira solves and then prescribe the old tool.
+  authors name the problem Bluprint solves and then prescribe the old tool.
 - **“Really read it, not skimming diffs.”** Right about ownership, wrong about
   method at agent speed. Reading every line doesn’t scale to agent output,
   and METR suggests people misjudge their own speed anyway. The answer is
@@ -106,7 +106,7 @@ Other points he makes that matter to us:
   tools to any agent, and that is the cheaper way to be agent-neutral now.
 - **“Saves tokens.”** Plausible, unmeasured. We should measure map tools
   against plain grep on a real task before we claim it.
-- **Debugger, test runner, refactoring.** Real IDE jobs, not ours. Mira sits
+- **Debugger, test runner, refactoring.** Real IDE jobs, not ours. Bluprint sits
   beside the editor; it does not replace it.
 - **Bias.** Both pieces are JetBrains marketing to some degree. The
   observations hold up; the conclusion (“so use our IDE”) does not follow.
@@ -118,7 +118,7 @@ and **shut the map down, keeping the review part**. Greptile started as
 codebase onboarding and **pivoted to PR review**. Sourcetrail was archived:
 “the sort of thing that you would need only once or every once in a while.”
 
-Both sources now say review is the bottleneck. Together that says Mira’s
+Both sources now say review is the bottleneck. Together that says Bluprint’s
 strongest story is **reviewing what agents changed, at the architecture
 level, and owning it**. Exploring an unfamiliar repo is still the way in, and
 the reason the map exists, but review is what people do every day.
@@ -164,7 +164,7 @@ rather than a list of files. It is the navigation check Witteveen uses to
 judge whether a change is safe.
 
 ### 5.6 Map tools for every agent (M)
-Register Mira’s MCP server with Codex and OpenCode when the agent strip
+Register Bluprint’s MCP server with Codex and OpenCode when the agent strip
 launches them, so `map_search` and friends work there too. Today they open as
 plain terminals. This is our answer to walled gardens, and it backs the
 landing page’s “works beside Claude Code, Codex and OpenCode”.
@@ -181,7 +181,7 @@ Run the project’s test or typecheck script and pin failures to sections via
 reviewer sees untested parts, and can spot Witteveen’s `return true` tests.
 
 ### 5.9 Measure the token claim (S)
-Run one real task twice in a Mira tab, with map tools and without, and record
+Run one real task twice in a Bluprint tab, with map tools and without, and record
 tokens and turns. If it holds up, it is a landing-page claim and a reason
 for 5.6.
 
@@ -198,7 +198,7 @@ for 5.6.
 - New **“Why we’re building this”** section (`landing/components/landing-why.tsx`),
   linked as “Why” in the nav. Headline “Code got cheap. Understanding
   didn’t.” Two paragraphs of backstory from PLAN.md’s problem statement. Four
-  frustrations, each with a sourced quote or number and what Mira does:
+  frustrations, each with a sourced quote or number and what Bluprint does:
   1. You can’t see what the agent changed.
   2. Reviewing takes longer than writing.
   3. You own what you ship, whoever typed it.
@@ -207,13 +207,13 @@ for 5.6.
   Then a “Worth reading” list: Levin, Witteveen, Stack Overflow, METR.
 - **Testimonials replaced.** The old ones were placeholders with invented
   roles (“SDE at Meta”). The carousel now shows three real, linked quotes.
-- **FAQ:** “Is this an IDE?” No: keep your editor; Mira shows how the whole
+- **FAQ:** “Is this an IDE?” No: keep your editor; Bluprint shows how the whole
   repository fits together and what a change did to it.
 
 Still open for the landing page:
 
 - **Personal backstory.** The current text is in the project’s voice. A few
-  first-person lines on how Mira started would make it stronger.
+  first-person lines on how Bluprint started would make it stronger.
 - **Lead with review?** If 5.1–5.4 land, the hero could say so, for example
   “See what your agent changed, and own it.”
 - **The token claim** waits for 5.9.

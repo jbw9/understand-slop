@@ -211,7 +211,7 @@ function PlanScene() {
               <h3 className={f.planTitle}>Saved sign-ins for the Preview browser</h3>
               <p className={f.lede}>
                 You sign in to a site once in the Preview, choose &ldquo;all projects&rdquo; or &ldquo;this project
-                only&rdquo;, and from then on Claude opens it already signed in. Mira keeps the site&rsquo;s session cookies
+                only&rdquo;, and from then on Claude opens it already signed in. Bluprint keeps the site&rsquo;s session cookies
                 the way a browser does and never stores your password.
               </p>
             </header>
@@ -268,7 +268,7 @@ function PlanScene() {
           }
         >
           <div className={f.term}>
-            <Hello cwd="~/code/mira" />
+            <Hello cwd="~/code/bluprint" />
             <p className={f.you}>&gt; let me sign in to Instagram once and keep it for every project</p>
             <div className={`${f.msg} ${f.in}`} style={at(0.3)}>
               <span className={f.ok}>⏺</span>

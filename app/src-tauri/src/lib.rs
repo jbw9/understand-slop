@@ -24,7 +24,7 @@ pub fn run() {
         .setup(|app| {
             // Claude's way into the preview, for every Claude tab (mcp.rs).
             mcp::start(app.handle().clone());
-            // Tab files a crashed or killed Mira left in the temp folder.
+            // Tab files a crashed or killed Bluprint left in the temp folder.
             std::thread::spawn(claude::sweep_stale);
             // Plans Claude Code wrote and nothing has touched in a month.
             std::thread::spawn(claude::prune_plans);
@@ -38,7 +38,7 @@ pub fn run() {
                 std::thread::spawn(move || {
                     if let Err(e) = server::start(&handle).and_then(|()| open_main(&handle).map_err(|e| e.to_string())) {
                         use tauri_plugin_dialog::DialogExt;
-                        handle.dialog().message(e).title("Mira couldn't start").blocking_show();
+                        handle.dialog().message(e).title("Bluprint couldn't start").blocking_show();
                         handle.exit(1);
                     }
                 });
@@ -117,11 +117,11 @@ fn open_main(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Mira in the menu bar, with how many Claude tabs have finished beside it, so
+/// Bluprint in the menu bar, with how many Claude tabs have finished beside it, so
 /// a finished turn shows from any app. Clicking it brings the window forward.
 fn done_tray(app: &tauri::App) -> tauri::Result<()> {
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-    let mut tray = TrayIconBuilder::with_id("done").tooltip("Mira").on_tray_icon_event(|tray, e| {
+    let mut tray = TrayIconBuilder::with_id("done").tooltip("Bluprint").on_tray_icon_event(|tray, e| {
         if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
             if let Some(w) = tray.app_handle().get_webview_window("main") {
                 let _ = w.unminimize();
@@ -142,7 +142,7 @@ fn done_tray(app: &tauri::App) -> tauri::Result<()> {
 fn done_count(app: tauri::AppHandle, n: u32) {
     if let Some(tray) = app.tray_by_id("done") {
         let _ = tray.set_title(if n == 0 { None } else { Some(n.to_string()) });
-        let _ = tray.set_tooltip(Some(if n == 0 { "Mira".to_string() } else { format!("Mira: {n} done") }));
+        let _ = tray.set_tooltip(Some(if n == 0 { "Bluprint".to_string() } else { format!("Bluprint: {n} done") }));
     }
 }
 

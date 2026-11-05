@@ -46,6 +46,11 @@ const WITTEVEEN: Source = {
   work: "“What is the Future of IDEs”",
   href: "https://www.youtube.com/watch?v=I5VxMzaBD6s",
 };
+const WILLISON: Source = {
+  who: "Simon Willison",
+  work: "“Not all AI-assisted programming is vibe coding”",
+  href: "https://simonwillison.net/2025/Mar/19/vibe-coding/",
+};
 const SO_SURVEY: Source = {
   who: "Stack Overflow",
   work: "Developer Survey 2025",
@@ -56,7 +61,7 @@ const SO_SURVEY: Source = {
 const VOICES: Voice[] = [
   { source: WITTEVEEN, quote: "The writing part has gotten cheap. The verification hasn’t." },
   { source: LEVIN, quote: "If you can’t see what it’s seeing, you’re not actually steering it." },
-  { source: LEVIN, quote: "You can’t own code you don’t understand." },
+  { source: WILLISON, quote: "I won’t commit any code to my repository if I couldn’t explain exactly what it does to somebody else." },
 ];
 
 const PROBLEMS: Problem[] = [

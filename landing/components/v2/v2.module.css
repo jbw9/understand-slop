@@ -518,6 +518,12 @@
   font: 300 clamp(32px, 4vw, 60px) / 1.02 var(--display);
   letter-spacing: -0.01em;
 }
+.point {
+  width: 84px;
+  margin-top: 12px;
+  /* The fingertip sits left of the picture's middle; this puts it on the page's. */
+  translate: 15px 0;
+}
 .kicker {
   font: 12px var(--mono);
   text-transform: uppercase;

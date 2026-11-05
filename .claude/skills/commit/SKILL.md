@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Write a commit in jbw9/understand-slop. Every commit is a title only, in the form `area: summary`. Use for every commit in this repo, in every directory and on every branch, and when the user invokes /commit.
+description: "Write a commit in jbw9/understand-slop. Every commit is a title only, in the form `area: summary`. Use for every commit in this repo, in every directory and on every branch, and when the user invokes /commit."
 ---
 
 # Commit

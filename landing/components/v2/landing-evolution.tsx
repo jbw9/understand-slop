@@ -18,7 +18,7 @@ const PATH = "M500 0C500 125 270 125 270 250S730 460 730 600 270 810 270 950 500
 
 /**
  * How we got here: one line drawn down the page as it scrolls, through three
- * people, from code read by hand to code nobody reads, and on into the app below.
+ * people, from code written by hand to code nobody reads, and on into the app below.
  */
 export function LandingEvolution() {
   const box = useRef<HTMLElement>(null);
@@ -50,7 +50,7 @@ export function LandingEvolution() {
   return (
     <section ref={box} className={s.evo} aria-labelledby="evo-title">
       <p className={s.bracket}>[ How we got here ]</p>
-      <h2 id="evo-title">People used to read every line.</h2>
+      <h2 id="evo-title">People used to write every line.</h2>
       <div className={s.evoField}>
         <svg className={s.evoLine} viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" aria-hidden>
           <path d={PATH} className={s.evoGhost} />

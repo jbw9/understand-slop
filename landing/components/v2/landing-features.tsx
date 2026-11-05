@@ -9,7 +9,7 @@ import f from "../landing-features.module.css";
  * map) can't show them. Each is drawn from the real components' markup and
  * the flask demo map's own names, and plays once when its tab opens.
  */
-export type Drawing = "claude" | "plan" | "review" | "run";
+export type Drawing = "claude" | "plan" | "review" | "run" | "agent";
 
 /**
  * The size the drawings are laid out for. They scale to the stage, never
@@ -732,11 +732,123 @@ function Habit({ name, streak, done, tap }: { name: string; streak: number; done
   );
 }
 
+/* ── an agent editing, and the map keeping up ────────────── */
+
+const ASK = "skip empty messages in flash()";
+
+/** The columns and rows of the Handling Requests picture with Helpers in them. */
+const HELPERS_VIEW = "292 0 772 318";
+
+/**
+ * A part picked on the map goes with Claude's next prompt; Claude edits the
+ * file under it, and the map marks the box whose code changed, as diff mode does.
+ */
+function AgentScene() {
+  return (
+    <>
+      <Strip>
+        <Tab on>Handling Requests</Tab>
+      </Strip>
+      <div className={f.main} style={{ "--ws": "42%" } as CSSProperties}>
+        <div className={f.page}>
+          <Head trail={["flask", "Handling Requests"]} eyebrow="Inside flask" title="Handling Requests" sub={HANDLING_SUB} />
+          <p className={f.cap}>
+            {HANDLING_CAPTION}
+            <span>colours match the parts below</span>
+          </p>
+          <div className={f.swap} style={{ display: "grid" }}>
+            <div className={f.out} style={at(0, 6.4)}>
+              <Picture view={HELPERS_VIEW} lit="helpers">
+                <svg className={f.mouse} style={{ left: "52%", top: "86%" }} viewBox="0 0 16 16">
+                  <path d="M2.5 1.5v12l3.2-3 2.2 4.7 2.1-1-2.2-4.6h4.4z" />
+                </svg>
+                <div data-chrome className={`${f.menu} ${f.blip}`} style={{ left: "55%", top: "52%", ...at(1.35, 2.45) }}>
+                  <span>Open in new tab</span>
+                  <span className={f.hot} style={at(2)}>
+                    Add to Claude context
+                  </span>
+                  <span>Add and open Claude</span>
+                </div>
+              </Picture>
+            </div>
+            <div className={f.in} style={at(6.4)}>
+              <Picture view={HELPERS_VIEW} marks={{ helpers: "changed", dispatch: "near" }} tags={{ helpers: [3, 1] }} recede />
+            </div>
+          </div>
+        </div>
+        <Workspace
+          tabs={
+            <>
+              <WsTab on icon={<ClaudeIcon />}>
+                claude 1
+              </WsTab>
+              <WsTab icon={<TerminalIcon />}>zsh 2</WsTab>
+            </>
+          }
+          strip={
+            <>
+              <span className={f.in} style={at(2.5)}>
+                context
+              </span>
+              <span className={f.swap}>
+                <span className={`${f.chip} ${f.blip}`} data-queued style={at(2.5, 4.6)}>
+                  <i>◷</i>Helpers<em>×</em>
+                </span>
+                <span className={`${f.chip} ${f.in}`} style={at(4.6)}>
+                  <i>✓</i>Helpers<em>×</em>
+                </span>
+              </span>
+            </>
+          }
+        >
+          <div className={f.term}>
+            <Hello />
+            <p className={`${f.you} ${f.in}`} style={at(4.6)}>
+              &gt; {ASK}
+            </p>
+            <div className={`${f.msg} ${f.in}`} style={at(5.2)}>
+              <span className={f.ok}>⏺</span>
+              <span>
+                <b>Update</b>(src/flask/helpers.py)
+                <br />
+                <span className={f.res}>⎿&nbsp;&nbsp;Updated with 3 additions and 1 removal</span>
+              </span>
+            </div>
+            <div className={`${f.msg} ${f.in}`} style={at(5.9)}>
+              <span className={f.ok}>⏺</span>
+              <span>
+                <b>Bash</b>(slop-map-show diff)
+                <br />
+                <span className={f.res}>⎿&nbsp;&nbsp;Showing changes</span>
+              </span>
+            </div>
+            <div className={`${f.msg} ${f.in}`} style={at(6.6)}>
+              <span>⏺</span>
+              <span>
+                <b>flash()</b> now returns early when the message is empty. The map marks Helpers, the one part whose
+                code changed.
+              </span>
+            </div>
+            <span className={f.grow} />
+            <Prompt>
+              <span className={f.typed} style={{ "--n": ASK.length, ...at(2.85, 4.6) } as CSSProperties}>
+                {ASK}
+              </span>
+            </Prompt>
+            <p className={f.hint}>? for shortcuts</p>
+          </div>
+        </Workspace>
+      </div>
+    </>
+  );
+}
+
 const SCENES: Record<Drawing, () => ReactNode> = {
   claude: ClaudeScene,
   plan: PlanScene,
   review: ReviewScene,
   run: RunScene,
+  agent: AgentScene,
 };
 
 /* ── the app's own pieces ───────────────────────────────── */

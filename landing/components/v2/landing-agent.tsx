@@ -1,11 +1,24 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Drawn } from "./landing-features";
 import s from "./v2.module.css";
 
 /**
- * The app beside the agent writing the code: a pick on the map goes into
- * Claude's next prompt, and after an edit the map redoes the sections it
- * touched. Drawn, not live: the frame above has Claude, not the agents.
+ * The app beside the agent writing the code: a part picked on the map goes
+ * into Claude's next prompt, and after the edit the map marks what changed.
+ * Drawn from the app's own pieces (landing-features.tsx), and played once it
+ * scrolls into view, so it starts where the reader can see it.
  */
-export function LandingAgent({ name, sections, changed }: { name: string; sections: string[]; changed: string }) {
+export function LandingAgent() {
+  const box = useRef<HTMLDivElement>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const watch = new IntersectionObserver(([e]) => e.isIntersecting && setSeen(true), { threshold: 0.4 });
+    watch.observe(box.current!);
+    return () => watch.disconnect();
+  }, []);
+
   return (
     <section id="agent" className={s.section} aria-labelledby="agent-title">
       <div className={`${s.wrap} ${s.agent}`}>
@@ -13,38 +26,16 @@ export function LandingAgent({ name, sections, changed }: { name: string; sectio
           <p className={s.eyebrow}>Beside your agent</p>
           <h2 id="agent-title">Keep up with your agent.</h2>
           <p className={s.intro}>
-            Claude Code, Codex and OpenCode open in tabs beside the map. Pick a section and it goes into Claude&rsquo;s
-            next prompt, so you can ask about the part you&rsquo;re looking at.
+            Claude Code, Codex and OpenCode open in tabs beside the map. Right-click a part to add it to Claude&rsquo;s
+            context, so you can ask about the part you&rsquo;re looking at.
           </p>
           <p className={s.intro}>
-            When an agent edits the code, the map redoes only the sections it touched, and marks which ones changed.
+            When an agent edits the code, the map marks the parts whose code changed, and dashes the ones that call into
+            them.
           </p>
         </div>
-        <div aria-hidden className={`${s.frame} ${s.desk} ${s.reveal}`}>
-          <div className={s.term}>
-            <div className={s.termTabs}>
-              <b>Claude Code</b>
-              <span>Codex</span>
-            </div>
-            <pre>
-              <span className={s.picked}>[Map section: {changed}]</span>
-              {"\n"}
-              <span className={s.prompt}>&gt;</span> return JSON from the 404 handler{"\n\n"}
-              <span className={s.faintText}>Edited src/flask/app.py</span>
-            </pre>
-          </div>
-          <div className={s.mini}>
-            <p className={s.winName}>{name}</p>
-            <ol>
-              {sections.map((t, i) => (
-                <li key={t} data-changed={t === changed || undefined}>
-                  <span className={s.n}>{i + 1}</span>
-                  <span className={s.miniTitle}>{t}</span>
-                  {t === changed ? <em>changed</em> : null}
-                </li>
-              ))}
-            </ol>
-          </div>
+        <div ref={box} className={`${s.agentFrame} ${s.reveal}`}>
+          {seen ? <Drawn drawing="agent" /> : null}
         </div>
       </div>
     </section>

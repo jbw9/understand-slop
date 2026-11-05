@@ -122,11 +122,7 @@ export default function Landing() {
             }}
           />
         </div>
-        <LandingAgent
-          name="flask"
-          sections={flask.AUTHORED.map((r) => r.title)}
-          changed={flask.AUTHORED.find((r) => r.id === "handling-requests")!.title}
-        />
+        <LandingAgent />
         <div className={s.wrap}>
           <LandingStart />
           <section className={`${s.close} ${s.reveal}`} aria-labelledby="close-title">

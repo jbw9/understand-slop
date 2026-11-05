@@ -1215,110 +1215,20 @@
 .section {
   margin-top: var(--gap);
 }
+/* The words, then the app beside the agent at full width, big enough to read. */
 .agent {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  align-items: center;
-  gap: 40px 72px;
+  gap: 48px;
 }
 .agent .intro + .intro {
   margin-top: 14px;
 }
-.desk {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-}
-.term,
-.mini {
-  min-width: 0;
+/* The drawing of the app, at the size the demo's own drawings use. */
+.agentFrame {
+  position: relative;
+  height: clamp(420px, 52vw, 720px);
   border: 1px solid var(--ink);
   overflow: hidden;
-}
-.term {
-  background: var(--code-bg);
-  color: var(--code-ink);
-}
-.termTabs {
-  display: flex;
-  border-bottom: 1px solid color-mix(in srgb, var(--code-ink) 30%, transparent);
-  font: 11px var(--mono);
-  text-transform: uppercase;
-}
-.termTabs b,
-.termTabs span {
-  padding: 6px 12px;
-  font-weight: 400;
-}
-.termTabs b {
-  background: var(--code-ink);
-  color: var(--code-bg);
-}
-.term pre {
-  margin: 0;
-  padding: 18px 16px 22px;
-  font: 12px/1.9 var(--mono);
-  white-space: pre-wrap;
-}
-.picked {
-  padding: 1px 5px;
-  border: 1px solid currentColor;
-  color: var(--code-key);
-}
-.prompt {
-  color: var(--code-key);
-}
-.faintText {
-  color: var(--code-num);
-}
-.mini {
-  padding: 14px;
-  background: var(--paper);
-}
-.mini .winName {
-  display: block;
-  margin: 0 0 12px;
-}
-.mini ol {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.mini li {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-.mini .n {
-  width: 18px;
-  height: 18px;
-  font-size: 10px;
-}
-.mini li[data-changed] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--on-ink);
-}
-.miniTitle {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mini em {
-  flex-shrink: 0;
-  margin-left: auto;
-  padding: 1px 6px;
-  border: 1px solid currentColor;
-  font: normal 9.5px/1.4 var(--mono);
-  text-transform: uppercase;
 }
 
 /* ── your own repo, and questions ─────────────────────── */
@@ -1707,9 +1617,6 @@
   /* The hand needs the room. */
   .window {
     display: none;
-  }
-  .desk {
-    grid-template-columns: minmax(0, 1fr);
   }
   .canvas {
     height: 600px;

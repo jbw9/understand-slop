@@ -162,7 +162,7 @@ export default function Landing() {
             <header id="app" className={s.appHead}>
               {/* Uncle Sam from the 1917 poster, cut out in the cover's blue like its hand, pointing out at the reader from behind the line. */}
               {/* eslint-disable-next-line @next/next/no-img-element -- the site is a static export, which next/image cannot optimize. */}
-              <img className={s.you} src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/uncle-sam.png`} alt="" />
+              <img className={s.you} src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/v2/uncle-sam-cutout.png`} alt="" />
               <h2>And now there&rsquo;s you.</h2>
               <a className={s.kicker} href="#agent">
                 Works with most coding agents <span aria-hidden>&rarr;</span>

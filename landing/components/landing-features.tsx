@@ -187,7 +187,7 @@ const SAVE_STEPS: [string, ReactNode][] = [
 
 /* ── a plan, before it is built ─────────────────────────── */
 
-/** The plan as written in plan mode, kept verbatim in demo/plans/saved-sign-ins.md. */
+/** The plan as written in plan mode. */
 function PlanScene() {
   return (
     <>

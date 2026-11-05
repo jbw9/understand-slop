@@ -26,6 +26,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { cloneUrl, repoName } from "@/lib/clone";
 import type { Run } from "@/lib/data";
 
@@ -151,7 +152,7 @@ const git = (root: string, ...args: string[]) => {
 /** Where the checkout's code is now, to tell a map that has fallen behind. */
 export const headOf = (root: string) => git(root, "rev-parse", "--short", "HEAD");
 
-const TSX = join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+const TSX = ["--import", pathToFileURL(join(process.cwd(), "node_modules", "tsx", "dist", "loader.mjs")).href];
 
 const alive = (pid: number) => {
   try {
@@ -363,7 +364,7 @@ export function generate(id: string, claude?: string, explain?: Explain, full?: 
   const log = openSync(join(dir, "generate.log"), "w");
   const child = spawn(
     process.execPath,
-    [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--name", id, "--out", dir],
+    [...TSX, "scripts/generate/run.mts", p.root, "--name", id, "--out", dir],
     {
       cwd: process.cwd(),
       detached: true,
@@ -557,7 +558,7 @@ export function updateMap(root: string, claude?: string, turn?: Turn): Project |
   const log = openSync(join(dir, "update.log"), "w");
   const child = spawn(
     process.execPath,
-    [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--update", "--out", dir],
+    [...TSX, "scripts/generate/run.mts", p.root, "--update", "--out", dir],
     {
       cwd: process.cwd(),
       detached: true,
@@ -597,7 +598,7 @@ export function tellStory(id: string, claude?: string): boolean {
   if (!p || !mapFileOf(id) || telling(id)) return false;
   const dir = projectDir(id);
   const log = openSync(join(dir, "story.log"), "w");
-  const child = spawn(process.execPath, [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", p.root, "--story", "--out", dir], {
+  const child = spawn(process.execPath, [...TSX, "scripts/generate/run.mts", p.root, "--story", "--out", dir], {
     cwd: process.cwd(),
     detached: true,
     windowsHide: true,
@@ -651,7 +652,7 @@ export function mapReview(id: string, commit: string, claude?: string): ReviewMa
   // The worktree is the whole repository; the project may be a folder in it.
   const sub = execFileSync("git", ["-C", p.root, "rev-parse", "--show-prefix"], { encoding: "utf8" }).trim();
   const log = openSync(join(out, "update.log"), "w");
-  const child = spawn(process.execPath, [TSX, "--tsconfig", "tsconfig.json", "scripts/generate/run.mts", join(tree, sub), "--update", "--out", out], {
+  const child = spawn(process.execPath, [...TSX, "scripts/generate/run.mts", join(tree, sub), "--update", "--out", out], {
     cwd: process.cwd(),
     detached: true,
     windowsHide: true,

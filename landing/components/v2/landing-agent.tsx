@@ -27,7 +27,7 @@ const Logo = ({ d }: { d: string }) => (
 
 const W = 164;
 const H = 44;
-const at = (b: { col: number; row: number }) => ({ x: 1 + b.col * 204, y: 22 + b.row * 80 });
+const at = (b: { col: number; row: number }) => ({ x: 1 + b.col * 204, y: 34 + b.row * 96 });
 
 /**
  * The app beside the agent writing the code: the agent's terminal, with the
@@ -65,7 +65,7 @@ export function LandingAgent({ name, diagram, changed }: { name: string; diagram
               <span className={s.winName}>{name}</span>
               <span>Showing changes · 1 changed</span>
             </p>
-            <svg viewBox="0 0 778 148" className={s.roots}>
+            <svg viewBox="0 0 778 196" className={s.roots}>
               {diagram.arrows.map((a) => {
                 const f = at(box.get(a.from)!);
                 const t = at(box.get(a.to)!);

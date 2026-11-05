@@ -1,0 +1,5 @@
+Most .scm files here are the tags.scm queries shipped with the tree-sitter
+grammars (tree-sitter-python, -javascript, -typescript, -go, -rust, -java, -c,
+-cpp, -c-sharp, -php, -ruby; MIT licensed, copyright their authors), with
+inheritance and path-call patterns added for graph.ts. kotlin, swift, elixir,
+dart and scala were written here against the grammars in tree-sitter-wasms.

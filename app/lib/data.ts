@@ -317,6 +317,13 @@ export interface DiagramArrow {
    * a real path" (D19) is checked rather than trusted.
    */
   at?: string;
+  /**
+   * The code connects these two in a way the fact graph cannot follow: a
+   * decorator, a callback passed as a value, an event, a queue, the network.
+   * Every other arrow's `at` must be a call the graph has from the one's code
+   * into the other's; this one is the author's reading, and is drawn dotted.
+   */
+  inferred?: boolean;
 }
 
 export type Anatomy =

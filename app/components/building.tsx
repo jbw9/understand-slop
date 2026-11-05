@@ -21,7 +21,6 @@ const STAGES = [
   ["cut", "Dividing it into parts"],
   ["author", "Writing each part"],
   ["overview", "Drawing how they connect"],
-  ["verify", "Checking claims against the code"],
 ] as const;
 
 /** Whether the top level is the run itself rather than its picture: until the overview lands. */

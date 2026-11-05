@@ -1,11 +1,13 @@
 /**
  * Stage 3 — one agent per root writes that root's whole subtree.
  *
- * It reads the code itself (numbered lines, grep, directory listings) and
- * hands in the finished node through `submit`, which runs the same checks the
- * map is held to. Problems come back as the tool's answer, so the repair loop
- * is the conversation itself: the model fixes what the checker names, with
- * the code still in front of it.
+ * It never reads a file. It sees the code only through the fact graph
+ * (graph.ts): every function, method and class with its signature, doc and
+ * what it does, and who calls whom, at which line. So every box, arrow and
+ * line it draws is one the graph has, and the checker proves its arrows
+ * against the same graph. It hands in the finished node through `submit`,
+ * which runs the checks the map is held to; problems come back as the tool's
+ * answer, so the repair loop is the conversation itself.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { execFileSync } from "node:child_process";
@@ -16,12 +18,14 @@ import { citations, required, symbolsOf, TRIVIAL_LINES, type Sym } from "@/lib/c
 import type { Node } from "@/lib/data";
 import { BACKEND, invoke, callsOf, type Block, type Message, type Tool } from "./bedrock";
 import { ccAgent, type Handled } from "./claude-code";
+import { activeGraph, type Def } from "./graph";
+import { briefCalls, GRAPH_TOOLS, graphTool, isGraphTool, signature } from "./graph-tools";
 import type { Cut, Root } from "./cut";
 import { cutRepo, excludedBy, owners, place, unclaimed } from "./cut";
 import { isSource, numbered, type Inventory } from "./inventory";
 import { CAPTION_WORDS, EXPLAIN_LEVEL, fixedNote, LEAF, SUB_WORDS, tally } from "./check";
 import { shapeProblems, submitProblems, typeReference } from "./schema";
-import { fit, full, oneLine, type FileSummary } from "./summarize";
+import { fit, oneLine, type FileSummary } from "./summarize";
 
 export interface Authored {
   root: Node | null;
@@ -49,6 +53,7 @@ function stepOf(name: string, input: any, content: string, problems?: string[]):
   if (name === "read_file") return { tool: name, what: `${i.path}${i.start || i.end ? ` ${i.start ?? 1}-${i.end ?? "end"}` : ""}`, result: /^\d/.test(content) ? `${content.split("\n").length} lines` : content.split("\n")[0].slice(0, 120) };
   if (name === "grep") return { tool: name, what: `/${i.pattern}/${i.under ? ` under ${i.under}` : ""}`, result: content === "No matches." ? "no matches" : `${content.split("\n").length} matches` };
   if (name === "list") return { tool: name, what: String(i.dir ?? ""), result: `${content.split("\n").length} entries` };
+  if (isGraphTool(name)) return { tool: name, what: [i.name, i.path, i.from, i.to].filter(Boolean).map((x) => (Array.isArray(x) ? x.join(",") : String(x))).join(" → ") || "", result: content.split("\n")[0].slice(0, 120) };
   const fixes = i.root ? null : typeof i.replace === "string" ? tryJson(i.replace) : i.replace;
   const what = Array.isArray(fixes) ? `fixes to ${fixes.map((n: any) => n?.id).filter(Boolean).join(", ")}` : "the whole root";
   return { tool: name, what, result: problems?.length ? `rejected — ${problems.length} problems: ${problems.slice(0, 8).join("; ")}${problems.length > 8 ? "; …" : ""}` : "accepted" };
@@ -89,6 +94,22 @@ export const TOOLS: Tool[] = [
     },
   },
 ];
+
+/**
+ * What an author works with: the graph, and the submit. No read_file, grep or
+ * list: an author that can open files drifts back to reading code and drawing
+ * what it read, which is what the graph replaces. (TOOLS keeps them for the
+ * benchmark's grep mode, ask.ts.)
+ */
+export const AUTHOR_TOOLS: Tool[] = [...GRAPH_TOOLS, TOOLS.find((t) => t.name === "submit")!];
+
+/** An author's tool call other than submit: answered from the run's graph, and only from it. */
+export function authorTool(call: { name: string; input: any }): string {
+  const g = activeGraph();
+  if (!g) throw new Error("no graph for this run: call setGraph() before authoring");
+  if (!isGraphTool(call.name)) return `No tool called ${call.name}. The code is seen only through the graph tools.`;
+  return graphTool(g, call);
+}
 
 /**
  * The worked example: one root of the hand-authored explorify map, kept as a
@@ -168,7 +189,7 @@ export function system(): Block[] {
  * How much of the brief a root's own files may take, in characters (about 30k
  * tokens). The brief is re-sent on every turn of the author's conversation, so
  * a root owning hundreds of files is folded by directory (fit): the author
- * still sees all of it, and lists or reads a folded directory to go further.
+ * still sees all of it, and looks a folded directory up in the graph to go further.
  */
 const OWNED_BUDGET = 110_000;
 
@@ -218,30 +239,6 @@ function contentKey(root: Root, cut: Cut, inv: Inventory): string {
   return createHash("sha256").update(lines.join("\n")).digest("hex");
 }
 
-/**
- * How many lines of its own files a root's brief shows whole, and the longest
- * file shown. One agent spent 52 of its 66 turns reading, a file a turn,
- * although which files it would read was known before it started: its own.
- * In the brief they are read once and cached with it for every later turn.
- */
-const SHOWN_LINES = Number(process.env.SLOP_SHOWN_LINES ?? 3500);
-const SHOWN_FILE = 400;
-
-/** The root's own short files, those with the most to cover first, as `read_file` would return them. */
-function shownFiles(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>) {
-  const need = needs(inv);
-  const picked: string[] = [];
-  let lines = 0;
-  for (const f of explains(root, cut, inv, sums)
-    .filter((f) => f.lines <= SHOWN_FILE)
-    .sort((a, b) => sums[b.path].symbols.filter(need).length - sums[a.path].symbols.filter(need).length || a.path.localeCompare(b.path))) {
-    if (lines + f.lines > SHOWN_LINES) continue;
-    picked.push(`${f.path} (lines 1-${f.lines} of ${f.lines})\n${numbered(inv.repo, f.path)}`);
-    lines += f.lines;
-  }
-  return picked;
-}
-
 /** Stems too common to say which file a doc means. */
 const GENERIC_STEMS = /^(index|utils?|helpers?|config|types?|constants|common|layout|page|route|main|mod|lib|init|server|client|app|base|core|models?|schema|errors?|tests?)$/i;
 const PASSAGES = 8;
@@ -273,9 +270,8 @@ function docPassages(mine: { path: string }[], inv: Inventory): string[] {
   return out;
 }
 
-function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
+export function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSummary>): string {
   const { mine, near } = neighbourhood(root, cut, inv);
-  const shown = SHOWN_LINES > 0 ? shownFiles(root, cut, inv, sums) : [];
   const titleOf = new Map(cut.roots.map((r) => [r.id, r.title]));
   const elsewhere = (p: string) => owners(cut, p).filter((r) => r !== root.id).map((r) => titleOf.get(r)).join(", ");
   // Who imports each of its files from outside it: the files other roots rest on, which a change here reaches.
@@ -284,14 +280,31 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
     for (const to of tos) for (const r of owners(cut, from)) if (r !== root.id && !owners(cut, to).includes(r)) users.set(to, (users.get(to) ?? new Set()).add(titleOf.get(r) ?? r));
   const usedBy = (p: string) => (users.get(p)?.size ? `\n    imported from: ${[...users.get(p)!].join(", ")}` : "");
   const passages = docPassages(mine, inv);
+  // The graph's facts that agents otherwise fetched a call at a time: each
+  // function's signature beside what it does, and the calls between files with
+  // the lines to cite. In the brief they are read once and cached for every turn.
+  const g = activeGraph();
+  const defsIn = new Map<string, Def[]>();
+  for (const d of g?.defs ?? []) defsIn.set(d.file, [...(defsIn.get(d.file) ?? []), d]);
+  const withSignatures = (s: FileSummary) => {
+    const defs = defsIn.get(s.path) ?? [];
+    const sig = (x: { name: string; start: number; end: number }) => {
+      const short = x.name.split(/[.:#\s(]/).filter(Boolean).pop() ?? x.name;
+      const d = defs.find((d) => d.start === x.start) ?? defs.find((d) => (d.name === short || d.name === x.name) && d.start <= x.end && x.start <= d.end);
+      return d?.head ? signature(d) : x.name;
+    };
+    const syms = s.symbols.map((x) => `    ${x.start}-${x.end} ${sig(x)}: ${x.does}`).join("\n");
+    return `${oneLine(s)}${s.user_sees ? `\n    user sees: ${s.user_sees}` : ""}${syms ? `\n${syms}` : ""}`;
+  };
+  const calls = g ? briefCalls(g, mine.map((f) => f.path), (p) => owners(cut, p).map((r) => titleOf.get(r) ?? r).join(", ")) : { inside: "", across: "" };
   return [
     `# Repository: ${inv.name}`,
     `## README (excerpt)\n${inv.readme.slice(0, 2500) || "(none)"}`,
     ...(inv.instructions ? [`## What the repository tells coding agents\nIts own conventions and rules (AGENTS.md, CLAUDE.md). They say what its parts are meant to be; where the code departs from them, that is worth an issue.\n\n${inv.instructions}`] : []),
     ...(inv.docs.length ? [`## Its docs (${inv.docs.length}): path, lines, first heading\n${inv.docs.slice(0, 80).map((d) => `${d.path} (${d.lines})${d.title ? ` — ${d.title}` : ""}`).join("\n")}`] : []),
-    ...(inv.scope ? [`## Scope\nThis map covers only part of the repository. Its reader: ${inv.scope.focus} Files outside it can still be read and cited.`] : []),
+    ...(inv.scope ? [`## Scope\nThis map covers only part of the repository. Its reader: ${inv.scope.focus} Code outside it is still in the graph and can be cited.`] : []),
     `## The whole map's top level — ${cut.about}\n${cut.roots.map((r) => `- ${r.id}: ${r.title} — ${r.sub}`).join("\n")}`,
-    `Code another root explains is not unknown: read it if you need it, and draw it as a box with no \`opens\` labelled with that root's title. Never mark a node unsure because something lies outside your root.`,
+    `Code another root explains is not unknown: look it up in the graph if you need it, and draw it as a box with no \`opens\` labelled with that root's title. Never mark a node unsure because something lies outside your root.`,
     `## Your root\nid: ${root.id}\ntitle: ${root.title}\nsub: ${root.sub}\nscope: ${root.why}\nEvery node id under it starts with "${root.prefix}-".`,
     `Brand marks you may use: ${inv.marks.length ? inv.marks.join(", ") : "none"}.`,
     `Screens: ${
@@ -299,21 +312,22 @@ function brief(root: Root, cut: Cut, inv: Inventory, sums: Record<string, FileSu
         ? "this is a mobile app, so every screen block is device \"phone\"."
         : inv.device === "web"
           ? "no mobile framework is in its dependencies, so every screen block is device \"web\", with the route it is at."
-          : "it has both a mobile app and a web one — give each screen block the device of the code it is read from."
+          : "it has both a mobile app and a web one — give each screen block the device of the code it shows."
     }`,
     ((owned) =>
-      `## Files this root owns (${mine.length}), with what each does${owned.folded ? "\nToo many to list one by one, so the deepest directories are folded into a line each (`dir/ (N files …)`); list or grep a folded directory to see its files." : ""}\n${owned.text}`)(
-      fit(mine, sums, (f) => `${sums[f.path] ? full(sums[f.path]) : `${f.path} (${f.lines} lines)`}${usedBy(f.path)}`, OWNED_BUDGET),
+      `## Files this root owns (${mine.length}), with what each does${owned.folded ? "\nToo many to list one by one, so the deepest directories are folded into a line each (`dir/ (N files …)`); graph_file or graph_find shows what is in them." : ""}\n${owned.text}`)(
+      fit(mine, sums, (f) => `${sums[f.path] ? withSignatures(sums[f.path]) : `${f.path} (${f.lines} lines)`}${usedBy(f.path)}`, OWNED_BUDGET),
     ),
+    calls.inside ? `## Calls between its files\nEvery call the graph has from one of this root's files into another, by file pair, with the line it happens on. These are the arrows inside this root: cite the line given as the arrow's \`at\`.\n${calls.inside}` : "",
+    calls.across ? `## Calls across its boundary\nThe calls between this root's files and code other roots explain (named in brackets), the same way. A box for the other side opens nothing and is labelled with that root's title.\n${calls.across}` : "",
     near.size ? `## Files just outside it that it talks to, with the root that explains each\n${[...near].sort().slice(0, 60).map((p) => `${sums[p] ? oneLine(sums[p]) : p}${elsewhere(p) ? ` — ${elsewhere(p)}` : ""}`).join("\n")}` : "",
     passages.length ? `## What its docs say about these files\nPassages that name them. Where one says why a part is built as it is, cite it in \`docs\` on that node.\n\n${passages.join("\n\n")}` : "",
-    shown.length ? `## Its files, already read (${shown.length})\nThese are shown whole, numbered as read_file returns them. Do not read them again.\n\n${shown.join("\n\n")}` : "",
     `## Task
-${shown.length ? "Your files above are already read. Read only what else you need — the longer files, by the symbol line ranges listed for them, and code across the boundary — then submit this root with its full subtree." : "Read the code you need, then submit this root with its full subtree."} Every turn re-sends the whole conversation, so read in few turns: ask for all the reads you already know you need at once, read a file of 400 lines or fewer whole and once, and use the symbol line ranges above only for longer files.
+You cannot open files: you see the code through the graph. Most of what you need is already above, from it: every file you own with each function's lines, signature and what it does, and every call between your files and across your boundary with the line to cite. Draft from that. Use the graph tools only for what it leaves out: graph_show for one function's doc and full callers and callees, graph_path to trace a flow a walkthrough or sequence follows, graph_file for a file you do not own, graph_links for a pair cut short above. Draw only what the graph shows: a box is a function, class, file or group of them; an arrow is a call listed above or one graph_links or graph_path showed, and its \`at\` is the line given. Where two parts connect in a way the graph cannot follow (a decorator, a callback, an event, a queue, the network), you may still draw the arrow, marked \`inferred: true\`, citing the line that wires it as you know it from the graph. Let the graph type the lines for you: a \`code\` entry may be \`{ "def": "<graph id>", "label": "..." }\` and gets that definition's file and lines; a box's \`ref\` and a flow or sequence step's \`at\` may be a graph id; leave out an arrow's \`at\` and it gets the line of the call the graph has between the two boxes' code; leave out \`col\`/\`row\` on a diagram's boxes and they are laid out along the arrows. Spend your words on what the graph cannot say. Write prose only from what the graph says a thing is and does; where it does not say, say less rather than guess. Every turn re-sends the whole conversation, so ask for all the lookups you need at once, in one turn, then submit this root with its full subtree.
 Every level with parts has a diagram whose boxes open each of them; every leaf is one piece of code with its own lines, and each step of a leaf's flow or sequence cites the lines it happens on in \`at\`. ${{ full: "Every level also has an `explain` for a reader new to the project and its field. ", detailed: "Every level also has a one- or two-paragraph `explain` for a reader who knows a little of the field and none of this project. ", brief: "Every level also has a one- or two-sentence `explain` for a reader who knows the field but not this project. ", minimal: "Every level also has a one-sentence `explain` for a reader who knows the field and has used this project. ", none: "" }[EXPLAIN_LEVEL]}Aim for 2-3 levels, 3-6 children per node, and real issues where the code has them.
 Cover the code: every symbol listed above of more than ${coverLines(inv)} lines, in a file whose first owner is this root, must be opened by a leaf's \`code\` or a step's \`at\`. A few small related ones may share a leaf; a part with more pieces than fit gets another level, not a summary.
-${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), grep or read the passage and cite it in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
-Budget: about 25 tool calls before you submit. Before you submit, count them: ${LIMITS}.`,
+${inv.docs.length ? "Where a doc above explains why this root's parts are built as they are (a design note, a recorded decision), cite the passage shown above in `docs` on the node it explains: the passage's own lines, labelled with what it says. Cite docs only where they bear on the node; most nodes have none.\n" : ""}
+Budget: about 8 tool calls before you submit. Before you submit, count them: ${LIMITS}.`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -442,7 +456,6 @@ export async function authorRoot(
   model: string,
   onSubmit: OnSubmit,
 ): Promise<Authored> {
-  const known = new Set(inv.files.map((f) => f.path));
   const res: Authored = { root: null, turns: 0, reads: 0, submits: 0, problems: [], trail: [] };
   // The last tree handed in, so a fix after a rejection resends only the nodes it changed.
   let last: Node | null = null;
@@ -458,7 +471,7 @@ export async function authorRoot(
   const handle = (name: string, input: any): Handled => {
     if (name !== "submit") {
       res.reads++;
-      const content = runTool({ name, input }, inv, known);
+      const content = authorTool({ name, input });
       res.trail.push(stepOf(name, input, content));
       return { content };
     }
@@ -525,15 +538,17 @@ interface Agent {
 export async function converse<T>(a: Agent): Promise<{ value: T | null; turns: number }> {
   const nudge = a.nudge ?? "Continue: use the tools, and finish by calling submit.";
   if (BACKEND === "claude-code") {
-    // Medium, not the API path's high: at high one root thought for 32k
-    // tokens in a reply. Medium halved that root's time (1118s to 614s) with a map as full.
-    return ccAgent<T>({ model: a.model, system: a.system ?? system(), prompt: a.prompt, tools: a.tools ?? TOOLS, handle: a.handle, effort: a.ccEffort ?? "medium", stage: a.stage, maxTurns: a.maxTurns, nudge, salt: a.salt });
+    // Low. At high one root thought for 32k tokens in a reply; medium halved
+    // that root's time (1118s to 614s). With the graph's outline and calls in
+    // the brief there is little left to work out, and output speed is what a
+    // root waits on: thinking was about 40% of an author's output tokens.
+    return ccAgent<T>({ model: a.model, system: a.system ?? system(), prompt: a.prompt, tools: a.tools ?? AUTHOR_TOOLS, handle: a.handle, effort: a.ccEffort ?? "low", stage: a.stage, maxTurns: a.maxTurns, nudge, salt: a.salt });
   }
 
   const messages: Message[] = [{ role: "user", content: a.prompt }];
   let turns = 0;
   for (; turns < a.maxTurns; turns++) {
-    const r = await invoke({ model: a.model, stage: a.stage, effort: "high", maxTokens: 64000, system: a.system ?? system(), messages: withCacheMark(messages), tools: a.tools ?? TOOLS });
+    const r = await invoke({ model: a.model, stage: a.stage, effort: "medium", maxTokens: 64000, system: a.system ?? system(), messages: withCacheMark(messages), tools: a.tools ?? AUTHOR_TOOLS });
     messages.push({ role: "assistant", content: r.content });
     const calls = callsOf(r);
     if (!calls.length) {
@@ -655,7 +670,6 @@ export async function authorSplit(
 
 /** The root's own level over parts already written: its words and the diagram whose boxes open them. */
 async function joinParts(root: Root, kids: Node[], inv: Inventory, model: string, onSubmit: OnSubmit) {
-  const known = new Set(inv.files.map((f) => f.path));
   const out = { node: null as Node | null, turns: 0, submits: 0, problems: [] as string[] };
   const describe = (n: Node) => `- ${n.id}: ${n.title} — ${n.sub}\n  ${n.detail ?? ""}\n  its parts: ${(n.children ?? []).map((c) => c.title).join(", ")}`;
   const prompt = [
@@ -664,10 +678,10 @@ async function joinParts(root: Root, kids: Node[], inv: Inventory, model: string
     `## Its parts, already written and checked\nEach is a child of this root as it stands; you do not change them.\n${kids.map(describe).join("\n")}`,
     `## Task
 Write this root's own level only, and submit it as \`root\` without \`children\`: they are put under it as they are. It has the fields any level with parts has: title, sub, detail, state, code (the few ranges that tie the parts together, or none), a diagram whose boxes open each part by its id (${kids.map((k) => k.id).join(", ")}) with arrows that cite the lines where one part reaches another${EXPLAIN_LEVEL === "none" ? "" : ", and an explain"}.
-Read only what you need to draw those arrows. Budget: about 10 tool calls before you submit.`,
+You see the code only through the graph tools: graph_links from one part's files to another's shows which parts call which. Leave out an arrow's \`at\` and it gets the line of that call; leave out the boxes' \`col\`/\`row\` and they are laid out along the arrows. A link the graph cannot follow is drawn \`inferred: true\`, with \`at\` the line that wires it. Budget: about 10 tool calls before you submit.`,
   ].join("\n\n");
   const handle = (name: string, input: any): Handled => {
-    if (name !== "submit") return { content: runTool({ name, input }, inv, known) };
+    if (name !== "submit") return { content: authorTool({ name, input }) };
     out.submits++;
     const top = input?.root;
     if (!top || typeof top !== "object") return { content: "Send `root`: this root's own level, without children.", isError: true };

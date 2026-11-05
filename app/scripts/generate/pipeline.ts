@@ -16,13 +16,13 @@ import { authorRoot, authorSplit, submitLine, tooBig, type Authored, type OnSubm
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose } from "./claude-code";
-import { check, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
+import { arrowStats, check, dedupeIssues, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, place, unclaimed, type Cut } from "./cut";
+import { activeGraph, buildGraph, setGraph, withSummaries } from "./graph";
 import { inventory, isSource, scopeTo, type Inventory } from "./inventory";
 import { overviewOf, toOverview, type Overviewed } from "./overview";
 import { shapeProblems } from "./schema";
 import { summarize, type FileSummary } from "./summarize";
-import { verifyTree, type Verdict } from "./verify";
 
 /** Written whole and renamed into place, so the app never parses half a file. */
 function atomic(path: string, body: string) {
@@ -60,7 +60,6 @@ export async function redrawOverview(map: MapFile, cut: Cut, inv: Inventory, mod
   const drawn = await overviewOf(map.AUTHORED, cut, inv, model, (n, problems) => console.log(`  overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`), sums);
   if (!drawn.overview) return drawn.problems;
   const node = { ...drawn.overview, id: OVERVIEW_ID, title: "Overview", sub: drawn.overview.sub ?? "", col: 0, row: 0 };
-  await verifyTree(node, inv, model);
   const top = toOverview(node);
   if (EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary"] as const) delete top[k];
   map.OVERVIEW = top;
@@ -93,15 +92,12 @@ export async function main(args: string[]) {
   const only = opt("--roots")?.split(",");
   const stopAfter = opt("--stop-after");
   const pick = (env: string | undefined, fallback: keyof typeof MODELS = "opus") => MODELS[(env ?? fallback) as keyof typeof MODELS] ?? MODELS[fallback];
-  // The parts of a split root and the verify reviewer read a bounded amount
-  // of code against a set brief; Sonnet does that at a fraction of Opus.
+  // The parts of a split root draw a bounded piece against a set brief; Sonnet does that at a fraction of Opus.
   const models = {
     summarize: MODELS.haiku,
     cut: pick(process.env.SLOP_CUT),
     author: pick(process.env.SLOP_AUTHOR),
     part: pick(process.env.SLOP_PART, "sonnet"),
-    verify: MODELS.haiku,
-    review: pick(process.env.SLOP_REVIEW, "sonnet"),
   };
 
   // --out puts the map elsewhere: the app's project vault (lib/vault.ts), so an
@@ -110,6 +106,8 @@ export async function main(args: string[]) {
   mkdirSync(out, { recursive: true });
   cacheIn(`${out}/.cache`, { fresh: has("--fresh") });
   // --overview redraws only the top level of the map that is there (D60).
+  // The graph is what every author draws from and what the checker proves arrows against.
+  setGraph(await buildGraph(inv));
   if (has("--overview")) return redraw(out, inv, models.author);
   const t0 = Date.now();
   const elapsed: Record<string, number> = {};
@@ -180,6 +178,9 @@ export async function main(args: string[]) {
     }),
   );
   writeFileSync(`${out}/.cache/summaries.json`, JSON.stringify(sums, null, 1));
+  // The one model reading of the code, laid onto the graph: what each file is for and each function does.
+  withSummaries(activeGraph()!, sums);
+  writeFileSync(`${out}/graph.json`, JSON.stringify(activeGraph()) + "\n");
   if (stopAfter === "summarize") return;
   progress.stage = "cut";
   flush();
@@ -262,29 +263,10 @@ export async function main(args: string[]) {
     return writing;
   };
 
-  // A root is verified as soon as it is accepted, while the others are still
-  // being written: verifying waited on the slowest root before, and then took
-  // a tenth of the run on its own. The overview is drawn from each root as it
-  // was accepted (`asAccepted`), as it was when verifying came after it, so
-  // what it is asked does not depend on which verification finished first.
-  const verdicts: Record<string, Verdict[]> = {};
-  const verifying: Promise<void>[] = [];
-  const asAccepted: Record<string, Node> = {};
-  // A failure is held until the verify stage, where it was raised before: a
-  // promise nothing awaits yet would take the process down mid-authoring.
-  let verifyFailed: unknown = null;
-  const verifyOnAccept = (id: string, root: Node) => {
+  // Nothing re-reads an accepted root: its arrows were proven against the graph when it was submitted.
+  const onAccept = (id: string, root: Node) => {
     if (only && !only.includes(id)) return;
-    asAccepted[id] = structuredClone(root);
-    verifying.push(
-      verifyTree(root, inv, models.review)
-        .then(async (v) => {
-          verdicts[id] = v;
-          say(`${id}: verified, ${v.filter((x) => x.flagged).length} flagged, ${v.filter((x) => x.rewritten).length} corrected`);
-          await partial();
-        })
-        .catch((e) => { verifyFailed ??= e; }),
-    );
+    dedupeIssues(root);
   };
 
   await lap("author", () =>
@@ -327,7 +309,7 @@ export async function main(args: string[]) {
         if (authored[r.id].root) {
           mark(r.id, "done", "explorable now");
           await partial();
-          verifyOnAccept(r.id, authored[r.id].root!);
+          onAccept(r.id, authored[r.id].root!);
         } else mark(r.id, "failed", `${authored[r.id].problems.length} problems unresolved`);
       }),
     ),
@@ -338,7 +320,7 @@ export async function main(args: string[]) {
 
   // The top level is drawn last, from the roots as accepted (D60). A repair
   // that leaves the same roots standing keeps the overview it had.
-  const accepted = cut.roots.flatMap((r) => (authored[r.id].root ? [asAccepted[r.id] ?? authored[r.id].root!] : []));
+  const accepted = cut.roots.flatMap((r) => (authored[r.id].root ? [authored[r.id].root!] : []));
   const same = (o: MapFile | null) => o?.OVERVIEW && o.AUTHORED.map((n) => n.id).join() === accepted.map((n) => n.id).join();
   let drawn: Overviewed | null = null;
   if (same(prev)) overview = prev!.OVERVIEW;
@@ -350,25 +332,6 @@ export async function main(args: string[]) {
     say(`overview: ${overview ? "accepted" : "FAILED"} after ${drawn.turns + 1} turns`);
     await partial();
   }
-  progress.stage = "verify";
-  flush();
-
-  // What is left of the roots' verifying once the overview is in: its time
-  // here is only what it adds to the run, not what it took beside authoring.
-  await lap("verify", () =>
-    Promise.all([
-      ...verifying,
-      // The overview's claims are read against its lines like any level's;
-      // what the reviewer corrects lands back on it.
-      (async () => {
-        if (!drawn?.overview) return;
-        const node = { ...drawn.overview, id: OVERVIEW_ID, title: "Overview", sub: drawn.overview.sub ?? "", col: 0, row: 0 };
-        verdicts[OVERVIEW_ID] = await verifyTree(node, inv, models.review);
-        overview = toOverview(node);
-      })(),
-    ]),
-  );
-  if (verifyFailed) throw verifyFailed;
 
   // A stage replayed wholly from cache took seconds and cost nothing, not what
   // generating it costs; the last report's time and bill for it stand, so the
@@ -393,7 +356,6 @@ export async function main(args: string[]) {
   progress.stage = "done";
   flush();
 
-  const allVerdicts = Object.values(verdicts).flat();
   const usd = Object.values(spent).reduce((a, b) => a + b.usd, 0);
   const fullUsd = Object.values(spent).reduce((a, b) => a + b.fullUsd, 0);
   const report = {
@@ -422,23 +384,17 @@ export async function main(args: string[]) {
       submits: authored[r.id].submits,
       lastProblems: authored[r.id].root ? [] : authored[r.id].problems.slice(0, 20),
       ...(authored[r.id].coverage ? { coverage: { symbols: authored[r.id].coverage!.symbols, unexplained: authored[r.id].coverage!.gaps.length } } : {}),
-      verify: verdicts[r.id] ? { nodes: verdicts[r.id].length, ok: verdicts[r.id].filter((v) => v.ok).length, flagged: verdicts[r.id].filter((v) => v.flagged).length, rewritten: verdicts[r.id].filter((v) => v.rewritten).map((v) => ({ id: v.id, claims: v.claims })), downgraded: verdicts[r.id].filter((v) => v.downgraded).map((v) => v.id) } : (last?.roots?.find((x: { id: string }) => x.id === r.id)?.verify ?? null),
     })),
     check: { problems: final.problems, depth: final.roots },
-    verifyPassRate: only && last?.verifyPassRate != null ? null : allVerdicts.length ? Math.round((100 * allVerdicts.filter((v) => v.ok).length) / allVerdicts.length) : null,
+    graph: { ...activeGraph()!.stats, defs: activeGraph()!.defs.length, edges: activeGraph()!.edges.length },
+    arrows: arrowStats(map),
   };
-  // A repair verified only the roots it redid; the rate is over every root.
-  if (report.verifyPassRate === null) {
-    const v = report.roots.map((r) => r.verify).filter(Boolean) as { nodes: number; ok?: number; downgraded: string[] }[];
-    const nodes = v.reduce((a, x) => a + x.nodes, 0);
-    if (nodes) report.verifyPassRate = Math.round((100 * v.reduce((a, x) => a + (x.ok ?? x.nodes - x.downgraded.length), 0)) / nodes);
-  }
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1) + "\n");
   writeFileSync(
     `${out}/audit.md`,
-    auditMarkdown({ inv, cut, rejected, leftover, cutReused, authored, drawn, overview, verdicts, only, backend: BACKEND, models, seconds: total, checkProblems: final.problems }),
+    auditMarkdown({ inv, cut, rejected, leftover, cutReused, authored, drawn, overview, only, backend: BACKEND, models, seconds: total, checkProblems: final.problems }),
   );
-  console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, ${covered.explained}/${covered.symbols} symbols explained, verify ${report.verifyPassRate}% , $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
+  console.log(`\n${out}/map.json — ${AUTHORED.length}/${cut.roots.length} roots, ${final.problems.length} check problems, ${covered.explained}/${covered.symbols} symbols explained, ${report.arrows.inferred}/${report.arrows.total} arrows inferred, $${report.usd} spent ($${report.fullUsd} uncached), ${report.elapsed.total}s`);
   final.problems.slice(0, 20).forEach((p) => console.log(`  ${p}`));
   // A whole map asked for every reply it still needs; the rest can never replay.
   if (!only) {

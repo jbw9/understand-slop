@@ -1,18 +1,16 @@
 /**
  * The run's audit: how the map was reached, as a reader can follow it. The
  * cut's reasons for each root and for what it left out, each author's reads,
- * searches and rejected submits in order, and what the verifier questioned,
- * rewrote or marked unsure. Written beside map.json and report.json; the
+ * searches and rejected submits in order, and what the final check still
+ * found. Written beside map.json and report.json; the
  * report keeps the numbers, this keeps the reasoning they came from.
  */
 import type { Node } from "@/lib/data";
 import type { Authored } from "./author";
-import { OVERVIEW_ID } from "./check";
 import type { Overview } from "@/lib/map";
 import type { Cut } from "./cut";
 import type { Inventory } from "./inventory";
 import type { Overviewed } from "./overview";
-import type { Verdict } from "./verify";
 
 export interface AuditInput {
   inv: Inventory;
@@ -27,7 +25,6 @@ export interface AuditInput {
   /** The overview as this run drew it; null when it kept the one it had. */
   drawn: Overviewed | null;
   overview?: Overview;
-  verdicts: Record<string, Verdict[]>;
   /** The roots this run redid, when it was a repair; the rest were kept as they were. */
   only?: string[];
   backend: string;
@@ -112,26 +109,8 @@ export function auditMarkdown(a: AuditInput): string {
     }
   }
 
-  // 4. Verification.
-  out.push("", "## 4. What verification changed", "", "A second model read each node against the lines it cites and the code around them. Questioned claims went to a reviewer that could read the repo, which dismissed them, added the missing citation, corrected the wording, or marked the node unsure.");
-  for (const r of [{ id: OVERVIEW_ID, title: "Overview" }, ...cut.roots]) {
-    const v = a.verdicts[r.id];
-    if (!v) continue;
-    const flagged = v.filter((x) => x.flagged);
-    const changed = v.filter((x) => x.rewritten || x.downgraded).length;
-    out.push("", `### ${r.title}`, "", `${v.length} nodes checked: ${v.length - changed} kept as written, ${flagged.length} questioned, ${v.filter((x) => x.rewritten).length} rewritten, ${v.filter((x) => x.downgraded).length} marked unsure.`);
-    for (const x of flagged) {
-      const what = x.downgraded ? "marked unsure" : x.rewritten ? "rewritten" : "every flag dismissed";
-      out.push("", `- \`${x.id}\` — ${what}`);
-      // The reviewer quotes the flags it upholds, not always word for word: match on the claim.
-      const upheld = new Set(x.claims.map(claimOf));
-      for (const f of x.flags ?? []) out.push(`  - ${upheld.has(claimOf(f)) ? "upheld" : "dismissed"}: ${f}`);
-      if (x.fixed) out.push(`  - now reads: ${x.fixed}`);
-    }
-  }
-
-  // 5. The final check.
-  out.push("", "## 5. The final check", "");
+  // 4. The final check.
+  out.push("", "## 4. The final check", "");
   if (a.checkProblems.length) {
     out.push(`${a.checkProblems.length} problems remain in the finished map:`, "");
     for (const p of a.checkProblems.slice(0, 50)) out.push(`- ${p}`);
@@ -139,5 +118,3 @@ export function auditMarkdown(a: AuditInput): string {
   return out.join("\n") + "\n";
 }
 
-/** A flag's claim, without its verdict and reasons. */
-const claimOf = (flag: string) => flag.split(" — ")[0].trim();

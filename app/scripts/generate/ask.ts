@@ -11,7 +11,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- model tool inputs */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { MapIndex } from "@/lib/coverage";
 import { mapSearch, mapSection, mapWhere } from "@/lib/lookup";
@@ -20,6 +20,8 @@ import { parseArgs } from "./args";
 import { converse, runTool, TOOLS } from "./author";
 import { ask, bill, cacheIn, MODELS, type Tool } from "./bedrock";
 import { ccClose } from "./claude-code";
+import { buildGraph, type Graph } from "./graph";
+import { GRAPH_TOOLS, graphTool, isGraphTool } from "./graph-tools";
 import { inventory } from "./inventory";
 
 export interface Question {
@@ -29,7 +31,7 @@ export interface Question {
   facts: string[];
   where: string[];
 }
-type Mode = "map" | "grep" | "both";
+type Mode = "map" | "grep" | "both" | "graph";
 type Verdict = "stated" | "partly" | "missing" | "contradicted";
 interface Answer { answer: string; cites: string[] }
 
@@ -51,11 +53,12 @@ const ANSWER: Tool = {
   },
 };
 const CODE_TOOLS = TOOLS.filter((t) => t.name !== "submit");
-const TOOLS_OF: Record<Mode, Tool[]> = { map: [...MAP_TOOLS, ANSWER], grep: [...CODE_TOOLS, ANSWER], both: [...MAP_TOOLS, ...CODE_TOOLS, ANSWER] };
+const TOOLS_OF: Record<Mode, Tool[]> = { map: [...MAP_TOOLS, ANSWER], grep: [...CODE_TOOLS, ANSWER], both: [...MAP_TOOLS, ...CODE_TOOLS, ANSWER], graph: [...GRAPH_TOOLS, ...CODE_TOOLS, ANSWER] };
 const SEES: Record<Mode, string> = {
   map: "Your tools read a map of the repository: a tree of sections, each explaining a part of the code and citing the lines it rests on. You cannot read the code itself.",
   grep: "Your tools read the repository's code.",
   both: "Your tools read a map of the repository (a tree of sections, each explaining a part of the code and citing its lines) and the repository's code itself.",
+  graph: "Your tools read the repository's code, and a graph of it built from the code: its functions, methods and classes, and who calls, inherits from and imports whom. Use the graph to find where things are and how they connect, then read the lines you need.",
 };
 const SYSTEM = "You answer questions about one codebase from what your tools show, never from what similar projects usually do.";
 
@@ -88,17 +91,19 @@ function lands(cites: string[], where: string[]): boolean {
   });
 }
 
-async function answer(q: Question, mode: Mode, ctx: { repo: string; m: ReturnType<typeof buildMap>; index: MapIndex | null; inv: ReturnType<typeof inventory>; salt: string; model: string }) {
+async function answer(q: Question, mode: Mode, ctx: { repo: string; m: ReturnType<typeof buildMap> | null; index: MapIndex | null; inv: ReturnType<typeof inventory>; graph: Graph | null; salt: string; model: string }) {
   const known = new Set(ctx.inv.files.map((f) => f.path));
   const handle = (name: string, input: any) => {
     if (name === "answer") return { content: "Recorded. Stop now.", done: { answer: String(input?.answer ?? ""), cites: Array.isArray(input?.cites) ? input.cites.map(String) : [] } };
-    if (name === "map_search") return { content: mapSearch(ctx.m, ctx.index, String(input?.query ?? "")) };
-    if (name === "map_section") return { content: mapSection(ctx.m, String(input?.name ?? ""), ctx.index) };
-    if (name === "map_where") return { content: mapWhere(ctx.m, ctx.index, String(input?.file ?? ""), Number(input?.line) || undefined) };
+    if (isGraphTool(name)) return mode === "graph" && ctx.graph ? { content: graphTool(ctx.graph, { name, input }) } : { content: `No tool called ${name}.`, isError: true };
+    if (!ctx.m && name.startsWith("map_")) return { content: `No tool called ${name}.`, isError: true };
+    if (name === "map_search") return { content: mapSearch(ctx.m!, ctx.index, String(input?.query ?? "")) };
+    if (name === "map_section") return { content: mapSection(ctx.m!, String(input?.name ?? ""), ctx.index) };
+    if (name === "map_where") return { content: mapWhere(ctx.m!, ctx.index, String(input?.file ?? ""), Number(input?.line) || undefined) };
     if (mode === "map") return { content: `No tool called ${name}.`, isError: true };
     return { content: runTool({ name, input }, ctx.inv, known) };
   };
-  const prompt = `# A question about the repository ${ctx.m.RUN.repo}\n\n${q.q}\n\nYou are a developer new to this codebase. ${SEES[mode]} Find the answer, then call \`answer\` once. If your tools don't show part of the answer, say which part instead of guessing.\nBudget: about 12 tool calls.`;
+  const prompt = `# A question about the repository ${ctx.m?.RUN.repo ?? ctx.inv.name}\n\n${q.q}\n\nYou are a developer new to this codebase. ${SEES[mode]} Find the answer, then call \`answer\` once. If your tools don't show part of the answer, say which part instead of guessing.\nBudget: about 12 tool calls.`;
   const r = await converse<Answer>({ prompt, handle, model: ctx.model, stage: `ask-${mode}`, maxTurns: 16, system: SYSTEM, tools: TOOLS_OF[mode], ccEffort: "low", nudge: "Finish by calling answer.", salt: `${mode} ${ctx.salt}` });
   return { got: r.value ?? { answer: "(no answer: the turns ran out)", cites: [] }, turns: r.turns };
 }
@@ -116,24 +121,30 @@ export async function score(args: string[]) {
   const { opt, repo: dir } = parseArgs(args);
   const out = resolve(dir!);
   const qfile = args.find((a, i) => i > 0 && a.endsWith(".json") && !args[i - 1]?.startsWith("--"));
-  if (!qfile) throw new Error("usage: ask.mts <map dir> <questions.json> [--repo dir] [--modes map,grep,both] [--only id,id]");
-  const file: MapFile = JSON.parse(readFileSync(`${out}/map.json`, "utf8"));
+  if (!qfile) throw new Error("usage: ask.mts <map dir> <questions.json> [--repo dir] [--modes map,grep,both,graph] [--only id,id]");
+  const modes = (opt("--modes") ?? "map,grep").split(",") as Mode[];
+  // Only the map modes need a map: grep and graph read the checkout, and the dir just holds ask.json.
+  const needsMap = modes.some((m) => m === "map" || m === "both");
+  if (!needsMap) mkdirSync(out, { recursive: true });
+  const file: MapFile | null = needsMap || existsSync(`${out}/map.json`) ? JSON.parse(readFileSync(`${out}/map.json`, "utf8")) : null;
   const indexPath = `${out}/index.json`;
   const index: MapIndex | null = existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, "utf8")) : null;
-  const repo = resolve(opt("--repo") ?? file.RUN.root ?? "");
+  const repo = resolve(opt("--repo") ?? file?.RUN.root ?? "");
   if (!existsSync(repo)) throw new Error(`no checkout at ${repo}: pass --repo`);
-  const modes = (opt("--modes") ?? "map,grep").split(",") as Mode[];
   const only = opt("--only")?.split(",");
   const set: { repo: string; commit: string; questions: Question[] } = JSON.parse(readFileSync(qfile, "utf8"));
   const questions = set.questions.filter((q) => !only || only.includes(q.id));
 
   cacheIn(`${out}/.cache`);
-  const m = buildMap(file, basename(out));
+  const m = file ? buildMap(file, basename(out)) : null;
   const inv = inventory(repo);
+  const graph = modes.includes("graph") ? await buildGraph(inv) : null;
   const model = MODELS[(process.env.SLOP_ASK ?? "sonnet") as keyof typeof MODELS] ?? MODELS.sonnet;
   // A map-reading answer depends on the map; a code-reading one on the checkout.
-  const mapSalt = createHash("sha256").update(readFileSync(`${out}/map.json`)).update(index ? readFileSync(indexPath) : "").digest("hex");
-  const ctx = { repo, m, index, inv, model, salt: "" };
+  const mapSalt = file ? createHash("sha256").update(readFileSync(`${out}/map.json`)).update(index ? readFileSync(indexPath) : "").digest("hex") : "";
+  // A graph answer depends on the graph too: a change to graph.ts is a new answer, not a cached one.
+  const graphSalt = graph ? createHash("sha256").update(JSON.stringify(graph.edges)).digest("hex").slice(0, 16) : "";
+  const ctx = { repo, m, index, inv, graph, model, salt: "" };
   if (inv.commit && set.commit && !inv.commit.startsWith(set.commit) && !set.commit.startsWith(inv.commit))
     console.warn(`warning: the questions were written at ${set.commit}, the checkout is at ${inv.commit}`);
 
@@ -141,7 +152,7 @@ export async function score(args: string[]) {
     questions.flatMap((q) =>
       modes.map(async (mode) => {
         // "list 2": grep answers cached before `list` took "." as the root said the repository was empty.
-        const { got, turns } = await answer(q, mode, { ...ctx, salt: mode === "grep" ? `${inv.commit} list 2` : mapSalt });
+        const { got, turns } = await answer(q, mode, { ...ctx, salt: mode === "grep" ? `${inv.commit} list 2` : mode === "graph" ? `${inv.commit} graph ${graphSalt}` : mapSalt });
         const verdicts = await grade(q, got);
         return { id: q.id, kind: q.kind, mode, score: mean(verdicts.map((v) => POINTS[v])), wrong: verdicts.includes("contradicted"), found: lands(got.cites, q.where), turns, verdicts, ...got };
       }),
@@ -164,7 +175,7 @@ export async function score(args: string[]) {
     }),
   );
   const kinds = [...new Set(questions.map((q) => q.kind))];
-  console.log(`${set.repo}: ${questions.length} questions, map ${out}`);
+  console.log(`${set.repo}: ${questions.length} questions, ${file ? `map ${out}` : `checkout ${repo}`}`);
   console.table(Object.fromEntries(kinds.map((k) => [k, Object.fromEntries(modes.map((mode) => [mode, pct(mean(rows.filter((r) => r.kind === k && r.mode === mode).map((r) => r.score)))]))])));
   console.table(Object.fromEntries(modes.map((mode) => [mode, { score: pct(summary[mode].score), "cites a key line": pct(summary[mode].found), contradicted: summary[mode].wrong, "turns/q": summary[mode].turns.toFixed(1), "tokens/q": summary[mode].tokens, usd: summary[mode].usd }])));
   writeFileSync(`${out}/ask.json`, JSON.stringify({ at: new Date().toISOString(), questions: resolve(qfile), commit: inv.commit, model, summary, rows }, null, 1) + "\n");

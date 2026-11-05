@@ -539,16 +539,17 @@
     transform: translateY(80px) scale(0.82);
   }
 }
+/* What the app does, a control of its own above the window, so it never reads as the window's tabs. */
 .switcher {
   display: flex;
-  margin-bottom: -1px;
+  justify-content: center;
+  margin-bottom: 20px;
 }
 .tabs {
   position: relative;
   display: flex;
   max-width: 100%;
   border: 1px solid var(--ink);
-  border-bottom: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }

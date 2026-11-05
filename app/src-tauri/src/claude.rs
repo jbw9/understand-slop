@@ -251,6 +251,7 @@ r=$(cat "$SLOP_CONTEXT.resume" 2>/dev/null); rm -f "$SLOP_CONTEXT.resume"
 /// `claude` typed in a tab: the launcher, so it is in front and takes context
 /// like one the app started. Not from Claude's own Bash tool, where the
 /// launcher's exit would take the tab's live marker from the Claude still running.
+#[cfg(unix)]
 const CLAUDE_SHIM: &str = r#"#!/bin/sh
 [ -n "$CLAUDECODE" ] && exec "$SLOP_CLAUDE_BIN" "$@"
 exec "$SLOP_LAUNCHER" "$@"

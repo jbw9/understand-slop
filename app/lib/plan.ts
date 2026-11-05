@@ -110,7 +110,7 @@ export function parsePlan(text: string): PlanDoc {
   for (const m of text.matchAll(/^\s*```files\s*\n([\s\S]*?)^\s*```/gm)) {
     for (const f of fileLines(m[1])) files[f.verdict]++;
   }
-  const words = lines.filter((l, i) => open[i]).join(" ").split(/\s+/).filter(Boolean).length;
+  const words = lines.filter((_, i) => open[i]).join(" ").split(/\s+/).filter(Boolean).length;
 
   return { title, lede, intro: intro.join("\n").trim(), sections, steps, files, minutes: Math.max(1, Math.ceil(words / 200)) };
 }

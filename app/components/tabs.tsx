@@ -152,6 +152,30 @@ export function NewTab({ onMap }: { onMap: () => void }) {
 }
 
 /**
+ * The landing page's demo repositories, when it frames this map
+ * (landing/components/v2/landing-demo.tsx): it posts them in, and the strip
+ * shows one tab per repository, as if each were open, instead of the map's
+ * own. Picking one posts back, and the landing points the frame at it.
+ */
+type Demos = { repos: { id: string; label: string }[]; open: string };
+let demos: Demos | null = null;
+const demoWatchers = new Set<() => void>();
+if (typeof window !== "undefined" && window.parent !== window) {
+  window.addEventListener("message", (e) => {
+    if (e.origin !== location.origin || e.data?.type !== "slop:repos") return;
+    demos = { repos: e.data.repos, open: e.data.open };
+    for (const f of demoWatchers) f();
+  });
+  // The landing's own post on load can come before this listens, so ask too.
+  window.parent.postMessage({ type: "slop:ready" }, location.origin);
+}
+const watchDemos = (f: () => void) => {
+  demoWatchers.add(f);
+  return () => void demoWatchers.delete(f);
+};
+const useDemos = () => useSyncExternalStore(watchDemos, () => demos, () => null);
+
+/**
  * The open map's tabs, across the top of the map: one per level the reader
  * has open, named by that level's title, and `+` for another at the top. A
  * part opens in a new tab with a middle click, ⌘/Ctrl-click, or "Open in new
@@ -173,6 +197,7 @@ export function SectionTabs({ path }: { path: string[] }) {
   const active = state?.active ?? 0;
   const many = tabs.length > 1;
   const drop = useDropOn("map");
+  const framed = useDemos();
   const titleOf = (t: Tab) => (t.file ? t.file.split("/").pop()! : t.path.length ? (nodeAt(t.path)?.title ?? RUN.repo) : RUN.repo);
 
   const select = (id: number) => {
@@ -213,6 +238,22 @@ export function SectionTabs({ path }: { path: string[] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [name]);
+
+  if (framed)
+    return (
+      <div role="tablist" data-chrome aria-label="Repository" className={TAB_STRIP}>
+        {framed.repos.map((r, i) => (
+          <SectionTab
+            key={r.id}
+            id={i}
+            label={r.label}
+            active={r.id === framed.open}
+            target={false}
+            onSelect={() => window.parent.postMessage({ type: "slop:open", id: r.id }, location.origin)}
+          />
+        ))}
+      </div>
+    );
 
   return (
     <div

@@ -624,36 +624,6 @@
   height: 9px;
   border: 1px solid currentColor;
 }
-.repos {
-  display: flex;
-  gap: 4px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.repos button {
-  flex-shrink: 0;
-  padding: 2px 9px;
-  border: 1px solid transparent;
-  background: none;
-  font: 11.5px var(--mono);
-  text-transform: uppercase;
-  color: inherit;
-  opacity: 0.75;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.repos button:hover {
-  opacity: 1;
-}
-.repos button[aria-selected="true"] {
-  border-color: currentColor;
-  opacity: 1;
-}
-.page .repos button:focus-visible {
-  outline-color: currentColor;
-  outline-offset: 1px;
-}
 .project {
   font: 11.5px var(--mono);
   text-transform: uppercase;

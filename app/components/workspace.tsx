@@ -619,6 +619,12 @@ export function Workspace() {
     reportStatus(tabs);
   }, [tabs]);
 
+  // The menu bar's count of finished Claude tabs (src-tauri/src/lib.rs done_tray).
+  const done = tabs.filter((t) => t.live && t.status === "done").length;
+  useEffect(() => {
+    if (desktop) void invoke("done_count", { n: done }).catch(() => {});
+  }, [desktop, done]);
+
   // A chime when an agent finishes or needs the user, heard wherever they are
   // looking: the dot alone is easy to miss with the workspace closed.
   const was = useRef<Record<number, Status | undefined>>({});

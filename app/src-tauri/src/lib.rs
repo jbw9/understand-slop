@@ -45,9 +45,11 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             terminal_menu(app)?;
+            done_tray(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            done_count,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
@@ -113,6 +115,35 @@ fn open_main(app: &tauri::AppHandle) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
     pinch_to_page(&_window);
     Ok(())
+}
+
+/// Mira in the menu bar, with how many Claude tabs have finished beside it, so
+/// a finished turn shows from any app. Clicking it brings the window forward.
+fn done_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+    let mut tray = TrayIconBuilder::with_id("done").tooltip("Mira").on_tray_icon_event(|tray, e| {
+        if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+            if let Some(w) = tray.app_handle().get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+    });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
+}
+
+/// The workspace's count of Claude tabs whose dot is green (components/workspace.tsx).
+#[tauri::command]
+fn done_count(app: tauri::AppHandle, n: u32) {
+    if let Some(tray) = app.tray_by_id("done") {
+        let _ = tray.set_title(if n == 0 { None } else { Some(n.to_string()) });
+        let _ = tray.set_tooltip(Some(if n == 0 { "Mira".to_string() } else { format!("Mira: {n} done") }));
+    }
 }
 
 /// Cmd+` and Ctrl+` from the menu bar as well as the page: a key pressed in

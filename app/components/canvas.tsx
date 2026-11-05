@@ -9,7 +9,7 @@ import { DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder,
 import { Building, DraftNote, Stages, Unmapped, isBuilding, useDrawIn } from "@/components/building";
 import { CodePopup, ExplainToggle, Explainer, StartHere, parseAt, useExplain, type CodeFocus } from "@/components/explain";
 import { InlineMarks } from "@/components/shapes";
-import { Eyebrow, Glossary, OriginMark, Prose, StateChip } from "@/components/state";
+import { Eyebrow, Glossary, OriginMark, Prose, StateChip, SymbolLinks } from "@/components/state";
 import { Zoom } from "@/components/zoom";
 import { Crumbs, goTo, useLocation, useMayBeStale } from "@/components/chrome";
 import { Button, CodeIcon } from "@/components/button";
@@ -19,7 +19,7 @@ import { useFlash } from "@/components/flash";
 import { useRedoing } from "@/components/statusbar";
 import { DocView, closeDoc, useOpenDoc } from "@/components/docs";
 import { TimelineView, closeTimeline, useTimelineOpen } from "@/components/timeline";
-import { FileView, closeFile, useOpenFile } from "@/components/code";
+import { FileView, closeFile, openFile, useOpenFile } from "@/components/code";
 import { AgentIcon, CLAUDE, useAgents } from "@/components/agents";
 import { handTo, mention, openClaude, section, sectionKey, usePicked, type Target } from "@/lib/context";
 import { startNote } from "@/lib/notes";
@@ -32,6 +32,8 @@ import { codeAt, describeElement, describeProblems, problemSpans, type BuiltMap 
 import { STATIC_MAP, readSource } from "@/lib/source";
 import { useSettings, type Ground } from "@/lib/settings";
 import type { Anatomy, Edge, Node } from "@/lib/data";
+import { citations, neighbours, nodesAt, symbolsOf, type Link } from "@/lib/coverage";
+import { useFiles } from "@/components/files";
 import { BLURB_LINES, type Shape } from "@/lib/view";
 
 /**
@@ -598,6 +600,41 @@ function Level({
   };
   const levelCtx: RowCtx = { ...ctx, onStepCode: showStep };
   const [explainOn] = useExplain();
+  const index = useFiles()?.index ?? null;
+  const key = path.join("/");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is `path` by value
+  const reach = useMemo(() => neighbours(map.L0, index, path), [map.L0, index, key]);
+  const walks = map.OVERVIEW?.walkthroughs ?? (explainOn && map.OVERVIEW?.walkthrough ? [map.OVERVIEW.walkthrough] : []);
+  // Each indexed symbol a level cites, by name, to the deepest level citing it;
+  // a name two places define links nowhere rather than to the wrong one.
+  const symbols = useMemo(() => {
+    const cited = citations(map.L0);
+    const at = new Map<string, string[] | null>();
+    for (const [file, f] of Object.entries(index?.files ?? {}))
+      for (const s of symbolsOf(cited, file, f)) {
+        const p = s.by[0]?.path;
+        if (!p) continue;
+        const prev = at.get(s.name);
+        at.set(s.name, prev === undefined || prev?.join("/") === p.join("/") ? p : null);
+      }
+    return at;
+  }, [map.L0, index]);
+  const linkOf = (name: string) => {
+    const p = symbols.get(name.replace(/\(.*\)$/, "")) ?? symbols.get(name.replace(/\(.*\)$/, "").split(".").pop()!);
+    return p && p.join("/") !== key ? () => onOpen(p) : undefined;
+  };
+  // A scenery box's code, opened at the section that explains it: the deepest
+  // citing that line, else the root that owns the file, else the file itself.
+  const openRef = (ref: string) => {
+    const m = /^(.+?)(?::(\d+))?(?:-\d+)?$/.exec(ref);
+    if (!m) return;
+    const cited = citations(map.L0);
+    const hit = m[2] ? nodesAt(cited, m[1], +m[2])[0] : (cited.get(m[1]) ?? []).slice().sort((a, b) => a.path.length - b.path.length)[0];
+    const root = index?.files[m[1]]?.roots.find((r) => map.L0.some((n) => n.id === r));
+    if (hit) onOpen(hit.path);
+    else if (root) onOpen([root]);
+    else openFile(path, m[1], m[2] ? +m[2] : undefined);
+  };
   // Only a map made with the plain-words layer offers the toggle.
   const explains = Boolean(map.OVERVIEW?.explain || map.L0.some((r) => r.explain));
   const trail = [RUN.repo, ...path.map((_, i) => nodeAt(path.slice(0, i + 1))?.title ?? "")];
@@ -622,6 +659,7 @@ function Level({
 
   return (
     <Glossary.Provider value={explainOn ? (map.OVERVIEW?.glossary ?? []) : []}>
+    <SymbolLinks.Provider value={linkOf}>
       <Header
         path={path}
         back={
@@ -708,6 +746,7 @@ function Level({
                     `?${[...path, id].map((p) => `at=${encodeURIComponent(p)}`).join("&")}`
                   }
                   onCode={showStep}
+                  onRef={openRef}
                 />
               </div>
             </div>
@@ -756,16 +795,17 @@ function Level({
             Renders nothing when there are none, diff mode or not. */}
         <RemovedSections path={path} />
 
-        {/* The repository's way in comes after its picture: the walkthrough
-            opens parts the reader has just seen drawn. */}
-        {explainOn && top && !run && map.OVERVIEW?.walkthrough ? (
-          <StartHere walkthrough={map.OVERVIEW.walkthrough} onOpen={onOpen} />
-        ) : null}
+        {!run ? <Reach uses={reach.uses} usedBy={reach.usedBy} onOpen={onOpen} /> : null}
+
+        {/* The repository's way in comes after its picture: the walkthroughs
+            open parts the reader has just seen drawn. A map from before they
+            were core keeps its one under the Explain layer. */}
+        {top && !run && walks.length ? <StartHere walkthroughs={walks} onOpen={onOpen} /> : null}
 
         {node.issues?.length ? (
           <div>
             <div className="max-w-[820px]">
-              <WatchOut issues={node.issues} action={<HandProblems node={node} path={path} />} />
+              <WatchOut issues={node.issues} action={<HandProblems node={node} path={path} />} onCode={showStep} />
             </div>
           </div>
         ) : null}
@@ -783,6 +823,7 @@ function Level({
       {codeFocus ? (
         <CodePopup focus={codeFocus} trail={trail} owner={node.id} ctx={ctx} onClose={() => setCodeFocus(null)} />
       ) : null}
+    </SymbolLinks.Provider>
     </Glossary.Provider>
   );
 }
@@ -1021,6 +1062,52 @@ function List({
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * What a level's code imports, and what imports it, each as the section that
+ * explains the other side (lib/coverage.ts neighbours): where to read next,
+ * and what a change here reaches.
+ */
+function Reach({ uses, usedBy, onOpen }: { uses: Link[]; usedBy: Link[]; onOpen: (p: string[]) => void }) {
+  const { nodeAt } = useMap();
+  if (!uses.length && !usedBy.length) return null;
+  const SHOWN = 8;
+  const row = (label: string, gloss: string, links: Link[]) =>
+    links.length ? (
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5">
+        <span className="mr-1.5 flex w-[96px] shrink-0 flex-col gap-1">
+          <Eyebrow>{label}</Eyebrow>
+          <span className="text-[11px] leading-tight text-faint">{gloss}</span>
+        </span>
+        {links.slice(0, SHOWN).map((l) => {
+          const titles = l.path ? l.path.map((_, i) => nodeAt(l.path!.slice(0, i + 1))?.title).filter(Boolean) : [];
+          const name = titles.slice(-2).join(" › ");
+          const title = `${l.via}${l.count > 1 ? ` and ${l.count - 1} more` : ""}`;
+          return l.path && name ? (
+            <button
+              key={l.path.join("/")}
+              onClick={() => onOpen(l.path!)}
+              title={title}
+              className="rounded-[3px] border border-border-gray px-2 py-1 text-[12.5px] text-ink transition-colors hover:border-deep-green hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-green"
+            >
+              {name}
+            </button>
+          ) : (
+            <span key={l.file} title={title} className="px-1 font-mono text-[11.5px] text-faint">
+              {l.file.split("/").pop()}
+            </span>
+          );
+        })}
+        {links.length > SHOWN ? <span className="text-[12px] text-faint">+{links.length - SHOWN} more</span> : null}
+      </div>
+    ) : null;
+  return (
+    <section data-pick="Uses and used by" className="flex max-w-[820px] flex-col gap-3">
+      {row("Uses", "what its code imports", uses)}
+      {row("Used by", "what a change here reaches", usedBy)}
+    </section>
   );
 }
 

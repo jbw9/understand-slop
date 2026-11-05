@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { Eyebrow, Prose } from "@/components/state";
+import { Eyebrow, Prose, SymbolLinks } from "@/components/state";
 import { Button } from "@/components/button";
 import { Overlay, DIALOG } from "@/components/dialog";
 import { AnatomyView, SourceView, type RowCtx } from "@/components/anatomy";
@@ -117,17 +117,28 @@ export function Explainer({ owner, explain, ctx }: { owner: string; explain: Exp
 }
 
 /**
- * The repository level's way in: one concrete thing followed through the
- * roots, each step opening the part where it happens. The map's words are
- * defined where they are used, on hover, so they get no list of their own.
+ * The repository level's way in: the core things the system does, each
+ * followed through the roots, each step opening the part where it happens.
+ * The map's words are defined where they are used, on hover, so they get no
+ * list of their own.
  */
 export function StartHere({
-  walkthrough,
+  walkthroughs,
   onOpen,
 }: {
-  walkthrough?: Walkthrough;
+  walkthroughs: Walkthrough[];
   onOpen: (path: string[]) => void;
 }) {
+  return (
+    <div className="flex flex-col gap-10">
+      {walkthroughs.map((w, i) => (
+        <Walk key={i} walkthrough={w} onOpen={onOpen} />
+      ))}
+    </div>
+  );
+}
+
+function Walk({ walkthrough, onOpen }: { walkthrough?: Walkthrough; onOpen: (path: string[]) => void }) {
   const { nodeAt } = useMap();
   return (
     <section data-pick="Start here" className="border-l-2 border-mint-line pl-5">
@@ -161,7 +172,10 @@ export function StartHere({
                       </span>
                     </span>
                     <span className="mt-1 block text-[13.5px] leading-relaxed text-on-surface-variant">
-                      <Prose text={s.detail} />
+                      {/* The step is a button already; a link inside it would nest one. */}
+                      <SymbolLinks.Provider value={() => undefined}>
+                        <Prose text={s.detail} />
+                      </SymbolLinks.Provider>
                     </span>
                   </button>
                 </li>

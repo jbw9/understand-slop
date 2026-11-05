@@ -81,15 +81,26 @@ export function Ident({ children }: { children: React.ReactNode }) {
  */
 export const Glossary = createContext<Term[]>([]);
 
+/** What opens the section explaining a backticked name, when one does: a symbol the map's index lists, cited by a level. */
+export const SymbolLinks = createContext<(name: string) => (() => void) | undefined>(() => undefined);
+
 export function Prose({ text }: { text: string }) {
   const terms = useContext(Glossary);
+  const linkOf = useContext(SymbolLinks);
   // Each term is marked once per passage: the first use is where it is met.
   const seen = new Set<string>();
   return (
     <>
       {text.split(/`([^`]+)`/).map((part, i) =>
         i % 2 ? (
-          <Ident key={i}>{part}</Ident>
+          ((go) =>
+            go ? (
+              <button key={i} onClick={go} title="Open where this is explained" className="rounded-[2px] underline decoration-faint underline-offset-[3px] hover:decoration-deep-green">
+                <Ident>{part}</Ident>
+              </button>
+            ) : (
+              <Ident key={i}>{part}</Ident>
+            ))(linkOf(part))
         ) : (
           // *word* is emphasis, as authors write it in plain text.
           part.split(/\*([^*\n]+)\*/).map((bit, j) =>

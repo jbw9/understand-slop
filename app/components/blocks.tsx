@@ -34,6 +34,7 @@ export function ExplainedBlock({
   onOpen,
   hrefFor,
   onCode,
+  onRef,
 }: {
   block: Explained;
   /** Opens the part a diagram box names (D40). Absent where a block is drawn
@@ -44,10 +45,12 @@ export function ExplainedBlock({
   hrefFor?: (id: string) => string;
   /** Shows the lines a sequence message cites (`Message.at`). */
   onCode?: (at: string, heading: string, detail?: string) => void;
+  /** Opens what explains the code a scenery box stands for (`DiagramBox.ref`). */
+  onRef?: (ref: string) => void;
 }) {
   switch (block.kind) {
     case "diagram":
-      return <Diagram block={block} onOpen={onOpen} hrefFor={hrefFor} />;
+      return <Diagram block={block} onOpen={onOpen} hrefFor={hrefFor} onRef={onRef} onCode={onCode} />;
     case "table":
       return <Table block={block} />;
     case "sequence":
@@ -125,10 +128,15 @@ function Diagram({
   block,
   onOpen,
   hrefFor,
+  onRef,
+  onCode,
 }: {
   block: Extract<Anatomy, { kind: "diagram" }>;
   onOpen?: (id: string) => void;
   hrefFor?: (id: string) => string;
+  onRef?: (ref: string) => void;
+  /** Shows the line an arrow cites (`DiagramArrow.at`), from its label. */
+  onCode?: (at: string, heading: string, detail?: string) => void;
 }) {
   const { W, H, boxes, arrows } = layoutDiagram(block);
   // Only a picture that actually leads somewhere dims its scenery: on a
@@ -217,7 +225,12 @@ function Diagram({
               </marker>
             ))}
           </defs>
-          {arrows.map(({ d, tone, label, from, to }, i) => (
+          {arrows.map(({ d, tone, label, from, to }, i) => {
+            // Arrows between the same two boxes are drawn as one; its label opens the first one's line.
+            const at = block.arrows.find((a) => a.from === from && a.to === to && a.at)?.at;
+            const name = (id: string) => block.boxes.find((x) => x.id === id)?.label ?? id;
+            const show = at && onCode ? () => onCode(at, `${name(from)} → ${name(to)}`, label?.text) : undefined;
+            return (
             <g key={i}>
               <path
                 d={d}
@@ -238,15 +251,19 @@ function Diagram({
                   strokeWidth="4"
                   strokeLinejoin="round"
                   paintOrder="stroke"
+                  onClick={show}
+                  className={show ? "cursor-pointer hover:fill-deep-green" : undefined}
                 >
+                  {at ? <title>{at}</title> : null}
                   {label.text}
                 </text>
               ) : null}
             </g>
-          ))}
+            );
+          })}
           {boxes.map(({ x, y, w, b }) => {
-            // Live only where the author named the part this box belongs to.
-            const go = b.opens && onOpen ? () => onOpen(b.opens!) : undefined;
+            // Live where the author named the part this box belongs to, or the code another section explains.
+            const go = b.opens && onOpen ? () => onOpen(b.opens!) : b.ref && onRef ? () => onRef(b.ref!) : undefined;
             const authored = b.tone && b.tone !== "plain";
             // An authored tone still wins: `good` and `warn` are claims about
             // the code, and a section hue is only an index.
@@ -363,6 +380,8 @@ function Box({
       data-opens={opens}
       className="dg-live"
       href={href}
+      // A box pointing at another section has no URL of its own; it still takes focus.
+      tabIndex={href ? undefined : 0}
       aria-label={`${label} — open this part`}
       onClick={(e) => {
         // Left-click navigates in place; cmd/ctrl-click and the context menu
@@ -829,7 +848,7 @@ function Note({ block }: { block: Extract<Anatomy, { kind: "note" }> }) {
 
 /* ── watch out ───────────────────────────────────────────────── */
 
-export function WatchOut({ issues, action }: { issues: Issue[]; action?: React.ReactNode }) {
+export function WatchOut({ issues, action, onCode }: { issues: Issue[]; action?: React.ReactNode; onCode?: (at: string, heading: string, detail?: string) => void }) {
   return (
     <section data-pick="Watch out">
       <div className="flex items-center justify-between gap-3">
@@ -847,7 +866,13 @@ export function WatchOut({ issues, action }: { issues: Issue[]; action?: React.R
             <p className="mt-1 text-[13.5px] leading-relaxed text-on-surface">
               <Prose text={it.detail} />
             </p>
-            {it.where ? <p className="mt-1.5 font-mono text-[11px] text-muted-slate">{it.where}</p> : null}
+            {it.where && onCode ? (
+              <button onClick={() => onCode(it.where!, it.title, it.detail)} className="mt-1.5 font-mono text-[11px] text-muted-slate underline-offset-2 hover:text-deep-green hover:underline">
+                {it.where}
+              </button>
+            ) : it.where ? (
+              <p className="mt-1.5 font-mono text-[11px] text-muted-slate">{it.where}</p>
+            ) : null}
           </li>
         ))}
       </ul>

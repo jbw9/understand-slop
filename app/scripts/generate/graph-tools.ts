@@ -254,13 +254,6 @@ export function signature(d: Def, max = 160): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
-/** A file's definitions as a brief lists them: nested as they sit, each with its lines, signature and what it does. */
-export function outlineLines(g: Graph, file: string, pad = "    "): string[] {
-  const ix = index(g);
-  const depth = (d: Def): number => (d.parent && ix.byId.has(d.parent) ? 1 + depth(ix.byId.get(d.parent)!) : 0);
-  return g.defs.filter((d) => d.file === file).map((d) => `${pad}${"  ".repeat(depth(d))}${d.start}-${d.end} ${signature(d)}${d.does ? ` — ${d.does}` : ""}`);
-}
-
 /**
  * The calls a root's brief carries, so its author draws arrows without asking
  * graph_links for each pair: every call from one of its files into another,

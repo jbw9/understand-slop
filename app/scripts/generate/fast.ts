@@ -29,7 +29,7 @@ import type { Node } from "@/lib/data";
 import type { MapFile, Overview } from "@/lib/map";
 import { prefixFor } from "./author";
 import { ask, type Tool } from "./bedrock";
-import { check, LEAF, SUB_WORDS } from "./check";
+import { check, LEAF, looksLikePath, SUB_WORDS, words } from "./check";
 import type { Graph } from "./graph";
 import { isSource, type Inventory } from "./inventory";
 import { oneLine, type FileSummary } from "./summarize";
@@ -38,6 +38,10 @@ import { oneLine, type FileSummary } from "./summarize";
 const MAX_FILES = Number(process.env.SLOP_FAST_MAX ?? 12);
 /** Components the top level holds at most. SLOP_FAST_TOP. */
 const TOP_MAX = Number(process.env.SLOP_FAST_TOP ?? 12);
+/** Sibling sections of one app merged into one stay within this many files. SLOP_FAST_FAMILY. */
+const FAMILY_MAX = Number(process.env.SLOP_FAST_FAMILY ?? 40);
+/** Sections the top level keeps at least, however small its families. */
+const TOP_MIN = 4;
 /** Columns a diagram is laid out in at most: past this it outgrows the page. */
 const COLS = 3;
 
@@ -196,6 +200,28 @@ export function partition(inv: Inventory): Component[] {
     }
   }
 
+  // Sibling sections of one small app (landing/app, landing/components and
+  // landing's own files) are one section with them as its groups, smallest
+  // family first, while the family stays within FAMILY_MAX files and the top
+  // level keeps at least TOP_MIN sections.
+  const parentOf = (dir: string) => segsOf(dir).slice(0, -1).join("/");
+  for (;;) {
+    const fams = new Map<string, typeof comps>();
+    for (const c of comps) if (segsOf(c.dir).length >= 2) fams.set(parentOf(c.dir), [...(fams.get(parentOf(c.dir)) ?? []), c]);
+    const members = (dir: string, cs: typeof comps) => [...cs, ...comps.filter((c) => c.dir === dir)];
+    const size = (cs: typeof comps) => cs.reduce((n, c) => n + c.files.length, 0);
+    const pick = [...fams]
+      .map(([dir, cs]) => [dir, members(dir, cs)] as const)
+      .filter(([, ms]) => ms.length >= 2 && size(ms) <= FAMILY_MAX && comps.length - ms.length + 1 >= TOP_MIN)
+      .sort((a, b) => size(a[1]) - size(b[1]))[0];
+    if (!pick) break;
+    const [dir, ms] = pick;
+    const at = comps.indexOf(ms[0]);
+    const merged = { dir, groups: ms.flatMap((m) => m.groups), files: ms.flatMap((m) => m.files) };
+    comps = comps.filter((c) => !ms.includes(c));
+    comps.splice(Math.min(at, comps.length), 0, merged);
+  }
+
   // Ids from the directory's last name, else its last two: `components`, `landing-components`.
   const last = (dir: string, n: number) => segsOf(dir).slice(-n).map(dirSlug).filter(Boolean).join("-") || "root";
   const ids = new Set<string>();
@@ -228,6 +254,8 @@ export function moduleGraph(g: Graph, comps: Component[]): ModuleEdge[] {
   const fileOf = new Map(g.defs.map((d) => [d.id, d.file]));
   const nameOf = new Map(g.defs.map((d) => [d.id, d.name]));
   const edges = new Map<string, ModuleEdge>();
+  // Per link, each name called with how often and one line it is called on, a stated call over one matched by name.
+  const called = new Map<string, Map<string, { n: number; at: string; inferred: boolean }>>();
   for (const e of g.edges) {
     const a = owner.get(fileOf.get(e.from) ?? e.from), b = owner.get(fileOf.get(e.to) ?? e.to);
     if (!a || !b || a === b) continue;
@@ -237,11 +265,20 @@ export function moduleGraph(g: Graph, comps: Component[]): ModuleEdge[] {
     if (e.kind !== "imports" && e.lines.length) {
       m.calls++;
       const name = nameOf.get(e.to) ?? basename(e.to);
-      if (!m.names.includes(name) && m.names.length < 4) m.names.push(name);
-      // A call the source states beats one matched by name.
-      if (!m.at || (m.inferred && e.how === "extracted")) [m.at, m.inferred] = [`${fileOf.get(e.from) ?? e.from}:${e.lines[0]}`, e.how !== "extracted"];
+      const byName = called.get(k) ?? new Map();
+      const c = byName.get(name) ?? { n: 0, at: `${fileOf.get(e.from) ?? e.from}:${e.lines[0]}`, inferred: e.how !== "extracted" };
+      c.n += e.lines.length;
+      if (c.inferred && e.how === "extracted") [c.at, c.inferred] = [`${fileOf.get(e.from) ?? e.from}:${e.lines[0]}`, false];
+      byName.set(name, c);
+      called.set(k, byName);
     }
     edges.set(k, m);
+  }
+  // The names most called first, and the arrow's line one of the first's calls: what its label describes is what it cites.
+  for (const [k, m] of edges) {
+    const byName = [...(called.get(k) ?? new Map<string, { n: number; at: string; inferred: boolean }>())].sort((x, y) => y[1].n - x[1].n || Number(x[1].inferred) - Number(y[1].inferred));
+    m.names = byName.slice(0, 4).map(([n]) => n);
+    if (byName.length) [m.at, m.inferred] = [byName[0][1].at, byName[0][1].inferred];
   }
   return [...edges.values()].sort((x, y) => y.weight - x.weight);
 }
@@ -253,7 +290,7 @@ export function entrypoints(inv: Inventory): string[] {
 }
 
 const NAMED = {
-  title: { type: "string", description: "1-3 words, Title Case: what this is to a reader. No file names." },
+  title: { type: "string", description: "1-3 words, Title Case: what this is to a reader, named for what its parts do together. Never a filler word: not Core, Main, Other, Misc, Supporting, Extended, Files or Utilities alone. No file names." },
   sub: { type: "string", description: `At most ${SUB_WORDS} words (count them): what it does. No file names.` },
 };
 const COMPONENT_TOOL: Tool = {
@@ -303,6 +340,38 @@ const SYNTH_TOOL: Tool = {
   },
 };
 
+/** What an answer breaks of the map's limits on words, which the check holds every card to. */
+function wordProblems(fields: [what: string, text: unknown, max: number][]): string[] {
+  const out: string[] = [];
+  for (const [what, text, max] of fields) {
+    const t = typeof text === "string" ? text : "";
+    if (words(t) > max) out.push(`${what} "${t}" is ${words(t)} words; at most ${max}`);
+    if (looksLikePath(t)) out.push(`${what} "${t}" names a file; say what it does instead`);
+  }
+  return out;
+}
+
+/**
+ * One structured answer, and if it breaks the limits on words, one more try
+ * with what it broke: the model counts words loosely, and a long sub fails the
+ * check on every card it is on. What is still over after that is listed by
+ * the check, not tried again.
+ */
+async function askWithin(req: { model: string; stage: string; maxTokens: number; prompt: string; tool: Tool }, problemsOf: (a: any) => string[]): Promise<any> {
+  const messages = [{ role: "user" as const, content: req.prompt }];
+  const first = await ask<any>({ model: req.model, stage: req.stage, maxTokens: req.maxTokens, system: SYSTEM, messages, tool: req.tool });
+  const wrong = problemsOf(first);
+  if (!wrong.length) return first;
+  return ask<any>({
+    model: req.model,
+    stage: req.stage,
+    maxTokens: req.maxTokens,
+    system: SYSTEM,
+    messages: [...messages, { role: "assistant" as const, content: JSON.stringify(first) }, { role: "user" as const, content: `Your answer breaks these limits:\n- ${wrong.join("\n- ")}\nAnswer again in full, with every one of them within its limit and the rest as it was.` }],
+    tool: req.tool,
+  });
+}
+
 const SYSTEM = "You describe one part of a map of a codebase from facts already extracted from its code. Use only what you are given; answer only with the structure asked for.";
 
 /** Code ranges for a file as a leaf cites them: the whole file if it is short, else its largest functions within the leaf's limits. */
@@ -348,6 +417,16 @@ function layered(ids: string[], arrows: { from: string; to: string }[]): Map<str
   );
 }
 
+/** A file summary's purpose as a card's detail: its sentences while they fit in 40 words (a first one alone over is kept, and the check lists it). */
+function within40(text: string): string {
+  const ss = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const x of ss) {
+    if (out.length && words([...out, x].join(" ")) > 40) break;
+    out.push(x);
+  }
+  return out.join(" ");
+}
 const short = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`);
 type Arrow = { from: string; to: string; label: string; at: string; inferred?: boolean };
 
@@ -387,6 +466,17 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
   const byId = new Map(comps.map((c) => [c.id, c]));
 
   // Phase 3: one short call per component, all at once.
+  /** What the rest of the code calls in some files, most called first: what a group is for, seen from outside it. */
+  const usedFor = (files: string[]) => {
+    const set = new Set(files);
+    const n = new Map<string, number>();
+    for (const e of calls) if (set.has(fileOfDef(e.to)) && !set.has(fileOfDef(e.from))) {
+      const name = defById.get(e.to)?.name ?? basename(e.to);
+      n.set(name, (n.get(name) ?? 0) + e.lines.length);
+    }
+    const top = [...n].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k);
+    return top.length ? ` — the rest of the code uses it for ${top.join(", ")}` : "";
+  };
   const fileLine = (p: string) => (sums[p] ? `${oneLine(sums[p])}\n${sums[p].symbols.slice(0, 8).map((s) => `    ${s.name} (${s.start}-${s.end}): ${s.does}`).join("\n")}` : p);
   const described = await lap("fanout", () =>
     Promise.all(
@@ -396,13 +486,21 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
           `# Repository: ${inv.name}`,
           `## Component "${c.id}" (${c.dir})`,
           c.groups.length
-            ? `## Its groups, each with its files\n${c.groups.map((gr) => `### Group "${gr.key}"\n${gr.files.map(fileLine).join("\n")}`).join("\n\n")}`
+            ? `## Its groups, each with its files\n${c.groups.map((gr) => `### Group "${gr.key}"${usedFor(gr.files)}\n${gr.files.map(fileLine).join("\n")}`).join("\n\n")}`
             : `## Its files\n${c.files.map(fileLine).join("\n")}`,
           `## Depends on\n${out.map((e) => `${e.to}: calls ${e.names.join(", ") || "(imports only)"}`).join("\n") || "(nothing)"}`,
           `## Used by\n${into.map((e) => `${e.from}: calls ${e.names.join(", ") || "(imports only)"}`).join("\n") || "(nothing)"}`,
           `${entries.some((p) => c.files.includes(p)) ? `## Entry points here\n${entries.filter((p) => c.files.includes(p)).join("\n")}\n\n` : ""}## Task\nDescribe this component${c.groups.length ? ", each of its groups," : ""} and each of its files.`,
         ].join("\n\n");
-        const a = await ask<any>({ model, stage: "fast-fanout", maxTokens: 8000, system: SYSTEM, messages: [{ role: "user", content: prompt }], tool: COMPONENT_TOOL });
+        const a = await askWithin({ model, stage: "fast-fanout", maxTokens: 8000, prompt, tool: COMPONENT_TOOL }, (x) =>
+          wordProblems([
+            ["the component's title", x?.title, 4],
+            ["the component's sub", x?.sub, SUB_WORDS],
+            ["the component's responsibility", x?.responsibility, 40],
+            ...(x?.groups ?? []).flatMap((gr: any): [string, unknown, number][] => [[`group ${gr?.key}'s title`, gr?.title, 3], [`group ${gr?.key}'s sub`, gr?.sub, SUB_WORDS], [`group ${gr?.key}'s detail`, gr?.detail, 40]]),
+            ...(x?.files ?? []).flatMap((f: any): [string, unknown, number][] => [[`${f?.path}'s title`, f?.title, 3], [`${f?.path}'s sub`, f?.sub, SUB_WORDS]]),
+          ]),
+        );
         return [c.id, a] as const;
       }),
     ),
@@ -420,10 +518,13 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
           return `- ${c.id}: ${a?.title} — ${a?.sub}\n  ${a?.responsibility}`;
         })
         .join("\n")}`,
-      `## Links between them, from the code (from → to: weight; what is called)\n${mod.filter((e) => e.calls).map((e) => `- ${e.from} → ${e.to}: ${e.weight}; ${e.names.join(", ")}`).join("\n") || "(none)"}`,
-      `## Task\nWrite the map's top level: its line and detail, the order of the components, and a label for each link listed.`,
+      `## Links between them, from the code (from → to: weight; what is called, most called first)\n${mod.filter((e) => e.calls).map((e) => `- ${e.from} → ${e.to}: ${e.weight}; ${e.names.join(", ")}`).join("\n") || "(none)"}`,
+      `## Task\nWrite the map's top level: its line and detail, the order of the components, and a label for each link listed. A link's arrow cites a call to the first name it lists, so its label says what that call does.`,
     ].join("\n\n");
-    return ask<any>({ model, stage: "fast-synthesize", maxTokens: 4000, system: SYSTEM, messages: [{ role: "user", content: prompt }], tool: SYNTH_TOOL });
+    return askWithin({ model, stage: "fast-synthesize", maxTokens: 4000, prompt, tool: SYNTH_TOOL }, (x) => [
+      ...wordProblems([["the sub", x?.sub, SUB_WORDS], ["the detail", x?.detail, 40]]),
+      ...(x?.arrows ?? []).filter((a: any) => typeof a?.label === "string" && a.label.length > 24).map((a: any) => `the label "${a.label}" of ${a.from} → ${a.to} is ${a.label.length} characters; at most 24`),
+    ]);
   });
 
   const discrepancies: string[] = [];
@@ -436,10 +537,17 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
    * another's, at the call's line. A call into code the target does not cite
    * is drawn as inferred: the checker holds an arrow to land in its box's code.
    */
-  const diagram = (caption: string, nodes: { node: Node; files: string[] }[], boxPrefix: string, label?: (from: Node, to: Node) => string | undefined) => {
+  const diagram = (
+    caption: string,
+    nodes: { node: Node; files: string[] }[],
+    boxPrefix: string,
+    label?: (from: Node, to: Node) => string | undefined,
+    /** The name an arrow's label describes, so its line is a call to that: the most-called, for the top level. */
+    prefer?: (from: Node, to: Node) => string | undefined,
+  ) => {
     const holder = new Map<string, Node>();
     for (const { node, files } of nodes) for (const f of files) holder.set(f, node);
-    const best = new Map<string, Arrow>();
+    const best = new Map<string, Arrow & { score: number }>();
     for (const e of calls) {
       const a = holder.get(fileOfDef(e.from)), b = holder.get(fileOfDef(e.to));
       if (!a || !b || a === b) continue;
@@ -453,10 +561,12 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
         ...(e.how !== "extracted" || !lands ? { inferred: true } : {}),
       };
       const k = `${a.id}\n${b.id}`;
+      // A call to the name the label describes, then a call the source states.
+      const score = (prefer && def?.name === prefer(a, b) ? 2 : 0) + (cand.inferred ? 0 : 1);
       const prev = best.get(k);
-      if (!prev || (prev.inferred && !cand.inferred)) best.set(k, cand);
+      if (!prev || score > prev.score) best.set(k, { ...cand, score });
     }
-    const arrows = [...best.values()];
+    const arrows: Arrow[] = [...best.values()].map(({ score, ...x }) => (void score, x));
     const place = layered(nodes.map(({ node }) => `${boxPrefix}${node.id}`), arrows);
     return { kind: "diagram", caption: short(caption, 30), boxes: nodes.map(({ node }) => ({ id: `${boxPrefix}${node.id}`, label: node.title, sub: node.sub, ...place.get(`${boxPrefix}${node.id}`)!, opens: node.id })), arrows };
   };
@@ -484,7 +594,8 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
     const leaf = (p: string, i: number): Node => {
       const s = sums[p];
       const t = titled.get(p);
-      const steps = (s?.symbols ?? []).slice(0, 8).map((sym, n) => ({ n: n + 1, title: short(sym.name, 40), detail: sym.does || sym.name, state: "derived", at: `${p}:${sym.start}` }));
+      // A step past the file's end is a summary's misreading: left out, not cited.
+      const steps = (s?.symbols ?? []).filter((sym) => sym.start >= 1 && sym.start <= (lines.get(p) ?? 0)).slice(0, 8).map((sym, n) => ({ n: n + 1, title: short(sym.name, 40), detail: sym.does || sym.name, state: "derived", at: `${p}:${sym.start}` }));
       return {
         id: unique(`${c.prefix}-${slug(basename(p))}`),
         title: short(t?.title || basename(p), 40),
@@ -492,7 +603,7 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
         state: "derived",
         col: 0,
         row: i,
-        detail: s?.purpose ?? "",
+        detail: within40(s?.purpose ?? ""),
         code: leafCode(p, lines.get(p) ?? 1, s),
         ...(steps.length ? { anatomy: [{ kind: "flow", rows: steps }] } : {}),
       } as unknown as Node;
@@ -539,6 +650,7 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
     AUTHORED.map((n) => ({ node: n, files: byId.get(n.id)!.files })),
     "bx-",
     (a, b) => labels.get(`${a.id}\n${b.id}`),
+    (a, b) => mod.find((e) => e.from === a.id && e.to === b.id)?.names[0],
   );
   const OVERVIEW = {
     sub: short(synth.sub ?? inv.name, 60),

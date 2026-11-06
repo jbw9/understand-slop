@@ -34,8 +34,9 @@ const splitSentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filte
  * source directory (`src/routes`). Words joined by slashes ("date/money",
  * "read/write/delete") are not paths.
  */
+// A capitalised word ending in `.js` is a product (Next.js, Node.js, Three.js), not a file.
 export const looksLikePath = (v: string) =>
-  /\b[\w-]+\.(tsx?|jsx?|mjs|mts|cjs|py|go|rb|rs|java|kt|swift|sql|json|ya?ml|css|html|md)\b|[\w.-]+\/(?=$|[\s),.;:])|(^|[\s(`"'])\.{0,2}\/?(src|app|lib|libs|pkg|cmd|internal|components|scripts|pages|assets|tests?|packages|apps)\/[\w.-]/.test(v);
+  /\b(?![A-Z][a-z]+\.js\b)[\w-]+\.(tsx?|jsx?|mjs|mts|cjs|py|go|rb|rs|java|kt|swift|sql|json|ya?ml|css|html|md)\b|[\w.-]+\/(?=$|[\s),.;:])|(^|[\s(`"'])\.{0,2}\/?(src|app|lib|libs|pkg|cmd|internal|components|scripts|pages|assets|tests?|packages|apps)\/[\w.-]/.test(v);
 export const sentences = (s: string) => s.split(/(?<=[.!?])\s+(?=[A-Z"`(])/).filter(Boolean).length;
 
 export type Range = { file: string; start: number; end: number };

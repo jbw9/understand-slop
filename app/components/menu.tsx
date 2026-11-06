@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 /**
  * A right-click menu: a small card at the pointer. It closes the way a native
  * one does — Escape, a click anywhere else, scrolling, or the window losing
  * focus — and Escape stops there rather than also leaving the level.
+ *
+ * It is drawn on the page's body, not where it was opened: opened from a bar
+ * ([data-chrome="bar"], black in Classic), it would take the bar's colours
+ * along with it, so the same menu would read two ways. Every menu is the
+ * sheet's.
  */
 
 export interface MenuItem {
@@ -66,7 +72,7 @@ export function Menu({
     };
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       role="menu"
@@ -88,8 +94,9 @@ export function Menu({
             onClose();
           }}
           className={cn(
-            "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink",
-            item.disabled ? "text-faint" : "cursor-pointer hover:bg-surface-container-low",
+            "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink outline-none",
+            // surface-container-low is the card's own white in Classic's chrome, so a hover on it would not show.
+            item.disabled ? "text-faint" : "cursor-pointer hover:bg-surface-container focus-visible:bg-surface-container",
             item.separated && "mt-1 border-t border-border-gray pt-2",
           )}
         >
@@ -97,6 +104,7 @@ export function Menu({
           {item.label}
         </button>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -114,7 +114,8 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
     };
 
     // The level's width is pinned to the pane's while magnified; follow the window.
-    const ro = new ResizeObserver(() => fit(box, pane, now.current));
+    // At 100% there is nothing to fit, and the workspace's resize fires this every frame.
+    const ro = new ResizeObserver(() => now.current !== 1 && fit(box, pane, now.current));
     ro.observe(pane);
 
     pane.addEventListener("wheel", onWheel, { passive: false });
@@ -144,7 +145,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
             type="button"
             aria-label="Zoom out"
             onClick={() => step(-1)}
-            className="cursor-pointer px-3 py-1 hover:bg-surface-container-low"
+            className="cursor-pointer px-3 py-1 hover:bg-surface-container"
           >
             −
           </button>
@@ -152,7 +153,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
             type="button"
             title="Back to 100% (⌘0)"
             onClick={() => zoomTo(1)}
-            className="tnum min-w-[52px] cursor-pointer py-1 text-center hover:bg-surface-container-low"
+            className="tnum min-w-[52px] cursor-pointer py-1 text-center hover:bg-surface-container"
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -160,7 +161,7 @@ export function Zoom({ scrollRef, children }: { scrollRef: RefObject<HTMLElement
             type="button"
             aria-label="Zoom in"
             onClick={() => step(1)}
-            className="cursor-pointer px-3 py-1 hover:bg-surface-container-low"
+            className="cursor-pointer px-3 py-1 hover:bg-surface-container"
           >
             +
           </button>

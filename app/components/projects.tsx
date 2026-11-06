@@ -239,10 +239,10 @@ export function ProjectsDialog() {
           <>
             <header className="flex items-center gap-1.5 border-b border-border-gray px-5 py-3">
               <h2 className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-ink">Projects</h2>
-              <button type="button" onClick={newProject} className={cn(QUIET, "px-3 py-1 text-[12.5px]")}>
+              <button type="button" onClick={newProject} className={QUIET}>
                 New Project…
               </button>
-              <button type="button" onClick={() => void openFolder()} className={cn(PRIMARY, "px-3 py-1 text-[12.5px]")}>
+              <button type="button" onClick={() => void openFolder()} className={PRIMARY}>
                 Open Folder…
               </button>
             </header>
@@ -358,8 +358,8 @@ function Understanding({ value, onChange }: { value: number; onChange: (v: numbe
           }}
           className="group relative h-7 cursor-pointer touch-none select-none outline-none"
         >
-          <div ref={track} className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border-gray">
-            <div className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out" style={{ width: left(value) }} />
+          <div ref={track} className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 bg-border-gray">
+            <div className="h-full bg-accent transition-[width] duration-200 ease-out" style={{ width: left(value) }} />
           </div>
           {UNDERSTAND.map((u, i) => (
             <span
@@ -392,7 +392,7 @@ function Understanding({ value, onChange }: { value: number; onChange: (v: numbe
           ))}
         </div>
       </div>
-      <div className=" border border-border-gray bg-card px-3 py-2.5">
+      <div className="border border-border-gray bg-card px-3 py-2.5">
         <span className="block font-mono text-[10.5px] uppercase tracking-[0.09em] text-accent">{EXPLAINS[explain].label}</span>
         <span className="mt-1 block text-[12px] text-muted-slate">{EXPLAINS[explain].note}</span>
       </div>
@@ -461,7 +461,7 @@ function StartProject({
           type="button"
           onClick={onCancel}
           aria-label="Back to projects"
-          className="flex size-7 cursor-pointer items-center justify-center text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
+          className="flex size-7 cursor-pointer items-center justify-center text-[15px] text-muted-slate hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
           ←
         </button>
@@ -501,7 +501,7 @@ function StartProject({
               className={INPUT}
             />
             {onBrowse ? (
-              <button type="button" onClick={onBrowse} className={cn(QUIET, "shrink-0 border border-border-gray")}>
+              <button type="button" onClick={onBrowse} className={cn(QUIET, "h-auto self-stretch border border-border-strong")}>
                 {root ? "Change…" : "Browse…"}
               </button>
             ) : null}
@@ -567,13 +567,13 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (on: boolean) 
       aria-label={label}
       onClick={() => onChange(!on)}
       className={cn(
-        "relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        "relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         on ? "bg-accent" : "bg-border-strong",
       )}
     >
       <span
         className={cn(
-          "absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform duration-150",
+          "absolute left-0.5 top-0.5 size-4 bg-card transition-transform duration-150",
           on && "translate-x-4",
         )}
       />
@@ -679,7 +679,7 @@ function ProjectRow({
 
   return (
     <li className="flex flex-col">
-      <div className="group flex items-center gap-3 px-3 py-2 hover:bg-surface-container-low">
+      <div className="group flex items-center gap-3 px-3 py-2 hover:bg-surface-container">
         <button
           type="button"
           onClick={() => openable && onOpen()}
@@ -698,7 +698,7 @@ function ProjectRow({
           {s.text}
         </span>
         {generating ? (
-          <button type="button" onClick={onCancel} disabled={busy} className={cn(QUIET, "shrink-0 px-2 py-0.5 text-[12px]")}>
+          <button type="button" onClick={onCancel} disabled={busy} className={cn(QUIET, "shrink-0")}>
             Cancel
           </button>
         ) : null}
@@ -711,8 +711,8 @@ function ProjectRow({
             setMenu({ x: r.right - 220, y: r.bottom + 4 });
           }}
           className={cn(
-            "flex size-7 shrink-0 cursor-pointer items-center justify-center text-[16px] leading-none text-faint hover:bg-surface-container hover:text-ink",
-            menu ? "bg-surface-container text-ink" : "opacity-60 group-hover:opacity-100",
+            "flex size-7 shrink-0 cursor-pointer items-center justify-center text-[16px] leading-none text-faint hover:bg-border-gray hover:text-ink focus-visible:opacity-100",
+            menu ? "bg-border-gray text-ink" : "opacity-60 group-hover:opacity-100",
           )}
         >
           ⋯
@@ -749,7 +749,7 @@ function ProjectRow({
                 setPanel(null);
                 onRegenerate(UNDERSTAND[understand].explain, p.hasMap);
               }}
-              className={cn(PRIMARY, "shrink-0 whitespace-nowrap")}
+              className={PRIMARY}
             >
               {p.hasMap ? "Remake map" : "Make map"}
             </button>
@@ -762,14 +762,14 @@ function ProjectRow({
           <p className="mr-auto text-[12.5px] text-ink">
             Remove <span className="font-semibold">{p.name}</span>? This deletes its map, not the folder.
           </p>
-          <button type="button" onClick={() => setPanel(null)} className={cn(QUIET, "px-2.5 py-1")}>
+          <button type="button" onClick={() => setPanel(null)} className={QUIET}>
             Cancel
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={onRemove}
-            className="cursor-pointer bg-clay-ink px-2.5 py-1 text-[13px] font-medium text-paper hover:opacity-90 disabled:opacity-50"
+            className={cn(PRIMARY, "border-clay-ink bg-clay-ink text-paper hover:border-clay-ink hover:bg-clay-ink hover:opacity-90")}
           >
             Remove
           </button>

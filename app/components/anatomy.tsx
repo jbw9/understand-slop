@@ -165,10 +165,10 @@ const SCHEMA_ROW =
 function rowClass(id: string, ctx: RowCtx, extra?: string) {
   const isLit = ctx.traced === id;
   return cn(
-    "w-full text-left transition-all duration-200",
+    "w-full text-left transition-[background-color,opacity] duration-150",
     isLit && "bg-accent-surface",
     ctx.traced !== null && !isLit && "opacity-55",
-    ctx.traced === null && "hover:bg-surface-container-low",
+    ctx.traced === null && "hover:bg-surface-container",
     extra,
   );
 }
@@ -353,7 +353,7 @@ function Block({
                 onClick={() => ctx.onTrace(id)}
                 title={c.note}
                 className={cn(
-                  " border px-2 py-1 font-mono text-[10px] transition-all duration-200",
+                  " border px-2 py-1 font-mono text-[10px] transition-[background-color,border-color,color,opacity] duration-150",
                   ctx.traced !== null && !isLit && "opacity-55",
                   isLit
                     ? "border-accent bg-accent text-on-accent"
@@ -405,7 +405,7 @@ function Block({
                   // the bar's job is the contrast, not the arithmetic.
                   style={{ width: `${Math.max((p.weight / total) * 100, 6)}%` }}
                   className={cn(
-                    "h-full border-r border-card transition-all duration-200 last:border-r-0",
+                    "h-full border-r border-card transition-[background-color,opacity] duration-150 last:border-r-0",
                     ctx.traced !== null && !isLit && "opacity-45",
                     isLit
                       ? "bg-accent"
@@ -513,7 +513,7 @@ function Block({
                       <span
                         style={{ width: `${Math.max((b.value / max) * 100, 2)}%` }}
                         className={cn(
-                          "block h-full transition-all duration-200",
+                          "block h-full transition-[background-color] duration-150",
                           isLit
                             ? "bg-accent"
                             : b.state === "derived"

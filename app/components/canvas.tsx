@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AnatomyView, TableGlyph, type RowCtx } from "@/components/anatomy";
 import { DocsList, Example, ExplainedBlock, WatchOut, isExplained, sectionOrder, sectionTone } from "@/components/blocks";
@@ -142,10 +142,10 @@ export function Canvas() {
     [key],
   );
 
-  // A new level starts at its top, not wherever the last one was scrolled to.
-  useLayoutEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [key]);
+  // A level gone into starts at its top; one come back to, where it was left.
+  const scrolls = useRef(new Map<string, number>());
+  const [came, setCame] = useState({ key, back: false });
+  if (came.key !== key) setCame({ key, back: isBack(came.key, key) });
 
   /* ── rows that open their own level ───────────────────────── */
 
@@ -312,6 +312,8 @@ export function Canvas() {
         {doc || file || timeline ? null : <DiffBar path={path} />}
         <Zoom scrollRef={scrollRef}>
         <div ref={contentRef} className="relative mx-auto max-w-[1680px] px-10 pb-28 pt-5">
+          {/* The CSS reduced-motion rule (app/globals.css) does not reach motion's own animations. */}
+          <MotionConfig reducedMotion="user">
           <AnimatePresence mode="wait" initial={false} custom={dir}>
             <motion.div
               key={key}
@@ -319,13 +321,16 @@ export function Canvas() {
               variants={{
                 in: { opacity: 1, y: 0 },
                 out: (d: number) => ({ opacity: 0, y: 10 * d }),
-                gone: (d: number) => ({ opacity: 0, y: -6 * d }),
+                // Leaving is quicker than arriving, and takes no clicks: a
+                // second click on the level going away would open one of its parts.
+                gone: (d: number) => ({ opacity: 0, y: -6 * d, pointerEvents: "none", transition: { duration: 0.1, ease: [0.22, 1, 0.36, 1] } }),
               }}
               initial="out"
               animate="in"
               exit="gone"
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
+              <Arrive pane={scrollRef} kept={scrolls} at={key} back={came.back} />
               {doc ? (
                 <DocView file={doc.file} line={doc.line} />
               ) : file ? (
@@ -340,11 +345,37 @@ export function Canvas() {
               )}
             </motion.div>
           </AnimatePresence>
+          </MotionConfig>
         </div>
         </Zoom>
       </main>
     </div>
   );
+}
+
+const overlaid = (key: string) => key === "timeline" || key.startsWith("doc:") || key.startsWith("file:");
+
+/** Whether `to` is where `from` was reached from: up the path, or out from under a doc, file or the history. */
+function isBack(from: string, to: string) {
+  if (overlaid(to)) return false;
+  return overlaid(from) || (from !== to && (to === "" || from.startsWith(`${to}/`)));
+}
+
+/**
+ * Scrolls the pane for a level as it arrives, and keeps where it was left as
+ * it goes. Mounted inside the level rather than run on the change of path: the
+ * level leaving is still on screen while it fades, and scrolling then jerked it
+ * to its top under the reader's eyes.
+ */
+function Arrive({ pane, kept, at, back }: { pane: React.RefObject<HTMLElement | null>; kept: React.RefObject<Map<string, number>>; at: string; back: boolean }) {
+  useLayoutEffect(() => {
+    const el = pane.current;
+    const tops = kept.current;
+    if (!el) return;
+    el.scrollTo({ top: back ? (tops.get(at) ?? 0) : 0 });
+    return () => void tops.set(at, el.scrollTop);
+  }, [pane, kept, at, back]);
+  return null;
 }
 
 const GROUND: Record<Ground, string> = { dots: "dotfield", squares: "gridfield", plain: "" };

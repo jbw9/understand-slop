@@ -115,7 +115,7 @@ export function HistoryDialog() {
                         type="button"
                         disabled={busy}
                         onClick={() => post({ action: "remove", id: e.id })}
-                        className="shrink-0 cursor-pointer font-mono text-[11px] text-faint hover:text-clay-ink"
+                        className="shrink-0 cursor-pointer font-mono text-[11px] text-faint hover:text-clay-ink disabled:cursor-default disabled:opacity-50"
                       >
                         remove
                       </button>
@@ -143,7 +143,7 @@ export function HistoryDialog() {
                           type="button"
                           disabled={busy}
                           onClick={() => post({ action: "revert", at: v.at })}
-                          className="shrink-0 cursor-pointer font-mono text-[11px] text-accent hover:underline"
+                          className="shrink-0 cursor-pointer font-mono text-[11px] text-accent hover:underline disabled:cursor-default disabled:opacity-50"
                         >
                           revert
                         </button>

@@ -26,7 +26,7 @@ export function Dictation() {
       role="status"
       className="pointer-events-none fixed inset-x-0 bottom-10 z-50 flex justify-center px-4"
     >
-      <div className="pointer-events-auto flex items-center gap-2.5 border border-border-gray bg-surface px-3.5 py-1.5 font-mono text-[11.5px] text-ink shadow-md">
+      <div className="pointer-events-auto flex items-center gap-2.5 border border-border-gray bg-card px-3.5 py-1.5 font-mono text-[11.5px] text-ink shadow-lift">
         <span
           aria-hidden
           className={cn("h-2 w-2 rounded-full", listening ? "animate-pulse bg-clay-ink" : d.phase === "working" ? "bg-accent" : "bg-faint")}

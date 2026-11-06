@@ -94,7 +94,16 @@ export function useSettings(): Settings {
  * made before first paint by THEME_SCRIPT (lib/theme.ts), so the page never flashes another theme.
  */
 export function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
+  const root = document.documentElement;
+  if (root.dataset.theme === theme) return;
+  // Every hover's transition-colors would fade into the new theme on its own,
+  // a beat behind everything else; the switch is one frame, all at once.
+  const still = document.createElement("style");
+  still.textContent = "*,*::before,*::after{transition:none!important}";
+  document.head.appendChild(still);
+  root.dataset.theme = theme;
+  void getComputedStyle(root).color;
+  requestAnimationFrame(() => still.remove());
 }
 
 /** Keeps the page on the saved theme. */

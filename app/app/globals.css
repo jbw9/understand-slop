@@ -305,8 +305,12 @@
    terminal and the workspace window read as part of the page. Only its bars
    ([data-chrome="bar"]: the title bar, the tab strips, the status bar, the
    Preview toolbar) are black, which frames the sheet; their accent stays
-   cobalt, lifted to read on black. */
-:root[data-theme="classic"] [data-chrome] {
+   cobalt, lifted to read on black.
+   Not inside a bar: this resets only two of the bar's colours, so chrome
+   nested in one (a menu once was) got a white hover under the bar's white
+   ink. There it keeps the bar's colours whole; a menu is drawn on the body
+   (components/menu.tsx) and so is the sheet's. */
+:root[data-theme="classic"] [data-chrome]:not([data-chrome="bar"], [data-chrome="bar"] *) {
   --color-surface: #ffffff;
   --color-surface-container-low: #ffffff;
 }
@@ -502,6 +506,8 @@
   }
   .doc-prose input[type="checkbox"] {
     margin-right: 0.4em;
+    /* A task's box in the ink, not the system's blue. */
+    accent-color: var(--color-accent);
   }
 
   /* A plan's numbered steps, drawn as the map draws a sequence of parts:
@@ -542,12 +548,6 @@
     bottom: calc(3px - 0.18em);
     border-left: 1px solid var(--color-border-strong);
   }
-}
-
-@layer utilities {
-  /* Dot grid for the canvas ground — paper texture, not a grid
-     you are meant to align to. */
-  .dotfield {
   /* Marked off as Claude builds the plan: done in the diff's green, the step
      under way in amber, a skipped one struck through. */
   .plan-prose ol > li[data-state="done"]::before {
@@ -571,6 +571,12 @@
     background: var(--color-paper);
     color: var(--color-faint);
   }
+}
+
+@layer utilities {
+  /* Dot grid for the canvas ground — paper texture, not a grid
+     you are meant to align to. */
+  .dotfield {
     background-image: radial-gradient(
       var(--color-surface-dim) 1px,
       transparent 1px
@@ -671,5 +677,20 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* The first-run tour's steps (components/welcome.tsx) come in with a small rise. */
+@keyframes tour-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes tour-in {
+    from {
+      opacity: 1;
+    }
   }
 }

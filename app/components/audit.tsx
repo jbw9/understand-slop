@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { goTo } from "@/components/chrome";
-import { DIALOG, Overlay } from "@/components/dialog";
+import { DIALOG, Overlay, QUIET } from "@/components/dialog";
 import { openDiff } from "@/components/diff";
 import { useMap } from "@/components/map-context";
 import { PanelHead } from "@/components/panel";
@@ -100,7 +100,7 @@ export function AuditDialog() {
           title="How sure is this map"
           note="What was checked against the code, and what to double-check."
           right={
-            <button type="button" onClick={close} className="cursor-pointer text-[13px] text-muted-slate hover:text-ink">
+            <button type="button" onClick={close} className={QUIET}>
               Close
             </button>
           }
@@ -135,7 +135,7 @@ export function AuditDialog() {
                   <button
                     type="button"
                     onClick={() => (close(), goTo(x.path))}
-                    className="flex w-full cursor-pointer flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-surface-container-low"
+                    className="flex w-full cursor-pointer flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-surface-container focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                   >
                     <span className="flex items-center gap-2">
                       <span className="font-medium text-ink">{x.node.title}</span>

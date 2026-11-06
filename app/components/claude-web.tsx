@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { MotionConfig, motion } from "motion/react";
+import { memo, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { goTo, useLocation } from "@/components/chrome";
@@ -175,13 +175,15 @@ export function ClaudeWeb() {
           Ask Claude
         </button>
       )}
+      {/* The CSS reduced-motion rule (app/globals.css) does not reach motion's own animations. */}
+      <MotionConfig reducedMotion="user">
       <motion.aside
         aria-label="Claude"
         aria-hidden={!open}
         inert={!open}
         initial={{ x: "110%" }}
         animate={{ x: open ? 0 : "110%" }}
-        transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         style={{ top: GAP, bottom: STATUSBAR + GAP, right: GAP, width: `min(${WIDTH}px, calc(100vw - ${2 * GAP}px))` }}
         data-chrome
         className="fixed z-40 flex flex-col overflow-hidden border border-border-gray bg-surface-container-low font-mono text-[12.5px] leading-relaxed text-on-surface shadow-[0_8px_28px_-8px_rgba(8,16,80,0.4)]"
@@ -214,9 +216,7 @@ export function ClaudeWeb() {
             ) : (
               <div key={i} className="mt-2 flex gap-2">
                 <span className="text-on-surface">⏺</span>
-                <div className={PROSE}>
-                  <Markdown remarkPlugins={[remarkGfm]}>{l.text}</Markdown>
-                </div>
+                <Answer text={l.text} />
               </div>
             ),
           )}
@@ -257,6 +257,17 @@ export function ClaudeWeb() {
           />
         </div>
       </motion.aside>
+      </MotionConfig>
     </>
   );
 }
+
+// Memoised: every key typed into the question, and every chunk of a streamed
+// answer, would otherwise parse each earlier answer's markdown again.
+const Answer = memo(function Answer({ text }: { text: string }) {
+  return (
+    <div className={PROSE}>
+      <Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown>
+    </div>
+  );
+});

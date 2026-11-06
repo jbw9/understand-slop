@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { CodeEditor } from "@/components/editor";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { keys, useMac } from "@/components/button";
 import { langOf } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ export function FileTab({ path, line, visible, inset }: { path: string; line?: n
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [source, setSource] = useState(false);
   const md = MARKDOWN.test(path);
+  const mac = useMac();
 
   const load = () =>
     invoke<ArrayBuffer>("file_read", { path }).then((buf): Read => {
@@ -142,7 +144,7 @@ export function FileTab({ path, line, visible, inset }: { path: string; line?: n
             {line ? <span>Ln {line}</span> : null}
             <span className="tnum">{(draft ?? text).split("\n").length.toLocaleString()} lines</span>
             {md ? (
-              <button type="button" onClick={() => setSource((v) => !v)} className="hover:text-ink" title="Switch between the drawn page and its Markdown">
+              <button type="button" onClick={() => setSource((v) => !v)} className="cursor-pointer hover:text-ink" title="Switch between the drawn page and its Markdown">
                 {source ? "Markdown source · show page" : "Live preview · show source"}
               </button>
             ) : (
@@ -153,7 +155,7 @@ export function FileTab({ path, line, visible, inset }: { path: string; line?: n
               {saved && saved !== "saved" ? (
                 <span className="text-clay-ink">Not saved: {saved}</span>
               ) : dirty ? (
-                "⌘S to save"
+                `${keys(mac, "S")} to save`
               ) : saved === "saved" ? (
                 "Saved"
               ) : null}

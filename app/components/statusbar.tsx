@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AgentIcon } from "@/components/agents";
-import { Kbd } from "@/components/button";
+import { Kbd, keys, useMac } from "@/components/button";
 import { useMap } from "@/components/map-context";
 import { openReview } from "@/components/diff";
 import { openFiles, useFiles } from "@/components/files";
@@ -45,6 +45,7 @@ export function StatusBar() {
   }, [L0, TOP]);
   const files = useFiles();
   const covered = useMemo(() => (files?.index ? coverage(files.index, L0) : null), [files, L0]);
+  const mac = useMac();
 
   return (
     <footer data-chrome="bar" className="flex h-6 shrink-0 select-none items-center gap-0.5 border-t border-border-gray bg-surface-container-low px-2 text-[11.5px] text-muted-slate">
@@ -74,7 +75,7 @@ export function StatusBar() {
         </Item>
       ) : null}
       <Sep />
-      <Item title="Levels in the map — Ctrl+K to go to one" onClick={() => openPalette()}>
+      <Item title={`Levels in the map — ${keys(mac, "K")} to go to one`} onClick={() => openPalette()}>
         {counts.levels} levels
       </Item>
       {counts.unsure ? (
@@ -92,12 +93,13 @@ export function StatusBar() {
       <span className="min-w-0 flex-1" />
       <MapUpdates key={name} id={name} root={RUN.root} local={local} />
       <Item title="Go to a level, or run an action" onClick={() => openPalette()}>
-        Go to <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl K</Kbd>
+        Go to <Kbd className={KEY}>{keys(mac, "K")}</Kbd>
       </Item>
       {STATIC_MAP ? (
         <Item title="Ask Claude about this code" onClick={toggleWorkspace}>
           <AgentIcon id="claude" />
-          Claude <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl `</Kbd>
+          {/* A published page takes Control+` only (components/claude-web.tsx). */}
+          Claude <Kbd className={KEY}>{keys(mac, "`", { ctrl: true })}</Kbd>
         </Item>
       ) : (
         <Item title="Claude Code & terminal" onClick={toggleWorkspace}>
@@ -105,12 +107,15 @@ export function StatusBar() {
             <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
             <path d="M4.5 6.5 6.5 8l-2 1.5M8.5 10h3" />
           </svg>
-          Workspace <Kbd className="h-[15px] min-w-[15px] text-[10px]">Ctrl `</Kbd>
+          Workspace <Kbd className={KEY}>{keys(mac, "`")}</Kbd>
         </Item>
       )}
     </footer>
   );
 }
+
+/** A key, sized to the bar. */
+const KEY = "h-[15px] min-w-[15px] text-[10px]";
 
 function Item({
   children,
@@ -128,7 +133,7 @@ function Item({
   const cls = cn(
     "flex h-full shrink-0 items-center gap-1.5 px-1.5",
     mono && "font-mono text-[11px]",
-    onClick && "cursor-pointer hover:bg-surface-container hover:text-ink",
+    onClick && "cursor-pointer hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
     className,
   );
   return onClick ? (

@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,6 +53,19 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
     </button>
   );
 });
+
+const noSubscribe = () => () => {};
+const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** Whether keys are a Mac's. False on the server, so the first paint hydrates, then the truth. */
+export const useMac = () => useSyncExternalStore(noSubscribe, isMac, () => false);
+
+/**
+ * A shortcut as the platform writes it: ⌘K on a Mac, Ctrl+K elsewhere. `ctrl`
+ * for a key that is Control on a Mac too (⌃T in a terminal).
+ */
+export const keys = (mac: boolean, key: string, { ctrl = false, shift = false } = {}) =>
+  mac ? `${ctrl ? "⌃" : "⌘"}${shift ? "⇧" : ""}${key}` : `Ctrl+${shift ? "Shift+" : ""}${key}`;
 
 /** A key, as the app writes one everywhere: in tooltips, the palette, the status bar. */
 export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {

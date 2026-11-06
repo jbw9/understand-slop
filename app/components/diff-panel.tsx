@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { DIALOG, Overlay } from "@/components/dialog";
 import { OPEN_DIFF, TINT, WORD, openDiff, useDiff } from "@/components/diff";
 import { goTo } from "@/components/chrome";
@@ -1120,7 +1120,9 @@ function Code({ text, lang }: { text: string; lang: ReturnType<typeof langOf> })
   );
 }
 
-function SplitDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
+// Memoised, as is InlineDiff: every line is highlighted as it is drawn, and
+// typing in the commit filter re-renders the whole panel around an open file.
+const SplitDiff = memo(function SplitDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
   const lang = langOf(path);
   const rows = useMemo(() => hunks.map(pairsOf), [hunks]);
   // Each side scrolls sideways on its own, as two editors would; rows are one
@@ -1154,9 +1156,9 @@ function SplitDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
       {side(1)}
     </div>
   );
-}
+});
 
-function InlineDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
+const InlineDiff = memo(function InlineDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
   const lang = langOf(path);
   return (
     <div className="overflow-x-auto">
@@ -1179,7 +1181,7 @@ function InlineDiff({ hunks, path }: { hunks: HunkLines[]; path: string }) {
       </div>
     </div>
   );
-}
+});
 
 const RTF = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [

@@ -306,7 +306,7 @@ export function TimelineView() {
                   type="button"
                   disabled={!a || !b}
                   onClick={() => a && b && show(a, b)}
-                  className="block w-full cursor-pointer px-2 py-1.5 text-left hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-accent"
+                  className="block w-full cursor-pointer px-2 py-1.5 text-left hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <span className="text-[13.5px] font-semibold text-ink">
                     <span className="tnum mr-1.5 text-faint">{i + 1}.</span>

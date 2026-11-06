@@ -95,7 +95,7 @@ export function Prose({ text }: { text: string }) {
         i % 2 ? (
           ((go) =>
             go ? (
-              <button key={i} onClick={go} title="Open where this is explained" className=" underline decoration-faint underline-offset-[3px] hover:decoration-accent">
+              <button key={i} type="button" onClick={go} title="Open where this is explained" className="cursor-pointer underline decoration-faint underline-offset-[3px] hover:decoration-accent">
                 <Ident>{part}</Ident>
               </button>
             ) : (

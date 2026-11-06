@@ -38,18 +38,27 @@ export const DIALOG =
 export const INPUT =
   "w-full border border-border-gray bg-card px-3 py-2 font-mono text-[12.5px] text-ink placeholder:text-faint focus:border-accent focus:outline-none";
 
-export const PRIMARY =
-  "cursor-pointer bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent hover:bg-accent-strong disabled:cursor-default disabled:opacity-50";
+/* A dialog's actions, drawn as Button's `primary` and `ghost` (components/button.tsx),
+   so a dialog's buttons read as the rest of the app's. */
+const ACTION =
+  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap px-2.5 font-mono text-[11.5px] font-medium uppercase tracking-[0.04em] transition-[background-color,border-color,color] duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/70 disabled:cursor-default disabled:opacity-50";
 
-export const QUIET =
-  "cursor-pointer px-3.5 py-1.5 text-[13px] text-muted-slate hover:bg-surface-container-low hover:text-ink";
+export const PRIMARY = `${ACTION} border border-accent bg-accent text-on-accent hover:border-accent-strong hover:bg-accent-strong`;
 
-export function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
+export const QUIET = `${ACTION} text-muted-slate hover:bg-surface-container hover:text-ink`;
+
+/**
+ * A labelled setting. `group` for one that holds buttons rather than a field:
+ * a <label> passes a click on its words to the first button inside, so
+ * clicking "Theme" would pick Classic.
+ */
+export function Field({ label, hint, group, children }: { label: string; hint: string; group?: boolean; children: React.ReactNode }) {
+  const Box = group ? "div" : "label";
   return (
-    <label className="block">
+    <Box className="block" {...(group ? { role: "group", "aria-label": label } : {})}>
       <span className="text-[13px] font-semibold text-ink">{label}</span>
       <span className="mb-2 mt-0.5 block text-[12px] text-muted-slate">{hint}</span>
       {children}
-    </label>
+    </Box>
   );
 }

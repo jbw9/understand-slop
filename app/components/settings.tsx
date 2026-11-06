@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { DIALOG, Field, INPUT, Overlay } from "@/components/dialog";
+import { keys, useMac } from "@/components/button";
 import { AgentIcon, CLAUDE, useInstalled } from "@/components/agents";
 import { PanelHead } from "@/components/panel";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,10 @@ const GROUNDS: { value: Ground; label: string }[] = [
 
 type Found = { path: string; version: string | null } | null;
 
+/** One choice of a row of them. */
+const SEGMENT =
+  "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
+
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
   // What is on screen is what is saved: there is no draft to keep in step.
@@ -36,6 +41,7 @@ export function SettingsDialog() {
   // undefined while looking.
   const [found, setFound] = useState<Found | undefined>(undefined);
   const agents = [CLAUDE, ...useInstalled()];
+  const mac = useMac();
 
   const detect = useCallback((claudePath: string) => {
     setFound(undefined);
@@ -86,7 +92,7 @@ export function SettingsDialog() {
               type="submit"
               aria-label="Close"
               title="Close (Esc)"
-              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center text-muted-slate hover:bg-surface-container hover:text-ink"
+              className="-mr-1.5 -mt-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center text-muted-slate hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
                 <path d="m4.5 4.5 7 7m0-7-7 7" />
@@ -95,7 +101,7 @@ export function SettingsDialog() {
           }
         />
         <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-5">
-          <Field label="Theme" hint="Classic is the landing page's cobalt ink. Light and Dark are plain.">
+          <Field group label="Theme" hint="Classic is the landing page's cobalt ink. Light and Dark are plain.">
             <div role="radiogroup" aria-label="Theme" className="inline-flex border border-border-gray p-0.5">
               {THEMES.map((t) => (
                 <button
@@ -105,7 +111,7 @@ export function SettingsDialog() {
                   aria-checked={draft.theme === t.value}
                   onClick={() => set({ theme: t.value })}
                   className={cn(
-                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT,
                     draft.theme === t.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -114,7 +120,7 @@ export function SettingsDialog() {
               ))}
             </div>
           </Field>
-          <Field label="Background" hint="What the map is drawn on.">
+          <Field group label="Background" hint="What the map is drawn on.">
             <div role="radiogroup" aria-label="Background" className="inline-flex border border-border-gray p-0.5">
               {GROUNDS.map((g) => (
                 <button
@@ -124,7 +130,7 @@ export function SettingsDialog() {
                   aria-checked={draft.ground === g.value}
                   onClick={() => set({ ground: g.value })}
                   className={cn(
-                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT,
                     draft.ground === g.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -134,8 +140,9 @@ export function SettingsDialog() {
             </div>
           </Field>
           <Field
+            group
             label="Default agent"
-            hint="What a tab opens into when the app opens one for you: Ctrl+`, Ctrl+Shift+T, the title bar, or the first in the + menu. Map context goes to Claude either way."
+            hint={`What a tab opens into when the app opens one for you: ${keys(mac, "`")}, ${keys(mac, "T", { shift: true })}, the title bar, or the first in the + menu. Map context goes to Claude either way.`}
           >
             <div role="radiogroup" aria-label="Default agent" className="inline-flex border border-border-gray p-0.5">
               {agents.map((a) => (
@@ -146,7 +153,7 @@ export function SettingsDialog() {
                   aria-checked={draft.agent === a.id}
                   onClick={() => set({ agent: a.id })}
                   className={cn(
-                    "flex cursor-pointer items-center gap-1.5 px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT, "flex items-center gap-1.5",
                     draft.agent === a.id ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -156,7 +163,7 @@ export function SettingsDialog() {
               ))}
             </div>
           </Field>
-          <Field label="Dev server" hint="Start a project's dev server when it opens, and show the running app in a Preview tab.">
+          <Field group label="Dev server" hint="Start a project's dev server when it opens, and show the running app in a Preview tab.">
             <div role="radiogroup" aria-label="Dev server" className="inline-flex border border-border-gray p-0.5">
               {[
                 { value: true, label: "Start it" },
@@ -169,7 +176,7 @@ export function SettingsDialog() {
                   aria-checked={draft.devServer === o.value}
                   onClick={() => set({ devServer: o.value })}
                   className={cn(
-                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT,
                     draft.devServer === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -223,6 +230,7 @@ export function SettingsDialog() {
             />
           </Field>
           <Field
+            group
             label="Claude Code dictation"
             hint="Hold Control+Option (⌃⌥), or Space in a Claude tab, and speak into Claude's prompt. Transcribed by Anthropic at no cost to your usage; needs a claude.ai sign-in, not Bedrock or an API key."
           >
@@ -238,7 +246,7 @@ export function SettingsDialog() {
                   aria-checked={draft.voice === o.value}
                   onClick={() => set({ voice: o.value })}
                   className={cn(
-                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT,
                     draft.voice === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -248,6 +256,7 @@ export function SettingsDialog() {
             </div>
           </Field>
           <Field
+            group
             label="Skills and web research"
             hint="Claude loads skills and searches or reads the web without asking each time, so plan mode can research freely. Plan mode still never edits files."
           >
@@ -263,7 +272,7 @@ export function SettingsDialog() {
                   aria-checked={draft.research === o.value}
                   onClick={() => set({ research: o.value })}
                   className={cn(
-                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT,
                     draft.research === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >
@@ -274,18 +283,20 @@ export function SettingsDialog() {
           </Field>
           <p className="text-[12px] text-faint">Claude Code changes apply to Claude tabs opened from now on.</p>
           <Field
+            group
             label="On-device dictation"
             hint="Hold Control+Option (⌃⌥) in a field in the app, or for Claude's prompt where Claude Code dictation isn't available. Runs on this machine, for any sign-in; nothing is sent anywhere."
           >
             <OnDevice />
           </Field>
           <Field
+            group
             label="Saved sign-ins"
             hint="Sites you signed in to in the Preview when Claude asked. Bluprint keeps their sign-in cookies, never your password. Forget signs you out."
           >
             <SignIns />
           </Field>
-          <Field label="Media while dictating" hint="Pauses Music and Spotify, and mutes everything else, while you hold ⌃⌥; all of it comes back when you let go.">
+          <Field group label="Media while dictating" hint="Pauses Music and Spotify, and mutes everything else, while you hold ⌃⌥; all of it comes back when you let go.">
             <div role="radiogroup" aria-label="Media while dictating" className="inline-flex border border-border-gray p-0.5">
               {[
                 { value: true, label: "Quiet it" },
@@ -298,7 +309,7 @@ export function SettingsDialog() {
                   aria-checked={draft.quietMedia === o.value}
                   onClick={() => set({ quietMedia: o.value })}
                   className={cn(
-                    "cursor-pointer px-3.5 py-1 text-[12.5px] transition-colors",
+                    SEGMENT,
                     draft.quietMedia === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink",
                   )}
                 >

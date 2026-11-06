@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { isTauri } from "@tauri-apps/api/core";
 import { useMap } from "@/components/map-context";
 import { addNote, clearSent, dropNote, editNote, reviewFor, sendNow, sendReview, stopEditing, useEditing, useNotes, type Editing, type Note } from "@/lib/notes";
+import { keys, useMac } from "@/components/button";
+import { PRIMARY, QUIET } from "@/components/dialog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,6 +19,8 @@ import { cn } from "@/lib/utils";
 const GAP = 12;
 const STATUSBAR = 24;
 const noSubscribe = () => () => {};
+/** A field to write a note in. */
+const FIELD = "w-full border border-border-gray bg-card px-2 py-1.5 text-[12.5px] text-ink outline-none placeholder:text-faint focus:border-accent";
 
 export function ReviewTray() {
   const { name } = useMap();
@@ -89,13 +93,13 @@ function Tray({ notes }: { notes: Note[] }) {
                     }}
                     rows={2}
                     placeholder="Anything else for Claude… (optional)"
-                    className="w-full resize-none border border-border-gray px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent"
+                    className={cn(FIELD, "resize-none")}
                   />
                   <button
                     type="button"
                     onClick={() => void sendReview(extra).then(() => setExtra(""))}
                     title="Sends every note to Claude as one turn, once it has finished the one it is on"
-                    className="cursor-pointer bg-accent px-3 py-1.5 text-[12.5px] font-medium text-card hover:opacity-90"
+                    className={cn(PRIMARY, "justify-center")}
                   >
                     Send review to Claude
                   </button>
@@ -143,7 +147,7 @@ function NoteRow({ n }: { n: Note }) {
             type="button"
             aria-label={`Remove the note on ${n.anchor.title}`}
             onClick={() => dropNote(n.id)}
-            className="shrink-0 cursor-pointer text-faint opacity-0 hover:text-ink group-hover:opacity-100"
+            className="shrink-0 cursor-pointer text-faint opacity-0 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
           >
             ×
           </button>
@@ -156,7 +160,7 @@ function NoteRow({ n }: { n: Note }) {
               value={n.after ?? ""}
               onChange={(e) => editNote(n.id, { after: e.target.value })}
               rows={2}
-              className="w-full resize-none border border-border-gray px-2 py-1 text-[12.5px] text-ink outline-none focus:border-accent"
+              className={cn(FIELD, "resize-none py-1")}
             />
           ) : null}
           <textarea
@@ -164,7 +168,7 @@ function NoteRow({ n }: { n: Note }) {
             onChange={(e) => editNote(n.id, { note: e.target.value })}
             rows={2}
             placeholder={n.kind === "suggest" ? "Why, or anything else (optional)" : "Your comment"}
-            className="w-full resize-none border border-border-gray px-2 py-1 text-[12.5px] text-ink outline-none focus:border-accent"
+            className={cn(FIELD, "resize-none py-1")}
           />
         </div>
       ) : null}
@@ -209,7 +213,8 @@ function NoteEditor({ e }: { e: Editing }) {
       add();
     }
   };
-  const field = "w-full resize-y border border-border-gray px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent";
+  const field = cn(FIELD, "resize-y");
+  const mac = useMac();
 
   return (
     <div
@@ -242,15 +247,15 @@ function NoteEditor({ e }: { e: Editing }) {
         />
       )}
       <div className="flex items-center justify-end gap-2">
-        <span className="mr-auto text-[11px] text-faint">⌘↵ to add</span>
-        <button type="button" onClick={stopEditing} className="cursor-pointer px-2 py-1 text-[12px] text-muted-slate hover:text-ink">
+        <span className="mr-auto text-[11px] text-faint">{keys(mac, mac ? "↵" : "Enter")} to add</span>
+        <button type="button" onClick={stopEditing} className={QUIET}>
           Cancel
         </button>
         <button
           type="button"
           disabled={!ready}
           onClick={add}
-          className="cursor-pointer bg-accent px-2.5 py-1 text-[12px] font-medium text-card hover:opacity-90 disabled:cursor-default disabled:opacity-40"
+          className={PRIMARY}
         >
           Add to review
         </button>

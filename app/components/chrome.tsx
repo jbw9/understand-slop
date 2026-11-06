@@ -146,7 +146,8 @@ export function Crumbs({
       aria-label="Location"
       className="sticky left-0 top-0 z-20 bg-paper/85 backdrop-blur-sm"
     >
-      <div className="mx-auto flex max-w-[1220px] items-start gap-6 px-10 py-3">
+      {/* The level's own width and gutter (components/canvas.tsx), so the trail starts where its title does. */}
+      <div className="mx-auto flex max-w-[1680px] items-start gap-6 px-10 py-3">
         {/* In the desktop app the switcher lives in the title bar. */}
         {switcher ? (
           <label className="flex shrink-0 items-center gap-2">
@@ -154,11 +155,12 @@ export function Crumbs({
             <MapSwitcher
               map={map}
               maps={maps}
-              className=" border border-border-strong bg-card px-2 py-1 text-[12.5px] text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              className="cursor-pointer border border-border-strong bg-card px-2 py-1 text-[12.5px] text-ink focus-visible:outline-2 focus-visible:outline-accent"
             />
           </label>
         ) : null}
-        <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-1">
+        {/* Pulled out by the first stop's padding, so its word lines up with the title's. */}
+        <ol className={cn("flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-1", !switcher && "-ml-1.5")}>
           {stops.map((c, i) => {
             const here = i === stops.length - 1;
             return (
@@ -174,7 +176,8 @@ export function Crumbs({
                     disabled={here}
                     aria-current={here ? "page" : undefined}
                     className={cn(
-                      " px-1.5 py-0.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-accent",
+                      "px-1.5 py-0.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-accent",
+                      !here && "cursor-pointer",
                       i === 0 && "font-mono text-[12.5px]",
                       here ? "font-semibold text-ink" : "text-muted-slate hover:bg-surface-container-low hover:text-ink",
                     )}

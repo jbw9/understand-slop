@@ -161,7 +161,7 @@ function Walk({ walkthrough, onOpen }: { walkthrough?: Walkthrough; onOpen: (pat
                   <button
                     onClick={() => onOpen(s.path)}
                     className={cn(
-                      "group min-w-0 flex-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-container-low",
+                      "group min-w-0 flex-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-container",
                       last ? "" : "mb-1",
                     )}
                   >

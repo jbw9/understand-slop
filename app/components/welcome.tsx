@@ -85,7 +85,7 @@ function Tour() {
   const steps = [
     { title: "Your code, as a map", body: "Bluprint reads a repository and draws it a level at a time. Click a box to go down a level.", view: <Demo /> },
     { title: "Pick a look", body: "It changes as you choose. Settings can change it later.", view: <Themes /> },
-    { title: "Map your first project", body: "Open a folder on this machine, or clone one from GitHub. Claude Code writes the map.", view: <Begin /> },
+    { title: "Map your first project", body: "Open a folder on this machine, or clone one from GitHub. Claude Code writes the map. When it finishes, Bluprint sends us how long it took and what it cost, never your code; Settings turns that off.", view: <Begin /> },
   ];
   const last = step === steps.length - 1;
   return (

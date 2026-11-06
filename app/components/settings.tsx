@@ -318,9 +318,49 @@ export function SettingsDialog() {
               ))}
             </div>
           </Field>
+          <Field
+            group
+            label="Run reports"
+            hint="When a map finishes, Bluprint sends the Bluprint team how long it took, what it cost, the repository's name and the end of its log, so the mapping keeps getting better. Never your code."
+          >
+            <RunReports />
+          </Field>
         </div>
       </form>
     </Overlay>
+  );
+}
+
+/** Whether finished runs are reported (lib/telemetry.ts); kept by the server, which sends them. */
+function RunReports() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch("/api/telemetry")
+      .then((r) => r.json())
+      .then((t: { on: boolean }) => setOn(t.on), () => setOn(null));
+  }, []);
+  const choose = (value: boolean) => {
+    setOn(value);
+    void fetch("/api/telemetry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: value }) });
+  };
+  return (
+    <div role="radiogroup" aria-label="Run reports" className="inline-flex border border-border-gray p-0.5">
+      {[
+        { value: true, label: "Send" },
+        { value: false, label: "Don't send" },
+      ].map((o) => (
+        <button
+          key={o.label}
+          type="button"
+          role="radio"
+          aria-checked={on === o.value}
+          onClick={() => choose(o.value)}
+          className={cn(SEGMENT, on === o.value ? "bg-accent text-on-accent" : "text-muted-slate hover:text-ink")}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

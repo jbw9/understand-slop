@@ -23,6 +23,9 @@ for d in $demos; do
   map=${d%%:*}
   cp -R "out/$map" "$site/$map"
 done
+# The admin dashboard, at blpr.dev/admin: one static page, its data behind a password (admin/supabase.sql).
+mkdir -p "$site/admin"
+cp ../admin/index.html "$site/admin/index.html"
 touch "$site/.nojekyll"
 # The site is served at blpr.dev; Pages drops the custom domain when this file is gone.
 echo blpr.dev > "$site/CNAME"

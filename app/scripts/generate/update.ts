@@ -52,6 +52,7 @@ import { plain, redrawOverview } from "./pipeline";
 import { idsOf, submitProblems } from "./schema";
 import { full, oneLine, summarize, type FileSummary } from "./summarize";
 import { activeGraph, buildGraph, setGraph, withSummaries } from "./graph";
+import { MAPPER_VERSION } from "./version";
 
 /** Written whole and renamed into place, so the open map never reads half a file. */
 function atomic(path: string, body: string) {
@@ -525,7 +526,7 @@ export async function update(args: string[]) {
   result({ ok: !failed.length, changed: found.map((c) => c.path), sections, homeless, unmatched, corrected: [...wrong.keys()].map((p) => p.node.id), usd, problems: final.problems.slice(0, 20), ...(failed.length ? { error: `Could not update ${failed.join(", ")}` } : {}) });
   if (existsSync(`${out}/report.json`)) {
     const report = JSON.parse(readFileSync(`${out}/report.json`, "utf8"));
-    report.updates = [...(report.updates ?? []), { at: new Date().toISOString(), changed: found.map((c) => c.path), sections: sections.map((s) => s.id), failed, seconds: Math.round((Date.now() - t0) / 1000), usd }];
+    report.updates = [...(report.updates ?? []), { at: new Date().toISOString(), mapperVersion: MAPPER_VERSION, changed: found.map((c) => c.path), sections: sections.map((s) => s.id), failed, seconds: Math.round((Date.now() - t0) / 1000), usd, bill }];
     writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1) + "\n");
   }
   // What asked for it, in the user's words where a prompt did: the line the turns list shows.

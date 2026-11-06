@@ -8,6 +8,7 @@ import { LandingHow } from "@/components/v2/landing-how";
 import { LandingInstall } from "@/components/v2/landing-install";
 import { LandingNav } from "@/components/v2/landing-nav";
 import { LandingStart } from "@/components/v2/landing-start";
+import { LandingVisit } from "@/components/v2/landing-visit";
 import { LandingVoices, type Voice } from "@/components/v2/landing-voices";
 import s from "@/components/v2/v2.module.css";
 import { loadMap } from "@/lib/maps";
@@ -86,6 +87,7 @@ export default function Landing() {
     <div className={`${s.page} ${display.variable} ${sans.variable} ${mono.variable}`}>
       <div className={s.paper}>
       <LandingNav github={GITHUB} />
+      <LandingVisit />
       <main>
         <LandingCover />
         <LandingEvolution />

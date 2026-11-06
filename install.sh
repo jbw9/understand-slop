@@ -2,10 +2,16 @@
 # Installs Bluprint on macOS or Linux, built from source:
 #   curl -fsSL https://raw.githubusercontent.com/jbw9/bluprint/main/install.sh | sh
 # The source is kept in ~/.bluprint/src (BLUPRINT_DIR moves it); running this again updates and rebuilds.
+# When it ends it tells us the OS and whether it worked, nothing else; BLUPRINT_NO_TELEMETRY=1 skips that.
 set -e
+
+# The admin dashboard's Supabase project (admin/supabase.sql); the key is the public one.
+SUPABASE_URL=https://jbvkjvdthuzofvmhwctv.supabase.co
+SUPABASE_KEY=sb_publishable_hbxcjbYF5H8py5gGLokxPg_tD9nGsNl
 
 # Everything happens inside main, called on the last line, so a download cut short runs nothing.
 main() {
+  trap report EXIT
   repo=${BLUPRINT_REPO:-https://github.com/jbw9/bluprint.git}
   ref=${BLUPRINT_REF:-main}
   dir=${BLUPRINT_DIR:-$HOME/.bluprint}/src
@@ -67,6 +73,14 @@ Install those, then run this again."
     say "Bluprint makes maps through Claude Code, which isn't on your PATH: https://claude.com/claude-code"
 }
 
+report() {
+  status=$?
+  ok=$([ "$status" = 0 ] && echo true || echo false)
+  [ -z "$BLUPRINT_NO_TELEMETRY" ] || return 0
+  curl -fsS -m 5 -o /dev/null -X POST "$SUPABASE_URL/rest/v1/rpc/bp_track_install" \
+    -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" \
+    -d "{\"os\":\"$(uname)\",\"arch\":\"$(uname -m)\",\"ok\":$ok}" 2>/dev/null || true
+}
 need() { command -v "$1" >/dev/null 2>&1 || missing="$missing
   - $1: $2"; }
 say() { printf '\033[1m==> %s\033[0m\n' "$1"; }

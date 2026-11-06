@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Bluprint admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&family=Zilla+Slab:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* The landing page's sheet (landing/components/v2/v2.module.css): one ink, cobalt, on white paper
+   lying on a blueprint desk. Always light. */
+:root {
+  --desk: #1a2fa0;
+  --desk-line: rgba(255, 255, 255, 0.1);
+  --paper: #fcfdff;
+  --low: #eef1fd;
+  --ink: #2438c8;
+  --muted: #4a5bd2;
+  --faint: #8995e2;
+  --line: rgba(36, 56, 200, 0.18);
+  --strong: rgba(36, 56, 200, 0.5);
+  --on-ink: #fcfdff;
+  --blush: #f4a3b4;
+  --code-bg: #2438c8;
+  --code-ink: #d5dbff;
+  --display: "Zilla Slab", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --gutter: clamp(16px, 3.4vw, 44px);
+  --edge: clamp(8px, 1.6vw, 22px);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  padding: var(--edge);
+  background-color: var(--desk);
+  background-image: linear-gradient(var(--desk-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--desk-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  color: var(--ink);
+  font: 14px/1.5 var(--body);
+}
+::selection { background: var(--ink); color: var(--on-ink); }
+a { color: inherit; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.paper { min-height: calc(100vh - 2 * var(--edge)); border-radius: 6px; background: var(--paper); overflow: clip; }
+.wrap { max-width: 1480px; margin: 0 auto; padding: 0 var(--gutter) var(--gutter); }
+
+/* the bar across the top */
+.nav { position: sticky; top: 0; z-index: 5; padding: 0 var(--gutter); background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(10px); }
+.navBar { display: flex; align-items: center; gap: 16px; max-width: calc(1480px - 2 * var(--gutter)); height: 56px; margin: 0 auto; border-bottom: 1px solid var(--line); }
+.mark { display: flex; align-items: center; gap: 10px; font: 500 15px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.mark svg { width: 42px; height: 30px; fill: currentColor; }
+.mark .blush { fill: var(--blush); }
+.mark small { font: 11.5px var(--mono); padding: 2px 7px; border: 1px solid var(--strong); }
+.navBar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.stamp { font: 11px var(--mono); text-transform: uppercase; color: var(--muted); }
+
+/* labels and buttons */
+.eyebrow { margin: 0 0 14px; font: 12px/1.4 var(--mono); text-transform: uppercase; }
+.eyebrow::before { content: "[ "; }
+.eyebrow::after { content: " ]"; }
+h1 { margin: 0; font: 300 clamp(40px, 5vw, 76px)/1 var(--display); letter-spacing: -0.02em; }
+h2 { margin: 0 0 4px; font: 300 clamp(26px, 2.6vw, 38px)/1.05 var(--display); letter-spacing: -0.015em; }
+.lede { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 14px; border: 1px solid var(--ink); background: var(--paper); font: 500 12px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; cursor: pointer; transition: background-color .15s ease-out, color .15s ease-out; }
+.btn:hover { background: var(--low); }
+.btn.primary { background: var(--ink); color: var(--on-ink); }
+.btn.primary:hover { background: color-mix(in srgb, var(--ink) 86%, var(--paper)); }
+.btn.big { height: 44px; padding: 0 18px; font-size: 13px; }
+
+/* sign in */
+.gate { display: grid; place-items: center; min-height: calc(100vh - 2 * var(--edge) - 56px); padding: var(--gutter); }
+.gate form { width: min(100%, 420px); padding: 22px; border: 1px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+.gate h1 { font-size: 52px; margin-bottom: 18px; }
+.gate label { display: block; font: 11px var(--mono); text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.gate input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--strong); background: var(--paper); font: 14px var(--mono); }
+.gate input:focus { outline: none; border-color: var(--ink); }
+.gate .row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+.gate .err { font: 12px var(--mono); text-transform: uppercase; color: var(--ink); }
+
+/* the sheet's sections */
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 36px 0 26px; }
+section { margin-top: 44px; }
+#runs { scroll-margin-top: 72px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); border: 1px solid var(--ink); }
+.tile { padding: 10px 14px 14px; border-left: 1px solid var(--ink); border-top: 1px solid var(--ink); margin: -1px 0 0 -1px; min-width: 0; }
+.tile dt { font: 10.5px var(--mono); text-transform: uppercase; color: var(--muted); }
+.tile dd { margin: 6px 0 0; font: 300 40px/1 var(--display); letter-spacing: -0.02em; }
+.tile small { display: block; margin-top: 6px; font: 11px var(--mono); text-transform: uppercase; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
+.card { border: 1px solid var(--strong); padding: 12px 14px 14px; min-width: 0; }
+.card h3 { margin: 0 0 10px; font: 11.5px var(--mono); letter-spacing: 0.03em; text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; }
+.card h3 span { color: var(--muted); }
+
+/* bar charts, as boxes on the grid */
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 4px; border-bottom: 1px solid var(--ink);
+  background-image: linear-gradient(var(--line) 1px, transparent 1px); background-size: 100% 35px; background-position: 0 -1px; }
+.bar { flex: 1; display: flex; flex-direction: column-reverse; min-width: 0; height: 100%; }
+.bar i { display: block; background: var(--ink); }
+.bar i.b { background: var(--blush); }
+.bar:hover i { background: var(--muted); }
+.bar:hover i.b { background: #e98aa0; }
+.axis { display: flex; justify-content: space-between; margin-top: 4px; font: 10px var(--mono); text-transform: uppercase; color: var(--muted); }
+.key { display: flex; gap: 12px; font: 10.5px var(--mono); text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.key i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; background: var(--ink); vertical-align: -1px; }
+.key i.b { background: var(--blush); }
+
+/* tables */
+.scroll { overflow-x: auto; border: 1px solid var(--ink); }
+table { width: 100%; border-collapse: collapse; font: 12.5px var(--mono); }
+th { text-align: left; font: 500 10.5px var(--mono); text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--ink); white-space: nowrap; background: var(--paper); }
+td { padding: 7px 10px; border-top: 1px solid var(--line); white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr.run { cursor: pointer; }
+tbody tr.run:hover td { background: var(--low); }
+tbody tr.open td { background: var(--low); }
+.tag { display: inline-block; padding: 0 6px; border: 1px solid var(--strong); font-size: 10.5px; text-transform: uppercase; }
+.tag.bad { background: var(--blush); border-color: var(--blush); color: var(--ink); }
+.tag.ok { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+td.detail { padding: 0; white-space: normal; }
+.detailIn { padding: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; background: var(--paper); }
+.detailIn h4 { margin: 0 0 6px; font: 500 10.5px var(--mono); text-transform: uppercase; color: var(--muted); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; font: 12px var(--mono); }
+.kv span:nth-child(odd) { color: var(--muted); }
+.wide { grid-column: 1 / -1; }
+pre.log { margin: 0; max-height: 420px; overflow: auto; padding: 12px 14px; background: var(--code-bg); color: var(--code-ink); font: 11.5px/1.55 var(--mono); white-space: pre; }
+ul.problems { margin: 0; padding-left: 16px; font: 11.5px/1.5 var(--mono); }
+.list { display: grid; gap: 4px; font: 12px var(--mono); }
+.list div { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; position: relative; padding: 2px 6px; }
+.list div b { position: absolute; inset: 0 auto 0 0; background: var(--low); z-index: 0; }
+.list div span { position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { font: 12px var(--mono); text-transform: uppercase; color: var(--faint); padding: 10px 0; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+button.repo { padding: 0; border: 0; background: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--strong); }
+button.repo:hover { text-decoration-color: var(--ink); }
+.repoHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+.repoHead h3 { margin: 0; font: 300 30px/1 var(--display); }
+.better { background: var(--ink); color: var(--on-ink); padding: 0 4px; }
+.worse { background: var(--blush); padding: 0 4px; }
+.delta { font-size: 10.5px; margin-left: 6px; }
+
+/* the drawing's title block */
+.end { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr; margin-top: 64px; border: 1px solid var(--ink); }
+.end > div { min-width: 0; padding: 8px 12px 10px; border-left: 1px solid var(--ink); }
+.end > div:first-child { border-left: 0; }
+.end dt { font: 10px var(--mono); text-transform: uppercase; color: var(--muted); }
+.end dd { margin: 4px 0 0; font: 12.5px var(--mono); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.end .title dd { font: 400 26px/1 var(--display); }
+@media (max-width: 760px) {
+  .end { grid-template-columns: 1fr 1fr; }
+  .end > div:nth-child(3) { border-left: 0; }
+  .end > div:nth-child(n+3) { border-top: 1px solid var(--ink); }
+  .stamp { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="paper">
+  <header class="nav">
+    <div class="navBar">
+      <span class="mark">
+        <svg viewBox="140 320 744 530" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M334 562C332 446 414 346 514 346C612 346 694 444 690 560"/>
+            <path d="M200 562c0-56 48-56 48 0c0-56 48-56 48 0M728 562c0-56 48-56 48 0c0-56 48-56 48 0"/>
+            <path d="M160 566C360 558 660 570 864 562"/>
+            <path d="M268 656H532M580 656H664M332 740H716M332 824H464M512 824H588"/>
+          </g>
+          <ellipse cx="460" cy="474" rx="16" ry="24"/><ellipse cx="570" cy="474" rx="16" ry="24"/>
+          <g class="blush"><ellipse cx="412" cy="524" rx="29" ry="16"/><ellipse cx="620" cy="524" rx="29" ry="16"/></g>
+        </svg>
+        Bluprint <small>Admin</small>
+      </span>
+      <div class="right" id="bar"></div>
+    </div>
+  </header>
+  <main id="app"></main>
+</div>
+<script>
+(function () {
+  // The Supabase project from admin/supabase.sql. The key is the public one: it can only call functions.
+  var SUPABASE_URL = "https://jbvkjvdthuzofvmhwctv.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_hbxcjbYF5H8py5gGLokxPg_tD9nGsNl";
+  var PW = "bp-admin-pw";
+
+  var app = document.getElementById("app");
+  var bar = document.getElementById("bar");
+  var data = null;
+  var openRun = null;
+  var openUpdate = null;
+  var repoView = null;
+  var runFilter = "all";
+  var details = {};
+
+  function stored() { try { return localStorage.getItem(PW) || ""; } catch (e) { return ""; } }
+  function keep(v) { try { v ? localStorage.setItem(PW, v) : localStorage.removeItem(PW); } catch (e) {} }
+
+  function rpc(fn, body) {
+    return fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok) throw new Error(j && j.message || r.statusText);
+        return j;
+      });
+    });
+  }
+
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var n = function (x) { return x == null ? "—" : Number(x).toLocaleString("en-US"); };
+  var usd = function (x) { return x == null ? "—" : "$" + Number(x).toFixed(2); };
+  var secs = function (x) {
+    if (x == null) return "—";
+    x = Math.round(Number(x));
+    return x < 60 ? x + "s" : Math.floor(x / 60) + "m " + String(x % 60).padStart(2, "0") + "s";
+  };
+  var pct = function (a, b) { return b ? Math.round(100 * a / b) + "%" : "—"; };
+  var when = function (iso) {
+    var d = new Date(iso), s = (Date.now() - d) / 1000;
+    if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m ago";
+    if (s < 86400) return Math.round(s / 3600) + "h ago";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+  var ver = function (v) { return v == null ? "unversioned" : "v" + v; };
+
+  function gate(msg) {
+    bar.innerHTML = "";
+    app.innerHTML =
+      '<div class="gate"><form id="gate">' +
+      '<p class="eyebrow">Internal</p><h1>Admin</h1>' +
+      '<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" autofocus>' +
+      '<div class="row"><button class="btn primary big" type="submit">Open</button>' +
+      (msg ? '<span class="err">' + esc(msg) + "</span>" : "") + "</div></form></div>";
+    document.getElementById("gate").addEventListener("submit", function (e) {
+      e.preventDefault();
+      load(document.getElementById("pw").value);
+    });
+  }
+
+  function load(pw) {
+    bar.innerHTML = '<span class="stamp">Loading…</span>';
+    rpc("bp_admin_overview", { pw: pw }).then(function (d) {
+      keep(pw);
+      data = d;
+      details = {};
+      render();
+    }, function (e) {
+      keep("");
+      gate(/not allowed/i.test(e.message) ? "Wrong password" : e.message);
+    });
+  }
+
+  function bars(rows, a, b) {
+    var max = Math.max(1, Math.max.apply(null, rows.map(function (r) { return (r[a] || 0) + (b ? r[b] || 0 : 0); })));
+    return '<div class="bars">' + rows.map(function (r) {
+      var day = new Date(r.day + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      var tip = day + ": " + (r[a] || 0) + (b ? " / " + (r[b] || 0) : "");
+      return '<div class="bar" title="' + esc(tip) + '"><i style="height:' + (100 * (r[a] || 0) / max) + '%"></i>' +
+        (b ? '<i class="b" style="height:' + (100 * (r[b] || 0) / max) + '%"></i>' : "") + "</div>";
+    }).join("") + '</div><div class="axis"><span>30 days ago</span><span>Today</span></div>';
+  }
+
+  function list(rows, label, value) {
+    if (!rows.length) return '<p class="empty">Nothing yet</p>';
+    var max = Math.max.apply(null, rows.map(function (r) { return r[value]; }));
+    return '<div class="list">' + rows.map(function (r) {
+      return '<div><b style="width:' + (100 * r[value] / max) + '%"></b><span>' + esc(r[label]) + "</span><span>" + n(r[value]) + "</span></div>";
+    }).join("") + "</div>";
+  }
+
+  function tile(label, value, sub) {
+    return '<div class="tile"><dt>' + label + "</dt><dd>" + value + "</dd>" + (sub ? "<small>" + sub + "</small>" : "") + "</div>";
+  }
+
+  function tokens(bill) {
+    var keys = Object.keys(bill || {});
+    if (!keys.length) return null;
+    return keys.reduce(function (t, k) {
+      var b = bill[k];
+      ["calls", "cached", "input", "output", "cacheRead"].forEach(function (f) { t[f] += Number(b[f] || 0); });
+      return t;
+    }, { calls: 0, cached: 0, input: 0, output: 0, cacheRead: 0 });
+  }
+
+  function billTable(bill) {
+    var keys = Object.keys(bill || {});
+    if (!keys.length) return "";
+    var t = tokens(bill), cost = keys.reduce(function (a, k) { return a + Number(bill[k].usd || 0); }, 0);
+    var row = function (name, b, c) {
+      return "<tr><td>" + name + '</td><td class="num">' + n(b.calls) + '</td><td class="num">' + n(b.input) + '</td><td class="num">' + n(b.output) +
+        '</td><td class="num">' + n(b.cacheRead) + '</td><td class="num">' + usd(c) + "</td></tr>";
+    };
+    return '<div class="scroll"><table><thead><tr><th>Stage</th><th class="num">Calls</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache read</th><th class="num">USD</th></tr></thead><tbody>' +
+      keys.map(function (k) { return row(esc(k), bill[k], bill[k].usd); }).join("") + row("<b>Total</b>", t, cost) + "</tbody></table></div>";
+  }
+
+  // The updates this map went on to get, newest first; one opens to its files, sections, tokens and (when it failed) its log.
+  function updatesTable(list) {
+    if (!list.length) return '<p class="empty">Not updated since</p>';
+    return '<div class="scroll"><table><thead><tr><th>When</th><th>Status</th><th>Version</th><th class="num">Files changed</th><th class="num">Sections redone</th><th class="num">Tokens</th><th class="num">Time</th><th class="num">Cost</th></tr></thead><tbody>' +
+      list.map(function (u) {
+        var rep = u.report || {}, t = tokens(rep.bill), open = openUpdate === u.id;
+        var changed = rep.changed || [], sections = rep.sections || [];
+        return '<tr class="run' + (open ? " open" : "") + '" data-update="' + u.id + '">' +
+          '<td title="' + esc(new Date(u.at).toLocaleString()) + '">' + when(u.at) + "</td>" +
+          '<td><span class="tag ' + (u.status === "ok" ? "ok" : "bad") + '">' + esc(u.status) + "</span></td>" +
+          "<td>" + ver(u.mapper_version) + '</td><td class="num">' + n(changed.length) + '</td><td class="num">' + n(sections.length) +
+          '</td><td class="num">' + (t ? n(t.input + t.output + t.cacheRead) : "—") + '</td><td class="num">' + secs(u.total_s) + '</td><td class="num">' + usd(u.usd) + "</td></tr>" +
+          (open ? '<tr><td class="detail" colspan="8"><div class="detailIn">' +
+            "<div><h4>Files changed</h4>" + (changed.length ? '<ul class="problems">' + changed.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") + "</ul>" : '<p class="empty">None</p>') + "</div>" +
+            "<div><h4>Sections redone</h4>" + (sections.length ? '<ul class="problems">' + sections.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") + "</ul>" : '<p class="empty">None</p>') +
+            ((rep.failed || []).length ? "<h4 style=\"margin-top:10px\">Failed</h4><ul class=\"problems\">" + rep.failed.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") + "</ul>" : "") + "</div>" +
+            (rep.bill ? '<div class="wide"><h4>Tokens and cost by stage</h4>' + billTable(rep.bill) + "</div>" : "") +
+            (u.log_tail ? '<div class="wide"><h4>End of the log</h4><pre class="log">' + esc(u.log_tail) + "</pre></div>" : "") +
+            "</div></td></tr>" : "");
+      }).join("") + "</tbody></table></div>";
+  }
+
+  function detail(r) {
+    var d = details[r.id];
+    if (!d) return '<p class="empty">Loading the report…</p>';
+    if (d.error) return '<p class="empty">' + esc(d.error) + "</p>";
+    var rep = d.report || {};
+    var el = rep.elapsed || {};
+    var billRows = billTable(rep.bill);
+    var tok = tokens(rep.bill);
+    var models = d.models || {};
+    var problems = (rep.check && rep.check.problems) || [];
+    var quick = (rep.quickCheck && rep.quickCheck.problems) || [];
+    var deepened = rep.deepened || [];
+    return '<div class="detailIn">' +
+      "<div><h4>Time</h4><div class=\"kv\">" + Object.keys(el).map(function (k) { return "<span>" + esc(k) + "</span><span>" + secs(el[k]) + "</span>"; }).join("") + "</div></div>" +
+      (tok ? "<div><h4>Tokens</h4><div class=\"kv\"><span>input</span><span>" + n(tok.input) + "</span><span>output</span><span>" + n(tok.output) +
+        "</span><span>cache read</span><span>" + n(tok.cacheRead) + "</span><span>total</span><span>" + n(tok.input + tok.output + tok.cacheRead) +
+        "</span><span>calls</span><span>" + n(tok.calls) + (tok.cached ? " (" + n(tok.cached) + " replayed)" : "") + "</span></div></div>" : "") +
+      "<div><h4>Models</h4><div class=\"kv\">" + Object.keys(models).map(function (k) { return "<span>" + esc(k) + "</span><span>" + esc(String(models[k]).replace(/^global\.anthropic\./, "")) + "</span>"; }).join("") + "</div></div>" +
+      (deepened.length ? "<div><h4>Sections</h4><div class=\"kv\">" + deepened.map(function (s) { return "<span>" + esc(s.id) + "</span><span>" + (s.accepted ? "accepted" : "not accepted") + " · " + s.turns + " turns</span>"; }).join("") + "</div></div>" : "") +
+      (billRows ? '<div class="wide"><h4>Tokens and cost by stage</h4>' + billRows + "</div>" : "") +
+      '<div class="wide"><h4>Updates · ' + d.updates.length + (d.updates.length ? " · " + usd(d.updates.reduce(function (a, u) { return a + Number(u.usd || 0); }, 0)) : "") + "</h4>" + updatesTable(d.updates) + "</div>" +
+      (quick.length || problems.length ? '<div class="wide"><h4>Check problems · quick ' + quick.length + " · final " + problems.length + '</h4><ul class="problems">' + problems.concat(problems.length ? [] : quick).slice(0, 30).map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul></div>" : "") +
+      '<div class="wide"><h4>End of the log</h4><pre class="log">' + esc(d.log_tail || "(no log)") + "</pre></div>" +
+      "</div>";
+  }
+
+  function runsTable() {
+    if (repoView) return repoPanel();
+    var rows = data.recent.filter(function (r) {
+      return runFilter === "all" || r.status !== "ok";
+    });
+    var filters = [["all", "All"], ["failed", "Failed"]].map(function (f) {
+      return '<button class="btn" data-filter="' + f[0] + '" aria-pressed="' + (runFilter === f[0]) + '">' + f[1] + "</button>";
+    }).join("");
+    if (!rows.length) return '<div class="filters">' + filters + '</div><p class="empty">No runs yet</p>';
+    return '<div class="filters">' + filters + '</div><div class="scroll"><table><thead><tr>' +
+      '<th>When</th><th>Status</th><th>Version</th><th>Repo</th><th>Commit</th><th class="num">Files</th><th class="num">Quick</th><th class="num">Total</th><th class="num">Cost</th><th class="num">Updates</th><th>Backend</th><th>Machine</th>' +
+      "</tr></thead><tbody>" + rows.map(function (r) {
+        var open = openRun === r.id;
+        return '<tr class="run' + (open ? " open" : "") + '" data-run="' + r.id + '">' +
+          '<td title="' + esc(new Date(r.at).toLocaleString()) + '">' + when(r.at) + "</td>" +
+          '<td><span class="tag ' + (r.status === "ok" ? "ok" : "bad") + '">' + esc(r.status) + "</span></td>" +
+          "<td>" + ver(r.mapper_version) + '</td><td><button class="repo" data-repo="' + esc(r.repo) + '" title="Every map of ' + esc(r.repo) + ' across versions">' + esc(r.repo) + "</button></td>" +
+          "<td>" + esc((r.repo_commit || "").slice(0, 7)) + '</td><td class="num">' + n(r.files) + '</td><td class="num">' + secs(r.quick_s) +
+          '</td><td class="num">' + secs(r.total_s) + '</td><td class="num">' + usd(r.usd) + '</td><td class="num" title="' + usd(r.updates_usd) + ' in updates">' + n(r.updates) + "</td><td>" + esc(r.backend) +
+          "</td><td>" + esc((r.install_id || "").slice(0, 8)) + "</td></tr>" +
+          (open ? '<tr><td class="detail" colspan="12">' + detail(r) + "</td></tr>" : "");
+      }).join("") + "</tbody></table></div>";
+  }
+
+  function render() {
+    var d = data;
+    var latest = d.versions.filter(function (v) { return v.mapper_version != null; })[0];
+    bar.innerHTML = '<span class="stamp">Updated ' + new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) + "</span>" +
+      '<button class="btn" id="refresh">Refresh</button><button class="btn" id="out">Sign out</button>';
+    app.innerHTML = '<div class="wrap">' +
+      '<div class="head"><div><p class="eyebrow">Internal · last 30 days</p><h1>How Bluprint is doing</h1>' +
+      '<p class="lede">Installs from install.sh, visits to blpr.dev, and every map run reported by the app, by mapping version.</p></div></div>' +
+
+      '<dl class="tiles">' +
+      tile("Installs", n(d.installs_30), n(d.installs_failed_30) + " failed · " + n(d.installs) + " all time") +
+      tile("Visitors", n(d.visitors_30), n(d.views_30) + " page views") +
+      tile("New maps", n(d.runs_30), pct(d.runs_failed_30, d.runs_30) + " failed · " + n(d.updates_30) + " updates") +
+      tile("Machines", n(d.machines), "that sent a run") +
+      tile("Model spend", usd(d.usd_30), "at API list price") +
+      tile("Mapper", latest ? ver(latest.mapper_version) : "—", latest ? "median " + secs(latest.total_s) + " · " + usd(latest.usd) : "no runs yet") +
+      "</dl>" +
+
+      '<section><div class="grid3">' +
+      '<div class="card"><h3>Installs per day <span>' + n(d.installs_30) + '</span></h3>' + bars(d.daily, "installs", "installs_failed") +
+      '<div class="key"><span><i></i>Worked</span><span><i class="b"></i>Failed</span></div></div>' +
+      '<div class="card"><h3>Visitors per day <span>' + n(d.visitors_30) + "</span></h3>" + bars(d.daily, "visitors") + "</div>" +
+      '<div class="card"><h3>New maps per day <span>' + n(d.runs_30) + "</span></h3>" + bars(d.daily, "runs_ok", "runs_failed") +
+      '<div class="key"><span><i></i>Finished</span><span><i class="b"></i>Failed</span></div></div>' +
+      "</div></section>" +
+
+      '<section><p class="eyebrow">Mapping algorithm</p><h2>By version</h2><p class="lede">Full map runs only, not updates. Times and cost are medians and averages of runs that finished.</p>' +
+      '<div class="scroll" style="margin-top:14px"><table><thead><tr><th>Version</th><th class="num">Runs</th><th class="num">Failed</th><th class="num">Quick map</th><th class="num">Full map</th><th class="num">Avg cost</th><th class="num">Avg files</th><th class="num">Check problems</th><th>First run</th><th>Last run</th></tr></thead><tbody>' +
+      (d.versions.length ? d.versions.map(function (v) {
+        return "<tr><td>" + ver(v.mapper_version) + '</td><td class="num">' + n(v.runs) + '</td><td class="num">' + pct(v.failed, v.runs) +
+          '</td><td class="num">' + secs(v.quick_s) + '</td><td class="num">' + secs(v.total_s) + '</td><td class="num">' + usd(v.usd) +
+          '</td><td class="num">' + (v.files == null ? "—" : Math.round(v.files)) + '</td><td class="num">' + (v.problems == null ? "—" : Number(v.problems).toFixed(1)) +
+          "</td><td>" + new Date(v.first_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + "</td><td>" + when(v.last_at) + "</td></tr>";
+      }).join("") : '<tr><td colspan="10" class="empty">No runs yet</td></tr>') +
+      "</tbody></table></div></section>" +
+
+      '<section><p class="eyebrow">Runs</p><h2>Recent maps</h2><p class="lede">The latest 200 new maps. Click one for its time by stage, tokens, models, cost, the end of its log, and every update it got after.</p><div style="margin-top:14px" id="runs">' + runsTable() + "</div></section>" +
+
+      '<section><div class="grid3">' +
+      '<div class="card"><h3>Where visitors came from</h3>' + list(d.referrers, "referrer", "visitors") + "</div>" +
+      '<div class="card"><h3>Countries</h3>' + list(d.countries, "country", "visitors") + "</div>" +
+      '<div class="card"><h3>Installs by system</h3>' + list(d.os, "os", "installs") + "</div>" +
+      "</div></section>" +
+
+      '<dl class="end"><div class="title"><dt>Title</dt><dd>Bluprint admin</dd></div><div><dt>Drawn</dt><dd>' +
+      new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) + '</dd></div><div><dt>Sheet</dt><dd>1 of 1</dd></div><div><dt>Site</dt><dd><a href="https://blpr.dev">blpr.dev</a></dd></div></dl>' +
+      "</div>";
+  }
+
+  var median = function (xs) {
+    xs = xs.filter(function (x) { return x != null; }).map(Number).sort(function (a, b) { return a - b; });
+    if (!xs.length) return null;
+    var m = xs.length >> 1;
+    return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2;
+  };
+  var mean = function (xs) {
+    xs = xs.filter(function (x) { return x != null; }).map(Number);
+    return xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : null;
+  };
+  // Lower is better for everything compared here.
+  function delta(now, before) {
+    if (now == null || before == null || !before) return "";
+    var p = Math.round(100 * (now - before) / before);
+    if (!p) return '<span class="delta">±0%</span>';
+    return '<span class="delta ' + (p < 0 ? "better" : "worse") + '">' + (p > 0 ? "+" : "") + p + "%</span>";
+  }
+
+  // Per-run bars for one measure, shaded by mapping version so a change of version shows as a change of shade.
+  function runBars(runs, key, fmt, versions) {
+    var ok = runs.filter(function (r) { return r.status === "ok" && r[key] != null; });
+    if (!ok.length) return '<p class="empty">No finished runs</p>';
+    var max = Math.max.apply(null, ok.map(function (r) { return Number(r[key]); })) || 1;
+    return '<div class="bars">' + ok.map(function (r) {
+      var shade = 0.35 + 0.65 * (versions.indexOf(r.mapper_version) + 1) / versions.length;
+      return '<div class="bar" title="' + esc(ver(r.mapper_version) + " · " + new Date(r.at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + fmt(r[key])) +
+        '"><i style="height:' + (100 * Number(r[key]) / max) + "%;opacity:" + shade + '"></i></div>';
+    }).join("") + '</div><div class="axis"><span>First map</span><span>Latest</span></div>';
+  }
+
+  function repoPanel() {
+    var v = repoView;
+    var head = '<div class="repoHead"><button class="btn" id="back">← All maps</button><h3>' + esc(v.name) + "</h3>" +
+      '<span class="stamp">Every new map of this repo, on every machine</span></div>';
+    if (!v.runs) return head + '<p class="empty">' + esc(v.error || "Loading…") + "</p>";
+    var runs = v.runs;
+    var versions = [];
+    runs.forEach(function (r) { if (versions.indexOf(r.mapper_version) < 0) versions.push(r.mapper_version); });
+    versions.sort(function (a, b) { return (a == null ? -1 : a) - (b == null ? -1 : b); });
+    var prev = null;
+    var byVersion = versions.map(function (ver_) {
+      var rs = runs.filter(function (r) { return r.mapper_version === ver_; });
+      var ok = rs.filter(function (r) { return r.status === "ok"; });
+      var row = {
+        version: ver_, runs: rs.length, failed: rs.length - ok.length,
+        total_s: median(ok.map(function (r) { return r.total_s; })),
+        quick_s: median(ok.map(function (r) { return r.quick_s; })),
+        usd: mean(ok.map(function (r) { return r.usd; })),
+        tokens: mean(ok.map(function (r) { return r.tokens; })),
+        problems: mean(ok.map(function (r) { return r.problems; })),
+        quick_problems: mean(ok.map(function (r) { return r.quick_problems; })),
+        accepted: mean(ok.map(function (r) { return r.sections ? r.accepted / r.sections : null; }))
+      };
+      row.prev = prev;
+      prev = row;
+      return row;
+    }).reverse();
+    var cell = function (row, key, fmt) {
+      return '<td class="num">' + (row[key] == null ? "—" : fmt(row[key])) + (row.prev ? delta(row[key], row.prev[key]) : "") + "</td>";
+    };
+    var one = function (x) { return Number(x).toFixed(1); };
+    var tok = function (x) { return n(Math.round(x)); };
+    return head +
+      '<div class="scroll"><table><thead><tr><th>Version</th><th class="num">Maps</th><th class="num">Failed</th><th class="num">Quick map</th><th class="num">Full map</th><th class="num">Avg cost</th><th class="num">Avg tokens</th><th class="num">Quick-map problems</th><th class="num">Final problems</th><th class="num">Sections accepted</th></tr></thead><tbody>' +
+      byVersion.map(function (row) {
+        return "<tr><td>" + ver(row.version) + '</td><td class="num">' + n(row.runs) + '</td><td class="num">' + pct(row.failed, row.runs) + "</td>" +
+          cell(row, "quick_s", secs) + cell(row, "total_s", secs) + cell(row, "usd", usd) + cell(row, "tokens", tok) +
+          cell(row, "quick_problems", one) + cell(row, "problems", one) +
+          '<td class="num">' + (row.accepted == null ? "—" : Math.round(100 * row.accepted) + "%") + "</td></tr>";
+      }).join("") + "</tbody></table></div>" +
+      '<p class="lede" style="margin-top:8px">Medians for time, averages for the rest, of maps that finished. Each change is against the version before; lower is better.</p>' +
+      '<div class="grid3" style="margin-top:18px">' +
+      '<div class="card"><h3>Full map time</h3>' + runBars(runs, "total_s", secs, versions) + "</div>" +
+      '<div class="card"><h3>Cost</h3>' + runBars(runs, "usd", usd, versions) + "</div>" +
+      '<div class="card"><h3>Quick-map problems</h3>' + runBars(runs, "quick_problems", n, versions) + "</div>" +
+      "</div>" +
+      '<p class="lede" style="margin-top:6px">One bar per map, oldest first; darker is a newer version.</p>' +
+      '<div class="scroll" style="margin-top:18px"><table><thead><tr><th>When</th><th>Status</th><th>Version</th><th>Commit</th><th class="num">Files</th><th class="num">Quick</th><th class="num">Total</th><th class="num">Cost</th><th class="num">Tokens</th><th class="num">Problems</th><th class="num">Updates</th><th>Machine</th></tr></thead><tbody>' +
+      runs.slice().reverse().map(function (r) {
+        var open = openRun === r.id;
+        return '<tr class="run' + (open ? " open" : "") + '" data-run="' + r.id + '">' +
+          '<td title="' + esc(new Date(r.at).toLocaleString()) + '">' + when(r.at) + "</td>" +
+          '<td><span class="tag ' + (r.status === "ok" ? "ok" : "bad") + '">' + esc(r.status) + "</span></td>" +
+          "<td>" + ver(r.mapper_version) + "</td><td>" + esc((r.repo_commit || "").slice(0, 7)) + '</td><td class="num">' + n(r.files) +
+          '</td><td class="num">' + secs(r.quick_s) + '</td><td class="num">' + secs(r.total_s) + '</td><td class="num">' + usd(r.usd) +
+          '</td><td class="num">' + (r.tokens == null ? "—" : n(r.tokens)) + '</td><td class="num">' + (r.problems == null ? "—" : n(r.quick_problems) + " → " + n(r.problems)) +
+          '</td><td class="num">' + n(r.updates) + "</td><td>" + esc((r.install_id || "").slice(0, 8)) + "</td></tr>" +
+          (open ? '<tr><td class="detail" colspan="12">' + detail(r) + "</td></tr>" : "");
+      }).join("") + "</tbody></table></div>";
+  }
+
+  function rerenderRuns() { document.getElementById("runs").innerHTML = runsTable(); }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button, tr.run");
+    if (t && t.dataset.update) {
+      var uid = Number(t.dataset.update);
+      openUpdate = openUpdate === uid ? null : uid;
+      return rerenderRuns();
+    }
+    if (!t) return;
+    if (t.id === "refresh") { repoView = null; return load(stored()); }
+    if (t.id === "back") { repoView = null; openRun = null; return rerenderRuns(); }
+    if (t.dataset.repo) {
+      var name = t.dataset.repo;
+      var view = repoView = { name: name, runs: null };
+      openRun = null;
+      rerenderRuns();
+      document.getElementById("runs").scrollIntoView({ block: "start" });
+      rpc("bp_admin_repo", { pw: stored(), repo_name: name }).then(function (runs) { view.runs = runs; }, function (err) { view.error = err.message; })
+        .then(function () { if (repoView === view) rerenderRuns(); });
+      return;
+    }
+    if (t.id === "out") { keep(""); data = null; return gate(); }
+    if (t.dataset.filter) { runFilter = t.dataset.filter; openRun = null; return rerenderRuns(); }
+    if (t.dataset.run) {
+      var id = Number(t.dataset.run);
+      openRun = openRun === id ? null : id;
+      openUpdate = null;
+      rerenderRuns();
+      if (openRun && !details[id]) {
+        rpc("bp_admin_run", { pw: stored(), run_id: id }).then(function (r) { details[id] = r || { error: "That run is gone" }; }, function (err) { details[id] = { error: err.message }; })
+          .then(function () { if (openRun === id) rerenderRuns(); });
+      }
+    }
+  });
+
+  stored() ? load(stored()) : gate();
+})();
+</script>
+</body>
+</html>

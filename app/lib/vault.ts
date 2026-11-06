@@ -29,6 +29,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { cloneUrl, repoName } from "@/lib/clone";
 import type { Run } from "@/lib/data";
+import { sendRun } from "@/lib/telemetry";
 
 const IDENTIFIER = "dev.bluprint.app";
 
@@ -191,6 +192,7 @@ function finished(p: Project, ok: boolean) {
     p.map.status = "failed";
     p.map.error = logTail(p.id) || "The generator stopped without saying why.";
   }
+  void sendRun(dir, "generate", p.map.status === "ready" ? "ok" : p.map.status);
 }
 
 /**
@@ -534,6 +536,7 @@ function updated(p: Project) {
       }
     })() || "The update stopped without saying why.";
   }
+  void sendRun(projectDir(p.id), "update", u.status === "done" ? "ok" : "failed");
 }
 
 /** An agent's turn the map follows: what it did and why (its transcript), and where it found the map wrong. */

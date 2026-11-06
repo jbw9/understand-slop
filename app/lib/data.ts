@@ -508,6 +508,8 @@ export interface Group {
 /** One mapping run: which repository, at which commit, and how it is cut. */
 export interface Run {
   command: string;
+  /** The mapping algorithm's version that made it (scripts/generate/version.ts). Absent on older maps. */
+  mapperVersion?: number;
   /** The checkout's directory name, looked for under the usual code folders (rootOf in lib/maps.ts) — also where the code level reads. */
   repo: string;
   commit: string;

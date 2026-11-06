@@ -25,6 +25,7 @@ import { inventory, isSource, scopeTo, type Inventory } from "./inventory";
 import { overviewOf, toOverview, type Overviewed } from "./overview";
 import { shapeProblems } from "./schema";
 import { summarize, type FileSummary } from "./summarize";
+import { MAPPER_VERSION } from "./version";
 
 /** Written whole and renamed into place, so the app never parses half a file. */
 function atomic(path: string, body: string) {
@@ -231,7 +232,7 @@ export async function main(args: string[]) {
     flush();
     const deepen = !has("--no-deepen");
     const agentDeepen = has("--deepen-agent");
-    const run: Run = { command: `bluprint map ${inv.name} --fast`, repo: inv.scope ? name : inv.name, commit: inv.commit, files: code.length, elapsed: "", root: repo, explain: deepen ? EXPLAIN_LEVEL : "none", models };
+    const run: Run = { command: `bluprint map ${inv.name} --fast`, mapperVersion: MAPPER_VERSION, repo: inv.scope ? name : inv.name, commit: inv.commit, files: code.length, elapsed: "", root: repo, explain: deepen ? EXPLAIN_LEVEL : "none", models };
     const r = await lap("fast", () => fastMap(inv, sums, activeGraph()!, models.author, run, say));
     const quick = Math.round((Date.now() - t0) / 1000);
     r.map.RUN.elapsed = `${Math.max(1, Math.round(quick / 60))} min`;
@@ -356,6 +357,7 @@ export async function main(args: string[]) {
         {
           repo: inv.name,
           commit: inv.commit,
+          mapperVersion: MAPPER_VERSION,
           backend: BACKEND,
           mode: deepen ? `fast, then deepened${agentDeepen ? " by agents" : " in words"}` : "fast",
           models,
@@ -437,6 +439,7 @@ export async function main(args: string[]) {
   // the time so far in place of the total the run does not have yet.
   const runNow = (): Run => ({
     command: `bluprint map ${inv.name}`,
+    mapperVersion: MAPPER_VERSION,
     // A scoped map is named for its part and counts only the files it covers.
     repo: inv.scope ? name : inv.name,
     commit: inv.commit,
@@ -559,6 +562,7 @@ export async function main(args: string[]) {
   const report = {
     repo: inv.name,
     commit: inv.commit,
+    mapperVersion: MAPPER_VERSION,
     // Through Claude Code, `usd` is what the same tokens cost at the API list
     // price; on a Claude plan they come out of the plan's usage instead.
     backend: BACKEND,

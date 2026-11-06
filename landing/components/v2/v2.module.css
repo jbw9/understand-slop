@@ -1797,3 +1797,25 @@
     max-width: 13em;
   }
 }
+/* A phone gets the short version: the pitch, the quotes, the agents, the questions, the install.
+   The live app, the history and the animated walkthroughs need a wider sheet than a phone has. */
+@media (max-width: 600px) {
+  .evo,
+  .top,
+  .how,
+  .desk,
+  .coverFoot {
+    display: none;
+  }
+  .close .ctas {
+    align-self: stretch;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .close .install {
+    width: 100%;
+  }
+  .close .installBox .btn {
+    flex: none;
+  }
+}

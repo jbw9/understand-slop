@@ -497,6 +497,9 @@ export function Shell({
           term.focus();
         }
       });
+      // Pointing at the terminal is enough to type into it, no click needed.
+      const focusOnHover = () => term.focus();
+      host.addEventListener("mouseenter", focusOnHover);
       const seen = new ResizeObserver(refit);
       seen.observe(el.current);
       show.current = () => {
@@ -519,6 +522,7 @@ export function Shell({
         host.removeEventListener("contextmenu", noKeyMenu, true);
         window.removeEventListener("mousedown", keepFocus, true);
         void drops.then((off) => off());
+        host.removeEventListener("mouseenter", focusOnHover);
         seen.disconnect();
         input.dispose();
         planLinks.dispose();

@@ -75,7 +75,7 @@ export function StatusBar() {
         </Item>
       ) : null}
       <Sep />
-      <Item title={`Levels in the map — ${keys(mac, "K")} to go to one`} onClick={() => openPalette()}>
+      <Item title={`Levels in the map — ${keys(mac, "P")} to go to one`} onClick={() => openPalette()}>
         {counts.levels} levels
       </Item>
       {counts.unsure ? (

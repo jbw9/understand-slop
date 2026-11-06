@@ -24,7 +24,8 @@ import { cn } from "@/lib/utils";
 /**
  * The palette: one box that goes anywhere. Type part of a level's name and
  * Enter opens it however deep it is, and a doc of the project's opens the
- * same way; start with `>` for the app's actions;
+ * same way; start with `>` for the app's actions; Cmd+K finds a file or
+ * symbol instead and opens it in the editor;
  * the map name in the title bar opens it on the maps, and the status bar's
  * counts open it on the levels that are not certain or the problems found.
  *
@@ -33,7 +34,7 @@ import { cn } from "@/lib/utils";
  */
 
 const OPEN = "slop:palette";
-export type PaletteMode = "all" | "actions" | "maps" | "unsure" | "problems" | "docs";
+export type PaletteMode = "all" | "code" | "actions" | "maps" | "unsure" | "problems" | "docs";
 export const openPalette = (mode: PaletteMode = "all") =>
   window.dispatchEvent(new CustomEvent<PaletteMode>(OPEN, { detail: mode }));
 
@@ -97,7 +98,10 @@ export function Palette() {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       // On a Mac the palette is Cmd+K; Ctrl+K in a terminal is the program's kill-line.
       if (e.code === "KeyK" && !e.metaKey && /Mac/.test(navigator.platform) && (e.target as Element | null)?.closest?.(".xterm")) return;
-      if (e.code === "KeyK" || (e.code === "KeyP" && !e.shiftKey)) {
+      if (e.code === "KeyK") {
+        e.preventDefault();
+        show("code");
+      } else if (e.code === "KeyP" && !e.shiftKey) {
         e.preventDefault();
         show("all");
       } else if (e.code === "KeyP" && e.shiftKey) {
@@ -140,9 +144,9 @@ export function Palette() {
     return out;
   }, [map]);
 
-  // The checkout's own names — paths and top-level symbols — each leading to
-  // the deepest level that opens it, so a name from a stack trace or a review
-  // finds its place on a map cut by features.
+  // The checkout's own names — paths and top-level symbols — each opening in
+  // the editor over the deepest level that explains it, so closing the file
+  // lands where it sits on a map cut by features.
   const files = useFiles();
   const cited = useCitations();
   const trailOf = useTrail();
@@ -157,8 +161,7 @@ export function Palette() {
         label: file,
         hint: at ? trailOf(at) : f.status === "excluded" ? "left out of the map · opens the file" : "not on any level · opens the file",
         kind: "file",
-        // A file no level explains opens itself, to read or edit, rather than a list that says so.
-        run: () => (at ? goTo(at) : openFile(path, file)),
+        run: () => openFile(at ?? path, file),
       });
       for (const sym of f.symbols) {
         const by = deepest(file, sym.start, sym.end);
@@ -167,7 +170,7 @@ export function Palette() {
           label: sym.name,
           hint: `${file} → ${by ? trailOf(by) : at ? `not explained; nearest ${trailOf(at)}` : "not explained"}`,
           kind: "symbol",
-          run: () => (by ?? at ? goTo((by ?? at)!) : setTimeout(() => openFiles("gaps"))),
+          run: () => openFile(by ?? at ?? path, file, sym.start),
         });
       }
     }
@@ -267,8 +270,9 @@ export function Palette() {
       : mode === "unsure" ? findings.unsure
       : mode === "problems" ? findings.problems
       : mode === "docs" ? docs
+      : mode === "code" ? code
       : actionsOnly ? actions
-      : q ? [...levels, ...code, ...docs, ...actions]
+      : q ? [...levels, ...docs, ...actions]
       : levels;
     return pool
       // A hint or a body counts only as a plain substring: scattered letters
@@ -330,6 +334,7 @@ export function Palette() {
             : mode === "unsure" ? `${findings.unsure.length} levels the map is not certain about — filter…`
             : mode === "problems" ? `${findings.problems.length} problems found in the code — filter…`
             : mode === "docs" ? (docList === null ? "Finding the docs…" : `${docList.length} docs in this project — filter…`)
+            : mode === "code" ? "Open a file or symbol in the editor…"
             : "Go to a level, or type > for actions"
           }
           className="h-11 w-full shrink-0 border-b border-border-gray bg-transparent px-4 text-[14px] text-ink placeholder:text-faint focus:outline-none"

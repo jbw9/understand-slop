@@ -93,7 +93,7 @@ export function StatusBar() {
       <span className="min-w-0 flex-1" />
       <MapUpdates key={name} id={name} root={RUN.root} local={local} />
       <Item title="Go to a level, or run an action" onClick={() => openPalette()}>
-        Go to <Kbd className={KEY}>{keys(mac, "K")}</Kbd>
+        Go to <Kbd className={KEY}>{keys(mac, "P")}</Kbd>
       </Item>
       {STATIC_MAP ? (
         <Item title="Ask Claude about this code" onClick={toggleWorkspace}>

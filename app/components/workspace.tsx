@@ -105,6 +105,8 @@ interface Tab {
   /** It runs the dev server: its output is watched for the server's address,
    * and it is drawn in the project's Preview tab rather than in a tab of its own. */
   dev?: boolean;
+  /** The dev server's: the folder of the web app it serves. */
+  site?: string;
   /** Moved out of the window, into the main view in front of the map. */
   main?: boolean;
   /** What the agent in front is doing, for the dot on the tab. */
@@ -123,12 +125,23 @@ interface Tab {
 
 /** How a project is run, from its files (src-tauri/src/devices.rs). */
 interface Project {
-  web: string | null;
+  /** Its web apps, the one to open first leading: the folder each is in, and how it starts. */
+  web: { dir: string; run: string }[];
   android: boolean;
   ios: boolean;
 }
 
 const OFFER_KEY = "slop.offer:";
+/** The web app a project's Preview was last switched to, by its folder. */
+const SITE_KEY = "slop.site:";
+
+function storedSite(root: string): string | null {
+  try {
+    return localStorage.getItem(SITE_KEY + root);
+  } catch {
+    return null;
+  }
+}
 /** The conversations Claude was having in the tabs, per project, so the app reopens them. */
 const SESSIONS_KEY = "slop.workspace.sessions";
 
@@ -235,7 +248,8 @@ export function Workspace() {
       const main = extra?.main ?? extra?.kind === "preview";
       setTabs((t) => [...t, { key, kind: "shell", start, ran: start, title: "terminal", cwd, live: false, busy: false, main, ...extra }]);
       if (main) setFront((f) => ({ ...f, [cwd]: key }));
-      else {
+      // A dev server is drawn in its Preview, never in the window.
+      else if (!extra?.dev) {
         setActive((a) => ({ ...a, [cwd]: key }));
         if (cwd === here) show(true);
       }
@@ -274,7 +288,11 @@ export function Workspace() {
   const [projects, setProjects] = useState<Record<string, Project>>({});
   const [offers, setOffers] = useState<Record<string, boolean>>({});
   const tabsNow = useRef(tabs);
+  const projectsNow = useRef(projects);
+  const serversNow = useRef(servers);
   useEffect(() => {
+    projectsNow.current = projects;
+    serversNow.current = servers;
     tabsNow.current = tabs;
     // Past every tab open: a hot reload starts the counter again, but not the tabs.
     for (const t of tabs) if (t.key >= nextKey) nextKey = t.key + 1;
@@ -294,11 +312,33 @@ export function Workspace() {
     return all.find((x) => x.key === lastPreview.current[root]) ?? all.at(-1);
   };
 
+  /**
+   * A project's dev server, started when it has a web app and none runs: the
+   * one asked for, else the one last switched to, else the one it opens first.
+   * Not over an address something else pointed the Preview at.
+   */
+  const startDev = useCallback(
+    (root: string, dir?: string, force?: boolean) => {
+      const sites = projectsNow.current[root]?.web ?? [];
+      if (!sites.length) return;
+      // Forced, by the user's own pick: whatever runs is being replaced.
+      if (!force && (!readSettings().devServer || serversNow.current[root] || tabsNow.current.some((x) => x.dev && x.cwd === root))) return;
+      const want = dir ?? storedSite(root);
+      const site = sites.find((x) => x.dir === want) ?? sites[0];
+      add(null, { run: site.run, dev: true, site: site.dir, label: "dev server", cwd: root });
+    },
+    [add],
+  );
+
   /** A project's Preview tab, the one last in view or the one keyed: brought to the front, or opened. */
   const preview = useCallback(
     (root: string, key?: number) => {
       const open = key === undefined ? previewTab(root) : tabsNow.current.find((x) => x.key === key);
-      if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
+      if (!open) {
+        // Closing the last Preview stopped the dev server; a new one starts it again.
+        startDev(root);
+        return add(null, { kind: "preview", title: "Preview", cwd: root });
+      }
       setServerShown((s) => ({ ...s, [open.key]: false }));
       if (open.main) setFront((f) => ({ ...f, [root]: open.key }));
       else {
@@ -307,19 +347,17 @@ export function Workspace() {
       }
       return open.key;
     },
-    [add, here, show],
+    [add, here, show, startDev],
   );
   useEffect(() => {
     const open = () => {
       // The dev server stops with a project's last Preview, so a new one starts it again.
-      const web = projects[here]?.web;
-      if (web && readSettings().devServer && !tabsNow.current.some((x) => x.dev && x.cwd === here))
-        add(null, { run: web, dev: true, label: "dev server", cwd: here });
+      startDev(here);
       add(null, { kind: "preview", title: "Preview", cwd: here });
     };
     window.addEventListener(OPEN_PREVIEW, open);
     return () => window.removeEventListener(OPEN_PREVIEW, open);
-  }, [add, here, projects]);
+  }, [add, here, startDev]);
 
   /** This project's phone of a kind: brought to the front, or opened. */
   const phone = (platform: Platform) => {
@@ -344,14 +382,15 @@ export function Workspace() {
     const root = here;
     invoke<Project>("project_detect", { root })
       .then((p) => {
+        projectsNow.current = { ...projectsNow.current, [root]: p };
         setProjects((all) => ({ ...all, [root]: p }));
-        if (p.web && readSettings().devServer) {
-          add(null, { run: p.web, dev: true, label: "dev server", cwd: root });
-          add(null, { kind: "preview", title: "Preview", cwd: root });
+        if (p.web.length && readSettings().devServer) {
+          startDev(root);
+          if (!tabsNow.current.some((x) => x.kind === "preview" && x.cwd === root)) add(null, { kind: "preview", title: "Preview", cwd: root });
         }
       })
       .catch(() => {});
-  }, [desktop, here, add]);
+  }, [desktop, here, add, startDev]);
 
   // The dev server's tab, read as it prints until it gives its address. Only
   // whole lines, so an address split across two reads is never taken short.
@@ -441,7 +480,7 @@ export function Workspace() {
         const asked = cmd.op === "navigate" && hostOf(cmd.url) ? (/^https?:/.test(cmd.url) ? cmd.url : `http://${cmd.url}`) : undefined;
         // Anything else to navigate to is a page from the web, which needs no server.
         const web = cmd.op === "sign_in" || (cmd.op === "navigate" && !asked && !cmd.url.trim().startsWith("/"));
-        if (!asked && !web && !servers[root])
+        if (!asked && !web && !servers[root] && !projects[root]?.web.length)
           throw new Error(
             "No preview is open for this project, and no dev server has printed an address. Start the dev server in a terminal tab, or navigate to its address, like http://localhost:3000.",
           );
@@ -723,6 +762,18 @@ export function Workspace() {
       const dev = last ? tabs.find((x) => x.dev && x.cwd === gone.cwd) : undefined;
       const rest = tabs.filter((x) => x.key !== key && x !== dev);
       setTabs(rest);
+      // A stopped dev server's address answers no more: kept, a Preview opened
+      // later would wait on it with no terminal to show why.
+      const stopped = gone.dev ? gone : dev;
+      if (stopped) {
+        delete tails.current[stopped.key];
+        setServers((all) => {
+          const rest = { ...all };
+          delete rest[stopped.cwd];
+          return rest;
+        });
+        setAsking((all) => ({ ...all, [stopped.cwd]: undefined }));
+      }
       forgetPlan(gone);
       if (gone.pty !== undefined) tabEnded(gone.pty);
       if (dev?.pty !== undefined) tabEnded(dev.pty);
@@ -742,6 +793,19 @@ export function Workspace() {
     },
     [tabs, active, front, here, show],
   );
+
+  /** The project's Preview switched to another of its web apps: its server stopped, the other's started. */
+  const switchSite = (root: string, dir: string) => {
+    try {
+      localStorage.setItem(SITE_KEY + root, dir);
+    } catch {
+      /* this session only */
+    }
+    const dev = tabs.find((x) => x.dev && x.cwd === root);
+    if (dev?.site === dir) return;
+    if (dev) close(dev.key);
+    startDev(root, dir, true);
+  };
 
   useEffect(() => {
     // Opening an empty panel starts the default agent; a plain terminal is one menu pick or Ctrl+T away.
@@ -1341,8 +1405,10 @@ export function Workspace() {
           const slot = host?.main ? mainSlot : panelSlot;
           if (t.kind === "preview") {
             const dev = tabs.find((x) => x.dev && x.cwd === t.cwd);
-            // Only the Preview the dev server's terminal is drawn in can switch to it.
-            const owns = !!dev && serverIn(t.cwd) === t;
+            const sites = projects[t.cwd]?.web ?? [];
+            // Only the Preview the dev server's terminal is drawn in can switch
+            // to it; with none running, switching starts it.
+            const owns = (!!dev || sites.length > 0) && serverIn(t.cwd) === t;
             return (
               <Held key={t.key} slot={slot}>
               <Preview
@@ -1357,7 +1423,18 @@ export function Workspace() {
                   setAsking((all) => ({ ...all, [t.cwd]: undefined }));
                 }}
                 serverShown={owns && serverShown[t.key]}
-                onServer={owns ? (on) => setServerShown((s) => ({ ...s, [t.key]: on })) : undefined}
+                onServer={
+                  owns
+                    ? (on) => {
+                        if (on && !dev) startDev(t.cwd, undefined, true);
+                        setServerShown((s) => ({ ...s, [t.key]: on }));
+                      }
+                    : undefined
+                }
+                sites={owns && sites.length > 1 ? sites.map((x) => x.dir) : undefined}
+                site={dev?.site}
+                onSite={(dir) => switchSite(t.cwd, dir)}
+                onStart={owns && !dev ? () => startDev(t.cwd, undefined, true) : undefined}
                 docked={!!t.main}
               />
               </Held>
@@ -1416,6 +1493,8 @@ export function Workspace() {
             onInput={() => {
               typed.current[t.key] = Date.now();
               rang.current[t.key] = false;
+              // The user restarting the dev server: the address it prints next is followed.
+              if (t.dev) tails.current[t.key] = "";
             }}
             onTitle={(title) => patch(t.key, { title })}
             onScreen={(read) => (screens.current[t.key] = read)}

@@ -63,32 +63,74 @@ fn manager(root: &Path) -> (&'static str, &'static str) {
     }
 }
 
-/// The command that serves the project as a web app, if it is one: its `dev`
+/// The command that serves a folder as a web app, if it is one: its `dev`
 /// script; for a React Native app, its `web` script when it can run on the web
 /// at all; else a `start` that is not a phone's bundler. Dependencies are
 /// installed first when they never were. `BROWSER=none` keeps Vite, Create
 /// React App and the like from opening a browser of their own.
 ///
-/// A repository with no package.json of its own (an app beside its landing
-/// page, a monorepo) is served from the first folder a level or two down that
-/// has a `dev` script, else one with a `start`, in the order of `NESTED`.
-fn web(root: &Path) -> Option<String> {
-    if let Some((_, start)) = served(root, root) {
-        return Some(start);
+/// A folder with no such script but an `index.html` is a plain site, served
+/// as files on a free port by the Python every Mac and most machines have.
+fn site(dir: &Path, root: &Path) -> Option<(u8, String)> {
+    if let Some((script, start)) = served(dir, root) {
+        return Some((if script == "start" { 1 } else { 0 }, start));
     }
-    let mut dirs: Vec<PathBuf> = NESTED.iter().map(|d| root.join(d)).collect();
+    if !dir.join("index.html").is_file() {
+        return None;
+    }
+    let python = if cfg!(windows) { "python" } else { "python3" };
+    Some((2, format!("{python} -m http.server 0 --bind 127.0.0.1")))
+}
+
+/// A web app the project has, and how to start it.
+#[derive(serde::Serialize)]
+pub struct Site {
+    /// The folder it is in, from the project's root; empty for the root itself.
+    dir: String,
+    run: String,
+}
+
+/// Every web app in the project, the one to open first leading. A project
+/// that is one itself is only that. A repository with no package.json of its
+/// own (an app beside its landing page, a monorepo) has each folder a level
+/// or two down that is one: a `dev` script first, then a `start`, then plain
+/// files, and among those the order of `NESTED`, then the alphabet's.
+fn sites(root: &Path) -> Vec<Site> {
+    if let Some((_, run)) = site(root, root) {
+        return vec![Site { dir: String::new(), run }];
+    }
+    let inside = |d: &Path| -> Vec<PathBuf> {
+        let mut all: Vec<PathBuf> = std::fs::read_dir(d)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_dir() && p.file_name().and_then(|n| n.to_str()).is_some_and(|n| !n.starts_with('.') && !SKIP.contains(&n)))
+            .collect();
+        all.sort();
+        all
+    };
+    let mut dirs = inside(root);
     for group in ["apps", "packages"] {
-        let mut inner: Vec<PathBuf> = std::fs::read_dir(root.join(group)).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
-        inner.sort();
-        dirs.extend(inner);
+        dirs.extend(inside(&root.join(group)));
     }
-    let found: Vec<(PathBuf, (&str, String))> = dirs.into_iter().filter_map(|d| served(&d, root).map(|s| (d, s))).collect();
-    let (dir, (_, start)) = found.iter().find(|(_, (script, _))| *script == "dev").or_else(|| found.first())?;
-    let sub = dir.strip_prefix(root).ok()?.to_string_lossy().into_owned();
-    Some(format!("cd \"{sub}\" && {start}"))
+    let mut found: Vec<(u8, usize, Site)> = dirs
+        .into_iter()
+        .filter_map(|d| {
+            let (rank, start) = site(&d, root)?;
+            let dir = d.strip_prefix(root).ok()?.to_string_lossy().replace('\\', "/");
+            let named = NESTED.iter().position(|n| *n == dir).unwrap_or(NESTED.len());
+            Some((rank, named, Site { run: format!("cd \"{dir}\" && {start}"), dir }))
+        })
+        .collect();
+    found.sort_by_key(|(rank, named, _)| (*rank, *named));
+    found.into_iter().map(|(_, _, s)| s).collect()
 }
 
 const NESTED: [&str; 5] = ["app", "web", "frontend", "client", "site"];
+
+/// Folders that hold what a build made or what was installed, never an app of their own.
+const SKIP: [&str; 7] = ["node_modules", "dist", "build", "out", "coverage", "target", "vendor"];
 
 /// The script `dir` is served by and the command that runs it there; `root`
 /// is the repository, whose lockfile and dependencies a workspace shares.
@@ -134,8 +176,8 @@ fn ios_dir(root: &Path) -> Option<PathBuf> {
 
 #[derive(serde::Serialize)]
 pub struct Project {
-    /// How to start its web dev server.
-    web: Option<String>,
+    /// Its web apps, the one to open first leading.
+    web: Vec<Site>,
     android: bool,
     ios: bool,
 }
@@ -146,7 +188,7 @@ pub fn project_detect(root: String) -> Project {
     // An Expo app can make either native project when asked, so it has both.
     let expo = kind(&root) == Kind::Expo;
     Project {
-        web: web(&root),
+        web: sites(&root),
         android: expo || android_dir(&root).is_some(),
         ios: expo || ios_dir(&root).is_some(),
     }
@@ -1126,18 +1168,23 @@ mod tests {
         project_detect(dir.path().to_string_lossy().into_owned())
     }
 
+    /// How the site opened first is started.
+    fn first(p: &Project) -> Option<&str> {
+        p.web.first().map(|s| s.run.as_str())
+    }
+
     #[test]
     fn a_vite_app_is_served_with_its_own_manager() {
         let d = project(&[("package.json", r#"{"scripts":{"dev":"vite"}}"#), ("pnpm-lock.yaml", ""), ("node_modules/.keep", "")]);
         let p = detect(&d);
-        assert_eq!(p.web.as_deref(), Some(format!("{}pnpm run dev", browser_none()).as_str()));
+        assert_eq!(first(&p), Some(format!("{}pnpm run dev", browser_none()).as_str()));
         assert!(!p.android && !p.ios);
     }
 
     #[test]
     fn dependencies_are_installed_first_when_missing() {
         let d = project(&[("package.json", r#"{"scripts":{"start":"react-scripts start"}}"#)]);
-        assert_eq!(detect(&d).web.as_deref(), Some(format!("npm install && {}npm run start", browser_none()).as_str()));
+        assert_eq!(first(&detect(&d)), Some(format!("npm install && {}npm run start", browser_none()).as_str()));
     }
 
     #[test]
@@ -1145,26 +1192,47 @@ mod tests {
         let native = r#"{"scripts":{"start":"expo start","web":"expo start --web"},"dependencies":{"expo":"~51.0.0"}}"#;
         let d = project(&[("package.json", native), ("node_modules/.keep", "")]);
         let p = detect(&d);
-        assert!(p.web.is_none() && p.android && p.ios);
+        assert!(p.web.is_empty() && p.android && p.ios);
         let webby = r#"{"scripts":{"start":"expo start","web":"expo start --web"},"dependencies":{"expo":"~51.0.0","react-native-web":"~0.19.10"}}"#;
         let d = project(&[("package.json", webby), ("node_modules/.keep", "")]);
-        assert_eq!(detect(&d).web.as_deref(), Some(format!("{}npm run web", browser_none()).as_str()));
+        assert_eq!(first(&detect(&d)), Some(format!("{}npm run web", browser_none()).as_str()));
     }
 
     #[test]
-    fn a_repository_without_a_package_is_served_from_its_app_folder() {
-        let d = project(&[("landing/package.json", r#"{"scripts":{"dev":"next dev"}}"#), ("app/package.json", r#"{"scripts":{"dev":"next dev"}}"#), ("app/node_modules/.keep", "")]);
-        assert_eq!(detect(&d).web.as_deref(), Some(format!("cd \"app\" && {}npm run dev", browser_none()).as_str()));
+    fn a_repository_without_a_package_has_each_of_its_sites_its_app_first() {
+        let d = project(&[
+            ("landing/package.json", r#"{"scripts":{"dev":"next dev -p 3001"}}"#),
+            ("app/package.json", r#"{"scripts":{"dev":"next dev"}}"#),
+            ("app/node_modules/.keep", ""),
+            ("app/out/index.html", ""),
+            ("docs/PLAN.md", ""),
+        ]);
+        let p = detect(&d);
+        let dirs: Vec<&str> = p.web.iter().map(|s| s.dir.as_str()).collect();
+        assert_eq!(dirs, ["app", "landing"]);
+        assert_eq!(first(&p), Some(format!("cd \"app\" && {}npm run dev", browser_none()).as_str()));
         let d = project(&[("apps/site/package.json", r#"{"scripts":{"start":"serve"}}"#), ("apps/web/package.json", r#"{"scripts":{"dev":"vite"}}"#), ("pnpm-lock.yaml", ""), ("node_modules/.keep", "")]);
-        let sub = format!("apps{}web", std::path::MAIN_SEPARATOR);
-        assert_eq!(detect(&d).web.as_deref(), Some(format!("cd \"{sub}\" && {}pnpm run dev", browser_none()).as_str()));
+        let p = detect(&d);
+        assert_eq!(first(&p), Some(format!("cd \"apps/web\" && {}pnpm run dev", browser_none()).as_str()));
+        assert_eq!(p.web[1].dir, "apps/site");
+    }
+
+    #[test]
+    fn a_plain_site_is_served_as_files() {
+        let d = project(&[("index.html", "<h1>hi</h1>"), ("admin/index.html", "")]);
+        let p = detect(&d);
+        assert_eq!(p.web.len(), 1);
+        assert!(first(&p).unwrap().contains("-m http.server 0 --bind 127.0.0.1"));
+        // An app with a dev script is not taken for its files.
+        let d = project(&[("package.json", r#"{"scripts":{"dev":"vite"}}"#), ("index.html", ""), ("node_modules/.keep", "")]);
+        assert!(first(&detect(&d)).unwrap().ends_with("npm run dev"));
     }
 
     #[test]
     fn native_projects_are_found_by_their_files() {
         let d = project(&[("settings.gradle", ""), ("app/build.gradle", "android {\n    defaultConfig {\n        applicationId \"dev.example.app\"\n    }\n}\n")]);
         let p = detect(&d);
-        assert!(p.android && !p.ios && p.web.is_none());
+        assert!(p.android && !p.ios && p.web.is_empty());
         assert_eq!(application_id(d.path()).as_deref(), Some("dev.example.app"));
         let d = project(&[("ios/Thing.xcodeproj/project.pbxproj", "")]);
         assert!(detect(&d).ios);

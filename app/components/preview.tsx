@@ -193,6 +193,10 @@ export function Preview({
   onAnswer,
   serverShown,
   onServer,
+  sites,
+  site,
+  onSite,
+  onStart,
   docked,
 }: {
   /** Its tab's key: what Claude's calls find it by. */
@@ -211,6 +215,12 @@ export function Preview({
   serverShown?: boolean;
   /** Switch between the page and the dev server's terminal; absent with no dev server. */
   onServer?: (shown: boolean) => void;
+  /** The project's web apps by folder, when it has more than one to switch between; the one running. */
+  sites?: string[];
+  site?: string;
+  onSite?: (dir: string) => void;
+  /** Start the project's dev server; absent while one runs. */
+  onStart?: () => void;
   /** In the main view rather than the window (components/workspace.tsx). */
   docked?: boolean;
 }) {
@@ -986,6 +996,26 @@ export function Preview({
             ))}
           </div>
         ) : null}
+        {sites ? (
+          <div role="radiogroup" aria-label="Web app" className="mr-1 flex min-w-0 shrink items-center overflow-hidden bg-surface-container p-0.5">
+            {sites.map((dir) => (
+              <button
+                key={dir}
+                type="button"
+                role="radio"
+                aria-checked={dir === site}
+                title={`Preview ${dir}`}
+                onClick={() => onSite?.(dir)}
+                className={cn(
+                  "h-5 max-w-28 shrink cursor-pointer truncate px-2 text-[11.5px]",
+                  dir === site ? "bg-card text-ink shadow-[0_0_0_1px_var(--color-border-gray)]" : "text-muted-slate hover:text-ink",
+                )}
+              >
+                {dir}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <Tool label="Back" onClick={() => void navigate("back").catch(() => {})} disabled={!ready}>
           <path d="M10 3.5 5.5 8l4.5 4.5" />
         </Tool>
@@ -1232,6 +1262,11 @@ export function Preview({
             ) : (
               <>
                 <p className="text-[13px] text-ink">Nothing to preview yet</p>
+                {onStart ? (
+                  <button type="button" onClick={onStart} className="mb-1 cursor-pointer bg-accent px-3 py-1 text-[12px] text-on-accent hover:opacity-90">
+                    Start the dev server
+                  </button>
+                ) : null}
                 <p className="text-[12px] text-muted-slate">Type an address above, like localhost:3000, or anything to search the web.</p>
                 <p className="text-[12px] text-muted-slate">Claude browses here too: ask it to look something up, and the page opens in this tab.</p>
               </>

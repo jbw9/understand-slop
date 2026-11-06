@@ -3,8 +3,9 @@
 import "@xterm/xterm/css/xterm.css";
 import type { ITheme } from "@xterm/xterm";
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMap } from "@/components/map-context";
 import { screens } from "@/lib/dictate";
 import { outline } from "@/lib/map";
@@ -100,24 +101,51 @@ const palette = () => PALETTES[themeOf(document.documentElement.dataset.theme)];
 
 /**
  * What a terminal app does with a key before the program sees it, as GNOME
- * Terminal and VS Code do. Ctrl+←/→ and Home/End are left alone: xterm sends
- * their standard sequences, which shells and Claude Code read themselves.
+ * Terminal and VS Code do, and on a Mac as Terminal.app and Ghostty do.
+ * Ctrl+←/→ and Home/End are left alone: xterm sends their standard
+ * sequences, which shells and Claude Code read themselves.
  */
 type Action = { send: string } | { copy: true } | { paste: true } | { zoom: number | null };
 
-function actionFor(e: KeyboardEvent, selected: boolean): Action | null {
+const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** `claude`: Claude Code is in front, so Ctrl+Enter is its "send now". */
+function actionFor(e: KeyboardEvent, selected: boolean, claude: boolean): Action | null {
+  const mac = isMac();
   const ctrl = e.ctrlKey && !e.altKey && !e.metaKey;
-  if (ctrl && !e.shiftKey) {
-    // Delete a word: Ctrl+W back (shells, readline, Claude Code), Alt+D on.
-    // Ctrl+W itself closes the tab (components/workspace.tsx), so this is the
-    // way to send it.
-    if (e.key === "Backspace") return { send: "\x17" };
+  // xterm sends nothing for Cmd+arrows and a plain DEL for Cmd+Backspace;
+  // a Mac terminal sends the line's start, end and delete-to-start. Option+
+  // arrows jump a word, as Esc b / Esc f, which zsh and bash read too.
+  if (mac && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+    if (e.key === "ArrowLeft") return { send: "\x01" };
+    if (e.key === "ArrowRight") return { send: "\x05" };
+    if (e.key === "Backspace") return { send: "\x15" };
+  }
+  if (mac && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    if (e.key === "ArrowLeft") return { send: "\x1bb" };
+    if (e.key === "ArrowRight") return { send: "\x1bf" };
     if (e.key === "Delete") return { send: "\x1bd" };
-    // With text selected, Ctrl+C copies it rather than interrupting.
-    if (e.code === "KeyC" && selected) return { copy: true };
+  }
+  // A Mac zooms on Cmd, leaving Ctrl+- to the program: Claude Code's undo.
+  if (mac ? e.metaKey && !e.ctrlKey && !e.altKey : ctrl && !e.shiftKey) {
     if (e.code === "Equal" || e.code === "NumpadAdd") return { zoom: 1 };
     if (e.code === "Minus" || e.code === "NumpadSubtract") return { zoom: -1 };
     if (e.code === "Digit0" || e.code === "Numpad0") return { zoom: null };
+  }
+  if (ctrl && !e.shiftKey) {
+    // Delete a word: Ctrl+W back (shells, readline, Claude Code), Alt+D on.
+    // Off a Mac, Ctrl+W itself closes the tab (components/workspace.tsx), so
+    // this is the way to send it.
+    if (e.key === "Backspace") return { send: "\x17" };
+    if (e.key === "Delete") return { send: "\x1bd" };
+    // With text selected, Ctrl+C copies it rather than interrupting — off a
+    // Mac, where Cmd+C copies and Ctrl+C always interrupts.
+    if (e.code === "KeyC" && selected && !mac) return { copy: true };
+    // xterm sends nothing for Ctrl+-; a Mac terminal sends ^_.
+    if (e.code === "Minus" && mac) return { send: "\x1f" };
+    // xterm sends a plain Return. Claude Code reads Ctrl+Enter, as CSI u,
+    // as sending now; a shell would print it, so only Claude gets it.
+    if (e.key === "Enter" && claude) return { send: "\x1b[13;5u" };
   }
   if (ctrl && e.shiftKey) {
     if (e.code === "KeyC") return { copy: true };
@@ -128,6 +156,14 @@ function actionFor(e: KeyboardEvent, selected: boolean): Action | null {
   if (e.key === "Enter" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) return { send: "\x1b\r" };
   return null;
 }
+
+/** A dropped path as the shell reads it: backslashed as Terminal.app does, quoted on Windows. */
+const quote = (path: string) =>
+  /Windows/.test(navigator.userAgent)
+    ? /\s/.test(path)
+      ? `"${path}"`
+      : path
+    : path.replace(/[^\w\-.,/:@+%=\u0080-\uffff]/g, "\\$&");
 
 /** One font size for every tab, kept per machine like the window's width. */
 const FONT_KEY = "slop.terminal.fontSize";
@@ -172,6 +208,7 @@ export function Shell({
   run,
   cwd,
   visible,
+  claude = false,
   onTitle,
   onSpawn,
   onClaude,
@@ -191,6 +228,8 @@ export function Shell({
   /** Where it starts. A tab keeps the one it was opened with. */
   cwd?: string;
   visible: boolean;
+  /** Claude Code is in front in it now, not the shell or another program. */
+  claude?: boolean;
   onTitle?: (title: string) => void;
   onSpawn?: (pty: number) => void;
   /** Whether Claude Code was found, so this tab can run it. */
@@ -211,13 +250,16 @@ export function Shell({
   onExit: () => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
+  const pane = useRef<HTMLDivElement>(null);
+  /** Files dragged from outside are over this terminal. */
+  const [dropping, setDropping] = useState(false);
   /** Re-fit and focus, set once the terminal exists. */
   const show = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest callbacks, so the effect below runs once per shell, not per render.
-  const handlers = useRef({ onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, session, onOpenFile, onExit });
+  const handlers = useRef({ claude, onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, session, onOpenFile, onExit });
   useEffect(() => {
-    handlers.current = { onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, session, onOpenFile, onExit };
+    handlers.current = { claude, onTitle, onSpawn, onClaude, onOutput, onInput, onScreen, onOpenPlan, session, onOpenFile, onExit };
   });
   // The map's sections, for `slop-map-list`. Through a ref for the same
   // reason: a map that updates must not restart the shell.
@@ -290,10 +332,14 @@ export function Shell({
       let ctrlEnter = 0;
       term.attachCustomKeyEventHandler((e) => {
         if (e.type === "keydown" && e.key === "Enter" && e.ctrlKey) ctrlEnter = e.timeStamp;
-        // Ctrl+` (Cmd+` too) and Ctrl+W belong to the workspace window, never the program in a tab.
-        if (e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyW") return false;
+        // An IME's keys (arrows and Enter among them) are its own until the text is committed.
+        if (e.isComposing || e.keyCode === 229) return true;
+        // Taken by the app first (the palette's keys, components/palette.tsx): not the program's too.
+        if (e.defaultPrevented) return false;
+        // Ctrl+` (Cmd+` too) and Ctrl+W off a Mac belong to the workspace window, never the program in a tab.
+        if (e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyW" && !isMac()) return false;
         if ((e.ctrlKey || e.metaKey) && e.code === "Backquote") return false;
-        const action = actionFor(e, term.hasSelection());
+        const action = actionFor(e, term.hasSelection(), handlers.current.claude);
         if (!action) return true;
         e.preventDefault();
         if (e.type !== "keydown") return false;
@@ -311,11 +357,15 @@ export function Shell({
         return false;
       });
 
-      /** Fit to the box — skipped while hidden, when it has no size to fit. */
+      /** Fit to the box — skipped while hidden, when it has no size to fit. The
+       * program is told only of a real change: each one makes Claude Code redraw. */
+      let told = "";
       const refit = () => {
         if (!el.current?.offsetWidth) return;
         fit.fit();
-        if (id !== null) void invoke("pty_resize", { id, cols: term.cols, rows: term.rows });
+        if (id === null || told === `${term.cols}x${term.rows}`) return;
+        told = `${term.cols}x${term.rows}`;
+        void invoke("pty_resize", { id, cols: term.cols, rows: term.rows });
       };
       refit();
 
@@ -419,6 +469,34 @@ export function Shell({
         if (e.timeStamp - ctrlEnter < 500) e.preventDefault();
       };
       host.addEventListener("contextmenu", noKeyMenu, true);
+      // A press on the workspace's own buttons — a tab, +, a menu's item — keeps
+      // the keys here, as a terminal's tab bar does: WebKit would otherwise
+      // leave focus nowhere once the menu closes.
+      const keepFocus = (e: MouseEvent) => {
+        const at = e.target as Element;
+        if (document.activeElement === term.textarea && at.closest?.("button") && at.closest('[aria-label="Workspace"], [role="menu"]'))
+          e.preventDefault();
+      };
+      window.addEventListener("mousedown", keepFocus, true);
+      // Files dragged from Finder: their paths typed at the cursor, as a
+      // terminal does — pasted, so Claude Code takes an image's for the image.
+      // The window's native drop handler takes OS drops, so the page's own
+      // drop events never carry paths; the one under the pointer is this
+      // terminal only if nothing (the floating window, a menu) lies over it.
+      const under = (at: { toLogical: (f: number) => { x: number; y: number } }) => {
+        const p = at.toLogical(window.devicePixelRatio || 1);
+        const hit = document.elementFromPoint(p.x, p.y);
+        return !!hit && !!pane.current?.contains(hit);
+      };
+      const drops = getCurrentWebview().onDragDropEvent(({ payload: d }) => {
+        if (d.type === "leave") return setDropping(false);
+        const here = under(d.position);
+        setDropping(here && d.type !== "drop");
+        if (d.type === "drop" && here && d.paths.length) {
+          term.paste(`${d.paths.map(quote).join(" ")} `);
+          term.focus();
+        }
+      });
       const seen = new ResizeObserver(refit);
       seen.observe(el.current);
       show.current = () => {
@@ -439,6 +517,8 @@ export function Shell({
         recolour.disconnect();
         host.removeEventListener("mouseup", copySelected);
         host.removeEventListener("contextmenu", noKeyMenu, true);
+        window.removeEventListener("mousedown", keepFocus, true);
+        void drops.then((off) => off());
         seen.disconnect();
         input.dispose();
         planLinks.dispose();
@@ -460,18 +540,20 @@ export function Shell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
+  // Before paint, so a tab shown again never draws a frame at its old size.
+  useLayoutEffect(() => {
     if (visible) show.current?.();
   }, [visible]);
 
   return (
     // Chrome wherever it is, the window or the main view.
-    <div data-chrome className={cn("absolute inset-0 bg-surface-container-low px-3 pb-1", !visible && "hidden")}>
+    <div ref={pane} data-chrome className={cn("absolute inset-0 bg-surface-container-low px-3 pb-1", !visible && "hidden")}>
       {error ? (
         <p className="font-mono text-[11.5px] text-clay-ink">{error}</p>
       ) : (
         <div ref={el} className="h-full w-full" />
       )}
+      {dropping ? <div className="pointer-events-none absolute inset-1 border border-dashed border-accent-line bg-accent/5" /> : null}
     </div>
   );
 }

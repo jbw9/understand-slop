@@ -545,7 +545,10 @@
   };
   let chosen = [];
   let hovered = null;
+  // Added and not yet sent, each labelled with the name it has in the prompt.
+  let kept = [];
   const follow = () => {
+    for (const b of kept) place(b);
     for (const b of chosen) place(b);
     if (hovered) place(hovered);
   };
@@ -575,6 +578,7 @@
     return {
       key: `preview:${location.pathname}#${selector}`,
       title: describe(el),
+      tag: el.localName,
       text: [
         `[Preview element: ${describe(el)} on ${location.href}`,
         `Selector: ${selector}`,
@@ -932,6 +936,21 @@
     },
     unmark() {
       unmark();
+      return "";
+    },
+    /** Outlines what is queued for Claude from this page, by pick key, replacing the last set. */
+    marks({ marks }) {
+      for (const b of kept) b.remove();
+      kept = [];
+      const here = `preview:${location.pathname}#`;
+      for (const { key, label } of marks || []) {
+        if (!key.startsWith(here)) continue;
+        let el = null;
+        try {
+          el = document.querySelector(key.slice(here.length));
+        } catch {}
+        if (el) kept.push(box(el, label, false));
+      }
       return "";
     },
     select({ on }) {

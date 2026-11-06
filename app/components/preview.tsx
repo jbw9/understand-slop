@@ -3,9 +3,9 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Menu } from "@/components/menu";
-import { mention, openClaude, type Target } from "@/lib/context";
+import { mention, openClaude, usePicks, type Target } from "@/lib/context";
 import { PRESETS, hostOf, registerPreview, type Call } from "@/lib/preview";
 import { cn } from "@/lib/utils";
 
@@ -245,6 +245,8 @@ export function Preview({
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [picking, setPicking] = useState<{ x: number; y: number; targets: Target[] } | null>(null);
   const [selecting, setSelecting] = useState(false);
+  // Counts the pages the agent has come up on, each needing its outlines again.
+  const [page, setPage] = useState(0);
   // A page from the web is in front, in the webview of this label.
   const [web, setWeb] = useState<string | null>(null);
   const [claude, setClaude] = useState(false);
@@ -453,9 +455,10 @@ export function Preview({
         if (m.ok) p.resolve(m.value);
         else p.reject(new Error(String(m.value)));
       } else if (m.type === "loaded") {
-        // A new page has a new agent, which is not selecting.
+        // A new page has a new agent, which is not selecting and has nothing outlined.
         setSelecting(false);
         loaded();
+        setPage((n) => n + 1);
       } else if (m.type === "pick") {
         // The page knows itself by the proxy's address; Claude knows the dev server's.
         const p = proxy.current;
@@ -589,6 +592,14 @@ export function Preview({
           reject(new Error("The page did not answer. It may still be loading: take a screenshot, or try again."));
       }, wait);
     });
+
+  // What is added from the page and not yet sent stays outlined there, under its name in the prompt.
+  const picks = usePicks();
+  const marks = useMemo(
+    () => picks.filter((p) => p.status === "queued" && p.key.startsWith("preview:")).map((p) => ({ key: p.key, label: p.title })),
+    [picks],
+  );
+  useEffect(() => void agent("marks", { marks }).catch(() => {}), [marks, page]);
 
   /** Opens a page and waits for it: the answer is where it ended up, not where it was asked to go. */
   const arrive = async (open: () => void) => {

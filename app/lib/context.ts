@@ -23,6 +23,8 @@ export interface Target {
   key: string;
   title: string;
   text: string;
+  /** An element of a page: its tag, which names it in the prompt (mention). */
+  tag?: string;
 }
 
 export interface Pick extends Target {
@@ -160,16 +162,37 @@ export function pick(t: Target) {
  */
 export function mention(t: Target) {
   if (WEB) return pick(t);
-  const name = `[${t.title}] `;
-  const named = { ...t, text: `Named in the prompt as [${t.title}]:\n${t.text}` };
+  const title = t.tag ? nameFor(t.key, t.tag) : t.title;
+  const name = `[${title}] `;
+  const named = { ...t, title, text: `Named in the prompt as [${title}]:\n${t.text}` };
   if (state.target === null) {
     naming.push(name);
     return pick(named);
   }
   const pty = state.target;
+  adding.push(named);
   void add(pty, named)
+    .finally(() => adding.splice(adding.indexOf(named), 1))
     .then(() => whenFree(pty))
     .then(() => paste(pty, name), () => {});
+}
+
+/** Mentioned, and not yet in the queue, which add() writes only once the tab has it. */
+const adding: Target[] = [];
+
+/**
+ * An element's name in the prompt: its tag and the first number no pick
+ * waiting to go has, `p1`, `h1-2`; or the name it has, if it is waiting already.
+ */
+function nameFor(key: string, tag: string) {
+  const mine = state.target === null ? [] : (state.picks[state.target] ?? []).filter((p) => p.status === "queued");
+  const queued = [...waiting, ...adding, ...mine];
+  const had = queued.find((p) => p.key === key);
+  if (had) return had.title;
+  const base = /\d$/.test(tag) ? `${tag}-` : tag;
+  let n = 1;
+  while (queued.some((p) => p.title === `${base}${n}`)) n++;
+  return `${base}${n}`;
 }
 
 /**

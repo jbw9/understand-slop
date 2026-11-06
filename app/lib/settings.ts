@@ -26,12 +26,14 @@ export interface Settings {
   research: boolean;
   /** Pause Music and Spotify and mute the rest while dictating; null until the first dictation asks. */
   quietMedia: boolean | null;
+  /** The first-run tour on the blank page (components/welcome.tsx) was finished or skipped. */
+  onboarded: boolean;
 }
 
 const KEY = SETTINGS_KEY;
 const CHANGED = "slop:settings-changed";
 const OPEN = "slop:settings";
-const DEFAULTS: Settings = { claudePath: "", model: "", theme: "classic", agent: "claude", ground: "plain", devServer: true, voice: true, research: true, quietMedia: null };
+const DEFAULTS: Settings = { claudePath: "", model: "", theme: "classic", agent: "claude", ground: "plain", devServer: true, voice: true, research: true, quietMedia: null, onboarded: false };
 
 /** Anything can ask for the settings dialog: the chrome's gear dispatches this. */
 export const openSettings = () => window.dispatchEvent(new Event(OPEN));

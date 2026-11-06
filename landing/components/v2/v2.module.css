@@ -1563,8 +1563,6 @@
   width: 220px;
   height: auto;
   aspect-ratio: 4 / 5;
-  border: 1px solid var(--strong);
-  background: var(--paper);
   rotate: var(--tilt);
   transform: scale(0.94);
   transition: transform 0.8s var(--ease);

@@ -39,6 +39,14 @@ export async function GET(request: Request) {
   } catch {
     // Not a git checkout: the index alone is what there is.
   }
+  // Files git ignores that a person still edits by hand: .env and its kin,
+  // where an API key goes. Nothing else ignored (builds, node_modules) is listed.
+  let local: string[] = [];
+  try {
+    local = execFileSync("git", ["-C", root, "ls-files", "--others", "--ignored", "--exclude-standard", "--", ".env*", "*/.env*"], { encoding: "utf8", maxBuffer: 1 << 20, stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
+      .split("\n")
+      .filter((p) => p && !p.includes("node_modules/"));
+  } catch {}
   // New code files, judged as an update judges them
   // (scripts/generate/inventory.ts): a lockfile, a test or a type stub
   // appearing is not something the map would add.
@@ -64,5 +72,5 @@ export async function GET(request: Request) {
     });
     return Response.json({ behind });
   }
-  return Response.json({ index, added });
+  return Response.json({ index, added, local });
 }

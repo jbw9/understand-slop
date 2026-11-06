@@ -33,6 +33,8 @@ interface Files {
   index: MapIndex | null;
   /** New files of a kind the map explains. */
   added: string[];
+  /** Files git ignores that are edited by hand: `.env` and its kin. */
+  local?: string[];
 }
 
 const fetched = new Map<string, Files>();

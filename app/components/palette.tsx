@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { goTo, useLocation } from "@/components/chrome";
+import { openFile } from "@/components/code";
 import { useMap } from "@/components/map-context";
-import { Kbd } from "@/components/button";
+import { Kbd, keys, useMac } from "@/components/button";
 import { StateChip } from "@/components/state";
 import { newProject, openFolder, openProjects } from "@/components/projects";
 import { openAudit } from "@/components/audit";
@@ -83,6 +84,7 @@ export function Palette() {
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
+  const mac = useMac();
 
   useEffect(() => {
     const show = (m: PaletteMode) => {
@@ -93,6 +95,8 @@ export function Palette() {
     const onOpen = (e: Event) => show((e as CustomEvent<PaletteMode>).detail);
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      // On a Mac the palette is Cmd+K; Ctrl+K in a terminal is the program's kill-line.
+      if (e.code === "KeyK" && !e.metaKey && /Mac/.test(navigator.platform) && (e.target as Element | null)?.closest?.(".xterm")) return;
       if (e.code === "KeyK" || (e.code === "KeyP" && !e.shiftKey)) {
         e.preventDefault();
         show("all");
@@ -151,9 +155,10 @@ export function Palette() {
       out.push({
         key: `file:${file}`,
         label: file,
-        hint: at ? trailOf(at) : f.status === "excluded" ? "left out of the map" : "not on any level",
+        hint: at ? trailOf(at) : f.status === "excluded" ? "left out of the map · opens the file" : "not on any level · opens the file",
         kind: "file",
-        run: () => (at ? goTo(at) : setTimeout(() => openFiles())),
+        // A file no level explains opens itself, to read or edit, rather than a list that says so.
+        run: () => (at ? goTo(at) : openFile(path, file)),
       });
       for (const sym of f.symbols) {
         const by = deepest(file, sym.start, sym.end);
@@ -166,9 +171,15 @@ export function Palette() {
         });
       }
     }
+    // Files the map has not seen: new since it was made, or ignored by git
+    // and kept by hand, like the .env an API key goes in.
+    for (const file of files?.added ?? [])
+      out.push({ key: `file:${file}`, label: file, hint: "new since the map was made · opens the file", kind: "file", run: () => openFile(path, file) });
+    for (const file of files?.local ?? [])
+      out.push({ key: `file:${file}`, label: file, hint: "not in git · opens the file", kind: "file", run: () => openFile(path, file) });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- trailOf reads the same map as cited
-  }, [files, cited]);
+  }, [files, cited, path]);
 
   const docList = useDocList();
   const docs = useMemo<Item[]>(
@@ -188,7 +199,7 @@ export function Palette() {
     const theme = (t: Theme) => () => saveSettings({ ...readSettings(), theme: t });
     return [
       { key: "a:back", label: "Go back a level", kind: "action", kbd: "Esc", run: () => path.length && goTo(path.slice(0, -1)) },
-      { key: "a:workspace", label: "Toggle Claude Code & terminal", kind: "action", kbd: "Ctrl+`", run: toggleWorkspace },
+      { key: "a:workspace", label: "Toggle Claude Code & terminal", kind: "action", kbd: keys(mac, "`"), run: toggleWorkspace },
       { key: "a:diff", label: "What changed in the code", hint: "Diff two commits over the map", kind: "action", run: openDiff },
       { key: "a:files", label: "Every file", hint: "Where each part of the code is explained", kind: "action", run: () => openFiles() },
       { key: "a:timeline", label: "How the code got here", hint: "Its commits over time, on the map's sections", kind: "action", run: openTimeline },
@@ -206,7 +217,7 @@ export function Palette() {
       { key: "a:light", label: "Theme: light", kind: "action", run: theme("light") },
       { key: "a:dark", label: "Theme: dark", kind: "action", run: theme("dark") },
     ];
-  }, [map.name, path]);
+  }, [map.name, path, mac]);
 
   const maps = useMemo<Item[]>(
     () =>
@@ -283,7 +294,7 @@ export function Palette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-center bg-night/15 px-4 pt-[12vh]"
+      className="fixed inset-0 z-50 flex justify-center bg-night/20 px-4 pt-[12vh]"
       onPointerDown={(e) => e.target === e.currentTarget && close()}
     >
       <div
@@ -334,7 +345,8 @@ export function Palette() {
                   className={cn(
                     "flex w-full cursor-pointer gap-2.5 px-4 text-left",
                     it.detail ? "items-start py-2" : "items-center py-[7px]",
-                    i === sel && "bg-surface-container-low",
+                    // Not surface-container-low: in Dark that is the card's own colour, a step too close to show.
+                    i === sel && "bg-surface-container",
                   )}
                 >
                   <KindIcon kind={it.kind} />

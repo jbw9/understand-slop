@@ -2,13 +2,15 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Markdown from "react-markdown";
+import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ExplainedBlock, type Explained } from "@/components/blocks";
 import { Button } from "@/components/button";
 import { goTo } from "@/components/chrome";
 import { useMaybeMap } from "@/components/map-context";
 import { findSection } from "@/lib/act";
+import { citations } from "@/lib/coverage";
+import type { BuiltMap } from "@/lib/map";
 import { DiagramDiff, TINT, WORD } from "@/components/diff";
 import { Eyebrow } from "@/components/state";
 import type { Anatomy, DiagramArrow, DiagramBox } from "@/lib/data";
@@ -19,8 +21,9 @@ import { cn } from "@/lib/utils";
 /**
  * A plan Claude wrote in plan mode, as a short design doc in a tab of its own
  * (components/workspace.tsx), so it is read rather than scrolled past in the
- * terminal: a title and one sentence, the picture, then a few short sections.
- * The picture is drawn the way the map draws a diff (components/diff.tsx) —
+ * terminal: a title and two sentences, then a few short sections, pictures
+ * among them only where the plan needs one, and its Steps ticked off as
+ * Claude builds it. A diagram is drawn the way the map draws a diff (components/diff.tsx) —
  * a plan is a diff that has not happened yet — so what it adds is green, what
  * it changes amber and what it removes red, against the parts it leaves alone.
  *
@@ -42,6 +45,14 @@ export interface Plan {
   asked?: string;
   /** What the user asked for that this revision answers. */
   after?: string;
+  /** Its steps as Claude marks them while it builds the plan (src-tauri/src/claude.rs, slop-plan-step). */
+  steps?: StepMark[];
+}
+
+export interface StepMark {
+  n: number;
+  state: "doing" | "done" | "skipped";
+  note: string | null;
 }
 
 type Status = "working" | "waiting" | "done";
@@ -134,7 +145,11 @@ export function PlanView({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Eyebrow className="text-accent">{plan.version > 1 ? `Plan · revision ${plan.version}` : "Plan"}</Eyebrow>
             <span className="flex flex-wrap items-center gap-x-3 font-mono text-[11px] text-faint">
-              {doc.steps ? <span className="tnum">{doc.steps} steps</span> : null}
+              {doc.steps ? (
+                <span className="tnum">
+                  {plan.steps?.length ? `${plan.steps.filter((s) => s.state === "done").length} of ${doc.steps} steps done` : `${doc.steps} steps`}
+                </span>
+              ) : null}
               {added + changed + removed ? (
                 <span className="tnum">
                   {added + changed + removed} {added + changed + removed === 1 ? "file" : "files"}
@@ -167,7 +182,7 @@ export function PlanView({
             return (
               <section key={i}>
                 <Eyebrow className={cn("mb-3.5 block", risky && "text-clay-ink")}>{s.title}</Eyebrow>
-                <Body text={s.body} />
+                <Body text={s.body} marks={/step/i.test(s.title) && plan.steps?.length ? plan.steps : undefined} />
               </section>
             );
           })}
@@ -257,6 +272,27 @@ function plannedSections(text: string): { label: string; section: string; change
 }
 
 /**
+/**
+ * A plan with no diagram tied to the map still names its files: each one the
+ * map already explains lands on the section that explains it most closely.
+ */
+function filedSections(text: string, map: BuiltMap): { label: string; section: string; change?: string }[] {
+  const cited = citations(map.L0);
+  const root = map.RUN.root?.replace(/\/$/, "");
+  const seen = new Set<string>();
+  return pieces(text).flatMap((p) => {
+    if (p.kind !== "figure" || p.lang !== "files") return [];
+    return fileLines(p.body).flatMap((f) => {
+      const path = (root && f.path.startsWith(`${root}/`) ? f.path.slice(root.length + 1) : f.path).replace(/^\.?\//, "");
+      const by = (cited.get(path) ?? []).slice().sort((a, b) => b.path.length - a.path.length)[0];
+      const section = by?.path.join("/");
+      if (!section || seen.has(section)) return [];
+      seen.add(section);
+      return [{ label: path.slice(path.lastIndexOf("/") + 1), section, change: f.verdict === "removed" ? "gone" : "changed" }];
+    });
+  });
+}
+
  * Where the plan lands on the map, each part a way to its level; and once
  * the plan is built, what the map's updates actually redid beside what the
  * plan said it would touch, so a plan that quietly grew, or missed a part,
@@ -264,7 +300,10 @@ function plannedSections(text: string): { label: string; section: string; change
  */
 function OnTheMap({ text, since, done }: { text: string; since?: number; done: boolean }) {
   const map = useMaybeMap();
-  const planned = useMemo(() => plannedSections(text), [text]);
+  const planned = useMemo(() => {
+    const drawn = plannedSections(text);
+    return drawn.length || !map ? drawn : filedSections(text, map);
+  }, [text, map]);
   const [touched, setTouched] = useState<{ id: string; title: string }[] | null>(null);
   useEffect(() => {
     if (!map || !done || since === undefined) return;
@@ -339,8 +378,8 @@ function Line({ dot, text, action }: { dot: string; text: string; action?: () =>
   );
 }
 
-/** A section's words and pictures, in order. */
-function Body({ text }: { text: string }) {
+/** A section's words and pictures, in order; the Steps with Claude's marks on them once it builds the plan. */
+function Body({ text, marks }: { text: string; marks?: StepMark[] }) {
   return (
     <div className="flex flex-col gap-6">
       {pieces(text).map((p, i) =>
@@ -348,7 +387,9 @@ function Body({ text }: { text: string }) {
           <Figure key={i} lang={p.lang} body={p.body} />
         ) : (
           <div key={i} className="doc-prose plan-prose max-w-[760px]">
-            <Markdown remarkPlugins={[remarkGfm]}>{p.text}</Markdown>
+            <Markdown remarkPlugins={[remarkGfm]} components={marks ? marked(p.text, marks) : undefined}>
+              {p.text}
+            </Markdown>
           </div>
         ),
       )}
@@ -357,6 +398,24 @@ function Body({ text }: { text: string }) {
 }
 
 /** A fence drawn as the map draws its blocks; one that does not parse is shown as written. */
+/** Each numbered step with its mark, found by the number its own line starts with. */
+function marked(text: string, marks: StepMark[]): Components {
+  const lines = text.split("\n");
+  return {
+    li({ node, children }) {
+      const n = Number(lines[(node?.position?.start.line ?? 0) - 1]?.match(/^(\d+)[.)]\s/)?.[1]);
+      const m = marks.find((s) => s.n === n);
+      return (
+        <li data-state={m?.state}>
+          {children}
+          {m?.state === "doing" ? <span className="ml-2 inline-block font-mono text-[10.5px] uppercase tracking-[0.08em] text-amber-ink">in progress</span> : null}
+          {m?.state === "skipped" ? <span className="ml-2 inline-block text-[13px] text-faint">skipped{m.note ? ` — ${m.note}` : ""}</span> : null}
+        </li>
+      );
+    },
+  };
+}
+
 function Figure({ lang, body }: { lang: string; body: string }) {
   if (lang === "files") {
     const lines = fileLines(body);

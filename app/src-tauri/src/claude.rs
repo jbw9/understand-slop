@@ -48,14 +48,57 @@ const EDITING_TOOLS: &str = "Edit|Write|MultiEdit|NotebookEdit|Bash";
 
 /// A plan Claude asks to start on: the hook's input, which carries the plan's
 /// Markdown, kept whole for the app to draw (components/plan.tsx). Renamed
-/// into place, so a plan is never read half written.
-const PLAN: &str = r#"f="$SLOP_CONTEXT"; cat > "$f.plan.part" && mv "$f.plan.part" "$f.plan""#;
+/// into place, so a plan is never read half written. A new plan ends the last
+/// one's checklist, before the app can draw the new one with its ticks, and
+/// its file waits (`.pending`) to become the checklist's once accepted.
+const PLAN: &str = r#"f="$SLOP_CONTEXT"; rm -f "$f.steps" "$f.accepted"; cat > "$f.plan.part" && sed -n 's/.*"planFilePath": *"\([^"]*\)".*/\1/p' "$f.plan.part" | head -n 1 > "$f.pending" && mv "$f.plan.part" "$f.plan""#;
 /// ExitPlanMode only runs once the user has accepted the plan, in the terminal
 /// or from the plan's own tab.
 const APPROVED: &str = r#": > "$SLOP_CONTEXT.approved""#;
-/// Said to Claude as the accepted plan comes back to it: on a long build it
-/// loses its place without a list to tick off, so it writes one first.
-const TODOS: &str = r#"printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"The plan is accepted. Before you change any file, turn its Steps into a to-do list with your to-do tool, one item per step plus a last item for its Check. Work through the list in order: mark an item in progress as you start it and done as soon as it is, and add an item when the work turns up one the plan missed."}}'"#;
+
+/// On a long build Claude loses its place, and the to-do tool it would keep a
+/// list in is off for the newer models (Claude Code turns it on only for older
+/// ones). So the plan's own Steps are the list: Claude marks them with
+/// `slop-plan-step` (STEP), the plan's tab shows them ticked off (`steps_of`),
+/// and the hooks below hold Claude to them. A macro, to be `concat!`ed into
+/// each hook that says it; no quotes in it, since it goes out inside JSON.
+macro_rules! checklist {
+    () => {
+        "Its Steps are your checklist, ticked off in the plan tab the user watches: run `slop-plan-step <n> doing` as you start a step and `slop-plan-step <n> done` as soon as it is finished, in order. A step that turns out wrong or unneeded is `slop-plan-step <n> skipped <why>`, and you tell the user why. Work the plan missed goes in the step it belongs to. Do not end the build with a step unmarked, and finish with the checks under Check."
+    };
+}
+/// Said to Claude as the accepted plan comes back to it.
+const TODOS: &str = concat!(
+    r#"f="$SLOP_CONTEXT"; [ -s "$f.pending" ] && mv "$f.pending" "$f.accepted"; printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"The plan is accepted. "#,
+    checklist!(),
+    r#" Run `slop-plan-step 1 doing` before you change any file."}}'"#
+);
+/// A plan accepted with "Yes, clear context" never finishes its ExitPlanMode:
+/// Claude Code denies the call, clears the conversation and starts a new one
+/// with the plan as its first message. So a clear with a plan still waiting
+/// may be that, or a `/clear` after the plan was turned down; Claude is told
+/// which way to read it, and nothing holds it to the steps (UNFINISHED,
+/// REMIND) until it marks one.
+const CLEARED: &str = concat!(
+    r#"f="$SLOP_CONTEXT"; [ -s "$f.pending" ] || exit 0; p=$(cat "$f.pending"); mv "$f.pending" "$f.accepted"; [ -f "$p" ] || exit 0; printf '%s\n\n' 'If the first message asks you to implement the plan below, the user accepted it. "#,
+    checklist!(),
+    r#" Run `slop-plan-step 1 doing` before you change any file. The plan:'; cat "$p"; exit 0"#
+);
+/// Compacting summarizes the plan away mid-build; it is said again, whole,
+/// with what is marked so far.
+const REMIND: &str = concat!(
+    r#"f="$SLOP_CONTEXT"; p=$(cat "$f.accepted" 2>/dev/null); [ -s "$f.steps" ] && [ -f "$p" ] || exit 0; printf '%s\n\n' 'The conversation was compacted while you were building the plan below, which the user accepted: pick up from the first step not marked done. "#,
+    checklist!(),
+    r#" The plan:'; cat "$p"; printf '\n\nMarked so far (step, state, note):\n'; cat "$f.steps"; exit 0"#
+);
+/// A new Claude in the tab is not building the last one's plan.
+const FRESH: &str = r#"rm -f "$SLOP_CONTEXT.accepted" "$SLOP_CONTEXT.pending""#;
+/// At the end of a turn, steps of the accepted plan still unmarked keep Claude
+/// going: exit 2 hands it the reason instead of stopping. Once per turn, since
+/// Claude Code says when a stop is already one this sent back, so a Claude
+/// waiting on the user can still stop. Writes the tab's `done` itself, so a
+/// turn sent back never shows as finished. All marked, the plan is let go.
+const UNFINISHED: &str = r#"f="$SLOP_CONTEXT"; p=$(cat "$f.accepted" 2>/dev/null); if [ -s "$f.steps" ] && [ -f "$p" ] && ! grep -q '"stop_hook_active": *true'; then left=$(awk -v m="$f.steps" 'BEGIN { while ((getline l < m) > 0) { split(l, a, "\t"); s[a[1]] = a[2] } } /^##[ \t]/ { on = tolower($0) ~ /step/; next } on && /^[0-9]+[.)][ \t]/ { n = $0 + 0; if (s[n] != "done" && s[n] != "skipped") o = o (o == "" ? "" : ", ") n } END { print o }' "$p"); if [ -n "$left" ]; then printf 'Steps of the plan the user accepted not marked done yet: %s. Finish them now, in order, marking each with slop-plan-step. One already finished: mark it done. One no longer wanted, or that cannot be done: `slop-plan-step <n> skipped <why>`, and tell the user. If you are waiting on the user, say what you need and stop.\n' "$left" >&2; exit 2; fi; rm -f "$f.accepted"; fi; printf done > "$f.status""#;
 
 /// Claude Code's own dialog shows the plan as its file reads once the hooks
 /// have run, and the plan's tab is where it is read: its diagrams are JSON in
@@ -163,6 +206,21 @@ const LIST: &str = r#"#!/bin/sh
 cat "$SLOP_CONTEXT.map"
 "#;
 
+/// What Claude runs to mark a step of the plan it is building (`checklist!`):
+/// one line per mark, the latest for a step standing (`steps_of`). Allowed
+/// without asking.
+const STEP: &str = r#"#!/bin/sh
+# Marks a step of the accepted plan, for its tab in Bluprint (src-tauri/src/claude.rs).
+[ -n "$SLOP_CONTEXT" ] || { echo "Not in a Bluprint tab; no plan to mark." >&2; exit 1; }
+usage='usage: slop-plan-step <step number> doing|done|skipped ["why"]'
+case "$1" in ''|*[!0-9]*) echo "$usage" >&2; exit 2 ;; esac
+case "$2" in doing|done|skipped) ;; *) echo "$usage" >&2; exit 2 ;; esac
+n=$1 state=$2
+shift 2
+printf '%s\t%s\t%s\n' "$n" "$state" "$(printf '%s' "$*" | tr '\t\n' '  ')" >> "$SLOP_CONTEXT.steps"
+echo "Step $n: $state."
+"#;
+
 const SYSTEM: &str = "This session was opened from Bluprint, an app that maps this \
 repository as a tree of sections (user journey, data flow, the code behind each). The user \
 can attach things they picked on the map: a whole section arrives as a block starting with \
@@ -207,23 +265,36 @@ your browser: to search the web or read a page as the user would see it, navigat
 there, never another browser: not Chrome, not a headless Chromium. When a skill says to \
 drive its own browser (gstack's `$B`), do those steps with the slop-preview tools instead. WebSearch and WebFetch are fine for reading docs as text; they \
 stay out of the preview. \
-A plan you finish in plan mode opens beside you as a short visual design doc, drawn from its \
-Markdown, and is accepted from there. Most people skip a long plan, so write one they will read: \
-`# <what will be built>`, then one sentence on what the user gets. Then the picture, as a fenced \
-block of JSON: a ```diagram of how the pieces fit, {\"caption\" (a few words), \"boxes\": [{\"id\", \
-\"label\" (1-3 words), \"sub\" (a file, or a few words), \"col\", \"row\", \"change\", \"section\" \
-(the id path of the map section this box is, from map_where or map_search, when it is one)}], \"arrows\": \
-[{\"from\", \"to\", \"label\" (1-3 words), \"change\"}]}, on a grid read left to right and at most \
-three columns wide, where `change` is \"new\", \"changed\" or \"gone\" and what stays as it is has \
-none; and when the user will see the change, a ```screen \
-wireframe too, {\"title\", \"device\": \"web\" or \"phone\", \"route\", \"items\": [{\"type\": heading, \
-text, field, choice, button, list or image, \"label\", \"note\"}]}, with a note on each new item. \
-Then `## Steps`, numbered, at most six, each a short line in plain words on what changes, not \
-how (the how is for the code); `## Files`, a ```files block with one line per file: `+ path — \
-what it is`, `~ path — what changes` or `- path — why it goes`; `## Risks` only when there are \
-real ones; and `## Check`, one to three short bullets on how you will know it works. Keep the \
-words outside the blocks under 150: no context section, no restating the request, and code only \
-where a signature is the decision. \
+A plan you finish in plan mode opens beside you as a short design doc, drawn from its Markdown, \
+and is accepted from there. Developers skip a wall of text, so write a plan they take in at a \
+glance: short sentences, bullets over paragraphs, a table wherever facts line up in columns, \
+nothing restated from the request and nothing written to fill a section. In this order, leaving \
+out any part with nothing real to say: `# <what will be built>`, a name of a few words, then two \
+sentences: what changes, and what the user gets from it. `## Overview`: three to five bullets on \
+how it works, as you would sketch it for a colleague: which part does what, and the decision the \
+rest follows from. A picture goes here only when it shows what the bullets cannot, of the kind this \
+change calls for, never out of habit: most changes need none, and boxes in a row that restate the \
+bullets are worse than none. Each is a fenced block of JSON: a ```diagram when parts are added, \
+removed or rewired, {\"caption\" (a few words), \"boxes\": [{\"id\", \"label\" (1-3 words), \"sub\" \
+(a file, or a few words), \"col\", \"row\", \"change\", \"section\" (the id path of the map section \
+this box is, from map_where or map_search, when it is one)}], \"arrows\": [{\"from\", \"to\", \
+\"label\" (1-3 words), \"change\"}]}, on a grid read left to right and at most three columns wide, \
+where `change` is \"new\", \"changed\" or \"gone\" and what stays as it is has none; a ```sequence \
+when the order of calls is the point, {\"caption\", \"actors\": [names], \"rows\": [{\"from\", \"to\", \
+\"label\", \"note\"}]}; a ```screen when the user will see something new, {\"title\", \"device\": \
+\"web\" or \"phone\", \"route\", \"items\": [{\"type\": heading, text, field, choice, button, list or \
+image, \"label\", \"note\"}]}, with a note on each new item. `## Data` when stored data or an API's \
+shape changes: a Markdown table for each table, collection or payload, `| Field | Type | Change | \
+Notes |`, a row per field added, changed or dropped, then one line on what happens to what is \
+already stored. `## Steps`: numbered, at most eight, each one line in plain words naming a piece of \
+work that can be finished and checked on its own, in the order you will do it; once the plan is \
+accepted they are your checklist. `## Trade-offs` only when you chose between real options: \
+`**Pros**` and `**Cons**`, two or three bullets each, then the option you passed over in one line \
+with why. `## Files`: a ```files block, one line per file: `+ path — what it is`, `~ path — what \
+changes` or `- path — why it goes`. `## Risks` only when there are real ones, a bullet each with \
+what you will do about it. `## Check`: one to three bullets on how you will know it works. A \
+one-file fix is the title, its two sentences, Steps, Files and Check. Stay under 250 words outside \
+the fenced blocks, and write code only where a signature is the decision. \
 End on the answer itself.";
 
 #[derive(serde::Deserialize)]
@@ -493,6 +564,36 @@ pub fn take_approved(queue: &Path) -> bool {
     std::fs::remove_file(queue.with_extension("md.approved")).is_ok()
 }
 
+/// A step of the accepted plan as Claude last marked it (STEP).
+#[derive(serde::Serialize, Debug, PartialEq)]
+pub struct Step {
+    n: u32,
+    /// `doing`, `done` or `skipped`.
+    state: String,
+    /// Why it was skipped.
+    note: Option<String>,
+}
+
+/// The accepted plan's steps Claude has marked, each at its latest mark, in
+/// order. Read on every poll rather than taken: the plan's tab keeps showing
+/// them, and a new plan clears them (PLAN).
+pub fn steps_of(queue: &Path) -> Vec<Step> {
+    let Ok(text) = std::fs::read_to_string(queue.with_extension("md.steps")) else { return Vec::new() };
+    let mut out: Vec<Step> = Vec::new();
+    for l in text.lines() {
+        let mut f = l.split('\t');
+        let (Some(n), Some(state)) = (f.next().and_then(|n| n.trim().parse().ok()), f.next().map(str::trim)) else { continue };
+        if !["doing", "done", "skipped"].contains(&state) {
+            continue;
+        }
+        let note = f.next().map(str::trim).filter(|s| !s.is_empty()).map(String::from);
+        out.retain(|s| s.n != n);
+        out.push(Step { n, state: state.to_string(), note });
+    }
+    out.sort_by_key(|s| s.n);
+    out
+}
+
 /// Something Claude asked the app to show. Serializes tagged on `verb`, for a
 /// discriminated union on the page: `{"verb":"section","section":"Sign ups"}`,
 /// or `{"verb":"diff","from":"HEAD~1","to":null}` — `from` empty meaning the
@@ -623,6 +724,7 @@ fn launcher() -> std::io::Result<PathBuf> {
     install(&dir.join("slop-map-fix"), FIX)?;
     install(&dir.join("slop-map-show"), SHOW)?;
     install(&dir.join("slop-map-list"), LIST)?;
+    install(&dir.join("slop-plan-step"), STEP)?;
     install(&dir.join("slop-terminal"), TERMINAL)?;
     let path = dir.join("slop-claude");
     install(&path, LAUNCHER)?;
@@ -687,7 +789,12 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     let hook = |c: &str| serde_json::json!({ "type": "command", "command": c });
     let mut settings = serde_json::json!({
         "hooks": {
-            "SessionStart": [{ "hooks": [hook(ON_PATH), hook(SESSION)] }],
+            "SessionStart": [
+                { "hooks": [hook(ON_PATH), hook(SESSION)] },
+                { "matcher": "startup", "hooks": [hook(FRESH)] },
+                { "matcher": "clear", "hooks": [hook(CLEARED)] },
+                { "matcher": "compact", "hooks": [hook(REMIND)] }
+            ],
             "UserPromptSubmit": [{ "hooks": [hook(HOOK), status("working")] }],
             "PreToolUse": [
                 { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [status("waiting")] },
@@ -702,11 +809,11 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
                 { "hooks": [hook(RESTORE), status("working")] }
             ],
             "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [status("waiting")] }],
-            "Stop": [{ "hooks": [hook(TURN), hook(RESTORE), status("done")] }],
+            "Stop": [{ "hooks": [hook(TURN), hook(RESTORE), hook(UNFINISHED)] }],
             "SessionEnd": [{ "hooks": [hook(RESTORE)] }]
         },
         "permissions": {
-            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "Bash(slop-terminal:*)", "mcp__slop-preview"],
+            "allow": ["Bash(slop-map-fix:*)", "Bash(slop-map-show:*)", "Bash(slop-map-list:*)", "Bash(slop-plan-step:*)", "Bash(slop-terminal:*)", "mcp__slop-preview"],
             // The preview is the browser here: Chrome would open beside the app, out of the user's sight.
             // So is gstack's headless Chromium: these skills do nothing but drive it, or hand it Chrome's sign-ins.
             "deny": [
@@ -1099,9 +1206,101 @@ mod tests {
         assert!(!take_approved(&q));
 
         // What Claude hears on acceptance must be JSON Claude Code can read.
-        let said = Command::new("sh").args(["-c", TODOS]).output().unwrap();
-        let said: serde_json::Value = serde_json::from_slice(&said.stdout).unwrap();
-        assert!(said["hookSpecificOutput"]["additionalContext"].as_str().unwrap().contains("to-do list"));
+        let said: serde_json::Value = serde_json::from_str(&run(TODOS, &q)).unwrap();
+        assert!(said["hookSpecificOutput"]["additionalContext"].as_str().unwrap().contains("slop-plan-step 1 doing"));
+    }
+
+    /// A hook as Claude Code runs it, handed `input`: what it printed, what it said to Claude, and its exit code.
+    #[cfg(unix)]
+    fn hand(cmd: &str, queue: &Path, input: &str) -> (String, String, i32) {
+        use std::io::Write as _;
+        let mut child = Command::new("sh")
+            .args(["-c", cmd])
+            .env("SLOP_CONTEXT", queue)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+        let out = child.wait_with_output().unwrap();
+        (String::from_utf8(out.stdout).unwrap(), String::from_utf8(out.stderr).unwrap(), out.status.code().unwrap_or(-1))
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_accepted_plan_holds_claude_to_its_steps_until_each_is_marked() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let file = dir.path().join("plan.md");
+        std::fs::write(&file, "# Add /health\n\nIt answers ok.\n\n## Steps\n1. Add the route\n2) Test it\n\n## Check\n- 1. not a step\n").unwrap();
+        let drafted = serde_json::json!({ "tool_name": "ExitPlanMode", "tool_input": { "plan": "…", "planFilePath": file } }).to_string();
+        let stop = r#"{"hook_event_name":"Stop","stop_hook_active":false}"#;
+        let mark = |args: &[&str]| {
+            let s = Command::new("sh").arg("-c").arg(STEP).arg("slop-plan-step").args(args).env("SLOP_CONTEXT", &q).output().unwrap();
+            s.status.code()
+        };
+        let status = || std::fs::read_to_string(q.with_extension("md.status")).unwrap_or_default();
+
+        hand(PLAN, &q, &drafted);
+        run(TODOS, &q);
+        // Accepted but not started: nothing holds it yet, and the turn ends.
+        assert_eq!(hand(UNFINISHED, &q, stop).2, 0);
+        assert_eq!(status(), "done");
+        assert_eq!(run(REMIND, &q), "");
+
+        assert_eq!(mark(&["1", "doing"]), Some(0));
+        assert_eq!(mark(&["one", "done"]), Some(2));
+        assert_eq!(mark(&["1", "finished"]), Some(2));
+        std::fs::remove_file(q.with_extension("md.status")).unwrap();
+        let (_, said, code) = hand(UNFINISHED, &q, stop);
+        assert_eq!(code, 2);
+        assert!(said.contains("not marked done yet: 1, 2."), "{said}");
+        // Sent back, the turn is not shown as finished.
+        assert_eq!(status(), "");
+        // Sent back once: the stop after that one goes through.
+        assert_eq!(hand(UNFINISHED, &q, r#"{"stop_hook_active": true}"#).2, 0);
+
+        // Compacting says the plan again, with the marks.
+        let again = run(REMIND, &q);
+        assert!(again.contains("## Steps\n1. Add the route") && again.contains("1\tdoing\t"), "{again}");
+
+        mark(&["1", "done"]);
+        mark(&["2", "skipped", "no", "test", "runner"]);
+        assert_eq!(
+            steps_of(&q),
+            vec![
+                Step { n: 1, state: "done".into(), note: None },
+                Step { n: 2, state: "skipped".into(), note: Some("no test runner".into()) }
+            ]
+        );
+        // All marked: the turn ends, and the plan is let go.
+        assert_eq!(hand(UNFINISHED, &q, stop).2, 0);
+        assert!(!q.with_extension("md.accepted").exists());
+        assert_eq!(run(REMIND, &q), "");
+
+        // A new plan clears the last one's marks.
+        hand(PLAN, &q, &drafted);
+        assert!(steps_of(&q).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_plan_accepted_by_clearing_the_conversation_is_said_to_the_new_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let q = dir.path().join("context-1.md");
+        let file = dir.path().join("plan.md");
+        std::fs::write(&file, "# Fix\n\n## Steps\n1. Do it\n").unwrap();
+        // A clear with no plan waiting says nothing.
+        assert_eq!(run(CLEARED, &q), "");
+        hand(PLAN, &q, &serde_json::json!({ "tool_input": { "plan": "…", "planFilePath": file } }).to_string());
+        let said = run(CLEARED, &q);
+        assert!(said.starts_with("If the first message asks you to implement the plan below") && said.ends_with("# Fix\n\n## Steps\n1. Do it\n"), "{said}");
+        // Once.
+        assert_eq!(run(CLEARED, &q), "");
+        // A new Claude in the tab is not held to it.
+        run(FRESH, &q);
+        assert!(!q.with_extension("md.accepted").exists());
     }
 
     /// The launcher as a tab runs it, with `bin` standing in for Claude.

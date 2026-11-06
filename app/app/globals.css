@@ -548,6 +548,29 @@
   /* Dot grid for the canvas ground — paper texture, not a grid
      you are meant to align to. */
   .dotfield {
+  /* Marked off as Claude builds the plan: done in the diff's green, the step
+     under way in amber, a skipped one struck through. */
+  .plan-prose ol > li[data-state="done"]::before {
+    content: "✓";
+    border-color: var(--color-diff-add-ink);
+    background: var(--color-diff-add-ink);
+    color: var(--color-paper);
+  }
+  .plan-prose ol > li[data-state="doing"]::before {
+    border-color: var(--color-amber-ink);
+    background: var(--color-paper);
+    color: var(--color-amber-ink);
+  }
+  .plan-prose ol > li[data-state="skipped"] {
+    color: var(--color-faint);
+    text-decoration: line-through;
+  }
+  .plan-prose ol > li[data-state="skipped"]::before {
+    content: "–";
+    border-color: var(--color-border-strong);
+    background: var(--color-paper);
+    color: var(--color-faint);
+  }
     background-image: radial-gradient(
       var(--color-surface-dim) 1px,
       transparent 1px

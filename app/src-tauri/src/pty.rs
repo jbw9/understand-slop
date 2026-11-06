@@ -265,6 +265,8 @@ pub struct State {
     plan: Option<claude::Plan>,
     /// The plan was accepted; reported once.
     approved: bool,
+    /// The accepted plan's steps as Claude has marked them; every poll.
+    steps: Vec<claude::Step>,
     /// The conversation Claude is having, to resume it after a restart.
     session: Option<String>,
 }
@@ -292,6 +294,7 @@ pub fn pty_state(id: u32, ptys: tauri::State<Ptys>) -> Result<State, String> {
         acts: claude::take_acts(&p.context),
         plan: claude::take_plan(&p.context),
         approved: claude::take_approved(&p.context),
+        steps: claude::steps_of(&p.context),
         session: claude::session_of(&p.context),
     })
 }

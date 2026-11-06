@@ -575,7 +575,7 @@ export function Workspace() {
           approved: boolean;
           session: string | null;
         }>("pty_state", { id: pty })
-          .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved, session }) => {
+          .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved, steps = [], session }) => {
             if (turn && cwd) void followTurn(cwd, turn);
             if (plan) planning.current(key, cwd, plan);
             if (approved) {
@@ -594,6 +594,7 @@ export function Workspace() {
                 ? (said ?? undefined)
                 : inFront({ ...x, live, busy })
                   ? rang.current[key]
+          steps: NonNullable<Plan["steps"]>;
                     ? "waiting"
                     : Date.now() - (printed.current[key] ?? 0) < 3000
                       ? "working"
@@ -602,6 +603,18 @@ export function Workspace() {
             setTabs((all) =>
               all.some((x) => x.key === key && (x.live !== live || x.busy !== busy || x.status !== statusOf(x) || x.session !== (session ?? undefined)))
                 ? all.map((x) => (x.key === key ? { ...x, live, busy, status: statusOf(x), session: session ?? undefined } : x))
+                : all,
+            );
+            // Claude marking a step means the plan was accepted, however it was
+            // answered: "Yes, clear context" never reports it (claude.rs, CLEARED).
+            const marks = JSON.stringify(steps);
+            setTabs((all) =>
+              all.some((x) => x.of === key && x.plan && JSON.stringify(x.plan.steps ?? []) !== marks)
+                ? all.map((x) =>
+                    x.of === key && x.plan
+                      ? { ...x, plan: { ...x.plan, steps, ...(steps.length && x.plan.state !== "approved" ? { state: "approved" as const, approvedAt: Date.now() } : {}) } }
+                      : x,
+                  )
                 : all,
             );
           })

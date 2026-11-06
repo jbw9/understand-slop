@@ -3,9 +3,9 @@
  * and the question Claude Code asks about it, read off the terminal.
  *
  * The plan is Markdown in the shape Claude is asked for (src-tauri/src/claude.rs,
- * SYSTEM): a title, one sentence, a picture as fenced JSON, then short
- * sections. Nothing here insists on that shape: a plan written any other way is
- * still split by its headings and drawn as Markdown.
+ * SYSTEM): a title, two sentences, then short sections, with a picture as
+ * fenced JSON only where one helps. Nothing here insists on that shape: a plan
+ * written any other way is still split by its headings and drawn as Markdown.
  */
 
 export interface Section {
@@ -15,9 +15,9 @@ export interface Section {
 
 export interface PlanDoc {
   title: string;
-  /** The one sentence under the title: what the user gets. */
+  /** The sentences under the title: what changes, and what the user gets. */
   lede: string;
-  /** Everything between the lede and the first section: the picture. */
+  /** Everything between the lede and the first section. */
   intro: string;
   sections: Section[];
   steps: number;

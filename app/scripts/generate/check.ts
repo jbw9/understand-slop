@@ -433,7 +433,7 @@ export type ExplainLevel = "none" | "minimal" | "brief" | "detailed" | "full";
 export const EXPLAIN_LEVEL: ExplainLevel = (["none", "minimal", "brief", "detailed", "full"] as const).find((l) => l === process.env.SLOP_EXPLAIN) ?? "full";
 
 /** An explainer's body: enough to define the words a level leans on, short enough to read. */
-const BOUNDS = {
+export const BOUNDS = {
   full: { min: 25, max: 200, blocks: 2, terms: [4, 12], steps: [3, 8], say: "a few short paragraphs, and a picture where it says more", words: "a newcomer must know to read this map" },
   detailed: { min: 15, max: 120, blocks: 1, terms: [4, 10], steps: [3, 6], say: "one or two short paragraphs", words: "a newcomer must know to read this map" },
   brief: { min: 8, max: 60, blocks: 0, terms: [3, 8], steps: [3, 5], say: "a sentence or two", words: "a developer outside this field would not know" },

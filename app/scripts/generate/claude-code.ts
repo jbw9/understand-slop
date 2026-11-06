@@ -239,7 +239,10 @@ async function claude(args: string[], prompt: string, stage: string, effort?: st
         // Not a nested session of whatever Claude Code launched this script.
         const env = { ...process.env };
         delete env.CLAUDECODE;
-        delete env.CLAUDE_CODE_ENTRYPOINT;
+        // Nor of the session's MCP: a Claude Code session (Bluprint's) hands its
+        // own servers to children through these, and a run handed the reader's
+        // map tools spent its turns looking up ids in the live map, not answering.
+        for (const k of Object.keys(env)) if (k.startsWith("CLAUDE_CODE_") || /^SLOP_(MCP_URL|CLAUDE_MCP|CLAUDE_SETTINGS|CLAUDE_SYSTEM|CONTEXT)$/.test(k)) delete env[k];
         env.MAX_THINKING_TOKENS = effort ? "16000" : "0";
         const p = spawn(process.env.SLOP_CLAUDE || "claude", ["-p", ...format, "--setting-sources", "", "--strict-mcp-config", ...flags], { cwd: cwd(), env, windowsHide: true }) as ChildProcessWithoutNullStreams;
         let stdout = "", stderr = "";
@@ -326,7 +329,8 @@ export async function ccAsk<T>(req: { model: string; system: string | { type: st
   // An answer that failed the schema until the turns ran out (a root's split
   // cut did, and took the whole run with it) gets one more try with more room.
   if (r.structured_output === undefined && r.subtype === "error_max_turns") r = await run(8);
-  if (r.structured_output === undefined) throw new Error(`${req.stage}: claude -p returned no structured output (${r.subtype})`);
+  // What it said instead, so a schema it kept failing says why.
+  if (r.structured_output === undefined) throw new Error(`${req.stage}: claude -p returned no structured output (${r.subtype})${r.result ? `: ${String(r.result).slice(0, 400)}` : ""}`);
   const usage = usageOf(r);
   chargeUsage(req.stage, req.model, usage, false);
   store(key, { value: r.structured_output, usage });

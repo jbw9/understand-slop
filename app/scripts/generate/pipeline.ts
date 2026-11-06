@@ -16,6 +16,7 @@ import { authorRoot, authorSplit, inParts, submitLine, tooBig, type Authored, ty
 import { catalogOf } from "./catalog";
 import { BACKEND, bill, MODELS, cacheIn, sweepCache, throttle } from "./bedrock";
 import { ccClose, type Turn } from "./claude-code";
+import { deepOverview, deepRoot } from "./deep";
 import { fastMap } from "./fast";
 import { arrowStats, check, dedupeIssues, EXPLAIN_LEVEL, OVERVIEW_ID } from "./check";
 import { cutRepo, place, unclaimed, type Cut } from "./cut";
@@ -136,6 +137,8 @@ export async function main(args: string[]) {
     cut: pick(process.env.SLOP_CUT),
     author: pick(process.env.SLOP_AUTHOR),
     part: pick(process.env.SLOP_PART, "sonnet"),
+    // A leaf's words in a deepened --fast map (deep.ts): its source is in front of it, nothing to find.
+    words: pick(process.env.SLOP_WORDS, "sonnet"),
   };
 
   // --out puts the map elsewhere: the app's project vault (lib/vault.ts), so an
@@ -227,6 +230,7 @@ export async function main(args: string[]) {
     progress.stage = "author";
     flush();
     const deepen = !has("--no-deepen");
+    const agentDeepen = has("--deepen-agent");
     const run: Run = { command: `bluprint map ${inv.name} --fast`, repo: inv.scope ? name : inv.name, commit: inv.commit, files: code.length, elapsed: "", root: repo, explain: deepen ? EXPLAIN_LEVEL : "none", models };
     const r = await lap("fast", () => fastMap(inv, sums, activeGraph()!, models.author, run, say));
     const quick = Math.round((Date.now() - t0) / 1000);
@@ -279,7 +283,11 @@ export async function main(args: string[]) {
         const root = fastCut.roots.find((x) => x.id === id)!;
         mark(id, "drafting", "writing in full");
         let done: Authored;
-        if (tooBig(root, fastCut, inv, sums)) {
+        // Code builds the section and a model writes its words (deep.ts); --deepen-agent writes it with an author agent, as before.
+        if (!agentDeepen)
+          // A section whose calls all fail keeps its quick version, as a failed author does.
+          done = await deepRoot(root, r.map.AUTHORED.find((n) => n.id === id)!, inv, sums, activeGraph()!, { group: models.author, words: models.words }, say).catch((e: Error) => ({ root: null, turns: 0, reads: 0, submits: 0, problems: [e.message.slice(0, 300)], trail: [] }));
+        else if (tooBig(root, fastCut, inv, sums)) {
           const split = await authorSplit(root, fastCut, inv, sums, { cut: models.cut, part: models.part, join: models.author }, null, { submit: submitted(id, root.prefix), part: () => {}, say });
           done = split?.authored ?? (await authorRoot(root, fastCut, inv, sums, models.author, submitted(id, root.prefix)));
         } else done = await authorRoot(root, fastCut, inv, sums, models.author, submitted(id, root.prefix));
@@ -293,13 +301,14 @@ export async function main(args: string[]) {
           dedupeIssues(map.AUTHORED[i]);
           await save();
           mark(id, "done", "written in full");
-          say(`${id}: written in full after ${done.turns + 1} turns`);
+          say(`${id}: written in full after ${done.turns + 1} ${agentDeepen ? "turns" : "calls"}`);
         } else {
           mark(id, "failed", "kept the quick version");
           say(`${id}: kept the quick version — ${done.problems.length} problems unresolved`);
         }
       };
-      const AT_ONCE = Number(process.env.SLOP_DEEPEN_AT_ONCE ?? 3);
+      // A section in words is a few short calls, so all of them at once; an agent per section, three.
+      const AT_ONCE = Number(process.env.SLOP_DEEPEN_AT_ONCE ?? (agentDeepen ? 3 : queue.length));
       await lap("deepen", () =>
         Promise.all(
           Array.from({ length: Math.min(AT_ONCE, queue.length) }, async () => {
@@ -317,7 +326,16 @@ export async function main(args: string[]) {
       // which the quick map has none of. If it fails the quick one stays.
       progress.stage = "overview";
       flush();
-      const drawn = await lap("overview", () => overviewOf(map.AUTHORED, fastCut, inv, models.author, (n, problems) => say(`overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`), sums));
+      const drawn: Overviewed = agentDeepen
+        ? await lap("overview", () => overviewOf(map.AUTHORED, fastCut, inv, models.author, (n, problems) => say(`overview: submit ${n} — ${problems ? `${problems} problems` : "clean"}`), sums))
+        : await lap("overview", async () => {
+            try {
+              const o = await deepOverview(map.AUTHORED, map.OVERVIEW!, inv, activeGraph()!, models.author);
+              return { overview: o.overview, turns: 0, submits: 1, problems: o.problems };
+            } catch (e) {
+              return { overview: null, turns: 0, submits: 0, problems: [(e as Error).message.slice(0, 300)] };
+            }
+          });
       if (drawn.overview) {
         const top = { ...drawn.overview };
         if (EXPLAIN_LEVEL === "none") for (const k of ["explain", "glossary"] as const) delete top[k];
@@ -339,7 +357,7 @@ export async function main(args: string[]) {
           repo: inv.name,
           commit: inv.commit,
           backend: BACKEND,
-          mode: deepen ? "fast, then deepened" : "fast",
+          mode: deepen ? `fast, then deepened${agentDeepen ? " by agents" : " in words"}` : "fast",
           models,
           elapsed: { ...elapsed, ...r.timing, quick, total },
           usd: Math.round(usd * 100) / 100,

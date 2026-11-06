@@ -35,7 +35,7 @@ import { isSource, type Inventory } from "./inventory";
 import { oneLine, type FileSummary } from "./summarize";
 
 /** Files one group holds at most: one diagram a reader takes in. SLOP_FAST_MAX. */
-const MAX_FILES = Number(process.env.SLOP_FAST_MAX ?? 12);
+export const MAX_FILES = Number(process.env.SLOP_FAST_MAX ?? 12);
 /** Components the top level holds at most. SLOP_FAST_TOP. */
 const TOP_MAX = Number(process.env.SLOP_FAST_TOP ?? 12);
 /** Sibling sections of one app merged into one stay within this many files. SLOP_FAST_FAMILY. */
@@ -73,7 +73,7 @@ export interface ModuleEdge {
   names: string[];
 }
 
-const slug = (s: string) => s.toLowerCase().replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x";
+export const slug = (s: string) => s.toLowerCase().replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x";
 /** A directory's name as an id: `.claude` → claude. */
 const dirSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const segsOf = (dir: string) => (dir && dir !== "." ? dir.split("/") : []);
@@ -85,7 +85,7 @@ const dirAt = (path: string, depth: number) => path.split("/").slice(0, -1).slic
  * first, while a cluster stays within MAX_FILES (union-find, as a spanning
  * tree is built). Files linked to nothing in it are chunked in name order.
  */
-function splitFlat(dir: string, ps: string[], inv: Inventory): Omit<Group, "key">[] {
+export function splitFlat(dir: string, ps: string[], inv: Inventory): Omit<Group, "key">[] {
   const set = new Set(ps);
   const weight = new Map<string, number>();
   for (const a of ps)
@@ -341,7 +341,7 @@ const SYNTH_TOOL: Tool = {
 };
 
 /** What an answer breaks of the map's limits on words, which the check holds every card to. */
-function wordProblems(fields: [what: string, text: unknown, max: number][]): string[] {
+export function wordProblems(fields: [what: string, text: unknown, max: number][]): string[] {
   const out: string[] = [];
   for (const [what, text, max] of fields) {
     const t = typeof text === "string" ? text : "";
@@ -357,7 +357,7 @@ function wordProblems(fields: [what: string, text: unknown, max: number][]): str
  * check on every card it is on. What is still over after that is listed by
  * the check, not tried again.
  */
-async function askWithin(req: { model: string; stage: string; maxTokens: number; prompt: string; tool: Tool }, problemsOf: (a: any) => string[]): Promise<any> {
+export async function askWithin(req: { model: string; stage: string; maxTokens: number; prompt: string; tool: Tool }, problemsOf: (a: any) => string[]): Promise<any> {
   const messages = [{ role: "user" as const, content: req.prompt }];
   const first = await ask<any>({ model: req.model, stage: req.stage, maxTokens: req.maxTokens, system: SYSTEM, messages, tool: req.tool });
   const wrong = problemsOf(first);
@@ -375,7 +375,7 @@ async function askWithin(req: { model: string; stage: string; maxTokens: number;
 const SYSTEM = "You describe one part of a map of a codebase from facts already extracted from its code. Use only what you are given; answer only with the structure asked for.";
 
 /** Code ranges for a file as a leaf cites them: the whole file if it is short, else its largest functions within the leaf's limits. */
-function leafCode(path: string, lines: number, s: FileSummary | undefined): NonNullable<Node["code"]> {
+export function leafCode(path: string, lines: number, s: FileSummary | undefined): NonNullable<Node["code"]> {
   if (lines <= LEAF.lines) return [{ file: path, start: 1, end: lines, label: s?.purpose?.split(/(?<=\.)\s/)[0] ?? basename(path) }];
   const out: NonNullable<Node["code"]> = [];
   let used = 0;
@@ -393,7 +393,7 @@ function leafCode(path: string, lines: number, s: FileSummary | undefined): NonN
  * arrows leading to it (a cycle stops growing at the box count), capped at
  * COLS; its row is its place among its column's boxes in the order given.
  */
-function layered(ids: string[], arrows: { from: string; to: string }[]): Map<string, { col: number; row: number }> {
+export function layered(ids: string[], arrows: { from: string; to: string }[]): Map<string, { col: number; row: number }> {
   const rank = new Map(ids.map((id) => [id, 0]));
   for (let pass = 0; pass < ids.length; pass++) {
     let moved = false;
@@ -418,7 +418,7 @@ function layered(ids: string[], arrows: { from: string; to: string }[]): Map<str
 }
 
 /** A file summary's purpose as a card's detail: its sentences while they fit in 40 words (a first one alone over is kept, and the check lists it). */
-function within40(text: string): string {
+export function within40(text: string): string {
   const ss = text.split(/(?<=[.!?])\s+/).filter(Boolean);
   const out: string[] = [];
   for (const x of ss) {
@@ -427,8 +427,63 @@ function within40(text: string): string {
   }
   return out.join(" ");
 }
-const short = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`);
-type Arrow = { from: string; to: string; label: string; at: string; inferred?: boolean };
+export const short = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`);
+export type Arrow = { from: string; to: string; label: string; at: string; inferred?: boolean };
+
+/**
+ * A diagram drawer over the graph: a box per node, each standing for some
+ * files, and an arrow wherever the graph has a call from one's files into
+ * another's, at the call's line. A call into code the target does not cite is
+ * drawn as inferred: the checker holds an arrow to land in its box's code.
+ */
+export function diagramOf(g: Graph) {
+  const defById = new Map(g.defs.map((d) => [d.id, d]));
+  const fileOfDef = (id: string) => defById.get(id)?.file ?? id;
+  const calls = g.edges.filter((e) => e.kind !== "imports" && e.lines.length);
+  return (
+    caption: string,
+    /** Each box's node and the files it stands for, or (parts of one file) the line ranges. */
+    nodes: { node: Node; files: string[]; ranges?: { file: string; start: number; end: number }[] }[],
+    boxPrefix: string,
+    label?: (from: Node, to: Node) => string | undefined,
+    /** The name an arrow's label describes, so its line is a call to that: the most-called, for the top level. */
+    prefer?: (from: Node, to: Node) => string | undefined,
+  ) => {
+    const holder = new Map<string, Node>();
+    for (const { node, files } of nodes) for (const f of files) holder.set(f, node);
+    const ranged = nodes.filter((x) => x.ranges?.length);
+    // The box a def's code is in: by its lines where boxes split a file, else by its file.
+    const boxOf = (id: string, line?: number) => {
+      const d = defById.get(id);
+      const file = d?.file ?? id;
+      const at = line ?? d?.start;
+      if (at !== undefined) for (const x of ranged) if (x.ranges!.some((r) => r.file === file && r.start <= at && at <= r.end)) return x.node;
+      return holder.get(file);
+    };
+    const best = new Map<string, Arrow & { score: number }>();
+    for (const e of calls) {
+      const a = boxOf(e.from, e.lines[0]), b = boxOf(e.to);
+      if (!a || !b || a === b) continue;
+      const def = defById.get(e.to);
+      const lands = !def || (b.code ?? []).some((r) => r.file === def.file && r.start <= def.end && def.start <= r.end);
+      const cand: Arrow = {
+        from: `${boxPrefix}${a.id}`,
+        to: `${boxPrefix}${b.id}`,
+        label: short(label?.(a, b) ?? `uses ${def?.name ?? basename(e.to)}`, 24),
+        at: `${fileOfDef(e.from)}:${e.lines[0]}`,
+        ...(e.how !== "extracted" || !lands ? { inferred: true } : {}),
+      };
+      const k = `${a.id}\n${b.id}`;
+      // A call to the name the label describes, then a call the source states.
+      const score = (prefer && def?.name === prefer(a, b) ? 2 : 0) + (cand.inferred ? 0 : 1);
+      const prev = best.get(k);
+      if (!prev || score > prev.score) best.set(k, { ...cand, score });
+    }
+    const arrows: Arrow[] = [...best.values()].map(({ score, ...x }) => (void score, x));
+    const place = layered(nodes.map(({ node }) => `${boxPrefix}${node.id}`), arrows);
+    return { kind: "diagram", caption: short(caption, 30), boxes: nodes.map(({ node }) => ({ id: `${boxPrefix}${node.id}`, label: node.title, sub: node.sub, ...place.get(`${boxPrefix}${node.id}`)!, opens: node.id })), arrows };
+  };
+}
 
 export interface FastResult {
   map: MapFile;
@@ -531,45 +586,7 @@ export async function fastMap(inv: Inventory, sums: Record<string, FileSummary>,
   const order = [...(synth.order ?? []).filter((id: string) => byId.has(id)), ...comps.map((c) => c.id).filter((id) => !(synth.order ?? []).includes(id))];
   for (const id of synth.order ?? []) if (!byId.has(id)) discrepancies.push(`synthesize ordered "${id}", which is no component`);
 
-  /**
-   * A diagram over some nodes, each standing for some files: a box per node,
-   * and an arrow wherever the graph has a call from one's files into
-   * another's, at the call's line. A call into code the target does not cite
-   * is drawn as inferred: the checker holds an arrow to land in its box's code.
-   */
-  const diagram = (
-    caption: string,
-    nodes: { node: Node; files: string[] }[],
-    boxPrefix: string,
-    label?: (from: Node, to: Node) => string | undefined,
-    /** The name an arrow's label describes, so its line is a call to that: the most-called, for the top level. */
-    prefer?: (from: Node, to: Node) => string | undefined,
-  ) => {
-    const holder = new Map<string, Node>();
-    for (const { node, files } of nodes) for (const f of files) holder.set(f, node);
-    const best = new Map<string, Arrow & { score: number }>();
-    for (const e of calls) {
-      const a = holder.get(fileOfDef(e.from)), b = holder.get(fileOfDef(e.to));
-      if (!a || !b || a === b) continue;
-      const def = defById.get(e.to);
-      const lands = !def || (b.code ?? []).some((r) => r.file === def.file && r.start <= def.end && def.start <= r.end);
-      const cand: Arrow = {
-        from: `${boxPrefix}${a.id}`,
-        to: `${boxPrefix}${b.id}`,
-        label: short(label?.(a, b) ?? `uses ${def?.name ?? basename(e.to)}`, 24),
-        at: `${fileOfDef(e.from)}:${e.lines[0]}`,
-        ...(e.how !== "extracted" || !lands ? { inferred: true } : {}),
-      };
-      const k = `${a.id}\n${b.id}`;
-      // A call to the name the label describes, then a call the source states.
-      const score = (prefer && def?.name === prefer(a, b) ? 2 : 0) + (cand.inferred ? 0 : 1);
-      const prev = best.get(k);
-      if (!prev || score > prev.score) best.set(k, { ...cand, score });
-    }
-    const arrows: Arrow[] = [...best.values()].map(({ score, ...x }) => (void score, x));
-    const place = layered(nodes.map(({ node }) => `${boxPrefix}${node.id}`), arrows);
-    return { kind: "diagram", caption: short(caption, 30), boxes: nodes.map(({ node }) => ({ id: `${boxPrefix}${node.id}`, label: node.title, sub: node.sub, ...place.get(`${boxPrefix}${node.id}`)!, opens: node.id })), arrows };
-  };
+  const diagram = diagramOf(g);
   /** The file of some files the others call into most: what a level's own code cites. */
   const keyFile = (files: string[]) => {
     const set = new Set(files);

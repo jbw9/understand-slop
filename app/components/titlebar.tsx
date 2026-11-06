@@ -8,8 +8,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { openSettings } from "@/lib/settings";
 import { openPalette } from "@/components/palette";
 import { useMap } from "@/components/map-context";
-import { openFolder, openProjects } from "@/components/projects";
-import { Menu } from "@/components/menu";
+import { openProjects } from "@/components/projects";
 import { keys } from "@/components/button";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
@@ -151,7 +150,6 @@ function Where({ mac }: { mac: boolean }) {
   const { name, maps } = useMap();
   const router = useRouter();
   const { open, last, status } = useOpenProjects();
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const shown = open.flatMap((id) => maps.filter((m) => m.id === id));
   const go = useCallback((id: string | null | undefined) => id && id !== name && router.push(`/?map=${encodeURIComponent(id)}`), [name, router]);
 
@@ -221,11 +219,7 @@ function Where({ mac }: { mac: boolean }) {
       </div>
       <button
         type="button"
-        onClick={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          setMenu({ x: r.left, y: r.bottom + 4 });
-        }}
-        aria-haspopup="menu"
+        onClick={() => openProjects()}
         aria-label="Open another project"
         title="Open another project"
         className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
@@ -234,22 +228,6 @@ function Where({ mac }: { mac: boolean }) {
           <path d="M5 1.5v7M1.5 5h7" />
         </svg>
       </button>
-      {menu ? (
-        <Menu
-          x={menu.x}
-          y={menu.y}
-          onClose={() => setMenu(null)}
-          items={[
-            ...maps.map((m) => ({
-              label: m.label,
-              icon: <span className="w-3 text-accent">{open.includes(m.id) ? "✓" : ""}</span>,
-              onClick: () => go(m.id),
-            })),
-            { label: "Import project…", icon: <span className="w-3 text-muted-slate">+</span>, onClick: () => void openFolder(), separated: true },
-            { label: "Manage projects…", icon: <span className="w-3" />, onClick: () => openProjects() },
-          ]}
-        />
-      ) : null}
     </>
   );
 }

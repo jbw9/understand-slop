@@ -483,8 +483,10 @@ export function Shell({
       // The window's native drop handler takes OS drops, so the page's own
       // drop events never carry paths; the one under the pointer is this
       // terminal only if nothing (the floating window, a menu) lies over it.
-      const under = (at: { toLogical: (f: number) => { x: number; y: number } }) => {
-        const p = at.toLogical(window.devicePixelRatio || 1);
+      // On macOS wry reports the drop in points, which Tauri labels physical:
+      // scaling it down there would look half way to the window's corner.
+      const under = (at: { x: number; y: number; toLogical: (f: number) => { x: number; y: number } }) => {
+        const p = isMac() ? at : at.toLogical(window.devicePixelRatio || 1);
         const hit = document.elementFromPoint(p.x, p.y);
         return !!hit && !!pane.current?.contains(hit);
       };

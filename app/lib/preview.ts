@@ -1,12 +1,12 @@
 /**
- * The previews open in the workspace, one per project, and how a call from
- * Claude reaches one (src-tauri/src/mcp.rs): it arrives as a `slop:preview`
- * event naming the tab Claude runs in, the workspace finds that tab's
- * project (components/workspace.tsx), and the project's preview runs it
+ * The previews open in the workspace, and how a call from Claude reaches one
+ * (src-tauri/src/mcp.rs): it arrives as a `slop:preview` event naming the tab
+ * Claude runs in, the workspace finds that tab's project and the Preview that
+ * agent drives (components/workspace.tsx), and that preview runs it
  * (components/preview.tsx).
  */
 
-/** `tab`: which of the project's Preview tabs, by its number from 1; null for the one last in view. */
+/** `tab`: which of the project's Preview tabs, by its number from 1; null for the calling agent's own. */
 export type Call = { tab?: number | null } & (
   | { op: "frame" }
   | { op: "agent"; name: string; args: Record<string, unknown> }

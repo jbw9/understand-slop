@@ -69,6 +69,24 @@
     e.preventDefault();
   });
 
+  // Which Preview the keyboard is in, for the app's Cmd+R (components/preview.tsx).
+  addEventListener("focus", () => post({ type: "focus" }));
+  // Off a Mac the menu bar has no keys for the preview (src-tauri/src/lib.rs),
+  // and a key pressed in the page never reaches the app: the browser's own
+  // Ctrl+R in a frame would reload the whole app. Caught here instead.
+  if (!/Mac/.test(navigator.platform))
+    addEventListener(
+      "keydown",
+      (e) => {
+        if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || !e.isTrusted) return;
+        const key = e.code === "KeyR" ? "reload" : e.code === "KeyL" ? "address" : null;
+        if (!key) return;
+        e.preventDefault();
+        post({ type: "key", key });
+      },
+      true,
+    );
+
   const where = () => post({ type: "location", url: location.href, title: document.title });
   for (const k of ["pushState", "replaceState"]) {
     const own = history[k];
@@ -217,6 +235,16 @@
     return `${document.title ? `Title: ${document.title}\n` : ""}URL: ${location.href}\n\n${lines.join("\n")}`;
   };
 
+  const ROLE_WORDS = {
+    textbox: "input field box text entry",
+    searchbox: "search input field box",
+    button: "btn",
+    link: "anchor",
+    checkbox: "check box tick",
+    radio: "option",
+    combobox: "select dropdown menu picker input field box",
+    slider: "range",
+  };
   const find = ({ query }) => {
     let found = [];
     try {
@@ -227,12 +255,22 @@
     // A word like "Submit" is a valid selector too; matching nothing, it is text.
     if (!found.length) {
       const q = query.toLowerCase();
+      const words = q.split(/\s+/).filter(Boolean);
+      const loose = [];
       for (const el of document.body.querySelectorAll("*")) {
         if (!visible(el)) continue;
         const role = roleOf(el);
         if (!role && !interactive(el, role)) continue;
-        if (nameOf(el).toLowerCase().includes(q)) found.push(el);
+        const name = nameOf(el).toLowerCase();
+        if (name.includes(q)) found.push(el);
+        // Asked as Claude says it, "greet button" or "name input": every word in
+        // the name or the role, so role words count.
+        else if (words.length > 1) {
+          const said = `${name} ${role} ${ROLE_WORDS[role] ?? ""}`;
+          if (words.every((w) => said.includes(w))) loose.push(el);
+        }
       }
+      if (!found.length) found = loose;
     }
     found = found.filter(visible).slice(0, 20);
     if (!found.length) return `Nothing on the page matches "${query}".`;
@@ -379,7 +417,9 @@
       if (button === 2) mouse(el, "contextmenu", x, y, { button });
       // A real click on a <label>, a link or a submit button does what it
       // does; el.click() runs the same default actions a person's would.
-      else if (i === 1) el.click();
+      // An SVG icon has no click() of its own: a click event on it reaches
+      // the button around it all the same.
+      else if (i === 1 && typeof el.click === "function") el.click();
       else mouse(el, "click", x, y, { button, detail: i });
     }
     if (count === 2) mouse(el, "dblclick", x, y, { detail: 2 });
@@ -477,15 +517,43 @@
     return null;
   };
 
-  // The picked element outlined while its menu is open (components/preview.tsx),
-  // in the top layer like Claude's pointer. A page from the web has no menu
-  // over it: there the pick is taken at once, and the outline only flashes.
-  let mark = null;
+  // Boxes over the page, in the top layer like Claude's pointer: dashed, the
+  // element under the pointer while selecting; solid, those picked, while
+  // their menu is open (components/preview.tsx). A page from the web has no
+  // menu over it: there a pick is taken at once, and its outline only flashes.
+  const place = (b) => {
+    const r = b.__slopFor.getBoundingClientRect();
+    b.style.cssText = `all:initial;position:fixed;box-sizing:border-box;left:${r.x - 2}px;top:${r.y - 2}px;width:${r.width + 4}px;height:${r.height + 4}px;margin:0;padding:0;overflow:visible;border:2px ${b.__slopDashed ? "dashed" : "solid"} #d97757;border-radius:3px;background:rgba(217,119,87,${b.__slopDashed ? ".12" : ".08"});pointer-events:none;z-index:2147483647`;
+    // The label above the box, or inside it where the page's top leaves no room.
+    b.firstChild.style.cssText = `all:initial;position:absolute;left:-2px;${r.y < 22 ? "top:0" : "bottom:100%"};margin:2px 0;padding:1px 6px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:3px;background:#d97757;color:#fff;font:500 11px/16px ui-sans-serif,system-ui,sans-serif;pointer-events:none`;
+  };
+  const box = (el, label, dashed) => {
+    const b = document.createElement("slop-mark");
+    b.setAttribute("popover", "manual");
+    b.append(document.createElement("span"));
+    b.firstChild.textContent = label;
+    b.__slopFor = el;
+    b.__slopDashed = dashed;
+    place(b);
+    (document.body || document.documentElement).appendChild(b);
+    try {
+      b.showPopover();
+    } catch {
+      /* no popover in this engine: fixed and z-indexed is near enough */
+    }
+    return b;
+  };
+  let chosen = [];
+  let hovered = null;
+  const follow = () => {
+    for (const b of chosen) place(b);
+    if (hovered) place(hovered);
+  };
+  addEventListener("scroll", follow, true);
+  addEventListener("resize", follow);
   const unmark = () => {
-    if (!mark) return;
-    mark.remove();
-    mark = null;
-    removeEventListener("scroll", unmark, true);
+    for (const b of chosen) b.remove();
+    chosen = [];
     removeEventListener("pointerdown", dismiss, true);
   };
   // Clicking in the page closes the menu, which cannot hear a click in a frame.
@@ -493,44 +561,18 @@
     unmark();
     post({ type: "unpick" });
   };
-  const outline = (el) => {
-    unmark();
-    const r = el.getBoundingClientRect();
-    mark = document.createElement("slop-mark");
-    mark.setAttribute("popover", "manual");
-    mark.style.cssText = `all:initial;position:fixed;left:${r.x - 2}px;top:${r.y - 2}px;width:${r.width}px;height:${r.height}px;margin:0;border:2px solid #d97757;border-radius:3px;background:rgba(217,119,87,.08);pointer-events:none;z-index:2147483647`;
-    (document.body || document.documentElement).appendChild(mark);
-    try {
-      mark.showPopover();
-    } catch {
-      /* no popover in this engine: fixed and z-indexed is near enough */
-    }
-    addEventListener("scroll", unmark, true);
-    if (native) setTimeout(unmark, 1200);
-    else addEventListener("pointerdown", dismiss, true);
+  const relabel = () => chosen.forEach((b, i) => (b.firstChild.textContent = chosen.length > 1 ? String(i + 1) : describe(b.__slopFor)));
+  const toggle = (el) => {
+    const at = chosen.findIndex((b) => b.__slopFor === el);
+    if (at >= 0) chosen.splice(at, 1)[0].remove();
+    else chosen.push(box(el, "", false));
+    relabel();
   };
-
-  // A person's right-click offers the thing under it to Claude, as the map's
-  // does: a control, or the nearest one it is inside, else what was hit. A
-  // page with a menu of its own keeps it, unless ⌥ is held. Claude's own
-  // right-click was kept closed above, so is passed over here.
-  addEventListener("contextmenu", (e) => {
-    if ((e.defaultPrevented && !e.altKey) || !(e.target instanceof Element)) return;
-    e.preventDefault();
-    let el = e.target;
-    for (let n = el, i = 0; n && n !== document.body && i < 6; n = n.parentElement, i++)
-      if (interactive(n, roleOf(n))) {
-        el = n;
-        break;
-      }
+  const targetOf = (el) => {
     const selector = selectorOf(el);
     const source = sourceOf(el);
     const text = clip(el.innerText || el.textContent, 300);
-    outline(el);
-    post({
-      type: "pick",
-      x: e.clientX,
-      y: e.clientY,
+    return {
       key: `preview:${location.pathname}#${selector}`,
       title: describe(el),
       text: [
@@ -544,7 +586,90 @@
         .filter(Boolean)
         .join("\n")
         .concat("]"),
-    });
+    };
+  };
+  // With ⇧ an element joins the set (or leaves it) and nothing opens; without,
+  // the set and this one are offered to Claude together.
+  const take = (el, x, y, more) => {
+    if (more) return toggle(el);
+    if (!chosen.some((b) => b.__slopFor === el)) toggle(el);
+    removeEventListener("pointerdown", dismiss, true);
+    if (native) setTimeout(unmark, 1200);
+    else addEventListener("pointerdown", dismiss, true);
+    post({ type: "pick", x, y, targets: chosen.map((b) => targetOf(b.__slopFor)) });
+  };
+
+  // Selecting (the preview's toolbar): the element under the pointer is
+  // outlined before it is clicked, and the click picks exactly it, without
+  // reaching the page. A person's clicks only: Claude's still act.
+  let selecting = false;
+  let crosshair = null;
+  const select = (on) => {
+    if (selecting === on) return;
+    selecting = on;
+    hovered?.remove();
+    hovered = null;
+    crosshair?.remove();
+    crosshair = null;
+    if (on) {
+      crosshair = document.createElement("style");
+      crosshair.textContent = "*{cursor:crosshair!important}";
+      document.documentElement.append(crosshair);
+    }
+    post({ type: "selecting", on });
+  };
+  const own = (e) => e.isTrusted && e.target instanceof Element && e.target.localName !== "slop-mark";
+  addEventListener(
+    "pointermove",
+    (e) => {
+      if (!selecting || !own(e) || hovered?.__slopFor === e.target) return;
+      hovered?.remove();
+      hovered = box(e.target, `${describe(e.target)} · click to add · ⇧ click for several · esc to stop`, true);
+    },
+    true,
+  );
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "dblclick", "auxclick"])
+    addEventListener(
+      type,
+      (e) => {
+        if (!selecting || !e.isTrusted) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (type !== "click" || !own(e)) return;
+        take(e.target, e.clientX, e.clientY, e.shiftKey);
+        if (!e.shiftKey) select(false);
+      },
+      true,
+    );
+  addEventListener(
+    "keydown",
+    (e) => {
+      if (!selecting || e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      unmark();
+      select(false);
+    },
+    true,
+  );
+
+  // A person's right-click offers the thing under it to Claude, as the map's
+  // does: a control, or the nearest one it is inside, else what was hit;
+  // while selecting, exactly what is outlined. A page with a menu of its own
+  // keeps it, unless ⌥ is held. Claude's own right-click was kept closed
+  // above, so is passed over here.
+  addEventListener("contextmenu", (e) => {
+    if ((e.defaultPrevented && !e.altKey) || !(e.target instanceof Element)) return;
+    e.preventDefault();
+    let el = e.target;
+    if (!selecting)
+      for (let n = el, i = 0; n && n !== document.body && i < 6; n = n.parentElement, i++)
+        if (interactive(n, roleOf(n))) {
+          el = n;
+          break;
+        }
+    take(el, e.clientX, e.clientY, e.shiftKey);
+    if (!e.shiftKey) select(false);
   });
 
   // The user types their own passwords: Claude is handed the sign_in tool instead.
@@ -552,7 +677,10 @@
   const secret = (el) => el instanceof HTMLInputElement && el.type === "password";
 
   /** Typing into whatever has focus, as React and the rest expect to hear it. */
+  let lastFocus = null;
+  document.addEventListener("focusin", (e) => (lastFocus = e.target), true);
   const type = (text) => {
+    COMMANDS.focused();
     const el = document.activeElement;
     if (!el || el === document.body) throw new Error("Nothing has focus to type into: click a field first.");
     if (secret(el)) throw new Error(PASSWORD);
@@ -806,8 +934,17 @@
       unmark();
       return "";
     },
+    select({ on }) {
+      // Stopped from the toolbar: a set gathered with ⇧ goes unoffered.
+      if (!on) unmark();
+      select(!!on);
+      return "";
+    },
     /** What typing would go into, if anything. */
     focused() {
+      // Hidden while another agent had the Preview in front, the page dropped
+      // the field it clicked; nothing having taken its place, it is focused again.
+      if ((!document.activeElement || document.activeElement === document.body) && lastFocus?.isConnected && visible(lastFocus)) lastFocus.focus({ preventScroll: true });
       const el = document.activeElement;
       if (secret(el)) throw new Error(PASSWORD);
       return !el || el === document.body ? null : describe(el);

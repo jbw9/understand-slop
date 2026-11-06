@@ -354,7 +354,7 @@ export function Device({
         {picking ? (
           <div aria-hidden className="pointer-events-none absolute border-2 border-[#d97757] bg-[#d97757]/8" style={picking.outline} />
         ) : null}
-        {picking ? <PickMenu x={picking.x} y={picking.y} target={picking.target} onClose={() => setPicking(null)} /> : null}
+        {picking ? <PickMenu x={picking.x} y={picking.y} targets={[picking.target]} onClose={() => setPicking(null)} /> : null}
         <div ref={ring} aria-hidden className="pointer-events-none absolute -left-3.5 -top-3.5 size-6 rounded-full border-2 border-[#d97757] opacity-0" />
         <div
           ref={hand}

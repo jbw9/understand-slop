@@ -13,7 +13,6 @@
 
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
@@ -21,8 +20,6 @@ use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, Url
 
 const AGENT: &str = include_str!("agent.js");
 const GONE: &str = "The page is gone from the preview.";
-
-static NEXT: AtomicU32 = AtomicU32::new(1);
 
 fn web(url: &str) -> Result<Url, String> {
     let u = Url::parse(url).map_err(|_| format!("Not an address: {url}"))?;
@@ -35,9 +32,12 @@ fn web(url: &str) -> Result<Url, String> {
 /// A page from the web, at a place in the window: CSS pixels of the app's
 /// page, with `zoom` the scale the viewport is drawn at. With `project`, in
 /// that project's own store of sign-ins rather than the shared one (signins.rs).
+/// `label` is the tab's to choose, so the page's first load, which can finish
+/// before this returns, is already known to be its own.
 #[tauri::command]
 pub async fn browser_open(
     app: AppHandle,
+    label: String,
     url: String,
     x: f64,
     y: f64,
@@ -47,7 +47,9 @@ pub async fn browser_open(
     project: Option<String>,
 ) -> Result<String, String> {
     let window = app.get_window("main").ok_or("The window is gone.")?;
-    let label = format!("browser-{}", NEXT.fetch_add(1, Ordering::Relaxed));
+    if !label.starts_with("browser-") || app.get_webview(&label).is_some() {
+        return Err(format!("Not a label for a new page: {label}"));
+    }
     let (tell, me) = (app.clone(), label.clone());
     let (own, mine) = (app.clone(), label.clone());
     let mut builder = WebviewBuilder::new(&label, WebviewUrl::External(web(&url)?))

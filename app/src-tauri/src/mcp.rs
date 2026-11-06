@@ -138,7 +138,8 @@ you would in a browser. They are your browser here: to look something up or read
 the web, navigate the preview there (an address, or words to search for) instead of opening \
 another browser, so the user sees it beside you. To research the web while working on the \
 project's own page, navigate with `new_tab` so the page stays open in its own Preview tab, \
-and once there are several, name the one each call is for with `tab`. WebFetch and WebSearch are fine for reading \
+and once there are several, name the one each call is for with `tab`. Other agents in the project \
+have Previews of their own: a call without `tab` goes to yours, never theirs. WebFetch and WebSearch are fine for reading \
 docs as text; they stay out of the preview. `device` does the same on an iOS Simulator or \
 Android emulator running in the app. `read_terminal` reads the project's terminals, the dev \
 server's logs by default: read it when the page misbehaves, a build fails or a request errors. When a page \
@@ -513,7 +514,7 @@ fn tools() -> Value {
         if !["device", "read_terminal", "map_search", "map_section", "map_where"].contains(&name) {
             t["inputSchema"]["properties"]["tab"] = json!({
                 "type": "number",
-                "description": "Which Preview tab, by its number (\"Preview 2\" is 2), when the project has more than one. Left out, the one last in view."
+                "description": "Which Preview tab, by its number (\"Preview 2\" is 2), when the project has more than one. Left out, your own: the one you used last, else one no other agent is using, opened for you when every one is. Replies name the tab used."
             });
         }
     }

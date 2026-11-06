@@ -68,8 +68,32 @@ fn manager(root: &Path) -> (&'static str, &'static str) {
 /// at all; else a `start` that is not a phone's bundler. Dependencies are
 /// installed first when they never were. `BROWSER=none` keeps Vite, Create
 /// React App and the like from opening a browser of their own.
+///
+/// A repository with no package.json of its own (an app beside its landing
+/// page, a monorepo) is served from the first folder a level or two down that
+/// has a `dev` script, else one with a `start`, in the order of `NESTED`.
 fn web(root: &Path) -> Option<String> {
-    let pkg = package(root)?;
+    if let Some((_, start)) = served(root, root) {
+        return Some(start);
+    }
+    let mut dirs: Vec<PathBuf> = NESTED.iter().map(|d| root.join(d)).collect();
+    for group in ["apps", "packages"] {
+        let mut inner: Vec<PathBuf> = std::fs::read_dir(root.join(group)).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+        inner.sort();
+        dirs.extend(inner);
+    }
+    let found: Vec<(PathBuf, (&str, String))> = dirs.into_iter().filter_map(|d| served(&d, root).map(|s| (d, s))).collect();
+    let (dir, (_, start)) = found.iter().find(|(_, (script, _))| *script == "dev").or_else(|| found.first())?;
+    let sub = dir.strip_prefix(root).ok()?.to_string_lossy().into_owned();
+    Some(format!("cd \"{sub}\" && {start}"))
+}
+
+const NESTED: [&str; 5] = ["app", "web", "frontend", "client", "site"];
+
+/// The script `dir` is served by and the command that runs it there; `root`
+/// is the repository, whose lockfile and dependencies a workspace shares.
+fn served(dir: &Path, root: &Path) -> Option<(&'static str, String)> {
+    let pkg = package(dir)?;
     let scripts = pkg.get("scripts")?;
     let has = |s: &str| scripts.get(s).and_then(|v| v.as_str()).is_some();
     let phone = depends_on(&pkg, "expo") || depends_on(&pkg, "react-native");
@@ -82,9 +106,11 @@ fn web(root: &Path) -> Option<String> {
     } else {
         return None;
     };
-    let (install, run) = manager(root);
+    let locked = |d: &Path| ["pnpm-lock.yaml", "yarn.lock", "bun.lockb", "bun.lock", "package-lock.json"].iter().any(|f| d.join(f).is_file());
+    let (install, run) = manager(if locked(dir) { dir } else { root });
     let start = if cfg!(windows) { format!("{run} {script}") } else { format!("BROWSER=none {run} {script}") };
-    Some(if root.join("node_modules").is_dir() { start } else { format!("{install} && {start}") })
+    let installed = dir.join("node_modules").is_dir() || root.join("node_modules").is_dir();
+    Some((script, if installed { start } else { format!("{install} && {start}") }))
 }
 
 fn has_child(dir: &Path, ext: &str) -> bool {
@@ -1123,6 +1149,15 @@ mod tests {
         let webby = r#"{"scripts":{"start":"expo start","web":"expo start --web"},"dependencies":{"expo":"~51.0.0","react-native-web":"~0.19.10"}}"#;
         let d = project(&[("package.json", webby), ("node_modules/.keep", "")]);
         assert_eq!(detect(&d).web.as_deref(), Some(format!("{}npm run web", browser_none()).as_str()));
+    }
+
+    #[test]
+    fn a_repository_without_a_package_is_served_from_its_app_folder() {
+        let d = project(&[("landing/package.json", r#"{"scripts":{"dev":"next dev"}}"#), ("app/package.json", r#"{"scripts":{"dev":"next dev"}}"#), ("app/node_modules/.keep", "")]);
+        assert_eq!(detect(&d).web.as_deref(), Some(format!("cd \"app\" && {}npm run dev", browser_none()).as_str()));
+        let d = project(&[("apps/site/package.json", r#"{"scripts":{"start":"serve"}}"#), ("apps/web/package.json", r#"{"scripts":{"dev":"vite"}}"#), ("pnpm-lock.yaml", ""), ("node_modules/.keep", "")]);
+        let sub = format!("apps{}web", std::path::MAIN_SEPARATOR);
+        assert_eq!(detect(&d).web.as_deref(), Some(format!("cd \"{sub}\" && {}pnpm run dev", browser_none()).as_str()));
     }
 
     #[test]

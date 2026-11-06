@@ -2,6 +2,7 @@
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Menu } from "@/components/menu";
 import { mention, openClaude, type Target } from "@/lib/context";
@@ -98,6 +99,48 @@ type Signing = { site: string; project: boolean };
 // Real input is AppKit's (src-tauri/src/browser.rs).
 const REAL = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 
+/**
+ * The Previews on screen, by tab, for a browser's keys: Cmd+R, Cmd+[, Cmd+]
+ * and Cmd+L from the menu bar on a Mac (src-tauri/src/lib.rs), Ctrl+R and
+ * Ctrl+L elsewhere. A key pressed in a page stays in its webview or frame,
+ * so the Preview last clicked or focused is remembered here.
+ */
+const onScreen = new Map<number, { el: HTMLElement; key: (k: string) => void }>();
+let touched: number | null = null;
+
+/** The Preview the keyboard is in; none while it is in a terminal or the map. */
+const focused = () => (touched !== null && onScreen.has(touched) ? touched : null);
+
+if (typeof window !== "undefined") {
+  // Whatever of the app's page was last clicked or focused; a page's own
+  // webview or frame says so itself (agent.js).
+  const into = (e: Event) => {
+    touched = [...onScreen].find(([, p]) => p.el.contains(e.target as Node))?.[0] ?? null;
+  };
+  window.addEventListener("pointerdown", into, true);
+  window.addEventListener("focusin", into, true);
+  // Off a Mac there is no menu bar to take the keys first, and the browser's
+  // own Ctrl+R would reload the whole app, losing every tab.
+  if (!REAL)
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || (e.code !== "KeyR" && e.code !== "KeyL")) return;
+        // A terminal's Ctrl+R is its shell's history search, and Ctrl+L its clear: its own to take.
+        if ((e.target as Element | null)?.closest?.(".xterm")) return;
+        const at = focused();
+        if (at === null) {
+          if (e.code === "KeyR") e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        onScreen.get(at)?.key(e.code === "KeyR" ? "reload" : "address");
+      },
+      true,
+    );
+}
+
 type Act = { kind: "move" | "down" | "up" | "drag" | "key" | "text"; x?: number; y?: number; button?: number; clicks?: number; text?: string };
 
 /** Where the agent found a click's target (agent.js `locate`). */
@@ -120,9 +163,14 @@ type Said =
   | { type: "open"; url: string }
   | { type: "reply"; id: number; ok: boolean; value: unknown }
   | { type: "loaded" }
-  /** The user right-clicked something to hand to Claude, at (x, y) in the page. */
-  | { type: "pick"; x: number; y: number; key: string; title: string; text: string }
-  | { type: "unpick" };
+  /** The user picked one or more things to hand to Claude, the last at (x, y) in the page. */
+  | { type: "pick"; x: number; y: number; targets: Target[] }
+  | { type: "unpick" }
+  /** The page's select mode went on or off (agent.js). */
+  | { type: "selecting"; on: boolean }
+  /** The page took the keyboard, or was given a browser's key off a Mac. */
+  | { type: "focus" }
+  | { type: "key"; key: string };
 
 /** What a page from the web has said since it was last asked (agent.js). */
 const DRAIN = "window.__slop ? window.__slop.drain() : []";
@@ -133,16 +181,16 @@ interface Line {
 }
 
 let nextCall = 1;
+let nextView = 1;
 
 export function Preview({
   id,
   root,
-  target,
+  target: served,
   visible,
   waiting,
   asking,
   onAnswer,
-  onTarget,
   serverShown,
   onServer,
   docked,
@@ -150,7 +198,8 @@ export function Preview({
   /** Its tab's key: what Claude's calls find it by. */
   id: number;
   root: string;
-  /** The dev server's address, once it has printed one. */
+  /** The project's dev server's address, once it has printed one: where the
+   * tab goes until it is pointed at another server of its own. */
   target?: string;
   visible: boolean;
   /** The command starting the dev server, until it prints an address. */
@@ -158,8 +207,6 @@ export function Preview({
   /** A yes-or-no question the dev server is waiting on, and its answer typed into it. */
   asking?: string;
   onAnswer?: (yes: boolean) => void;
-  /** The preview was pointed at another server: from the address bar, or by Claude. */
-  onTarget: (url: string) => void;
   /** The dev server's terminal is shown in the page's place (components/workspace.tsx). */
   serverShown?: boolean;
   /** Switch between the page and the dev server's terminal; absent with no dev server. */
@@ -167,8 +214,14 @@ export function Preview({
   /** In the main view rather than the window (components/workspace.tsx). */
   docked?: boolean;
 }) {
+  // Another server this tab was pointed at, from its address bar or by
+  // Claude: this tab's alone, so the project's other Previews stay put.
+  const [pointed, setPointed] = useState<string | undefined>();
+  const target = pointed ?? served;
   const frame = useRef<HTMLIFrameElement>(null);
   const stage = useRef<HTMLDivElement>(null);
+  const whole = useRef<HTMLDivElement>(null);
+  const address = useRef<HTMLInputElement>(null);
   // Where the frame starts. Set once: every later move is made on the frame itself.
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -180,7 +233,8 @@ export function Preview({
   const [badge, setBadge] = useState(false);
   const sizeBadge = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [picking, setPicking] = useState<{ x: number; y: number; target: Target } | null>(null);
+  const [picking, setPicking] = useState<{ x: number; y: number; targets: Target[] } | null>(null);
+  const [selecting, setSelecting] = useState(false);
   // A page from the web is in front, in the webview of this label.
   const [web, setWeb] = useState<string | null>(null);
   const [claude, setClaude] = useState(false);
@@ -203,6 +257,11 @@ export function Preview({
   const dialogs = useRef<string[]>([]);
   const pending = useRef(new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>());
   const loads = useRef<(() => void)[]>([]);
+  // A Preview just opened for an agent is asked before its first page is in:
+  // the call waits for it, rather than being answered by its arrival.
+  const everLoaded = useRef(false);
+  // Why the page last asked for could not be opened, for the navigate waiting on it.
+  const missed = useRef<string | null>(null);
   // The pages this tab has shown, for its own back and forward. The page's
   // history is shared with the app's window, so it is never stepped through:
   // every move is a replace, and adds nothing to the app's back.
@@ -242,30 +301,42 @@ export function Preview({
           setWeb(label);
           return invoke("browser_go", { label, url });
         }
-        if (label) {
-          browser.current = null;
-          void invoke("browser_close", { label });
-        }
+        if (label) void invoke("browser_close", { label });
         const r = sheet.current?.getBoundingClientRect();
         const { scale: zoom } = view.current;
-        const opened = await invoke<string>("browser_open", {
-          url,
-          x: r?.x ?? 0,
-          y: r?.y ?? 0,
-          width: r?.width || 1,
-          height: r?.height || 1,
-          zoom,
-          project: own ? root : null,
-        });
+        // Named before it opens: its first load can be heard before the open returns.
+        const opened = `browser-${id}-${nextView++}`;
         browser.current = opened;
         ownStore.current = own;
+        try {
+          await invoke("browser_open", {
+            label: opened,
+            url,
+            x: r?.x ?? 0,
+            y: r?.y ?? 0,
+            width: r?.width || 1,
+            height: r?.height || 1,
+            zoom,
+            project: own ? root : null,
+          });
+        } catch (e) {
+          if (browser.current === opened) browser.current = null;
+          throw e;
+        }
         if (onWeb.current) setWeb(opened);
-      })().catch((e) => setError(String(e)));
+      })().catch(fail);
     }
     onWeb.current = false;
     setWeb(null);
     const w = frame.current?.contentWindow;
     if (w) w.location.replace(url);
+    else setSrc(url);
+  };
+
+  const fail = (e: unknown) => {
+    setError(String(e));
+    missed.current = String(e);
+    loads.current.splice(0).forEach((f) => f());
   };
 
   // A proxy in front of the dev server, opened once it has an address and
@@ -276,8 +347,11 @@ export function Preview({
     const open = proxy.current;
     if (open) {
       void invoke("preview_target", { id: open.id, target }).then(() => {
-        go(`http://localhost:${open.port}${pathOf(target)}`);
-      });
+        // A page from the web in front is left there; the frame behind follows.
+        const url = `http://localhost:${open.port}${pathOf(target)}`;
+        if (onWeb.current) frame.current?.contentWindow?.location.replace(url);
+        else go(url);
+      }, fail);
       return;
     }
     let gone = false;
@@ -285,12 +359,16 @@ export function Preview({
       .then((p) => {
         if (gone) return void invoke("preview_close", { id: p.id });
         proxy.current = p;
-        here.current = `http://localhost:${p.port}${pathOf(target)}`;
-        setShown(display(here.current));
-        setSrc(here.current);
+        const url = `http://localhost:${p.port}${pathOf(target)}`;
+        // Opened behind a page from the web, which keeps the address bar.
+        if (!onWeb.current) {
+          here.current = url;
+          setShown(display(url));
+        }
+        setSrc(url);
         setError(null);
       })
-      .catch((e) => setError(String(e)));
+      .catch(fail);
     return () => {
       gone = true;
     };
@@ -309,6 +387,8 @@ export function Preview({
   );
 
   const loaded = () => {
+    everLoaded.current = true;
+    setError(null);
     // A page that navigated took its unanswered calls with it.
     for (const p of pending.current.values()) p.resolve(`The page navigated to ${display(here.current)}.`);
     pending.current.clear();
@@ -335,6 +415,7 @@ export function Preview({
     if (el && here.current && !isWeb(here.current)) el.src = here.current;
   }, [docked]);
 
+  const keyed = useRef<(k: string) => void>(() => {});
   // What the agent in the page says: where it is, what it logged, its answers.
   const hear = useRef<(m: Said) => void>(() => {});
   useEffect(() => {
@@ -362,32 +443,60 @@ export function Preview({
         if (m.ok) p.resolve(m.value);
         else p.reject(new Error(String(m.value)));
       } else if (m.type === "loaded") {
+        // A new page has a new agent, which is not selecting.
+        setSelecting(false);
         loaded();
       } else if (m.type === "pick") {
         // The page knows itself by the proxy's address; Claude knows the dev server's.
         const p = proxy.current;
-        const text = p && server.current ? m.text.replaceAll(`http://localhost:${p.port}`, originOf(server.current)) : m.text;
-        const target = { key: m.key, title: m.title, text };
+        const targets = m.targets.map((t) => ({
+          ...t,
+          text: p && server.current ? t.text.replaceAll(`http://localhost:${p.port}`, originOf(server.current)) : t.text,
+        }));
         // A page from the web is a webview over the app, which would hide a menu.
-        if (onWeb.current) return mention(target);
+        if (onWeb.current) return targets.forEach(mention);
         const r = frame.current?.getBoundingClientRect();
         const k = view.current.scale;
-        setPicking({ x: (r?.x ?? 0) + m.x * k, y: (r?.y ?? 0) + m.y * k, target });
+        setPicking({ x: (r?.x ?? 0) + m.x * k, y: (r?.y ?? 0) + m.y * k, targets });
       } else if (m.type === "unpick") {
         setPicking(null);
+      } else if (m.type === "selecting") {
+        setSelecting(m.on);
+      } else if (m.type === "focus") {
+        touched = id;
+      } else if (m.type === "key") {
+        keyed.current(m.key);
       }
     };
   });
   useEffect(() => {
     const on = (e: MessageEvent) => {
-      if (frame.current && e.source === frame.current.contentWindow && e.data?.__slop) hear.current(e.data);
+      if (!frame.current || e.source !== frame.current.contentWindow || !e.data?.__slop) return;
+      // Behind a page from the web, the frame's page is not the one in front:
+      // where it is, what it logs and that it loaded are not this tab's.
+      if (onWeb.current && e.data.type !== "reply") return;
+      hear.current(e.data);
     };
     window.addEventListener("message", on);
-    return () => window.removeEventListener("message", on);
+    // Every page of the webview, heard from its first: a load can finish
+    // before the webview is shown, or before its open has returned.
+    const off = isTauri()
+      ? listen<{ label: string; url: string; done: boolean }>("slop:browser", (e) => {
+          if (e.payload.label !== browser.current || !onWeb.current) return;
+          replace.current();
+          if (!e.payload.done) return setShown(bare(e.payload.url));
+          // Where it ended up, before the page's own word on it is next collected.
+          hear.current({ type: "location", url: e.payload.url });
+          hear.current({ type: "loaded" });
+        })
+      : undefined;
+    return () => {
+      window.removeEventListener("message", on);
+      void off?.then((f) => f());
+    };
   }, []);
 
-  // A page from the web keeps what it says until it is collected; and says
-  // when it has loaded through the app.
+  // A page from the web keeps what it says until it is collected.
   useEffect(() => {
     if (!web) return;
     let busy = false;
@@ -399,18 +508,7 @@ export function Preview({
         .catch(() => {})
         .finally(() => (busy = false));
     }, 120);
-    const off = listen<{ label: string; url: string; done: boolean }>("slop:browser", (e) => {
-      if (e.payload.label !== web || !onWeb.current) return;
-      replace.current();
-      if (!e.payload.done) return setShown(bare(e.payload.url));
-      // Where it ended up, before the page's own word on it is next collected.
-      hear.current({ type: "location", url: e.payload.url });
-      hear.current({ type: "loaded" });
-    });
-    return () => {
-      clearInterval(timer);
-      void off.then((f) => f());
-    };
+    return () => clearInterval(timer);
   }, [web]);
 
   // The webview of a page from the web, kept over the viewport: moved with
@@ -424,9 +522,12 @@ export function Preview({
       const el = sheet.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
+      // The viewport's own resize edges lie over the page's sides when it
+      // fills the tab: they are the preview's, not something over it.
+      const own = stage.current ?? el;
       const inside = (x: number, y: number) => {
         const top = document.elementFromPoint(x, y);
-        return !!top && el.contains(top);
+        return !!top && own.contains(top);
       };
       const shown =
         r.width > 0 &&
@@ -479,10 +580,19 @@ export function Preview({
       }, wait);
     });
 
+  /** Opens a page and waits for it: the answer is where it ended up, not where it was asked to go. */
+  const arrive = async (open: () => void) => {
+    missed.current = null;
+    const done = nextLoad();
+    open();
+    await done;
+    if (missed.current) throw new Error(missed.current);
+    return `Now at ${display(here.current)}.`;
+  };
+
   /** A path, an address on this machine or the web, a search, or back, forward, reload. */
   const navigate = async (raw: string): Promise<string> => {
     const v = raw.trim();
-    const p = proxy.current;
     if (v === "back" || v === "forward" || v === "reload") {
       const t = trail.current;
       const at = v === "back" ? t.at - 1 : v === "forward" ? t.at + 1 : t.at;
@@ -492,30 +602,46 @@ export function Preview({
         t.at = at;
         t.stepping = true;
       }
-      const done = nextLoad();
-      go(url);
-      await done;
-      return `Now at ${display(here.current)}.`;
+      return arrive(() => go(url));
     }
     const host = hostOf(v);
-    if (!host && !v.startsWith("/")) {
-      const done = nextLoad();
-      go(toWeb(v));
-      await done;
-      return `Now at ${display(here.current)}.`;
-    }
+    if (!host && !v.startsWith("/")) return arrive(() => go(toWeb(v)));
     if (host && host !== hostOf(server.current ?? "")) {
-      // Another server: the preview follows it (the effect above).
-      onTarget(/^https?:/.test(v) ? v : `http://${v}`);
-      return `Opening ${bare(v)}.`;
+      // Another server: this tab follows it (the effect above), in front of any page from the web.
+      return arrive(() => {
+        onWeb.current = false;
+        setWeb(null);
+        setPointed(/^https?:/.test(v) ? v : `http://${v}`);
+      });
     }
-    if (!p || !frame.current) throw new Error("The preview has no page open yet.");
+    // A tab just opened is still opening its proxy.
+    for (let i = 0; i < 50 && server.current && !proxy.current; i++) await sleep(100);
+    const p = proxy.current;
+    if (!p) throw new Error("The preview has no page open yet.");
     const path = host ? pathOf(v) : v.startsWith("/") ? v : `/${v}`;
-    const done = nextLoad();
-    go(`http://localhost:${p.port}${path}`);
-    await done;
-    return `Now at ${display(here.current)}.`;
+    return arrive(() => go(`http://localhost:${p.port}${path}`));
   };
+
+  // A browser's keys, given to this tab while it is the one in use (above).
+  useEffect(() => {
+    keyed.current = (k) => {
+      if (k === "address") address.current?.focus();
+      else if (k === "reload" || k === "back" || k === "forward") void navigate(k).catch(() => {});
+    };
+  });
+  useEffect(() => {
+    const el = whole.current;
+    if (!visible || !el) return;
+    const me = { el, key: (k: string) => keyed.current(k) };
+    onScreen.set(id, me);
+    // Just brought to the front, with nothing else of the app's in use.
+    if (touched === null) touched = id;
+    const off = isTauri() ? listen<string>("slop:preview-key", (e) => focused() === id && keyed.current(e.payload)) : undefined;
+    return () => {
+      if (onScreen.get(id) === me) onScreen.delete(id);
+      void off?.then((f) => f());
+    };
+  }, [id, visible]);
 
   /**
    * Whether real input can reach the page: always for a page from the web,
@@ -613,6 +739,8 @@ export function Preview({
     }
     if (action === "key") {
       const text = String(a.text ?? "").trim();
+      // Puts back the field the page dropped while hidden; a password field still takes Enter.
+      await agent("focused", {}).catch(() => {});
       // One at a time: the page takes keys in turn, but an edit (cmd+v) at once.
       for (const k of text.split(/\s+/)) {
         await real([{ kind: "key", text: k }]);
@@ -660,6 +788,7 @@ export function Preview({
 
   // Claude's calls (src-tauri/src/mcp.rs), by way of the workspace.
   const run = async (call: Call): Promise<unknown> => {
+    if (!everLoaded.current && call.op !== "navigate" && call.op !== "sign_in") await nextLoad();
     switch (call.op) {
       case "frame": {
         // Drawn first: the tab may have just come to the front.
@@ -694,7 +823,19 @@ export function Preview({
         if (signingNow.current)
           throw new Error(`The user is signing in to ${signingNow.current.site} in the preview. Wait for sign_in to return before using the page.`);
         dialogs.current = [];
-        let said = call.name === "computer" && reachable() ? await act(call.args) : null;
+        // Real input takes the keyboard: where the user was typing elsewhere in the
+        // app, a Claude prompt, it is handed back, so their keys never land in the page.
+        const theirs = document.hasFocus() ? document.activeElement : null;
+        const handBack = theirs instanceof HTMLElement && theirs !== document.body && !stage.current?.contains(theirs);
+        let said: string | null;
+        try {
+          said = call.name === "computer" && reachable() ? await act(call.args) : null;
+        } finally {
+          if (handBack && theirs.isConnected) {
+            if (onWeb.current) await getCurrentWebview().setFocus().catch(() => {});
+            theirs.focus({ preventScroll: true });
+          }
+        }
         if (said === null) said = (await agent(call.name, call.args)) as string;
         // A page from the web is heard by polling: heard once more, so a dialog the action set off is in its answer.
         if (onWeb.current && browser.current)
@@ -814,7 +955,14 @@ export function Preview({
   const ready = (src !== null && !!target) || web !== null;
 
   return (
-    <div className={cn("absolute inset-0 flex flex-col", !visible && "pointer-events-none invisible")}>
+    <div
+      ref={whole}
+      className={cn("absolute inset-0 flex flex-col", !visible && "pointer-events-none invisible")}
+      // In the main view, clear of the window floating over its right, as the
+      // map is (components/workspace.tsx): a page from the web would hide
+      // wherever the window covers it, and a screenshot would take the window in.
+      style={docked ? { paddingRight: "var(--workspace-inset, 0px)" } : undefined}
+    >
       <div data-chrome="bar" className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border-gray bg-surface px-1.5">
         {onServer ? (
           <div role="radiogroup" aria-label="Show" className="mr-1 flex shrink-0 items-center bg-surface-container p-0.5">
@@ -852,16 +1000,14 @@ export function Preview({
           onSubmit={(e) => {
             e.preventDefault();
             if (draft?.trim()) {
-              const v = draft.trim();
-              // No server yet: an address on this machine typed here is the one to preview.
-              if (!target && hostOf(v)) onTarget(/^https?:/.test(v) ? v : `http://${v}`);
-              else void navigate(v).catch(() => {});
+              void navigate(draft.trim()).catch(() => {});
             }
             setDraft(null);
             (document.activeElement as HTMLElement | null)?.blur();
           }}
         >
           <input
+            ref={address}
             aria-label="Address"
             value={draft ?? shown}
             placeholder={target ? "" : "localhost:3000, or search the web"}
@@ -919,6 +1065,15 @@ export function Preview({
             Claude
           </span>
         ) : null}
+        <Tool
+          label={selecting ? "Stop selecting (Esc)" : "Select an element to add to Claude · ⇧ click picks several"}
+          on={selecting}
+          onClick={() => void agent("select", { on: !selecting }).catch(() => {})}
+          disabled={!ready}
+        >
+          <path d="M6 2.5H2.5V6M2.5 9v1M13.5 6V2.5H10M9 2.5H7" />
+          <path d="m7 7 6.5 2.4-2.8 1-1 2.8z" />
+        </Tool>
         <Tool
           label="Open in your browser"
           onClick={() =>
@@ -1011,7 +1166,7 @@ export function Preview({
                   ref={frame}
                   src={src}
                   title="Preview"
-                  onLoad={loaded}
+                  onLoad={() => !onWeb.current && loaded()}
                   style={{ width: vw, height: vh, transform: scale < 1 ? `scale(${scale})` : undefined, transformOrigin: "0 0" }}
                   className={cn("block border-0", web && "invisible")}
                 />
@@ -1100,20 +1255,21 @@ export function Preview({
   );
 }
 
-/** What a right-clicked element of a page or a phone offers, as the map's PickMenu (components/canvas.tsx) does. */
-export function PickMenu({ x, y, target, onClose }: { x: number; y: number; target: Target; onClose: () => void }) {
+/** What the picked elements of a page or a phone offer, as the map's PickMenu (components/canvas.tsx) does. */
+export function PickMenu({ x, y, targets, onClose }: { x: number; y: number; targets: Target[]; onClose: () => void }) {
+  const add = () => targets.forEach(mention);
   return (
     <Menu
       x={x}
       y={y}
-      title={target.title}
+      title={targets.length > 1 ? `${targets.length} elements` : targets[0].title}
       onClose={onClose}
       items={[
-        { label: "Add to Claude", onClick: () => mention(target) },
+        { label: targets.length > 1 ? `Add all ${targets.length} to Claude` : "Add to Claude", onClick: add },
         {
           label: "Add and open Claude",
           onClick: () => {
-            mention(target);
+            add();
             openClaude();
           },
         },
@@ -1122,15 +1278,19 @@ export function PickMenu({ x, y, target, onClose }: { x: number; y: number; targ
   );
 }
 
-function Tool({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function Tool({ label, onClick, disabled, on, children }: { label: string; onClick: () => void; disabled?: boolean; on?: boolean; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      aria-pressed={on}
       title={label}
-      className="flex size-7 shrink-0 cursor-pointer items-center justify-center text-muted-slate hover:bg-surface-container hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+      className={cn(
+        "flex size-7 shrink-0 cursor-pointer items-center justify-center hover:bg-surface-container hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent",
+        on ? "bg-[#d97757]/12 text-[#b4553a]" : "text-muted-slate",
+      )}
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {children}

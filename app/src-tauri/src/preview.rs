@@ -386,9 +386,11 @@ fn serve(client: TcpStream, to: &Upstream, port: u16) -> std::io::Result<()> {
 }
 
 /// The agent, first thing in the page's head, so it hears the page's own
-/// console from the start.
+/// console from the start. It takes itself out of the page as it runs: React
+/// hydrates a server-rendered head in order, and would read a script left
+/// there as the page's own first one, and call the page mismatched.
 fn with_agent(page: &[u8]) -> Vec<u8> {
-    let script = format!("<script data-slop-agent>{AGENT}</script>");
+    let script = format!("<script data-slop-agent>document.currentScript.remove();\n{AGENT}</script>");
     let lower = String::from_utf8_lossy(page).to_ascii_lowercase();
     let after_tag = |tag: &str| lower.find(tag).and_then(|at| lower[at..].find('>').map(|end| at + end + 1));
     let at = after_tag("<head").or_else(|| after_tag("<html")).or_else(|| after_tag("<!doctype")).unwrap_or(0);
@@ -406,7 +408,8 @@ fn with_agent(page: &[u8]) -> Vec<u8> {
 /// every second, so a server that restarts comes back by itself.
 fn waiting(origin: &str) -> String {
     format!(
-        r#"<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="1"><title>Waiting</title><body style="font:13px ui-monospace,monospace;color:#6b7280;display:grid;place-items:center;height:100vh;margin:0">Waiting for {origin}…</body>"#
+        // A server that stopped never answers, so the page says where to see why.
+        r#"<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="1"><title>Waiting</title><body style="font:13px/1.6 -apple-system,system-ui,sans-serif;color:#85858e;display:grid;place-items:center;height:100vh;margin:0;text-align:center"><div>Waiting for {origin}…<br>If the dev server stopped, <b style="font-weight:500">Server</b> above shows its terminal.</div></body>"#
     )
 }
 

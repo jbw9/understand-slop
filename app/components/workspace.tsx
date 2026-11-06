@@ -20,7 +20,7 @@ import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, 
 import { useLocation } from "@/components/chrome";
 import { DROP_TARGET, DropMarker, BlueprintIcon, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, tabTitle, useDropOn } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
-import { findAddress, findQuestion, hostOf, previewOf, type Call } from "@/lib/preview";
+import { findAddress, findQuestion, findTaken, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
 import { updateMap, type Turn } from "@/lib/update-map";
 import type { Exchange } from "@/lib/keep";
@@ -395,6 +395,7 @@ export function Workspace() {
   // The dev server's tab, read as it prints until it gives its address. Only
   // whole lines, so an address split across two reads is never taken short.
   const tails = useRef<Record<number, string>>({});
+  const borrowed = useRef(new Set<number>());
   // Agents other than Claude have no hooks to say what they are doing, so it
   // is read off the terminal: printing is working, quiet is done, and a bell
   // asks for the user. Echoes of the user's own typing are not the agent's.
@@ -412,7 +413,12 @@ export function Workspace() {
     const tail = ((tails.current[t.key] ?? "") + text).slice(-4000);
     const q = findQuestion(tail) ?? undefined;
     setAsking((all) => (all[t.cwd] === q ? all : { ...all, [t.cwd]: q }));
-    const url = findAddress(tail.slice(0, tail.lastIndexOf("\n") + 1));
+    const whole = tail.slice(0, tail.lastIndexOf("\n") + 1);
+    // Its port already served, as by the same app started elsewhere: that one
+    // is shown, and this tab kept past its exit so its error can be read.
+    const taken = findAddress(whole) ? null : findTaken(whole);
+    if (taken) borrowed.current.add(t.key);
+    const url = taken ?? findAddress(whole);
     if (!url) {
       tails.current[t.key] = tail;
       return;
@@ -767,6 +773,7 @@ export function Workspace() {
       const stopped = gone.dev ? gone : dev;
       if (stopped) {
         delete tails.current[stopped.key];
+        borrowed.current.delete(stopped.key);
         setServers((all) => {
           const rest = { ...all };
           delete rest[stopped.cwd];
@@ -1506,7 +1513,7 @@ export function Workspace() {
               patch(t.key, { pty });
               tabStarted(pty, t.start === CLAUDE.id);
             }}
-            onExit={() => close(t.key)}
+            onExit={() => !borrowed.current.has(t.key) && close(t.key)}
           />
           );
           return (

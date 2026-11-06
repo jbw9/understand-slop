@@ -58,6 +58,16 @@ export function findAddress(text: string): string | null {
   return m ? m[0].replace("0.0.0.0", "localhost") : null;
 }
 
+/**
+ * The address a dev server could not take because something already serves
+ * it: Node's `EADDRINUSE: address already in use :::3001`, as Next prints it
+ * on a fixed port before it exits.
+ */
+export function findTaken(text: string): string | null {
+  const m = text.replace(ANSI, "").match(/address already in use \S*?:(\d+)/);
+  return m ? `http://localhost:${m[1]}` : null;
+}
+
 const YES_NO = /\s*›?\s*\(\s*y\s*\/\s*n\s*\)\s*$/i;
 
 /**

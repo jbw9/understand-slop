@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { createPortal } from "react-dom";
 import { motion, useMotionValue } from "motion/react";
 import { AgentIcon, CLAUDE, TerminalIcon, agentById, useAgents, type Agent } from "@/components/agents";
+import { keys, useMac } from "@/components/button";
 import { useMap } from "@/components/map-context";
 import { Menu } from "@/components/menu";
 import { Shell } from "@/components/shell";
@@ -188,6 +189,7 @@ export function Workspace() {
   const drop = useDropOn("main");
   const titleOf = (p: string[], file?: string) => tabTitle(map.nodeAt, p, file);
   const desktop = useSyncExternalStore(noSubscribe, isTauri, () => false);
+  const onMac = useMac();
   // Hidden once it has slid away, so it takes no clicks and no focus.
   const [settled, setSettled] = useState(true);
   const [open, setOpen] = useState(false);
@@ -223,10 +225,7 @@ export function Workspace() {
   const patch = (key: number, next: Partial<Tab>) =>
     setTabs((all) => all.map((x) => (x.key === key ? { ...x, ...next } : x)));
 
-  const show = useCallback((next: boolean) => {
-    setOpen(next);
-    setSettled(false);
-  }, []);
+  const show = useCallback((next: boolean) => setOpen(next), []);
 
   const add = useCallback(
     (start: string | null, extra?: Partial<Tab>) => {
@@ -269,7 +268,7 @@ export function Workspace() {
   // project is run, read when it is first opened.
   const [servers, setServers] = useState<Record<string, string>>({});
   // The projects whose Preview shows the dev server's terminal, not the page.
-  const [serverShown, setServerShown] = useState<Record<string, boolean>>({});
+  const [serverShown, setServerShown] = useState<Record<number, boolean>>({});
   // A yes-or-no question each project's dev server is waiting on, asked in its Preview.
   const [asking, setAsking] = useState<Record<string, string | undefined>>({});
   const [projects, setProjects] = useState<Record<string, Project>>({});
@@ -277,11 +276,16 @@ export function Workspace() {
   const tabsNow = useRef(tabs);
   useEffect(() => {
     tabsNow.current = tabs;
+    // Past every tab open: a hot reload starts the counter again, but not the tabs.
+    for (const t of tabs) if (t.key >= nextKey) nextKey = t.key + 1;
   });
 
-  // The Preview last in view, per project: the one Claude uses, and the one
+  // The Preview last in view, per project: the one an agent is first given, and the one
   // brought back when a project's Preview is asked for.
   const lastPreview = useRef<Record<string, number>>({});
+  // The Previews each agent has used, by its tab's pty, the latest last; let
+  // go of once that tab is closed.
+  const claims = useRef<Record<number, number[]>>({});
   useEffect(() => {
     for (const t of [current, upFront]) if (t?.kind === "preview") lastPreview.current[t.cwd] = t.key;
   });
@@ -294,8 +298,8 @@ export function Workspace() {
   const preview = useCallback(
     (root: string, key?: number) => {
       const open = key === undefined ? previewTab(root) : tabsNow.current.find((x) => x.key === key);
-      setServerShown((s) => ({ ...s, [root]: false }));
       if (!open) return add(null, { kind: "preview", title: "Preview", cwd: root });
+      setServerShown((s) => ({ ...s, [open.key]: false }));
       if (open.main) setFront((f) => ({ ...f, [root]: open.key }));
       else {
         setActive((a) => ({ ...a, [root]: open.key }));
@@ -406,13 +410,28 @@ export function Workspace() {
         const open = previews().length;
         throw new Error(`There is no Preview ${n}: this project has ${open || "no"} Preview tab${open === 1 ? "" : "s"} open. Navigate with new_tab to open another.`);
       }
-      let key = n !== undefined ? previews()[n - 1].key : previewTab(root)?.key;
-      // A new tab beside a Preview already open; with none, the first one opens below as before.
-      if (cmd.op === "navigate" && cmd.newTab && key !== undefined) {
+      // Each agent drives Previews of its own, so two sessions in a project
+      // never move each other's page: its last one, else one nobody has.
+      const own = () => (claims.current[tab] ?? []).filter((k) => previews().some((x) => x.key === k));
+      const taken = (k: number) =>
+        Object.entries(claims.current).some(([p, ks]) => +p !== tab && ks.includes(k) && tabsNow.current.some((x) => x.pty === +p));
+      const free = [previewTab(root), ...previews()].find((x) => x && !taken(x.key));
+      let key = n !== undefined ? previews()[n - 1].key : (own().at(-1) ?? free?.key);
+      // A new tab beside a Preview already open, or the agent's own when all are
+      // others'; with none, the first one opens below as before.
+      if (previews().length && ((cmd.op === "navigate" && cmd.newTab) || key === undefined)) {
+        // In front only where the user is already with this agent or a Preview,
+        // never over a tab they are typing in.
+        const forward = root === here && (current?.pty === tab || upFront?.pty === tab || upFront?.kind === "preview");
+        const before = front[root] ?? null;
         const made = add(null, { kind: "preview", title: "Preview", cwd: root });
+        if (!forward) setFront((f) => ({ ...f, [root]: before }));
         await until(() => previewOf(made), 8000);
         key = made;
       }
+      const claim = () => {
+        if (key !== undefined && !taken(key)) claims.current[tab] = [...own().filter((k) => k !== key), key];
+      };
       const which = () => {
         const all = previews();
         return all.length > 1 ? ` (in Preview ${all.findIndex((x) => x.key === key) + 1})` : "";
@@ -430,8 +449,10 @@ export function Workspace() {
         preview(root);
         handle = await until(() => previewOf(previewTab(root)?.key), 8000);
         key = previewTab(root)?.key;
-        if (asked) return reply(true, `Opened ${asked} in the preview.`);
+        claim();
+        if (asked) return reply(true, `Opened ${asked} in the preview${which()}.`);
       }
+      claim();
       const seen = cmd.op === "frame" || cmd.op === "sign_in" || (cmd.op === "agent" && cmd.name === "computer");
       if (seen && root === latest.current.here) {
         const hidden = !latest.current.shown;
@@ -444,7 +465,9 @@ export function Workspace() {
         throw new Error("That preview belongs to a project that is not open in the window, so it cannot be seen.");
       }
       const out = await handle.run(cmd);
-      reply(true, cmd.op === "navigate" && typeof out === "string" ? out + which() : out);
+      // Named, so the agent can say `tab` from here on.
+      if (cmd.op === "frame" && out && typeof out === "object") return reply(true, { ...out, url: `${(out as { url: string }).url}${which()}` });
+      reply(true, typeof out === "string" ? out + which() : out);
     } catch (e) {
       reply(false, e instanceof Error ? e.message : String(e));
     }
@@ -573,6 +596,7 @@ export function Workspace() {
           acts: Act[];
           plan: { text: string; file: string | null } | null;
           approved: boolean;
+          steps: NonNullable<Plan["steps"]>;
           session: string | null;
         }>("pty_state", { id: pty })
           .then(({ claude: live, busy, status: said, turn, ended, acts, plan, approved, steps = [], session }) => {
@@ -583,6 +607,18 @@ export function Workspace() {
               if (shut) closedPlans.current[key] = { ...shut, state: "approved", approvedAt: Date.now() };
               setTabs((all) => all.map((x) => (x.of === key && x.plan ? { ...x, plan: { ...x.plan, state: "approved", approvedAt: Date.now() } } : x)));
             }
+            // Claude marking a step means the plan was accepted, however it was
+            // answered: "Yes, clear context" never reports it (claude.rs, CLEARED).
+            const marks = JSON.stringify(steps);
+            setTabs((all) =>
+              all.some((x) => x.of === key && x.plan && JSON.stringify(x.plan.steps ?? []) !== marks)
+                ? all.map((x) =>
+                    x.of === key && x.plan
+                      ? { ...x, plan: { ...x.plan, steps, ...(steps.length && x.plan.state !== "approved" ? { state: "approved" as const, approvedAt: Date.now() } : {}) } }
+                      : x,
+                  )
+                : all,
+            );
             if (ended) void offerAnswer(ended);
             // Mid-turn, deliberately: Claude shows a section while it is still
             // explaining it (lib/act.ts).
@@ -594,7 +630,6 @@ export function Workspace() {
                 ? (said ?? undefined)
                 : inFront({ ...x, live, busy })
                   ? rang.current[key]
-          steps: NonNullable<Plan["steps"]>;
                     ? "waiting"
                     : Date.now() - (printed.current[key] ?? 0) < 3000
                       ? "working"
@@ -603,18 +638,6 @@ export function Workspace() {
             setTabs((all) =>
               all.some((x) => x.key === key && (x.live !== live || x.busy !== busy || x.status !== statusOf(x) || x.session !== (session ?? undefined)))
                 ? all.map((x) => (x.key === key ? { ...x, live, busy, status: statusOf(x), session: session ?? undefined } : x))
-                : all,
-            );
-            // Claude marking a step means the plan was accepted, however it was
-            // answered: "Yes, clear context" never reports it (claude.rs, CLEARED).
-            const marks = JSON.stringify(steps);
-            setTabs((all) =>
-              all.some((x) => x.of === key && x.plan && JSON.stringify(x.plan.steps ?? []) !== marks)
-                ? all.map((x) =>
-                    x.of === key && x.plan
-                      ? { ...x, plan: { ...x.plan, steps, ...(steps.length && x.plan.state !== "approved" ? { state: "approved" as const, approvedAt: Date.now() } : {}) } }
-                      : x,
-                  )
                 : all,
             );
           })
@@ -746,9 +769,42 @@ export function Workspace() {
         toggle();
         return;
       }
+      // On a Mac Cmd+T and Cmd+W, as in Terminal.app: Ctrl+T and Ctrl+W are
+      // Claude Code's task list and a shell's delete-word there.
+      const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+      if (mac && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && (e.code === "KeyT" || e.code === "KeyW")) {
+        const into = e.target as globalThis.Node;
+        const tab = aside.current?.contains(into) ? current : mainPane.current?.contains(into) ? upFront : undefined;
+        // Cmd+T anywhere; Cmd+W only from inside the window, leaving the map's own tabs theirs.
+        if (e.code === "KeyW" && !tab) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (tab && e.code === "KeyW") close(tab.key);
+        else add(null);
+        return;
+      }
+      // The next or previous tab of the strip the key was pressed in: Ctrl+Tab
+      // as in a browser, Cmd+Shift+] and [ as in a Mac's tabbed apps. Outside
+      // the window and the main view's tabs, the map's own tabs take it (components/tabs.tsx).
+      const by =
+        e.code === "Tab" && e.ctrlKey && !e.metaKey && !e.altKey
+          ? e.shiftKey ? -1 : 1
+          : mac && e.metaKey && e.shiftKey && !e.ctrlKey && !e.altKey && (e.code === "BracketRight" || e.code === "BracketLeft")
+            ? e.code === "BracketRight" ? 1 : -1
+            : 0;
+      if (by) {
+        const into = e.target as globalThis.Node;
+        // With nothing focused, the main view, which is what is in view.
+        const where = aside.current?.contains(into) ? "window" : mainPane.current?.contains(into) || into === document.body ? "main" : null;
+        if (!where) return;
+        e.preventDefault();
+        e.stopPropagation();
+        step(where, by);
+        return;
+      }
       if (!e.ctrlKey || e.altKey || e.metaKey) return;
       // Ctrl+T: a new terminal tab.
-      if (e.code === "KeyT" && !e.shiftKey) {
+      if (e.code === "KeyT" && !e.shiftKey && !mac) {
         e.preventDefault();
         e.stopPropagation();
         add(null);
@@ -756,7 +812,7 @@ export function Workspace() {
       }
       // Ctrl+W closes the tab in view, as in a browser — only from inside the
       // window, so the map never loses a tab to a stray key.
-      if (e.code === "KeyW" && !e.shiftKey) {
+      if (e.code === "KeyW" && !e.shiftKey && !mac) {
         const into = e.target as globalThis.Node;
         const tab = aside.current?.contains(into) ? current : mainPane.current?.contains(into) ? upFront : undefined;
         if (!tab) return;
@@ -783,6 +839,51 @@ export function Workspace() {
       const key = add(agent);
       setToPaste((all) => ({ ...all, [key]: { text, send: !!question } }));
     };
+    /** One tab along in the window's strip or the main view's (the map's tabs, then the docked ones), wrapping. */
+    const step = (where: "window" | "main", by: number) => {
+      const maps = mapState?.tabs ?? [{ id: 0 }];
+      const list: (number | { map: number })[] = where === "window" ? panel.map((t) => t.key) : [...maps.map((m) => ({ map: m.id })), ...docked.map((t) => t.key)];
+      const now = where === "window" ? current?.key : (upFront?.key ?? maps.findIndex((m) => m.id === mapActive));
+      const at = where === "main" && !upFront ? (now as number) : list.indexOf(now as number);
+      const next = list[(at + by + list.length) % list.length];
+      if (typeof next === "number") bring(next);
+      else if (next) {
+        setFront((f) => ({ ...f, [here]: null }));
+        const p = selectTab(map.name, next.map);
+        if (p) showTab(p);
+      }
+    };
+    // On a Mac the menu bar takes these keys before the page sees them
+    // (src-tauri/src/lib.rs). With focus in the page, the key goes back to
+    // what has it, so the strip it is in steps, the map's own included; with
+    // focus in a Preview's page, that Preview's strip steps.
+    const fromStep = desktop
+      ? listen<number>("slop:tab-step", (e) => {
+          if (document.hasFocus()) {
+            const key = { code: "Tab", key: "Tab", ctrlKey: true, shiftKey: e.payload < 0, bubbles: true, cancelable: true };
+            (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", key));
+          } else step(open && panel.length && current?.kind === "preview" ? "window" : upFront?.kind === "preview" ? "main" : "window", e.payload);
+        })
+      : undefined;
+    // Ctrl+Enter from the menu bar, to the terminal with focus (components/shell.tsx).
+    const fromSend = desktop
+      ? listen("slop:send-now", () => {
+          const key = { code: "Enter", key: "Enter", ctrlKey: true, bubbles: true, cancelable: true };
+          (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", key));
+        })
+      : undefined;
+    // Cmd+W from the menu bar, the same way.
+    const fromClose = desktop
+      ? listen("slop:tab-close", () => {
+          if (document.hasFocus()) {
+            const key = { code: "KeyW", key: "w", metaKey: true, bubbles: true, cancelable: true };
+            (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", key));
+          } else {
+            const tab = open && panel.length && current?.kind === "preview" ? current : upFront?.kind === "preview" ? upFront : undefined;
+            if (tab) close(tab.key);
+          }
+        })
+      : undefined;
     window.addEventListener("keydown", onKey, true);
     window.addEventListener(TOGGLE, toggle);
     // The menu bar's Cmd+`/Ctrl+`, for when focus is in a Preview's page (src-tauri/src/lib.rs).
@@ -793,10 +894,13 @@ export function Workspace() {
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener(TOGGLE, toggle);
       void fromMenu?.then((f) => f());
+      void fromStep?.then((f) => f());
+      void fromClose?.then((f) => f());
+      void fromSend?.then((f) => f());
       off();
       offHand();
     };
-  }, [open, mine, panel, current, upFront, main, add, close, bring, show, desktop]);
+  }, [open, mine, panel, docked, current, upFront, main, add, close, bring, show, desktop, mapState, mapActive, here, map.name]);
 
   const drag = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -808,12 +912,16 @@ export function Workspace() {
     let last = start;
     const move = (m: PointerEvent) => {
       last = Math.max(MIN_WIDTH, Math.min(window.innerWidth - 2 * GAP, start + from - m.clientX));
-      setWidth(last);
+      // Straight to the page while dragging: a render of every tab per move made the edge trail the pointer.
+      if (aside.current) aside.current.style.width = `min(${last}px, calc(100vw - ${2 * GAP}px))`;
+      document.documentElement.style.setProperty("--workspace-inset", `calc(min(${last}px, 100vw - ${2 * GAP}px) + ${2 * GAP}px)`);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       delete document.body.dataset.dragging;
+      setWidth(last);
       try {
         localStorage.setItem(WIDTH_KEY, String(last));
       } catch {
@@ -822,13 +930,21 @@ export function Workspace() {
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   };
 
   const shown = open && panel.length > 0;
+  // Any change of shown, not only show(): closing the last tab slides the window away too.
+  const [wasShown, setWasShown] = useState(shown);
+  if (wasShown !== shown) {
+    setWasShown(shown);
+    setSettled(false);
+  }
   // What the window covers of the main view's right, gap included. The plan
   // keeps clear of it, and so does the map (components/canvas.tsx), which is
   // not drawn here and reads it as --workspace-inset.
-  const inset = shown ? `calc(min(${width}px, 100vw - ${2 * GAP}px) + ${2 * GAP}px)` : undefined;
+  // Kept until the window has slid away, so the map widens once, after, not under it.
+  const inset = shown || !settled ? `calc(min(${width}px, 100vw - ${2 * GAP}px) + ${2 * GAP}px)` : undefined;
   useEffect(() => {
     const root = document.documentElement.style;
     if (inset) root.setProperty("--workspace-inset", inset);
@@ -878,7 +994,8 @@ export function Workspace() {
   };
 
   const nameOf = (t: Tab) => {
-    const i = mine.indexOf(t);
+    // Numbered among the terminals alone, so a Preview or a plan before it never shifts it.
+    const i = mine.filter((x) => x.kind === "shell" && !x.dev).indexOf(t);
     const front = inFront(t);
     const previews = mine.filter((x) => x.kind === "preview");
     return t.kind === "preview"
@@ -886,7 +1003,7 @@ export function Workspace() {
         ? `Preview ${previews.indexOf(t) + 1}`
         : "Preview"
       : t.kind === "plan"
-        ? "Plan"
+        ? (t.plan?.text.match(/^#\s+(.+)$/m)?.[1].trim() ?? "Plan")
         : t.kind === "file"
         ? t.title
         : t.kind !== "shell"
@@ -991,7 +1108,7 @@ export function Workspace() {
       aria-hidden={!shown}
       initial={{ x: "110%" }}
       animate={{ x: shown ? 0 : "110%" }}
-      transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       onAnimationComplete={() => setSettled(true)}
       style={{
         top: (desktop ? TITLEBAR : 0) + GAP,
@@ -1026,7 +1143,7 @@ export function Workspace() {
           }}
           aria-label="New tab"
           aria-haspopup="menu"
-          title="New tab (Ctrl+T for a terminal, Ctrl+Shift+T for the default agent)"
+          title={`New tab (${keys(onMac, "T")} for a terminal, ${keys(onMac, "T", { shift: true })} for the default agent)`}
           className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[15px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           +
@@ -1036,7 +1153,7 @@ export function Workspace() {
           type="button"
           onClick={() => show(false)}
           aria-label="Hide workspace"
-          title="Hide (Ctrl+`) — everything keeps running. Ctrl+W closes a tab."
+          title={`Hide (${keys(onMac, "`")}) — everything keeps running. ${keys(onMac, "W")} closes a tab.`}
           className="flex w-7 shrink-0 cursor-pointer items-center justify-center border-b border-border-gray text-[12px] text-muted-slate hover:bg-surface-container-low hover:text-ink"
         >
           ✕
@@ -1212,14 +1329,20 @@ export function Workspace() {
     ) : null}
     {tabs.map((t) => {
           const inView = (x: Tab) => (x.main ? x.cwd === here && x.key === upFront?.key : shown && x.key === current?.key);
-          // A dev server is drawn in its project's first Preview, under that Preview's toolbar.
-          const host = t.dev ? tabs.find((x) => x.kind === "preview" && x.cwd === t.cwd) : t;
-          const visible = !!host && inView(host) && (!t.dev || !!serverShown[t.cwd]);
+          // A dev server is drawn under the toolbar of its project's Preview in
+          // view, so any of them can switch to it; else under the first.
+          const serverIn = (cwd: string) => {
+            const pages = tabs.filter((x) => x.kind === "preview" && x.cwd === cwd);
+            const seen = pages.filter(inView);
+            return seen.find((x) => serverShown[x.key]) ?? seen[0] ?? pages[0];
+          };
+          const host = t.dev ? serverIn(t.cwd) : t;
+          const visible = !!host && inView(host) && (!t.dev || !!serverShown[host.key]);
           const slot = host?.main ? mainSlot : panelSlot;
           if (t.kind === "preview") {
             const dev = tabs.find((x) => x.dev && x.cwd === t.cwd);
-            // Only the first Preview can switch to the dev server's terminal: that is where it is drawn.
-            const owns = !!dev && tabs.find((x) => x.kind === "preview" && x.cwd === t.cwd) === t;
+            // Only the Preview the dev server's terminal is drawn in can switch to it.
+            const owns = !!dev && serverIn(t.cwd) === t;
             return (
               <Held key={t.key} slot={slot}>
               <Preview
@@ -1233,9 +1356,8 @@ export function Workspace() {
                   if (dev?.pty !== undefined) void invoke("pty_write", { id: dev.pty, data: yes ? "y\r" : "n\r" });
                   setAsking((all) => ({ ...all, [t.cwd]: undefined }));
                 }}
-                onTarget={(url) => setServers((all) => ({ ...all, [t.cwd]: url }))}
-                serverShown={owns && serverShown[t.cwd]}
-                onServer={owns ? (on) => setServerShown((s) => ({ ...s, [t.cwd]: on })) : undefined}
+                serverShown={owns && serverShown[t.key]}
+                onServer={owns ? (on) => setServerShown((s) => ({ ...s, [t.key]: on })) : undefined}
                 docked={!!t.main}
               />
               </Held>
@@ -1282,6 +1404,7 @@ export function Workspace() {
           const shell = (
           <Shell
             startClaude={t.start === CLAUDE.id}
+            claude={!!t.live}
             resume={t.resume}
             run={t.run ?? (t.start && t.start !== CLAUDE.id ? agentById(t.start)?.command : undefined)}
             cwd={t.cwd || undefined}
@@ -1309,7 +1432,14 @@ export function Workspace() {
           );
           return (
           <Held key={t.key} slot={slot}>
-            {t.dev ? <div className={cn("absolute inset-x-0 top-9 bottom-0", !visible && "hidden")}>{shell}</div> : shell}
+            {t.dev ? (
+              // Clear of the window in the main view, as its Preview is (components/preview.tsx).
+              <div className={cn("absolute inset-x-0 top-9 bottom-0", !visible && "hidden")} style={host?.main ? { right: "var(--workspace-inset, 0px)" } : undefined}>
+                {shell}
+              </div>
+            ) : (
+              shell
+            )}
           </Held>
           );
         })}
@@ -1350,7 +1480,7 @@ function Offer({ phones, onPick, onDismiss }: { phones: Platform[]; onPick: (p: 
       aria-label="Run the phone app here"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       style={{ bottom: STATUSBAR + GAP }}
       className="fixed left-3 z-40 flex max-w-[340px] flex-col gap-2.5 border border-border-gray bg-card p-3.5 shadow-lift"
     >

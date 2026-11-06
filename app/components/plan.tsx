@@ -106,7 +106,8 @@ export function PlanView({
   inset?: string;
 }) {
   const doc = useMemo(() => parsePlan(plan.text), [plan.text]);
-  const choices = useChoices(read, plan.state !== "approved" && pty !== undefined);
+  // Not read while the tab is out of sight: it is the terminal's whole screen, every 400ms.
+  const choices = useChoices(read, visible && plan.state !== "approved" && pty !== undefined);
   const [words, setWords] = useState("");
   const top = useRef<HTMLDivElement>(null);
 
@@ -272,7 +273,6 @@ function plannedSections(text: string): { label: string; section: string; change
 }
 
 /**
-/**
  * A plan with no diagram tied to the map still names its files: each one the
  * map already explains lands on the section that explains it most closely.
  */
@@ -293,6 +293,7 @@ function filedSections(text: string, map: BuiltMap): { label: string; section: s
   });
 }
 
+/**
  * Where the plan lands on the map, each part a way to its level; and once
  * the plan is built, what the map's updates actually redid beside what the
  * plan said it would touch, so a plan that quietly grew, or missed a part,
@@ -397,7 +398,6 @@ function Body({ text, marks }: { text: string; marks?: StepMark[] }) {
   );
 }
 
-/** A fence drawn as the map draws its blocks; one that does not parse is shown as written. */
 /** Each numbered step with its mark, found by the number its own line starts with. */
 function marked(text: string, marks: StepMark[]): Components {
   const lines = text.split("\n");
@@ -416,6 +416,7 @@ function marked(text: string, marks: StepMark[]): Components {
   };
 }
 
+/** A fence drawn as the map draws its blocks; one that does not parse is shown as written. */
 function Figure({ lang, body }: { lang: string; body: string }) {
   if (lang === "files") {
     const lines = fileLines(body);
@@ -544,8 +545,11 @@ function Files({ lines }: { lines: FileLine[] }) {
             <span aria-label={WORD[f.verdict]} className="w-3 shrink-0 text-center font-mono text-[14px] font-bold" style={{ color: t.ink }}>
               {t.mark}
             </span>
-            <span className={cn("shrink-0 font-mono text-[12.5px] text-ink", f.verdict === "removed" && "line-through")}>{f.path}</span>
-            {f.why ? <span className="min-w-0 text-[13.5px] leading-snug text-on-surface-variant">{f.why}</span> : null}
+            {/* A long path keeps its end, the file's own name, and leaves the reason room. */}
+            <span title={f.path} className={cn("max-w-[55%] shrink-0 font-mono text-[12.5px] break-all text-ink", f.verdict === "removed" && "line-through")}>
+              {f.path.length > 60 ? `…${f.path.slice(-59)}` : f.path}
+            </span>
+            {f.why ? <span className="min-w-0 flex-1 text-[13.5px] leading-snug text-on-surface-variant">{f.why}</span> : null}
           </li>
         );
       })}

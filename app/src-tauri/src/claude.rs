@@ -316,6 +316,9 @@ trap 'rm -f "$SLOP_CONTEXT.live" "$SLOP_CONTEXT.session"' EXIT INT TERM HUP
 : > "$SLOP_CONTEXT.live"
 # A reopened tab's conversation, taken once: a `claude` typed later starts afresh.
 r=$(cat "$SLOP_CONTEXT.resume" 2>/dev/null); rm -f "$SLOP_CONTEXT.resume"
+# Claude Code keeps a conversation only once it has a message: one never
+# written to cannot be resumed, so that tab starts afresh rather than failing.
+[ -n "$r" ] && [ -z "$(find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects" -maxdepth 2 -name "$r.jsonl" 2>/dev/null | head -n 1)" ] && r=
 "$SLOP_CLAUDE_BIN" --settings "$SLOP_CLAUDE_SETTINGS" --append-system-prompt "$SLOP_CLAUDE_SYSTEM" ${SLOP_CLAUDE_MODEL:+--model "$SLOP_CLAUDE_MODEL"} ${SLOP_CLAUDE_MCP:+--mcp-config "$SLOP_CLAUDE_MCP"} ${r:+--resume "$r"} "$@"
 "#;
 
@@ -861,7 +864,9 @@ pub fn prepare(cmd: &mut CommandBuilder, launch: &Launch, queue: &Path, outline:
     // Other shells ignore it.
     #[cfg(unix)]
     {
-        if let Some(theirs) = std::env::var_os("ZDOTDIR") {
+        // A Bluprint started from one of Bluprint's own terminals inherits our
+        // ZDOTDIR: taken as theirs, our .zshenv would source itself forever.
+        if let Some(theirs) = std::env::var_os("ZDOTDIR").filter(|z| Path::new(z) != zdotdir()) {
             cmd.env("SLOP_ZDOTDIR", theirs);
         }
         cmd.env("ZDOTDIR", zdotdir());
@@ -1311,6 +1316,7 @@ mod tests {
             .env("SLOP_CLAUDE_BIN", bin)
             .env("SLOP_CLAUDE_SETTINGS", "{}")
             .env("SLOP_CLAUDE_SYSTEM", "")
+            .env("CLAUDE_CONFIG_DIR", queue.parent().unwrap())
             .status()
             .unwrap()
     }
@@ -1369,6 +1375,12 @@ mod tests {
 printf '[%s]' \"$@\" > '{}'\n", args.display())).unwrap();
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&probe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Only a conversation Claude Code kept: one never written to starts afresh.
+        resuming(&q, "abc-5").unwrap();
+        launch(&q, probe.to_str().unwrap());
+        assert!(!std::fs::read_to_string(&args).unwrap().contains("--resume"));
+        std::fs::create_dir_all(dir.path().join("projects/p")).unwrap();
+        std::fs::write(dir.path().join("projects/p/abc-4.jsonl"), "").unwrap();
         resuming(&q, "abc-4").unwrap();
         launch(&q, probe.to_str().unwrap());
         assert!(std::fs::read_to_string(&args).unwrap().ends_with("[--resume][abc-4]"));

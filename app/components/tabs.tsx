@@ -99,7 +99,7 @@ export function DropMarker({ drop }: { drop: Drop | null }) {
     <span
       aria-hidden
       style={{ left: drop.x }}
-      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 rounded-full bg-accent"
+      className="pointer-events-none absolute bottom-0.5 top-[5px] w-[2px] -translate-x-1/2 bg-accent"
     />
   ) : null;
 }
@@ -195,7 +195,8 @@ const useDemos = () => useSyncExternalStore(watchDemos, () => demos, () => null)
  * has open, named by that level's title, and `+` for another at the top. A
  * part opens in a new tab with a middle click, ⌘/Ctrl-click, or "Open in new
  * tab" on its right-click menu (components/canvas.tsx). Ctrl+Tab and
- * Ctrl+Shift+Tab step through them; Ctrl+W (⌘W on a Mac) closes the one in front.
+ * Ctrl+Shift+Tab (⌘⇧] and ⌘⇧[ on a Mac) step through them; Ctrl+W (⌘W on a
+ * Mac) closes the one in front.
  */
 export function SectionTabs({ path }: { path: string[] }) {
   const { name, nodeAt } = useMap();
@@ -233,9 +234,11 @@ export function SectionTabs({ path }: { path: string[] }) {
       const t = readTabs(name);
       if (!t) return;
       const at = t.tabs.findIndex((x) => x.id === t.active);
-      if (e.code === "Tab" && e.ctrlKey && !e.altKey && !e.metaKey) {
+      const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+      const bracket = mac && e.metaKey && e.shiftKey && !e.ctrlKey && !e.altKey && (e.code === "BracketRight" || e.code === "BracketLeft");
+      if ((e.code === "Tab" && e.ctrlKey && !e.altKey && !e.metaKey) || bracket) {
         e.preventDefault();
-        const step = e.shiftKey ? -1 : 1;
+        const step = bracket ? (e.code === "BracketRight" ? 1 : -1) : e.shiftKey ? -1 : 1;
         const next = t.tabs[(at + step + t.tabs.length) % t.tabs.length];
         if (next.id !== t.active) {
           const p = selectTab(name, next.id);
@@ -243,7 +246,7 @@ export function SectionTabs({ path }: { path: string[] }) {
         }
         return;
       }
-      const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? e.metaKey : e.ctrlKey;
+      const mod = mac ? e.metaKey : e.ctrlKey;
       if (e.code === "KeyW" && mod && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         const p = closeTab(name, t.active);

@@ -10,6 +10,7 @@ import { openPalette } from "@/components/palette";
 import { useMap } from "@/components/map-context";
 import { openFolder, openProjects } from "@/components/projects";
 import { Menu } from "@/components/menu";
+import { keys } from "@/components/button";
 import { openAudit } from "@/components/audit";
 import { openHistory } from "@/components/history";
 import { openDiff, useDiff } from "@/components/diff";
@@ -89,7 +90,10 @@ export function Titlebar({ bare }: { bare?: boolean }) {
         {bare ? null : <MapTools />}
         <span aria-hidden className="mx-1 h-4 w-px bg-border-strong" />
         {bare ? null : (
-          <Control label={STATIC_MAP ? "Claude (Ctrl+`)" : "Claude Code & terminal (Ctrl+`)"} onClick={toggleWorkspace}>
+          <Control
+            label={STATIC_MAP ? `Claude (${keys(mac, "`", { ctrl: true })})` : `Claude Code & terminal (${keys(mac, "`")})`}
+            onClick={toggleWorkspace}
+          >
             {/* A published page has no terminal, only Claude (components/claude-web.tsx). */}
             {STATIC_MAP ? (
               <path d={LOGOS.claude.d} transform="scale(0.6667)" fill={LOGOS.claude.color} stroke="none" />
@@ -165,7 +169,8 @@ function Where({ mac }: { mac: boolean }) {
     const pick = (n: string) => go(n === "last" ? last : ids.split("\n")[Number(n) - 1]);
     const onKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.metaKey || e.altKey) return;
-      const n = e.code === "Tab" && !e.shiftKey ? "last" : !e.shiftKey && /^Digit[1-9]$/.test(e.code) ? e.code.slice(5) : null;
+      // Ctrl+Tab is the tabs' own (components/workspace.tsx, components/tabs.tsx).
+      const n = !e.shiftKey && /^Digit[1-9]$/.test(e.code) ? e.code.slice(5) : null;
       if (!n) return;
       e.preventDefault();
       e.stopPropagation();
@@ -199,7 +204,7 @@ function Where({ mac }: { mac: boolean }) {
               key={m.id}
               role="tab"
               aria-selected={here}
-              title={`${m.label}${i < 9 ? ` (${mac ? "⌘" : "Ctrl+"}${i + 1})` : ""}`}
+              title={`${m.label}${i < 9 ? ` (${keys(mac, String(i + 1))})` : ""}`}
               className={cn(
                 "group flex h-6 min-w-0 max-w-48 items-center gap-1.5 pl-2 pr-1 font-mono text-[11.5px] transition-colors",
                 here ? "bg-surface-container font-semibold text-ink" : "text-muted-slate hover:bg-surface-container hover:text-ink",
@@ -221,6 +226,7 @@ function Where({ mac }: { mac: boolean }) {
           setMenu({ x: r.left, y: r.bottom + 4 });
         }}
         aria-haspopup="menu"
+        aria-label="Open another project"
         title="Open another project"
         className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-faint transition-colors hover:bg-surface-container hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
       >

@@ -21,6 +21,23 @@ pub fn run() {
         .manage(pty::Ptys::default())
         .manage(preview::Previews::default())
         .manage(server::Server::default())
+        // A reload of the app's page forgets what its tabs had running: the web
+        // pages its Previews opened (browser.rs), which would stay drawn over the
+        // new page and refuse its labels, and the terminals and Previews' proxies,
+        // which the new page opens afresh, resuming each Claude's conversation in
+        // a new one; left running, two Claudes would answer in one conversation.
+        .on_page_load(|webview, load| {
+            if webview.label() == "main" && matches!(load.event(), tauri::webview::PageLoadEvent::Started) {
+                let app = webview.app_handle();
+                for (label, view) in app.webviews() {
+                    if label.starts_with("browser-") {
+                        let _ = view.close();
+                    }
+                }
+                app.state::<pty::Ptys>().kill_all();
+                app.state::<preview::Previews>().close_all();
+            }
+        })
         .setup(|app| {
             // Claude's way into the preview, for every Claude tab (mcp.rs).
             mcp::start(app.handle().clone());
@@ -136,22 +153,66 @@ fn terminal_menu(app: &tauri::App) -> tauri::Result<()> {
     let menu = Menu::default(app.handle())?;
     let cmd = MenuItem::with_id(app, "terminal", "Toggle Terminal", true, Some("Cmd+`"))?;
     let ctrl = MenuItem::with_id(app, "terminal-ctrl", "Toggle Terminal", true, Some("Ctrl+`"))?;
-    menu.append(&Submenu::with_items(app, "Terminal", true, &[&cmd, &ctrl])?)?;
+    // Claude Code's send-now (components/shell.tsx): Control-Return is otherwise
+    // AppKit's key for the context menu, which opens and the terminal never sees it.
+    let send = MenuItem::with_id(app, "send-now", "Send Now", true, Some("Ctrl+Enter"))?;
+    menu.append(&Submenu::with_items(app, "Terminal", true, &[&cmd, &ctrl, &send])?)?;
     // The title bar's project tabs (components/titlebar.tsx), for when focus is in a Preview's page.
     let mut projects = Vec::new();
     for n in 1..=9 {
         projects.push(MenuItem::with_id(app, format!("project-{n}"), format!("Project {n}"), true, Some(&format!("Cmd+{n}")))?);
     }
-    projects.push(MenuItem::with_id(app, "project-last", "Last Project", true, Some("Ctrl+Tab"))?);
+    // No key: Ctrl+Tab steps through the tabs (the Window menu below), as in a browser.
+    projects.push(MenuItem::with_id(app, "project-last", "Last Project", true, None::<&str>)?);
     let items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = projects.iter().map(|m| m as _).collect();
     menu.append(&Submenu::with_items(app, "Projects", true, &items)?)?;
+    // A Preview's own keys, as a browser's (components/preview.tsx): its page is
+    // a webview of its own or a frame, and the keys pressed in it stay there.
+    let reload = MenuItem::with_id(app, "preview-reload", "Reload Page", true, Some("Cmd+R"))?;
+    let back = MenuItem::with_id(app, "preview-back", "Back", true, Some("Cmd+["))?;
+    let forward = MenuItem::with_id(app, "preview-forward", "Forward", true, Some("Cmd+]"))?;
+    let address = MenuItem::with_id(app, "preview-address", "Open Location", true, Some("Cmd+L"))?;
+    menu.append(&Submenu::with_items(app, "Preview", true, &[&reload, &back, &forward, &address])?)?;
+    // A menu key reaches the menu before the page, so the page is handed these
+    // and the tab strip with focus acts on them (components/workspace.tsx).
+    let next = MenuItem::with_id(app, "tab-next", "Next Tab", true, Some("Ctrl+Tab"))?;
+    let prev = MenuItem::with_id(app, "tab-prev", "Previous Tab", true, Some("Ctrl+Shift+Tab"))?;
+    let next_cmd = MenuItem::with_id(app, "tab-next-cmd", "Next Tab", true, Some("Cmd+Shift+]"))?;
+    let prev_cmd = MenuItem::with_id(app, "tab-prev-cmd", "Previous Tab", true, Some("Cmd+Shift+["))?;
+    let close = MenuItem::with_id(app, "tab-close", "Close Tab", true, Some("Cmd+W"))?;
+    menu.append(&Submenu::with_items(app, "Tabs", true, &[&next, &prev, &next_cmd, &prev_cmd, &close])?)?;
+    // Cmd+W closes a tab, never the window: the default Close Window took the
+    // key first and, Bluprint being one window, quit the app.
+    for item in menu.items()? {
+        if let Some(sub) = item.as_submenu() {
+            for inner in sub.items()? {
+                if let Some(p) = inner.as_predefined_menuitem().filter(|p| p.text().is_ok_and(|t| t == "Close Window")) {
+                    sub.remove(p)?;
+                }
+            }
+        }
+    }
     app.set_menu(menu)?;
     app.on_menu_event(|app, e| {
         let id = e.id().as_ref();
         if id == "terminal" || id == "terminal-ctrl" {
             let _ = app.emit_to("main", "slop:toggle-workspace", ());
+        } else if id == "send-now" {
+            let _ = app.emit_to("main", "slop:send-now", ());
+        } else if id == "tab-close" {
+            let _ = app.emit_to("main", "slop:tab-close", ());
+        } else if let Some(dir) = id.strip_prefix("tab-") {
+            let _ = app.emit_to("main", "slop:tab-step", if dir.starts_with("next") { 1 } else { -1 });
         } else if let Some(n) = id.strip_prefix("project-") {
             let _ = app.emit_to("main", "slop:project", n.to_string());
+        } else if let Some(key) = id.strip_prefix("preview-") {
+            // The address bar is the app's page: the keyboard is taken back from a page's webview.
+            if key == "address" {
+                if let Some(main) = app.get_webview("main") {
+                    let _ = main.set_focus();
+                }
+            }
+            let _ = app.emit_to("main", "slop:preview-key", key.to_string());
         }
     });
     Ok(())

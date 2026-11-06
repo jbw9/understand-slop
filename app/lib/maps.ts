@@ -77,7 +77,8 @@ export function loadMap(name: string | undefined): { name: string; version?: str
   const opened = (p: (typeof projects)[number]) => Date.parse(p.openedAt ?? p.addedAt);
   const project =
     (name ? projects.find((p) => p.id === name && openable(p)) : undefined) ??
-    projects.filter((p) => mapFileOf(p.id)).sort((a, b) => opened(b) - opened(a))[0];
+    // The last one opened, mapped or not: one not mapped yet still reopens where it was left.
+    projects.filter(openable).sort((a, b) => opened(b) - opened(a))[0];
   if (!project || !openable(project)) return null;
   markOpened(project.id);
   const version = mapVersion(project.id);

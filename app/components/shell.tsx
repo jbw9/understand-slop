@@ -7,6 +7,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMap } from "@/components/map-context";
+import { onFocusClaude } from "@/lib/context";
 import { screens } from "@/lib/dictate";
 import { outline } from "@/lib/map";
 import { readSettings } from "@/lib/settings";
@@ -502,6 +503,9 @@ export function Shell({
       // Pointing at the terminal is enough to type into it, no click needed.
       const focusOnHover = () => term.focus();
       host.addEventListener("mouseenter", focusOnHover);
+      const offFocus = onFocusClaude((pty) => {
+        if (pty === id && host.checkVisibility()) term.focus();
+      });
       const seen = new ResizeObserver(refit);
       seen.observe(el.current);
       show.current = () => {
@@ -525,6 +529,7 @@ export function Shell({
         window.removeEventListener("mousedown", keepFocus, true);
         void drops.then((off) => off());
         host.removeEventListener("mouseenter", focusOnHover);
+        offFocus();
         seen.disconnect();
         input.dispose();
         planLinks.dispose();

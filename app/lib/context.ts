@@ -89,6 +89,14 @@ export const onOpenClaude = (f: () => void) => {
   return () => window.removeEventListener(OPEN, f);
 };
 
+/** The keys to Claude's terminal (components/shell.tsx), when it is in view, so a pick is followed by typing the prompt. */
+const FOCUS = "slop:focus-claude";
+export const onFocusClaude = (f: (pty: number) => void) => {
+  const on = (e: Event) => f((e as CustomEvent<number>).detail);
+  window.addEventListener(FOCUS, on);
+  return () => window.removeEventListener(FOCUS, on);
+};
+
 /**
  * A tab has its pty, so it can hold picks. One starting in Claude takes the
  * picks that were waiting for it, and the next ones; a plain shell waits until
@@ -170,6 +178,7 @@ export function mention(t: Target) {
     return pick(named);
   }
   const pty = state.target;
+  window.dispatchEvent(new CustomEvent(FOCUS, { detail: pty }));
   adding.push(named);
   void add(pty, named)
     .finally(() => adding.splice(adding.indexOf(named), 1))

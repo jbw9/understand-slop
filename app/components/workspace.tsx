@@ -18,7 +18,7 @@ import { announceAnswer, announceDraft } from "@/components/keep";
 import { announceAct, type Act } from "@/lib/act";
 import { onHand, onOpenClaude, prompt, retarget, section, tabEnded, tabStarted, tabStatus } from "@/lib/context";
 import { useLocation } from "@/components/chrome";
-import { DROP_TARGET, DropMarker, BlueprintIcon, NewTab, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, tabTitle, useDropOn } from "@/components/tabs";
+import { DROP_TARGET, DropMarker, BlueprintIcon, NewTab, OPEN_BLANK, OPEN_PREVIEW, TAB_STRIP, TabClose, TabLabel, openInTab, show as showTab, tabLook, tabTitle, useDropOn } from "@/components/tabs";
 import { closeTab, selectTab, useTabs } from "@/lib/tabs";
 import { findAddress, findQuestion, findTaken, hostOf, previewOf, type Call } from "@/lib/preview";
 import { openSettings, readSettings } from "@/lib/settings";
@@ -80,8 +80,8 @@ const STATUSBAR = 24;
 
 interface Tab {
   key: number;
-  /** A terminal, the project running (its web app, or a phone), a plan, or a file a terminal named. */
-  kind: "shell" | "preview" | "plan" | "file" | Platform;
+  /** A terminal, the project running (its web app, or a phone), a plan, a file a terminal named, or nothing yet. */
+  kind: "shell" | "preview" | "plan" | "file" | "blank" | Platform;
   /** The agent it opened into, or null for a plain shell. */
   start: string | null;
   /** The agent last started in it, from the menu or the strip: what a busy shell is running. */
@@ -358,6 +358,11 @@ export function Workspace() {
     window.addEventListener(OPEN_PREVIEW, open);
     return () => window.removeEventListener(OPEN_PREVIEW, open);
   }, [add, here, startDev]);
+  useEffect(() => {
+    const open = () => add(null, { kind: "blank", title: "New tab", main: true });
+    window.addEventListener(OPEN_BLANK, open);
+    return () => window.removeEventListener(OPEN_BLANK, open);
+  }, [add]);
 
   /** This project's phone of a kind: brought to the front, or opened. */
   const phone = (platform: Platform) => {
@@ -1075,7 +1080,7 @@ export function Workspace() {
         : "Preview"
       : t.kind === "plan"
         ? (t.plan?.text.match(/^#\s+(.+)$/m)?.[1].trim() ?? "Plan")
-        : t.kind === "file"
+        : t.kind === "file" || t.kind === "blank"
         ? t.title
         : t.kind !== "shell"
         ? PLATFORM[t.kind].label
@@ -1091,7 +1096,7 @@ export function Workspace() {
       <PlanIcon />
     ) : t.kind === "file" ? (
       <FileIcon />
-    ) : t.kind !== "shell" ? (
+    ) : t.kind === "blank" ? null : t.kind !== "shell" ? (
       <PhoneIcon />
     ) : front ? (
       <AgentIcon id={front.id} />
@@ -1474,6 +1479,7 @@ export function Workspace() {
                 <FileTab path={t.file} line={t.line} visible={visible} inset={t.main ? inset : undefined} />
               </Held>
             );
+          if (t.kind === "blank") return null;
           if (t.kind !== "shell")
             return (
               <Held key={t.key} slot={slot}>

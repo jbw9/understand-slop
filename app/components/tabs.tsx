@@ -130,8 +130,10 @@ export function DragChip() {
 
 /** A Preview tab asked for from the main view's `+`; the workspace (components/workspace.tsx) opens it. */
 export const OPEN_PREVIEW = "slop:new-preview";
+/** An empty tab asked for from the main view's `+`; the workspace opens it too. */
+export const OPEN_BLANK = "slop:new-blank";
 
-/** The main view's `+`: another tab of the map, or a Preview. */
+/** The main view's `+`: another tab of the map, a Preview, or an empty tab. */
 export function NewTab({ onMap }: { onMap: () => void }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   return (
@@ -159,6 +161,7 @@ export function NewTab({ onMap }: { onMap: () => void }) {
           items={[
             { label: "Bluprint", onClick: onMap },
             { label: "Preview", onClick: () => window.dispatchEvent(new Event(OPEN_PREVIEW)) },
+            { label: "Empty tab", onClick: () => window.dispatchEvent(new Event(OPEN_BLANK)) },
           ]}
         />
       ) : null}
